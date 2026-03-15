@@ -1,3 +1,8 @@
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Módulo de exportación de reportes a Excel y PDF
+# =============================================================================
+
 import sqlite3
 import datetime
 import calendar
@@ -11,11 +16,25 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
 
 
-def obtener_datos_reporte(anio, mes):
+MESES = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+]
+
+
+# =============================================================================
+# DATOS DEL REPORTE
+# =============================================================================
+
+def _obtener_datos_reporte(anio: int, mes: int) -> list:
+    """
+    Calcula el cumplimiento mensual por objetivo.
+    Retorna lista de (nombre, días controlados, días sin control, porcentaje).
+    Solo considera los días que corresponden según la cobertura configurada.
+    """
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
-
-    cursor.execute('SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos')
+    cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
     objetivos = cursor.fetchall()
 
     resultados = []
@@ -24,7 +43,6 @@ def obtener_datos_reporte(anio, mes):
     for o in objetivos:
         obj_id, nombre, inicio, fin, dias_str = o
         dias_semana = [int(d) for d in dias_str.split(",")]
-
         dias_esperados = 0
         dias_controlados = 0
         dias_sin_control = 0
@@ -41,11 +59,9 @@ def obtener_datos_reporte(anio, mes):
                 continue
 
             dias_esperados += 1
-
-            cursor.execute('''
-                SELECT COUNT(*) FROM pasadas
-                WHERE fecha = ? AND objetivo_id = ?
-            ''', (fecha, obj_id))
+            cursor.execute("""
+                SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?
+            """, (fecha, obj_id))
 
             if cursor.fetchone()[0] > 0:
                 dias_controlados += 1
@@ -60,18 +76,22 @@ def obtener_datos_reporte(anio, mes):
     return resultados
 
 
-MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+# =============================================================================
+# EXPORTAR A EXCEL
+# =============================================================================
 
-
-def exportar_excel(anio, mes, ruta):
-    resultados = obtener_datos_reporte(anio, mes)
+def exportar_excel(anio: int, mes: int, ruta: str) -> None:
+    """
+    Genera un archivo Excel con el reporte mensual de cumplimiento.
+    Incluye logo, encabezado corporativo y colores por estado de cumplimiento.
+    """
+    resultados = _obtener_datos_reporte(anio, mes)
 
     wb = Workbook()
     ws = wb.active
     ws.title = f"Reporte {MESES[mes-1]} {anio}"
 
-    # Logo
+    # Logo corporativo
     try:
         img = XLImage("assets/vesp.png")
         img.width = 80
@@ -80,9 +100,9 @@ def exportar_excel(anio, mes, ruta):
     except Exception:
         pass
 
-    # Titulo
+    # Encabezado corporativo
     ws.merge_cells("B1:E2")
-    ws["B1"] = f"V.E.S.P Organizations - Seguridad Privada"
+    ws["B1"] = "V.E.S.P Organizations - Seguridad Privada"
     ws["B1"].font = Font(bold=True, size=14, color="2E7D32")
     ws["B1"].alignment = Alignment(horizontal="center", vertical="center")
 
@@ -96,7 +116,7 @@ def exportar_excel(anio, mes, ruta):
     ws["A4"].font = Font(size=9, color="888888")
     ws["A4"].alignment = Alignment(horizontal="center")
 
-    # Encabezados
+    # Encabezados de columnas
     encabezados = ["Objetivo", "Días controlados", "Días sin control", "Porcentaje", "Estado"]
     for col, enc in enumerate(encabezados, 1):
         celda = ws.cell(row=6, column=col, value=enc)
@@ -104,7 +124,7 @@ def exportar_excel(anio, mes, ruta):
         celda.fill = PatternFill(fill_type="solid", fgColor="1B5E20")
         celda.alignment = Alignment(horizontal="center")
 
-    # Datos
+    # Filas de datos con color según cumplimiento
     for fila, r in enumerate(resultados, 7):
         estado = "CUMPLE" if r[3] >= 80 else "NO CUMPLE"
         valores = [r[0], r[1], r[2], f"{r[3]:.1f}%", estado]
@@ -114,7 +134,7 @@ def exportar_excel(anio, mes, ruta):
             celda.fill = PatternFill(fill_type="solid", fgColor=color)
             celda.alignment = Alignment(horizontal="center")
 
-    # Ancho columnas
+    # Ancho de columnas
     ws.column_dimensions["A"].width = 30
     ws.column_dimensions["B"].width = 18
     ws.column_dimensions["C"].width = 18
@@ -124,31 +144,43 @@ def exportar_excel(anio, mes, ruta):
     ws.row_dimensions[2].height = 60
 
     wb.save(ruta)
-    print(f"Excel exportado en {ruta}")
 
 
-def exportar_pdf(anio, mes, ruta):
-    resultados = obtener_datos_reporte(anio, mes)
+# =============================================================================
+# EXPORTAR A PDF
+# =============================================================================
+
+def exportar_pdf(anio: int, mes: int, ruta: str) -> None:
+    """
+    Genera un archivo PDF con el reporte mensual de cumplimiento.
+    Incluye logo, encabezado corporativo, tabla de datos y resumen final.
+    """
+    resultados = _obtener_datos_reporte(anio, mes)
 
     doc = SimpleDocTemplate(
-        ruta,
-        pagesize=A4,
-        rightMargin=2*cm,
-        leftMargin=2*cm,
-        topMargin=2*cm,
-        bottomMargin=2*cm
+        ruta, pagesize=A4,
+        rightMargin=2*cm, leftMargin=2*cm,
+        topMargin=2*cm, bottomMargin=2*cm
     )
 
     estilos = getSampleStyleSheet()
     elementos = []
 
-    # Encabezado con logo
+    # Encabezado con logo y datos corporativos
     try:
         logo = RLImage("assets/vesp.png", width=2.5*cm, height=2.5*cm)
         datos_header = [[
             logo,
-            Paragraph("<b><font color='#2E7D32' size=14>V.E.S.P Organizations</font></b><br/><font size=10>Seguridad Privada</font>", estilos["Normal"]),
-            Paragraph(f"<font size=9 color='grey'>Generado el<br/>{datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}</font>", estilos["Normal"])
+            Paragraph(
+                "<b><font color='#2E7D32' size=14>V.E.S.P Organizations</font></b>"
+                "<br/><font size=10>Seguridad Privada</font>",
+                estilos["Normal"]
+            ),
+            Paragraph(
+                f"<font size=9 color='grey'>Generado el<br/>"
+                f"{datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}</font>",
+                estilos["Normal"]
+            )
         ]]
         tabla_header = Table(datos_header, colWidths=[3*cm, 10*cm, 4*cm])
         tabla_header.setStyle(TableStyle([
@@ -160,8 +192,6 @@ def exportar_pdf(anio, mes, ruta):
         elementos.append(Paragraph("<b>V.E.S.P Organizations</b>", estilos["Title"]))
 
     elementos.append(Spacer(1, 0.5*cm))
-
-    # Titulo reporte
     elementos.append(Paragraph(
         f"<b>Reporte mensual - {MESES[mes-1]} {anio}</b>",
         estilos["Title"]
@@ -185,17 +215,15 @@ def exportar_pdf(anio, mes, ruta):
         ("ROWHEIGHT", (0, 0), (-1, -1), 20),
     ]))
 
-    # Colorear filas según cumplimiento
+    # Color de filas según cumplimiento
     for i, r in enumerate(resultados, 1):
         color = colors.HexColor("#C8E6C9") if r[3] >= 80 else colors.HexColor("#FFCDD2")
-        tabla.setStyle(TableStyle([
-            ("BACKGROUND", (0, i), (-1, i), color),
-        ]))
+        tabla.setStyle(TableStyle([("BACKGROUND", (0, i), (-1, i), color)]))
 
     elementos.append(tabla)
     elementos.append(Spacer(1, 0.5*cm))
 
-    # Resumen
+    # Resumen final
     total = len(resultados)
     cumplen = sum(1 for r in resultados if r[3] >= 80)
     elementos.append(Paragraph(
@@ -204,4 +232,3 @@ def exportar_pdf(anio, mes, ruta):
     ))
 
     doc.build(elementos)
-    print(f"PDF exportado en {ruta}")

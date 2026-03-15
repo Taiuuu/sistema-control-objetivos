@@ -1,35 +1,51 @@
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Pantalla de notas y observaciones diarias
+# =============================================================================
+
+import sqlite3
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QDateEdit, QTextEdit, QListWidget, QMessageBox
 )
 from PyQt6.QtCore import QDate
-import sqlite3
 
 
-def cargar_notas(fecha):
+# =============================================================================
+# CONSULTAS A BASE DE DATOS
+# =============================================================================
+
+def _cargar_notas(fecha: str) -> list:
+    """Retorna todas las notas registradas para una fecha dada."""
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
-    cursor.execute('SELECT id, nota FROM notas WHERE fecha = ?', (fecha,))
+    cursor.execute("SELECT id, nota FROM notas WHERE fecha = ?", (fecha,))
     resultado = cursor.fetchall()
     conexion.close()
     return resultado
 
 
-def guardar_nota(fecha, nota):
+def _guardar_nota(fecha: str, nota: str) -> None:
+    """Registra una nueva nota para una fecha dada."""
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
-    cursor.execute('INSERT INTO notas (fecha, nota) VALUES (?, ?)', (fecha, nota))
+    cursor.execute("INSERT INTO notas (fecha, nota) VALUES (?, ?)", (fecha, nota))
     conexion.commit()
     conexion.close()
 
 
-def eliminar_nota(nota_id):
+def _eliminar_nota(nota_id: int) -> None:
+    """Elimina una nota por su ID."""
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
-    cursor.execute('DELETE FROM notas WHERE id = ?', (nota_id,))
+    cursor.execute("DELETE FROM notas WHERE id = ?", (nota_id,))
     conexion.commit()
     conexion.close()
 
+
+# =============================================================================
+# PANTALLA DE NOTAS DIARIAS
+# =============================================================================
 
 class NotasDiarias(QWidget):
 
@@ -46,40 +62,40 @@ class NotasDiarias(QWidget):
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.setCalendarPopup(True)
         boton_buscar = QPushButton("Buscar")
-        boton_buscar.clicked.connect(self.cargar_lista)
+        boton_buscar.clicked.connect(self._cargar_lista)
         fila.addWidget(QLabel("Fecha:"))
         fila.addWidget(self.selector_fecha)
         fila.addWidget(boton_buscar)
         fila.addStretch()
         layout.addLayout(fila)
 
-        # Lista de notas
+        # Lista de notas del día
         layout.addWidget(QLabel("Notas del día:"))
         self.lista_notas = QListWidget()
         layout.addWidget(self.lista_notas)
 
-        # Boton eliminar
         boton_eliminar = QPushButton("Eliminar nota seleccionada")
-        boton_eliminar.clicked.connect(self.eliminar_seleccionada)
+        boton_eliminar.clicked.connect(self._eliminar_seleccionada)
         layout.addWidget(boton_eliminar)
 
-        # Escribir nueva nota
+        # Campo para escribir nueva nota
         layout.addWidget(QLabel("Nueva nota:"))
         self.input_nota = QTextEdit()
         self.input_nota.setFixedHeight(80)
         layout.addWidget(self.input_nota)
 
         boton_guardar = QPushButton("Guardar nota")
-        boton_guardar.clicked.connect(self.guardar)
+        boton_guardar.clicked.connect(self._guardar)
         layout.addWidget(boton_guardar)
 
         self.setLayout(layout)
         self.notas_ids = []
-        self.cargar_lista()
+        self._cargar_lista()
 
-    def cargar_lista(self):
+    def _cargar_lista(self) -> None:
+        """Carga las notas de la fecha seleccionada en la lista."""
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
-        notas = cargar_notas(fecha)
+        notas = _cargar_notas(fecha)
 
         self.lista_notas.clear()
         self.notas_ids = []
@@ -88,7 +104,8 @@ class NotasDiarias(QWidget):
             self.lista_notas.addItem(n[1])
             self.notas_ids.append(n[0])
 
-    def guardar(self):
+    def _guardar(self) -> None:
+        """Valida y guarda una nueva nota para la fecha seleccionada."""
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
         nota = self.input_nota.toPlainText().strip()
 
@@ -96,11 +113,12 @@ class NotasDiarias(QWidget):
             QMessageBox.warning(self, "Error", "La nota no puede estar vacía.")
             return
 
-        guardar_nota(fecha, nota)
+        _guardar_nota(fecha, nota)
         self.input_nota.clear()
-        self.cargar_lista()
+        self._cargar_lista()
 
-    def eliminar_seleccionada(self):
+    def _eliminar_seleccionada(self) -> None:
+        """Elimina la nota seleccionada en la lista tras confirmación."""
         fila = self.lista_notas.currentRow()
         if fila < 0:
             QMessageBox.warning(self, "Error", "Seleccioná una nota para eliminar.")
@@ -112,5 +130,5 @@ class NotasDiarias(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if confirmar == QMessageBox.StandardButton.Yes:
-            eliminar_nota(self.notas_ids[fila])
-            self.cargar_lista()
+            _eliminar_nota(self.notas_ids[fila])
+            self._cargar_lista()

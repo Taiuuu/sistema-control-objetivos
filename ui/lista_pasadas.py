@@ -1,44 +1,196 @@
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Pantalla de listado, edición y eliminación de pasadas registradas
+# =============================================================================
+
+import sqlite3
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTableWidget, QTableWidgetItem, QPushButton,
-    QDateEdit, QMessageBox
+    QDateEdit, QTimeEdit, QComboBox, QMessageBox, QDialog
 )
-from PyQt6.QtCore import QDate
-import sqlite3
+from PyQt6.QtCore import QDate, QTime
 
 
-def cargar_pasadas(fecha):
+# =============================================================================
+# CONSULTAS A BASE DE DATOS
+# =============================================================================
+
+def _cargar_pasadas(fecha: str) -> list:
+    """
+    Retorna todas las pasadas registradas para una fecha dada,
+    incluyendo nombre del objetivo y del supervisor.
+    """
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
-
-    cursor.execute('''
-        SELECT p.id, p.hora, p.turno, o.nombre, s.nombre
+    cursor.execute("""
+        SELECT p.id, p.hora, p.turno, o.nombre, s.nombre, p.objetivo_id, p.supervisor_id
         FROM pasadas p
         JOIN objetivos o ON p.objetivo_id = o.id
         JOIN supervisores s ON p.supervisor_id = s.id
         WHERE p.fecha = ?
         ORDER BY p.hora
-    ''', (fecha,))
-
+    """, (fecha,))
     resultado = cursor.fetchall()
     conexion.close()
     return resultado
 
 
-def eliminar_pasada(pasada_id):
+def _eliminar_pasada(pasada_id: int) -> None:
+    """Elimina una pasada de la base de datos por su ID."""
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
-    cursor.execute('DELETE FROM pasadas WHERE id = ?', (pasada_id,))
+    cursor.execute("DELETE FROM pasadas WHERE id = ?", (pasada_id,))
     conexion.commit()
     conexion.close()
 
+
+def _obtener_info_pasada(pasada_id: int) -> tuple | None:
+    """Retorna los datos completos de una pasada para edición o log."""
+    conexion = sqlite3.connect('seguridad.db')
+    cursor = conexion.cursor()
+    cursor.execute("""
+        SELECT p.id, p.fecha, p.hora, p.turno, p.objetivo_id, p.supervisor_id,
+               o.nombre, s.nombre
+        FROM pasadas p
+        JOIN objetivos o ON p.objetivo_id = o.id
+        JOIN supervisores s ON p.supervisor_id = s.id
+        WHERE p.id = ?
+    """, (pasada_id,))
+    resultado = cursor.fetchone()
+    conexion.close()
+    return resultado
+
+
+def _actualizar_pasada(pasada_id: int, hora: str, turno: str, objetivo_id: int, supervisor_id: int) -> None:
+    """Actualiza los datos de una pasada existente."""
+    conexion = sqlite3.connect('seguridad.db')
+    cursor = conexion.cursor()
+    cursor.execute("""
+        UPDATE pasadas SET hora = ?, turno = ?, objetivo_id = ?, supervisor_id = ?
+        WHERE id = ?
+    """, (hora, turno, objetivo_id, supervisor_id, pasada_id))
+    conexion.commit()
+    conexion.close()
+
+
+def _cargar_objetivos() -> list:
+    """Retorna todos los objetivos registrados."""
+    conexion = sqlite3.connect('seguridad.db')
+    cursor = conexion.cursor()
+    cursor.execute("SELECT id, nombre FROM objetivos")
+    resultado = cursor.fetchall()
+    conexion.close()
+    return resultado
+
+
+def _cargar_supervisores() -> list:
+    """Retorna todos los supervisores registrados."""
+    conexion = sqlite3.connect('seguridad.db')
+    cursor = conexion.cursor()
+    cursor.execute("SELECT id, nombre FROM supervisores")
+    resultado = cursor.fetchall()
+    conexion.close()
+    return resultado
+
+
+# =============================================================================
+# DIÁLOGO DE EDICIÓN DE PASADA
+# =============================================================================
+
+class DialogoEditarPasada(QDialog):
+
+    def __init__(self, pasada_id: int, parent=None):
+        super().__init__(parent)
+        self.pasada_id = pasada_id
+        self.setWindowTitle("Editar pasada")
+        self.setFixedSize(350, 280)
+
+        info = _obtener_info_pasada(pasada_id)
+        if not info:
+            self.close()
+            return
+
+        _, fecha, hora, turno, objetivo_id, supervisor_id, _, _ = info
+
+        layout = QVBoxLayout()
+
+        # Hora
+        layout.addWidget(QLabel("Hora:"))
+        self.input_hora = QTimeEdit()
+        self.input_hora.setTime(QTime.fromString(hora, "HH:mm"))
+        layout.addWidget(self.input_hora)
+
+        # Turno
+        layout.addWidget(QLabel("Turno:"))
+        self.input_turno = QComboBox()
+        self.input_turno.addItems(["dia", "noche"])
+        self.input_turno.setCurrentText(turno)
+        layout.addWidget(self.input_turno)
+
+        # Objetivo
+        layout.addWidget(QLabel("Objetivo:"))
+        self.input_objetivo = QComboBox()
+        for o in _cargar_objetivos():
+            self.input_objetivo.addItem(o[1], o[0])
+            if o[0] == objetivo_id:
+                self.input_objetivo.setCurrentIndex(self.input_objetivo.count() - 1)
+        layout.addWidget(self.input_objetivo)
+
+        # Supervisor
+        layout.addWidget(QLabel("Supervisor:"))
+        self.input_supervisor = QComboBox()
+        for s in _cargar_supervisores():
+            self.input_supervisor.addItem(s[1], s[0])
+            if s[0] == supervisor_id:
+                self.input_supervisor.setCurrentIndex(self.input_supervisor.count() - 1)
+        layout.addWidget(self.input_supervisor)
+
+        # Botones
+        fila_botones = QHBoxLayout()
+        boton_guardar = QPushButton("Guardar cambios")
+        boton_guardar.clicked.connect(self._guardar)
+        boton_cancelar = QPushButton("Cancelar")
+        boton_cancelar.clicked.connect(self.reject)
+        fila_botones.addWidget(boton_guardar)
+        fila_botones.addWidget(boton_cancelar)
+        layout.addLayout(fila_botones)
+
+        self.setLayout(layout)
+
+    def _guardar(self) -> None:
+        """Guarda los cambios de la pasada y registra la acción en los logs."""
+        hora = self.input_hora.time().toString("HH:mm")
+        turno = self.input_turno.currentText()
+        objetivo_id = self.input_objetivo.currentData()
+        supervisor_id = self.input_supervisor.currentData()
+        objetivo_nombre = self.input_objetivo.currentText()
+        supervisor_nombre = self.input_supervisor.currentText()
+
+        _actualizar_pasada(self.pasada_id, hora, turno, objetivo_id, supervisor_id)
+
+        from services.logger import registrar_accion
+        from services.sesion import get_usuario_id
+        registrar_accion(
+            get_usuario_id(),
+            f"Editó pasada id={self.pasada_id} - Hora: {hora} | Turno: {turno} | "
+            f"Objetivo: {objetivo_nombre} | Supervisor: {supervisor_nombre}"
+        )
+
+        QMessageBox.information(self, "Listo", "Pasada actualizada correctamente.")
+        self.accept()
+
+
+# =============================================================================
+# PANTALLA DE LISTADO DE PASADAS
+# =============================================================================
 
 class ListaPasadas(QWidget):
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Pasadas del día")
-        self.setGeometry(200, 200, 700, 400)
+        self.setGeometry(200, 200, 800, 400)
 
         layout = QVBoxLayout()
 
@@ -48,48 +200,57 @@ class ListaPasadas(QWidget):
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.setCalendarPopup(True)
         boton_buscar = QPushButton("Buscar")
-        boton_buscar.clicked.connect(self.cargar_tabla)
+        boton_buscar.clicked.connect(self._cargar_tabla)
         fila.addWidget(QLabel("Fecha:"))
         fila.addWidget(self.selector_fecha)
         fila.addWidget(boton_buscar)
         fila.addStretch()
         layout.addLayout(fila)
 
-        # Tabla
         self.tabla = QTableWidget()
-        self.tabla.setColumnCount(5)
+        self.tabla.setColumnCount(6)
         self.tabla.setHorizontalHeaderLabels([
-            "Hora", "Turno", "Objetivo", "Supervisor", "Acción"
+            "Hora", "Turno", "Objetivo", "Supervisor", "Editar", "Eliminar"
         ])
         self.tabla.setColumnWidth(0, 80)
         self.tabla.setColumnWidth(1, 80)
         self.tabla.setColumnWidth(2, 200)
         self.tabla.setColumnWidth(3, 150)
-        self.tabla.setColumnWidth(4, 120)
+        self.tabla.setColumnWidth(4, 100)
+        self.tabla.setColumnWidth(5, 100)
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
-        self.cargar_tabla()
+        self._cargar_tabla()
 
-    def cargar_tabla(self):
+    def _cargar_tabla(self) -> None:
+        """Carga las pasadas de la fecha seleccionada en la tabla."""
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
-        pasadas = cargar_pasadas(fecha)
+        pasadas = _cargar_pasadas(fecha)
 
         self.tabla.setRowCount(len(pasadas))
-        self.ids = []
-
         for i, p in enumerate(pasadas):
-            self.ids.append(p[0])
             self.tabla.setItem(i, 0, QTableWidgetItem(p[1]))
             self.tabla.setItem(i, 1, QTableWidgetItem(p[2]))
             self.tabla.setItem(i, 2, QTableWidgetItem(p[3]))
             self.tabla.setItem(i, 3, QTableWidgetItem(p[4]))
 
-            boton = QPushButton("Eliminar")
-            boton.clicked.connect(lambda checked, pid=p[0]: self.eliminar(pid))
-            self.tabla.setCellWidget(i, 4, boton)
+            boton_editar = QPushButton("Editar")
+            boton_editar.clicked.connect(lambda checked, pid=p[0]: self._editar(pid))
+            self.tabla.setCellWidget(i, 4, boton_editar)
 
-    def eliminar(self, pasada_id):
+            boton_eliminar = QPushButton("Eliminar")
+            boton_eliminar.clicked.connect(lambda checked, pid=p[0]: self._eliminar(pid))
+            self.tabla.setCellWidget(i, 5, boton_eliminar)
+
+    def _editar(self, pasada_id: int) -> None:
+        """Abre el diálogo de edición para la pasada seleccionada."""
+        dialogo = DialogoEditarPasada(pasada_id, self)
+        if dialogo.exec():
+            self._cargar_tabla()
+
+    def _eliminar(self, pasada_id: int) -> None:
+        """Elimina una pasada tras confirmación y registra la acción en los logs."""
         confirmar = QMessageBox.question(
             self, "Confirmar",
             "¿Seguro que querés eliminar esta pasada?",
@@ -99,22 +260,14 @@ class ListaPasadas(QWidget):
             from services.logger import registrar_accion
             from services.sesion import get_usuario_id
 
-            # Obtener info de la pasada antes de borrarla
-            conexion = sqlite3.connect('seguridad.db')
-            cursor = conexion.cursor()
-            cursor.execute('''
-                SELECT p.fecha, p.hora, p.turno, o.nombre, s.nombre
-                FROM pasadas p
-                JOIN objetivos o ON p.objetivo_id = o.id
-                JOIN supervisores s ON p.supervisor_id = s.id
-                WHERE p.id = ?
-            ''', (pasada_id,))
-            info = cursor.fetchone()
-            conexion.close()
-
-            eliminar_pasada(pasada_id)
+            info = _obtener_info_pasada(pasada_id)
+            _eliminar_pasada(pasada_id)
 
             if info:
-                registrar_accion(get_usuario_id(), f"Eliminó pasada - Fecha: {info[0]} | Hora: {info[1]} | Turno: {info[2]} | Objetivo: {info[3]} | Supervisor: {info[4]}")
+                registrar_accion(
+                    get_usuario_id(),
+                    f"Eliminó pasada - Fecha: {info[1]} | Hora: {info[2]} | "
+                    f"Turno: {info[3]} | Objetivo: {info[6]} | Supervisor: {info[7]}"
+                )
 
-            self.cargar_tabla()
+            self._cargar_tabla()

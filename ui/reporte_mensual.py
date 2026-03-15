@@ -1,19 +1,32 @@
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Pantalla de reporte mensual de cumplimiento por objetivo
+# =============================================================================
+
+import sqlite3
+import datetime
+import calendar
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QTableWidget, QTableWidgetItem, QComboBox, QFileDialog
 )
 from PyQt6.QtGui import QColor
 from services.exportar import exportar_excel, exportar_pdf
-import sqlite3
-import datetime
-import calendar
 
 
-def calcular_reporte(anio, mes):
+# =============================================================================
+# CÁLCULO DEL REPORTE
+# =============================================================================
+
+def calcular_reporte(anio: int, mes: int) -> list:
+    """
+    Calcula el cumplimiento mensual por objetivo.
+    Para cada objetivo retorna: (nombre, días controlados, días sin control, porcentaje).
+    Solo considera los días que corresponden según la cobertura configurada.
+    """
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
-
-    cursor.execute('SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos')
+    cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
     objetivos = cursor.fetchall()
 
     resultados = []
@@ -22,7 +35,6 @@ def calcular_reporte(anio, mes):
     for o in objetivos:
         obj_id, nombre, inicio, fin, dias_str = o
         dias_semana = [int(d) for d in dias_str.split(",")]
-
         dias_esperados = 0
         dias_controlados = 0
         dias_sin_control = 0
@@ -39,11 +51,9 @@ def calcular_reporte(anio, mes):
                 continue
 
             dias_esperados += 1
-
-            cursor.execute('''
-                SELECT COUNT(*) FROM pasadas
-                WHERE fecha = ? AND objetivo_id = ?
-            ''', (fecha, obj_id))
+            cursor.execute("""
+                SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?
+            """, (fecha, obj_id))
 
             if cursor.fetchone()[0] > 0:
                 dias_controlados += 1
@@ -58,6 +68,10 @@ def calcular_reporte(anio, mes):
     return resultados
 
 
+# =============================================================================
+# PANTALLA DE REPORTE MENSUAL
+# =============================================================================
+
 class ReporteMensual(QWidget):
 
     def __init__(self):
@@ -67,11 +81,14 @@ class ReporteMensual(QWidget):
 
         layout = QVBoxLayout()
 
+        # Selectores de mes y año
         fila = QHBoxLayout()
 
         self.selector_mes = QComboBox()
-        meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                 "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+        meses = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ]
         for m in meses:
             self.selector_mes.addItem(m)
         self.selector_mes.setCurrentIndex(datetime.datetime.now().month - 1)
@@ -83,13 +100,13 @@ class ReporteMensual(QWidget):
         self.selector_anio.setCurrentText(str(anio_actual))
 
         boton_generar = QPushButton("Generar reporte")
-        boton_generar.clicked.connect(self.generar)
+        boton_generar.clicked.connect(self._generar)
 
         boton_excel = QPushButton("Exportar Excel")
-        boton_excel.clicked.connect(self.exportar_excel)
+        boton_excel.clicked.connect(self._exportar_excel)
 
         boton_pdf = QPushButton("Exportar PDF")
-        boton_pdf.clicked.connect(self.exportar_pdf)
+        boton_pdf.clicked.connect(self._exportar_pdf)
 
         fila.addWidget(QLabel("Mes:"))
         fila.addWidget(self.selector_mes)
@@ -98,9 +115,9 @@ class ReporteMensual(QWidget):
         fila.addWidget(boton_generar)
         fila.addWidget(boton_excel)
         fila.addWidget(boton_pdf)
-
         layout.addLayout(fila)
 
+        # Tabla de resultados
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(4)
         self.tabla.setHorizontalHeaderLabels([
@@ -114,13 +131,13 @@ class ReporteMensual(QWidget):
 
         self.setLayout(layout)
 
-    def generar(self):
+    def _generar(self) -> None:
+        """Calcula y muestra el reporte en la tabla. Verde >= 80%, rojo < 80%."""
         mes = self.selector_mes.currentIndex() + 1
         anio = int(self.selector_anio.currentText())
-
         resultados = calcular_reporte(anio, mes)
-        self.tabla.setRowCount(len(resultados))
 
+        self.tabla.setRowCount(len(resultados))
         for i, r in enumerate(resultados):
             self.tabla.setItem(i, 0, QTableWidgetItem(r[0]))
             self.tabla.setItem(i, 1, QTableWidgetItem(str(r[1])))
@@ -132,20 +149,26 @@ class ReporteMensual(QWidget):
                 self.tabla.item(i, col).setBackground(color)
                 self.tabla.item(i, col).setForeground(QColor("#000000"))
 
-    def exportar_excel(self):
+    def _exportar_excel(self) -> None:
+        """Abre un diálogo para guardar el reporte como archivo Excel."""
         mes = self.selector_mes.currentIndex() + 1
         anio = int(self.selector_anio.currentText())
         ruta, _ = QFileDialog.getSaveFileName(
-            self, "Guardar Excel", f"reporte_{anio}_{mes:02d}.xlsx", "Excel (*.xlsx)"
+            self, "Guardar Excel",
+            f"reporte_{anio}_{mes:02d}.xlsx",
+            "Excel (*.xlsx)"
         )
         if ruta:
             exportar_excel(anio, mes, ruta)
 
-    def exportar_pdf(self):
+    def _exportar_pdf(self) -> None:
+        """Abre un diálogo para guardar el reporte como archivo PDF."""
         mes = self.selector_mes.currentIndex() + 1
         anio = int(self.selector_anio.currentText())
         ruta, _ = QFileDialog.getSaveFileName(
-            self, "Guardar PDF", f"reporte_{anio}_{mes:02d}.pdf", "PDF (*.pdf)"
+            self, "Guardar PDF",
+            f"reporte_{anio}_{mes:02d}.pdf",
+            "PDF (*.pdf)"
         )
         if ruta:
             exportar_pdf(anio, mes, ruta)

@@ -1,9 +1,18 @@
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Formulario para agregar supervisores
+# =============================================================================
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel,
     QLineEdit, QPushButton, QMessageBox
 )
 from models.supervisores import agregar_supervisor
 
+
+# =============================================================================
+# FORMULARIO DE SUPERVISOR
+# =============================================================================
 
 class FormSupervisor(QWidget):
 
@@ -19,12 +28,13 @@ class FormSupervisor(QWidget):
         layout.addWidget(self.input_nombre)
 
         boton_guardar = QPushButton("Guardar supervisor")
-        boton_guardar.clicked.connect(self.guardar)
+        boton_guardar.clicked.connect(self._guardar)
         layout.addWidget(boton_guardar)
 
         self.setLayout(layout)
 
-    def guardar(self):
+    def _guardar(self) -> None:
+        """Valida y registra el nuevo supervisor en la base de datos."""
         nombre = self.input_nombre.text().strip()
 
         if not nombre:
