@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QLabel,
     QPushButton, QDateEdit, QComboBox, QMessageBox,
-    QFrame, QSizePolicy
+    QFrame, QLineEdit
 )
 from PyQt6.QtCore import QDate, QTimer, QEvent, Qt
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
@@ -209,6 +209,7 @@ class VentanaPrincipal(QWidget):
         layout_derecho.setContentsMargins(12, 12, 12, 12)
         layout_derecho.setSpacing(8)
 
+        # Fila superior con fecha y filtros
         fila_superior = QHBoxLayout()
 
         self.selector_fecha = QDateEdit()
@@ -232,6 +233,11 @@ class VentanaPrincipal(QWidget):
         boton_filtrar = QPushButton("Filtrar")
         boton_filtrar.clicked.connect(self.cargar_tabla)
 
+        self.buscador = QLineEdit()
+        self.buscador.setPlaceholderText("Buscar objetivo...")
+        self.buscador.setFixedWidth(180)
+        self.buscador.textChanged.connect(self.cargar_tabla)
+
         fila_superior.addWidget(QLabel("Fecha:"))
         fila_superior.addWidget(self.selector_fecha)
         fila_superior.addWidget(boton_buscar)
@@ -243,10 +249,14 @@ class VentanaPrincipal(QWidget):
         fila_superior.addWidget(QLabel("Estado:"))
         fila_superior.addWidget(self.filtro_estado)
         fila_superior.addWidget(boton_filtrar)
+        fila_superior.addSpacing(20)
+        fila_superior.addWidget(QLabel("Buscar:"))
+        fila_superior.addWidget(self.buscador)
         fila_superior.addStretch()
 
         layout_derecho.addLayout(fila_superior)
 
+        # Tabla
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(6)
         self.tabla.setHorizontalHeaderLabels([
@@ -324,6 +334,7 @@ class VentanaPrincipal(QWidget):
         turno = None if turno == "Todos los turnos" else turno
         supervisor_id = self.filtro_supervisor.currentData()
         filtro_estado = self.filtro_estado.currentText()
+        texto_busqueda = self.buscador.text().strip().lower()
 
         self.objetivos_actuales = obtener_objetivos_del_dia(fecha)
         equipo_dia = obtener_equipo(fecha, "dia")
@@ -331,6 +342,9 @@ class VentanaPrincipal(QWidget):
 
         filas = []
         for o in self.objetivos_actuales:
+            if texto_busqueda and texto_busqueda not in o[1].lower():
+                continue
+
             pasadas = contar_pasadas(fecha, o[0], turno, supervisor_id)
             estado_detallado, color_hex = obtener_estado_detallado(fecha, o[0])
 
