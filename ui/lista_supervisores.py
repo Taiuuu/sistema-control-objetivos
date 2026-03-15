@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget,
     QTableWidgetItem, QPushButton, QMessageBox
 )
-
+from database.db import DB_PATH
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 
 def _cargar_supervisores() -> list:
     """Retorna todos los supervisores registrados."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, nombre FROM supervisores")
     resultado = cursor.fetchall()
@@ -26,7 +26,7 @@ def _cargar_supervisores() -> list:
 
 def _eliminar_supervisor(supervisor_id: int) -> None:
     """Elimina un supervisor de la base de datos por su ID."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("DELETE FROM supervisores WHERE id = ?", (supervisor_id,))
     conexion.commit()

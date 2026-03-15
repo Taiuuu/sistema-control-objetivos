@@ -6,10 +6,11 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QDate
 from PyQt6.QtGui import QColor
 from services.reportes import obtener_objetivos_del_dia
+from database.db import DB_PATH
 import sqlite3
 
 def contar_pasadas(fecha, objetivo_id):
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute('''
         SELECT COUNT(*) FROM pasadas

@@ -7,7 +7,7 @@
 import sqlite3
 import os
 import bcrypt
-
+from database.db import DB_PATH
 
 def reset_fabrica():
     confirmar = input("¿Seguro que querés borrar TODOS los datos? Escribí CONFIRMAR para continuar: ")
@@ -15,7 +15,7 @@ def reset_fabrica():
         print("Reset cancelado.")
         return
 
-    conn = sqlite3.connect('seguridad.db')
+    conn = sqlite3.connect(DB_PATH)
 
     # Borrar todos los datos de todas las tablas
     conn.execute("DELETE FROM pasadas")

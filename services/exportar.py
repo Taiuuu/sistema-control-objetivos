@@ -14,6 +14,7 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
+from database.db import DB_PATH
 
 
 MESES = [
@@ -30,9 +31,8 @@ def _obtener_datos_reporte(anio: int, mes: int) -> list:
     """
     Calcula el cumplimiento mensual por objetivo.
     Retorna lista de (nombre, días controlados, días sin control, porcentaje).
-    Solo considera los días que corresponden según la cobertura configurada.
     """
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
     objetivos = cursor.fetchall()
@@ -91,7 +91,6 @@ def exportar_excel(anio: int, mes: int, ruta: str) -> None:
     ws = wb.active
     ws.title = f"Reporte {MESES[mes-1]} {anio}"
 
-    # Logo corporativo
     try:
         img = XLImage("assets/vesp.png")
         img.width = 80
@@ -100,7 +99,6 @@ def exportar_excel(anio: int, mes: int, ruta: str) -> None:
     except Exception:
         pass
 
-    # Encabezado corporativo
     ws.merge_cells("B1:E2")
     ws["B1"] = "V.E.S.P Organizations - Seguridad Privada"
     ws["B1"].font = Font(bold=True, size=14, color="2E7D32")
@@ -116,7 +114,6 @@ def exportar_excel(anio: int, mes: int, ruta: str) -> None:
     ws["A4"].font = Font(size=9, color="888888")
     ws["A4"].alignment = Alignment(horizontal="center")
 
-    # Encabezados de columnas
     encabezados = ["Objetivo", "Días controlados", "Días sin control", "Porcentaje", "Estado"]
     for col, enc in enumerate(encabezados, 1):
         celda = ws.cell(row=6, column=col, value=enc)
@@ -124,7 +121,6 @@ def exportar_excel(anio: int, mes: int, ruta: str) -> None:
         celda.fill = PatternFill(fill_type="solid", fgColor="1B5E20")
         celda.alignment = Alignment(horizontal="center")
 
-    # Filas de datos con color según cumplimiento
     for fila, r in enumerate(resultados, 7):
         estado = "CUMPLE" if r[3] >= 80 else "NO CUMPLE"
         valores = [r[0], r[1], r[2], f"{r[3]:.1f}%", estado]
@@ -134,7 +130,6 @@ def exportar_excel(anio: int, mes: int, ruta: str) -> None:
             celda.fill = PatternFill(fill_type="solid", fgColor=color)
             celda.alignment = Alignment(horizontal="center")
 
-    # Ancho de columnas
     ws.column_dimensions["A"].width = 30
     ws.column_dimensions["B"].width = 18
     ws.column_dimensions["C"].width = 18
@@ -166,7 +161,6 @@ def exportar_pdf(anio: int, mes: int, ruta: str) -> None:
     estilos = getSampleStyleSheet()
     elementos = []
 
-    # Encabezado con logo y datos corporativos
     try:
         logo = RLImage("assets/vesp.png", width=2.5*cm, height=2.5*cm)
         datos_header = [[
@@ -198,7 +192,6 @@ def exportar_pdf(anio: int, mes: int, ruta: str) -> None:
     ))
     elementos.append(Spacer(1, 0.5*cm))
 
-    # Tabla de datos
     datos = [["Objetivo", "Días controlados", "Días sin control", "Porcentaje", "Estado"]]
     for r in resultados:
         estado = "CUMPLE" if r[3] >= 80 else "NO CUMPLE"
@@ -215,7 +208,6 @@ def exportar_pdf(anio: int, mes: int, ruta: str) -> None:
         ("ROWHEIGHT", (0, 0), (-1, -1), 20),
     ]))
 
-    # Color de filas según cumplimiento
     for i, r in enumerate(resultados, 1):
         color = colors.HexColor("#C8E6C9") if r[3] >= 80 else colors.HexColor("#FFCDD2")
         tabla.setStyle(TableStyle([("BACKGROUND", (0, i), (-1, i), color)]))
@@ -223,7 +215,6 @@ def exportar_pdf(anio: int, mes: int, ruta: str) -> None:
     elementos.append(tabla)
     elementos.append(Spacer(1, 0.5*cm))
 
-    # Resumen final
     total = len(resultados)
     cumplen = sum(1 for r in resultados if r[3] >= 80)
     elementos.append(Paragraph(

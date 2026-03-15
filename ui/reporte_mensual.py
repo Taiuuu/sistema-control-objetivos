@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QColor
 from services.exportar import exportar_excel, exportar_pdf
-
+from database.db import DB_PATH
 
 # =============================================================================
 # CÁLCULO DEL REPORTE
@@ -24,7 +24,7 @@ def calcular_reporte(anio: int, mes: int) -> list:
     Para cada objetivo retorna: (nombre, días controlados, días sin control, porcentaje).
     Solo considera los días que corresponden según la cobertura configurada.
     """
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
     objetivos = cursor.fetchall()

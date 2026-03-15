@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QDateEdit, QTextEdit, QListWidget, QMessageBox
 )
 from PyQt6.QtCore import QDate
-
+from database.db import DB_PATH
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
@@ -17,7 +17,7 @@ from PyQt6.QtCore import QDate
 
 def _cargar_notas(fecha: str) -> list:
     """Retorna todas las notas registradas para una fecha dada."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, nota FROM notas WHERE fecha = ?", (fecha,))
     resultado = cursor.fetchall()
@@ -27,7 +27,7 @@ def _cargar_notas(fecha: str) -> list:
 
 def _guardar_nota(fecha: str, nota: str) -> None:
     """Registra una nueva nota para una fecha dada."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("INSERT INTO notas (fecha, nota) VALUES (?, ?)", (fecha, nota))
     conexion.commit()
@@ -36,7 +36,7 @@ def _guardar_nota(fecha: str, nota: str) -> None:
 
 def _eliminar_nota(nota_id: int) -> None:
     """Elimina una nota por su ID."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("DELETE FROM notas WHERE id = ?", (nota_id,))
     conexion.commit()

@@ -5,12 +5,12 @@
 
 import sqlite3
 import bcrypt
+from database.db import DB_PATH
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QTableWidget,
     QTableWidgetItem, QComboBox, QMessageBox
 )
-
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 
 def cargar_usuarios() -> list:
     """Retorna todos los usuarios registrados en el sistema."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, username, rol FROM usuarios")
     resultado = cursor.fetchall()
@@ -28,7 +28,7 @@ def cargar_usuarios() -> list:
 
 def eliminar_usuario(usuario_id: int) -> None:
     """Elimina un usuario del sistema por su ID."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("DELETE FROM usuarios WHERE id = ?", (usuario_id,))
     conexion.commit()
@@ -38,7 +38,7 @@ def eliminar_usuario(usuario_id: int) -> None:
 def resetear_password(usuario_id: int) -> None:
     """Resetea la contraseña de un usuario a 0000 y lo obliga a cambiarla al próximo login."""
     password_hash = bcrypt.hashpw("0000".encode(), bcrypt.gensalt()).decode()
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
         UPDATE usuarios SET password = ?, debe_cambiar_password = 1 WHERE id = ?
@@ -127,7 +127,7 @@ class GestionarUsuarios(QWidget):
         password_hash = bcrypt.hashpw("0000".encode(), bcrypt.gensalt()).decode()
 
         try:
-            conexion = sqlite3.connect('seguridad.db')
+            conexion = sqlite3.connect(DB_PATH)
             cursor = conexion.cursor()
             cursor.execute("""
                 INSERT INTO usuarios (username, password, rol, debe_cambiar_password)

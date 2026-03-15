@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QDateEdit, QPushButton
 )
 from PyQt6.QtCore import QDate
-
+from database.db import DB_PATH
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
@@ -20,7 +20,7 @@ def _cargar_logs(fecha: str) -> list:
     Retorna todos los logs de una fecha dada,
     incluyendo el nombre de usuario que realizó cada acción.
     """
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
         SELECT l.fecha, l.hora, u.username, l.accion

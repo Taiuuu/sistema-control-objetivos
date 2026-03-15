@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtCore import Qt
-
+from database.db import DB_PATH
 
 # =============================================================================
 # AUTENTICACIÓN
@@ -22,7 +22,7 @@ def verificar_login(username: str, password: str) -> tuple | None:
     Verifica las credenciales del usuario contra la base de datos.
     Retorna (id, rol, debe_cambiar_password) si son correctas, None si no.
     """
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
         SELECT id, rol, debe_cambiar_password, password
@@ -188,7 +188,7 @@ class LoginWindow(QWidget):
 
     def _login_post_cambio(self, usuario_id: int) -> None:
         """Completa el login después de que el usuario cambió su contraseña."""
-        conexion = sqlite3.connect('seguridad.db')
+        conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
         cursor.execute("SELECT rol FROM usuarios WHERE id = ?", (usuario_id,))
         rol = cursor.fetchone()[0]

@@ -5,6 +5,7 @@
 
 import sqlite3
 import bcrypt
+from database.db import DB_PATH
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QMessageBox
@@ -151,7 +152,7 @@ class CambiarPassword(QWidget):
 
         password_hash = bcrypt.hashpw(nueva.encode(), bcrypt.gensalt()).decode()
 
-        conexion = sqlite3.connect('seguridad.db')
+        conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
         cursor.execute("""
             UPDATE usuarios SET password = ?, debe_cambiar_password = 0 WHERE id = ?

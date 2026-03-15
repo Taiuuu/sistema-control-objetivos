@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QComboBox, QDateEdit, QMessageBox
 )
 from PyQt6.QtCore import QDate
-
+from database.db import DB_PATH
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
@@ -17,7 +17,7 @@ from PyQt6.QtCore import QDate
 
 def _cargar_supervisores() -> list:
     """Retorna todos los supervisores registrados."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, nombre FROM supervisores")
     resultado = cursor.fetchall()
@@ -30,7 +30,7 @@ def _guardar_equipo_turno(fecha: str, turno: str, sup1_id: int, sup2_id: int) ->
     Registra los dos supervisores asignados a un turno en una fecha.
     Si ya existe un equipo para esa fecha y turno lo reemplaza.
     """
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("DELETE FROM equipos WHERE fecha = ? AND turno = ?", (fecha, turno))
     cursor.execute("""

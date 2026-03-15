@@ -4,6 +4,7 @@
 # =============================================================================
 
 import sqlite3
+import os
 import bcrypt
 
 
@@ -11,7 +12,9 @@ import bcrypt
 # CONEXIÓN
 # =============================================================================
 
-DB_PATH = "seguridad.db"
+# Base de datos guardada en la carpeta del usuario para evitar problemas de permisos
+DB_PATH = os.path.join(os.path.expanduser("~"), "VESP Control", "seguridad.db")
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 
 def conectar() -> sqlite3.Connection:
@@ -31,7 +34,6 @@ def crear_base_datos() -> None:
     conexion = conectar()
     cursor = conexion.cursor()
 
-    # Objetivos: lugares que deben ser controlados
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS objetivos (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +44,6 @@ def crear_base_datos() -> None:
         )
     """)
 
-    # Supervisores: personas que realizan los controles
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS supervisores (
             id     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,7 +51,6 @@ def crear_base_datos() -> None:
         )
     """)
 
-    # Pasadas: cada registro de control de un supervisor sobre un objetivo
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pasadas (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,7 +64,6 @@ def crear_base_datos() -> None:
         )
     """)
 
-    # Equipos: los dos supervisores asignados a cada turno por día
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS equipos (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,7 +76,6 @@ def crear_base_datos() -> None:
         )
     """)
 
-    # Notas: observaciones o incidentes registrados por día
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS notas (
             id    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,7 +84,6 @@ def crear_base_datos() -> None:
         )
     """)
 
-    # Usuarios: cuentas de acceso al sistema
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id                    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,7 +94,6 @@ def crear_base_datos() -> None:
         )
     """)
 
-    # Logs: registro de todas las acciones realizadas en el sistema
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,

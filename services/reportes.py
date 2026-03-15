@@ -15,9 +15,7 @@ from database.db import DB_PATH
 def obtener_objetivos_del_dia(fecha: str) -> list:
     """
     Retorna los objetivos que corresponden ser controlados en una fecha dada.
-    Filtra por:
-      - Que la fecha esté dentro del rango de vigencia del objetivo
-      - Que el día de la semana coincida con los días de cobertura configurados
+    Filtra por rango de vigencia y días de cobertura configurados.
     """
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
@@ -31,7 +29,6 @@ def obtener_objetivos_del_dia(fecha: str) -> list:
     objetivos = cursor.fetchall()
     conexion.close()
 
-    # Detectar qué día de la semana es (1=lunes, 7=domingo)
     fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
     dia_semana = fecha_dt.isoweekday()
 

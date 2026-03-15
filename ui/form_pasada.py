@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QDate, QTime
 from models.turnos import registrar_turno
-
+from database.db import DB_PATH
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
@@ -18,7 +18,7 @@ from models.turnos import registrar_turno
 
 def _cargar_objetivos() -> list:
     """Retorna todos los objetivos registrados."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, nombre FROM objetivos")
     resultado = cursor.fetchall()
@@ -31,7 +31,7 @@ def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
     Retorna los supervisores asignados al turno de una fecha dada.
     Si no hay equipo registrado para ese turno, retorna todos los supervisores.
     """
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
 
     cursor.execute("""
@@ -49,7 +49,7 @@ def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
         return [(equipo[0], equipo[1]), (equipo[2], equipo[3])]
 
     # Si no hay equipo registrado para ese turno retorna todos
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, nombre FROM supervisores")
     resultado = cursor.fetchall()

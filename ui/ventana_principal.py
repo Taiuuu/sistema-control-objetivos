@@ -22,11 +22,12 @@ from ui.ayuda import Ayuda
 from models.objetivos import dar_de_baja_objetivo
 from services.backup import hacer_backup
 from services.logger import registrar_accion
+from database.db import DB_PATH
 import sqlite3
 
 
 def contar_pasadas(fecha, objetivo_id, turno=None, supervisor_id=None):
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     query = 'SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?'
     params = [fecha, objetivo_id]
@@ -56,7 +57,7 @@ def obtener_estado_detallado(fecha, objetivo_id):
 
 
 def obtener_equipo(fecha, turno):
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute('''
         SELECT s1.nombre, s2.nombre
@@ -73,7 +74,7 @@ def obtener_equipo(fecha, turno):
 
 
 def cargar_supervisores():
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute('SELECT id, nombre FROM supervisores')
     resultado = cursor.fetchall()
@@ -82,7 +83,7 @@ def cargar_supervisores():
 
 
 def obtener_nombre_usuario(usuario_id):
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute('SELECT username FROM usuarios WHERE id = ?', (usuario_id,))
     resultado = cursor.fetchone()

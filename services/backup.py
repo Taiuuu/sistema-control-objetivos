@@ -9,8 +9,8 @@ import datetime
 from database.db import DB_PATH
 
 
-BACKUP_DIR = "backups"
-DIAS_RETENTION = 30  # Cantidad de días que se conservan los backups
+BACKUP_DIR = os.path.join(os.path.expanduser("~"), "VESP Control", "backups")
+DIAS_RETENTION = 30
 
 
 # =============================================================================
@@ -29,7 +29,6 @@ def hacer_backup() -> None:
 
     fecha_hoy = datetime.datetime.now().strftime("%Y-%m-%d")
 
-    # Evitar duplicados del mismo día
     backups_hoy = [f for f in os.listdir(BACKUP_DIR) if fecha_hoy in f]
     if backups_hoy:
         return

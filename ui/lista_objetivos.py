@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QDate
 from models.objetivos import dar_de_baja_objetivo
-
+from database.db import DB_PATH
 
 # Mapeo de número de día a abreviatura
 DIAS_MAP = {
@@ -25,7 +25,7 @@ DIAS_MAP = {
 
 def _cargar_objetivos() -> list:
     """Retorna todos los objetivos registrados con sus datos completos."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
     resultado = cursor.fetchall()

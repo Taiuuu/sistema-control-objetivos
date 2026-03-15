@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QDateEdit, QTimeEdit, QComboBox, QMessageBox, QDialog
 )
 from PyQt6.QtCore import QDate, QTime
-
+from database.db import DB_PATH
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
@@ -21,7 +21,7 @@ def _cargar_pasadas(fecha: str) -> list:
     Retorna todas las pasadas registradas para una fecha dada,
     incluyendo nombre del objetivo y del supervisor.
     """
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
         SELECT p.id, p.hora, p.turno, o.nombre, s.nombre, p.objetivo_id, p.supervisor_id
@@ -38,7 +38,7 @@ def _cargar_pasadas(fecha: str) -> list:
 
 def _eliminar_pasada(pasada_id: int) -> None:
     """Elimina una pasada de la base de datos por su ID."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("DELETE FROM pasadas WHERE id = ?", (pasada_id,))
     conexion.commit()
@@ -47,7 +47,7 @@ def _eliminar_pasada(pasada_id: int) -> None:
 
 def _obtener_info_pasada(pasada_id: int) -> tuple | None:
     """Retorna los datos completos de una pasada para edición o log."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
         SELECT p.id, p.fecha, p.hora, p.turno, p.objetivo_id, p.supervisor_id,
@@ -64,7 +64,7 @@ def _obtener_info_pasada(pasada_id: int) -> tuple | None:
 
 def _actualizar_pasada(pasada_id: int, hora: str, turno: str, objetivo_id: int, supervisor_id: int) -> None:
     """Actualiza los datos de una pasada existente."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
         UPDATE pasadas SET hora = ?, turno = ?, objetivo_id = ?, supervisor_id = ?
@@ -76,7 +76,7 @@ def _actualizar_pasada(pasada_id: int, hora: str, turno: str, objetivo_id: int, 
 
 def _cargar_objetivos() -> list:
     """Retorna todos los objetivos registrados."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, nombre FROM objetivos")
     resultado = cursor.fetchall()
@@ -86,7 +86,7 @@ def _cargar_objetivos() -> list:
 
 def _cargar_supervisores() -> list:
     """Retorna todos los supervisores registrados."""
-    conexion = sqlite3.connect('seguridad.db')
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, nombre FROM supervisores")
     resultado = cursor.fetchall()
