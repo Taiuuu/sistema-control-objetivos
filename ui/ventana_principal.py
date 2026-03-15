@@ -36,6 +36,19 @@ def contar_pasadas(fecha, objetivo_id, turno=None, supervisor_id=None):
     return resultado
 
 
+def obtener_estado_detallado(fecha, objetivo_id):
+    pasadas_dia = contar_pasadas(fecha, objetivo_id, turno="dia")
+    pasadas_noche = contar_pasadas(fecha, objetivo_id, turno="noche")
+
+    if pasadas_dia > 0 and pasadas_noche > 0:
+        return "Pasaron los dos", "#90EE90"
+    elif pasadas_dia > 0 and pasadas_noche == 0:
+        return "No pasó noche", "#FFD700"
+    elif pasadas_dia == 0 and pasadas_noche > 0:
+        return "No pasó día", "#FFD700"
+    else:
+        return "No pasó nadie", "#FF6B6B"
+
 def cargar_supervisores():
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
@@ -149,23 +162,26 @@ class VentanaPrincipal(QWidget):
         filas = []
         for o in self.objetivos_actuales:
             pasadas = contar_pasadas(fecha, o[0], turno, supervisor_id)
-            estado = "OK" if pasadas > 0 else "FALTA"
+            estado_detallado, color_hex = obtener_estado_detallado(fecha, o[0])
 
-            if filtro_estado != "Todos" and estado != filtro_estado:
+            if filtro_estado == "OK" and estado_detallado != "Pasaron los dos":
+                continue
+            if filtro_estado == "FALTA" and estado_detallado == "Pasaron los dos":
                 continue
 
-            filas.append((o, pasadas, estado))
+            filas.append((o, pasadas, estado_detallado, color_hex))
 
         self.tabla.setRowCount(len(filas))
 
-        for i, (o, pasadas, estado) in enumerate(filas):
+        for i, (o, pasadas, estado_detallado, color_hex) in enumerate(filas):
             self.tabla.setItem(i, 0, QTableWidgetItem(o[1]))
             self.tabla.setItem(i, 1, QTableWidgetItem(str(pasadas)))
-            self.tabla.setItem(i, 2, QTableWidgetItem(estado))
+            self.tabla.setItem(i, 2, QTableWidgetItem(estado_detallado))
 
-            color = QColor("#90EE90") if pasadas > 0 else QColor("#FF6B6B")
+            color = QColor(color_hex)
             for col in range(3):
                 self.tabla.item(i, col).setBackground(color)
+                self.tabla.item(i, col).setForeground(QColor("#000000"))
 
             boton_baja = QPushButton("Dar de baja")
             boton_baja.clicked.connect(lambda checked, obj_id=o[0]: self.dar_de_baja(obj_id))
