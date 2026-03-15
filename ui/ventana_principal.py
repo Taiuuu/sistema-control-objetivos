@@ -329,49 +329,93 @@ class VentanaPrincipal(QWidget):
         self.cargar_tabla()
 
     def abrir_form_objetivo(self):
-        self.form_objetivo = FormObjetivo()
-        self.form_objetivo.destroyed.connect(self.cargar_tabla)
-        self.form_objetivo.show()
+        if not hasattr(self, 'form_objetivo') or not self.form_objetivo.isVisible():
+            self.form_objetivo = FormObjetivo()
+            self.form_objetivo.destroyed.connect(self.cargar_tabla)
+            self.form_objetivo.show()
+        else:
+            self.form_objetivo.raise_()
+            self.form_objetivo.activateWindow()
 
     def abrir_form_supervisor(self):
-        self.form_supervisor = FormSupervisor()
-        self.form_supervisor.show()
+        if not hasattr(self, 'form_supervisor') or not self.form_supervisor.isVisible():
+            self.form_supervisor = FormSupervisor()
+            self.form_supervisor.show()
+        else:
+            self.form_supervisor.raise_()
+            self.form_supervisor.activateWindow()
 
     def abrir_form_pasada(self):
-        self.form_pasada = FormPasada()
-        self.form_pasada.destroyed.connect(self.cargar_tabla)
-        self.form_pasada.show()
+        if not hasattr(self, 'form_pasada') or not self.form_pasada.isVisible():
+            self.form_pasada = FormPasada()
+            self.form_pasada.destroyed.connect(self.cargar_tabla)
+            self.form_pasada.show()
+        else:
+            self.form_pasada.raise_()
+            self.form_pasada.activateWindow()
 
     def abrir_form_turno(self):
-        self.form_turno = FormTurno()
-        self.form_turno.destroyed.connect(self.cargar_tabla)
-        self.form_turno.show()
+        if not hasattr(self, 'form_turno') or not self.form_turno.isVisible():
+            self.form_turno = FormTurno()
+            self.form_turno.destroyed.connect(self.cargar_tabla)
+            self.form_turno.show()
+        else:
+            self.form_turno.raise_()
+            self.form_turno.activateWindow()
 
     def abrir_lista_objetivos(self):
-        self.lista_objetivos = ListaObjetivos()
-        self.lista_objetivos.show()
+        if not hasattr(self, 'lista_objetivos') or not self.lista_objetivos.isVisible():
+            self.lista_objetivos = ListaObjetivos()
+            self.lista_objetivos.show()
+        else:
+            self.lista_objetivos.raise_()
+            self.lista_objetivos.activateWindow()
 
     def abrir_lista_supervisores(self):
-        self.lista_supervisores = ListaSupervisores()
-        self.lista_supervisores.show()
+        if not hasattr(self, 'lista_supervisores') or not self.lista_supervisores.isVisible():
+            self.lista_supervisores = ListaSupervisores()
+            self.lista_supervisores.show()
+        else:
+            self.lista_supervisores.raise_()
+            self.lista_supervisores.activateWindow()
 
     def abrir_lista_pasadas(self):
-        self.lista_pasadas = ListaPasadas()
-        self.lista_pasadas.destroyed.connect(self.cargar_tabla)
-        self.lista_pasadas.show()
+        if not hasattr(self, 'lista_pasadas') or not self.lista_pasadas.isVisible():
+            self.lista_pasadas = ListaPasadas()
+            self.lista_pasadas.destroyed.connect(self.cargar_tabla)
+            self.lista_pasadas.show()
+        else:
+            self.lista_pasadas.raise_()
+            self.lista_pasadas.activateWindow()
 
     def abrir_notas(self):
-        self.notas = NotasDiarias()
-        self.notas.show()
+        if not hasattr(self, 'notas') or not self.notas.isVisible():
+            self.notas = NotasDiarias()
+            self.notas.show()
+        else:
+            self.notas.raise_()
+            self.notas.activateWindow()
 
     def abrir_reporte_mensual(self):
-        self.reporte_mensual = ReporteMensual()
-        self.reporte_mensual.show()
+        if not hasattr(self, 'reporte_mensual') or not self.reporte_mensual.isVisible():
+            self.reporte_mensual = ReporteMensual()
+            self.reporte_mensual.show()
+        else:
+            self.reporte_mensual.raise_()
+            self.reporte_mensual.activateWindow()
 
     def abrir_gestionar_usuarios(self):
-        self.gestionar_usuarios = GestionarUsuarios()
-        self.gestionar_usuarios.show()
+        if not hasattr(self, 'gestionar_usuarios') or not self.gestionar_usuarios.isVisible():
+            self.gestionar_usuarios = GestionarUsuarios()
+            self.gestionar_usuarios.show()
+        else:
+            self.gestionar_usuarios.raise_()
+            self.gestionar_usuarios.activateWindow()
 
     def abrir_logs(self):
-        self.logs = VistaLogs()
-        self.logs.show()
+        if not hasattr(self, 'logs') or not self.logs.isVisible():
+            self.logs = VistaLogs()
+            self.logs.show()
+        else:
+            self.logs.raise_()
+            self.logs.activateWindow()

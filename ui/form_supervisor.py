@@ -32,5 +32,10 @@ class FormSupervisor(QWidget):
             return
 
         agregar_supervisor(nombre)
+
+        from services.logger import registrar_accion
+        from services.sesion import get_usuario_id
+        registrar_accion(get_usuario_id(), f"Agregó supervisor: {nombre}")
+
         QMessageBox.information(self, "Listo", f"Supervisor '{nombre}' guardado correctamente.")
         self.input_nombre.clear()

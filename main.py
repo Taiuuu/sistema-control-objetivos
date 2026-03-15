@@ -100,6 +100,8 @@ def iniciar_app():
     sys.exit(app.exec())
 
 def on_login_exitoso(usuario_id, rol):
+    from services.sesion import iniciar_sesion
+    iniciar_sesion(usuario_id, rol)
     global ventana_principal
     ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso)
     ventana_principal.show()

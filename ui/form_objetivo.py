@@ -72,5 +72,10 @@ class FormObjetivo(QWidget):
 
         dias_str = ",".join(dias_seleccionados)
         agregar_objetivo(nombre, inicio, None, dias_str)
+
+        from services.logger import registrar_accion
+        from services.sesion import get_usuario_id
+        registrar_accion(get_usuario_id(), f"Agregó objetivo: {nombre} | Inicio: {inicio} | Días: {dias_str}")
+
         QMessageBox.information(self, "Listo", f"Objetivo '{nombre}' guardado correctamente.")
         self.close()

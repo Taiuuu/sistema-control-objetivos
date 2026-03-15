@@ -82,6 +82,13 @@ class FormPasada(QWidget):
         turno = self.input_turno.currentText()
         objetivo_id = self.input_objetivo.currentData()
         supervisor_id = self.input_supervisor.currentData()
+        objetivo_nombre = self.input_objetivo.currentText()
+        supervisor_nombre = self.input_supervisor.currentText()
 
         registrar_turno(fecha, hora, turno, objetivo_id, supervisor_id)
+
+        from services.logger import registrar_accion
+        from services.sesion import get_usuario_id
+        registrar_accion(get_usuario_id(), f"Registró pasada - Objetivo: {objetivo_nombre} | Supervisor: {supervisor_nombre} | Turno: {turno} | Fecha: {fecha} | Hora: {hora}")
+
         QMessageBox.information(self, "Listo", "Pasada registrada correctamente.")
