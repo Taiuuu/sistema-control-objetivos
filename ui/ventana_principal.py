@@ -9,6 +9,7 @@ from services.reportes import obtener_objetivos_del_dia
 from ui.form_objetivo import FormObjetivo
 from ui.form_supervisor import FormSupervisor
 from ui.form_pasada import FormPasada
+from ui.form_de_turno import FormTurno
 from ui.lista_objetivos import ListaObjetivos
 from ui.lista_supervisores import ListaSupervisores
 from ui.reporte_mensual import ReporteMensual
@@ -49,6 +50,27 @@ def obtener_estado_detallado(fecha, objetivo_id):
     else:
         return "No pasó nadie", "#FF6B6B"
 
+
+def obtener_equipo(fecha, turno):
+    conexion = sqlite3.connect('seguridad.db')
+    cursor = conexion.cursor()
+
+    cursor.execute('''
+        SELECT s1.nombre, s2.nombre
+        FROM equipos e
+        JOIN supervisores s1 ON e.supervisor1_id = s1.id
+        JOIN supervisores s2 ON e.supervisor2_id = s2.id
+        WHERE e.fecha = ? AND e.turno = ?
+    ''', (fecha, turno))
+
+    resultado = cursor.fetchone()
+    conexion.close()
+
+    if resultado:
+        return f"{resultado[0]} y {resultado[1]}"
+    return "-"
+
+
 def cargar_supervisores():
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
@@ -63,7 +85,7 @@ class VentanaPrincipal(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Sistema de control de objetivos")
-        self.setGeometry(100, 100, 1000, 500)
+        self.setGeometry(100, 100, 1100, 500)
 
         layout = QVBoxLayout()
 
@@ -86,6 +108,9 @@ class VentanaPrincipal(QWidget):
         boton_pasada = QPushButton("Registrar pasada")
         boton_pasada.clicked.connect(self.abrir_form_pasada)
 
+        boton_turno = QPushButton("Registrar turno")
+        boton_turno.clicked.connect(self.abrir_form_turno)
+
         boton_lista_objetivos = QPushButton("Ver objetivos")
         boton_lista_objetivos.clicked.connect(self.abrir_lista_objetivos)
 
@@ -102,6 +127,7 @@ class VentanaPrincipal(QWidget):
         fila_superior.addWidget(boton_objetivo)
         fila_superior.addWidget(boton_supervisor)
         fila_superior.addWidget(boton_pasada)
+        fila_superior.addWidget(boton_turno)
         fila_superior.addWidget(boton_lista_objetivos)
         fila_superior.addWidget(boton_lista_supervisores)
         fila_superior.addWidget(boton_reporte)
@@ -138,12 +164,16 @@ class VentanaPrincipal(QWidget):
 
         # Tabla
         self.tabla = QTableWidget()
-        self.tabla.setColumnCount(4)
-        self.tabla.setHorizontalHeaderLabels(["Objetivo", "Pasadas", "Estado", "Dar de baja"])
-        self.tabla.setColumnWidth(0, 300)
-        self.tabla.setColumnWidth(1, 100)
-        self.tabla.setColumnWidth(2, 100)
-        self.tabla.setColumnWidth(3, 150)
+        self.tabla.setColumnCount(6)
+        self.tabla.setHorizontalHeaderLabels([
+            "Objetivo", "Turno día", "Turno noche", "Pasadas", "Estado", "Dar de baja"
+        ])
+        self.tabla.setColumnWidth(0, 200)
+        self.tabla.setColumnWidth(1, 150)
+        self.tabla.setColumnWidth(2, 150)
+        self.tabla.setColumnWidth(3, 80)
+        self.tabla.setColumnWidth(4, 130)
+        self.tabla.setColumnWidth(5, 120)
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
@@ -158,6 +188,9 @@ class VentanaPrincipal(QWidget):
         filtro_estado = self.filtro_estado.currentText()
 
         self.objetivos_actuales = obtener_objetivos_del_dia(fecha)
+
+        equipo_dia = obtener_equipo(fecha, "dia")
+        equipo_noche = obtener_equipo(fecha, "noche")
 
         filas = []
         for o in self.objetivos_actuales:
@@ -175,17 +208,19 @@ class VentanaPrincipal(QWidget):
 
         for i, (o, pasadas, estado_detallado, color_hex) in enumerate(filas):
             self.tabla.setItem(i, 0, QTableWidgetItem(o[1]))
-            self.tabla.setItem(i, 1, QTableWidgetItem(str(pasadas)))
-            self.tabla.setItem(i, 2, QTableWidgetItem(estado_detallado))
+            self.tabla.setItem(i, 1, QTableWidgetItem(equipo_dia))
+            self.tabla.setItem(i, 2, QTableWidgetItem(equipo_noche))
+            self.tabla.setItem(i, 3, QTableWidgetItem(str(pasadas)))
+            self.tabla.setItem(i, 4, QTableWidgetItem(estado_detallado))
 
             color = QColor(color_hex)
-            for col in range(3):
+            for col in range(5):
                 self.tabla.item(i, col).setBackground(color)
                 self.tabla.item(i, col).setForeground(QColor("#000000"))
 
             boton_baja = QPushButton("Dar de baja")
             boton_baja.clicked.connect(lambda checked, obj_id=o[0]: self.dar_de_baja(obj_id))
-            self.tabla.setCellWidget(i, 3, boton_baja)
+            self.tabla.setCellWidget(i, 5, boton_baja)
 
     def dar_de_baja(self, objetivo_id):
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
@@ -205,6 +240,11 @@ class VentanaPrincipal(QWidget):
         self.form_pasada = FormPasada()
         self.form_pasada.destroyed.connect(self.cargar_tabla)
         self.form_pasada.show()
+
+    def abrir_form_turno(self):
+        self.form_turno = FormTurno()
+        self.form_turno.destroyed.connect(self.cargar_tabla)
+        self.form_turno.show()
 
     def abrir_lista_objetivos(self):
         self.lista_objetivos = ListaObjetivos()
