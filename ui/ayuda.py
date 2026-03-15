@@ -39,7 +39,7 @@ class Ayuda(QWidget):
 
         # Logo
         logo = QLabel()
-        pixmap = QPixmap("assets/vesp.png").scaled(
+        pixmap = QPixmap(ruta_asset("assets/vesp.png")).scaled(
             60, 60,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation

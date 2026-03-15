@@ -85,7 +85,7 @@ class LoginWindow(QWidget):
         self.on_login_exitoso = on_login_exitoso
         self.setWindowTitle("V.E.S.P Organizations")
         self.setFixedSize(400, 540)
-        self.setWindowIcon(QIcon("assets/vesp.png"))
+        self.setWindowIcon(QIcon(ruta_asset("assets/vesp.png")))
 
         layout = QVBoxLayout()
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -93,7 +93,7 @@ class LoginWindow(QWidget):
 
         # Logo
         logo_label = QLabel()
-        pixmap = QPixmap("assets/vesp.png").scaled(
+        pixmap = QPixmap(ruta_asset("assets/vesp.png")).scaled(
             180, 180,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation
@@ -115,7 +115,7 @@ class LoginWindow(QWidget):
 
         # Versión actual
         try:
-            version = open("version.txt").read().strip()
+            version = open(ruta_asset("version.txt")).read().strip()
         except Exception:
             version = ""
         version_label = QLabel(f"v{version}")

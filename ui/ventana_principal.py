@@ -101,7 +101,7 @@ class VentanaPrincipal(QWidget):
         super().__init__()
         self.setWindowTitle("VESP Control de Objetivos")
         self.setGeometry(100, 100, 1200, 600)
-        self.setWindowIcon(QIcon("assets/vesp.png"))
+        self.setWindowIcon(QIcon(ruta_asset("assets/vesp.png")))
 
         layout_principal = QHBoxLayout()
         layout_principal.setSpacing(0)
@@ -116,7 +116,7 @@ class VentanaPrincipal(QWidget):
         layout_lateral.setContentsMargins(8, 12, 8, 12)
 
         logo_label = QLabel()
-        pixmap = QPixmap("assets/vesp.png").scaled(60, 60, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        pixmap = QPixmap(ruta_asset("assets/vesp.png")).scaled(60, 60, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         logo_label.setPixmap(pixmap)
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout_lateral.addWidget(logo_label)
