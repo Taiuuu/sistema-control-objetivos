@@ -70,5 +70,18 @@ class ListaObjetivos(QWidget):
     def dar_de_baja(self, objetivo_id):
         fecha_hoy = QDate.currentDate().toString("yyyy-MM-dd")
         dar_de_baja_objetivo(objetivo_id, fecha_hoy)
+
+        from services.logger import registrar_accion
+        from services.sesion import get_usuario_id
+
+        conexion = sqlite3.connect('seguridad.db')
+        cursor = conexion.cursor()
+        cursor.execute('SELECT nombre FROM objetivos WHERE id = ?', (objetivo_id,))
+        info = cursor.fetchone()
+        conexion.close()
+
+        if info:
+            registrar_accion(get_usuario_id(), f"Dio de baja objetivo: {info[0]} | Fecha: {fecha_hoy}")
+
         QMessageBox.information(self, "Listo", "Objetivo dado de baja correctamente.")
         self.cargar_tabla()

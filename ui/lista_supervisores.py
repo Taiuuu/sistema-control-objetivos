@@ -53,6 +53,24 @@ class ListaSupervisores(QWidget):
             self.tabla.setCellWidget(i, 1, boton)
 
     def eliminar(self, supervisor_id):
-        eliminar_supervisor(supervisor_id)
-        QMessageBox.information(self, "Listo", "Supervisor eliminado correctamente.")
-        self.cargar_tabla()
+        confirmar = QMessageBox.question(
+            self, "Confirmar",
+            "¿Seguro que querés eliminar este supervisor?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if confirmar == QMessageBox.StandardButton.Yes:
+            from services.logger import registrar_accion
+            from services.sesion import get_usuario_id
+
+            conexion = sqlite3.connect('seguridad.db')
+            cursor = conexion.cursor()
+            cursor.execute('SELECT nombre FROM supervisores WHERE id = ?', (supervisor_id,))
+            info = cursor.fetchone()
+            conexion.close()
+
+            eliminar_supervisor(supervisor_id)
+
+            if info:
+                registrar_accion(get_usuario_id(), f"Eliminó supervisor: {info[0]}")
+
+            self.cargar_tabla()

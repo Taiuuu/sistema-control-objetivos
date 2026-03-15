@@ -96,5 +96,25 @@ class ListaPasadas(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if confirmar == QMessageBox.StandardButton.Yes:
+            from services.logger import registrar_accion
+            from services.sesion import get_usuario_id
+
+            # Obtener info de la pasada antes de borrarla
+            conexion = sqlite3.connect('seguridad.db')
+            cursor = conexion.cursor()
+            cursor.execute('''
+                SELECT p.fecha, p.hora, p.turno, o.nombre, s.nombre
+                FROM pasadas p
+                JOIN objetivos o ON p.objetivo_id = o.id
+                JOIN supervisores s ON p.supervisor_id = s.id
+                WHERE p.id = ?
+            ''', (pasada_id,))
+            info = cursor.fetchone()
+            conexion.close()
+
             eliminar_pasada(pasada_id)
+
+            if info:
+                registrar_accion(get_usuario_id(), f"Eliminó pasada - Fecha: {info[0]} | Hora: {info[1]} | Turno: {info[2]} | Objetivo: {info[3]} | Supervisor: {info[4]}")
+
             self.cargar_tabla()
