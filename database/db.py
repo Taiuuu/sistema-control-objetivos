@@ -48,7 +48,15 @@ def crear_base_datos():
         FOREIGN KEY (supervisor2_id) REFERENCES supervisores(id)
         )
     ''')
-
+    #Tabla para notas
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS notas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fecha TEXT,
+        nota TEXT
+        )
+    ''')
+    
     conexion.commit()
     conexion.close()
 

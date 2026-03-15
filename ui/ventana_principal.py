@@ -15,6 +15,7 @@ from ui.lista_supervisores import ListaSupervisores
 from ui.reporte_mensual import ReporteMensual
 from models.objetivos import dar_de_baja_objetivo
 from ui.lista_pasadas import ListaPasadas
+from ui.notas_diarias import NotasDiarias
 import sqlite3
 
 
@@ -125,6 +126,10 @@ class VentanaPrincipal(QWidget):
         boton_lista_pasadas = QPushButton("Ver pasadas")
         boton_lista_pasadas.clicked.connect(self.abrir_lista_pasadas)
         
+        boton_notas = QPushButton("Notas del día")
+        boton_notas.clicked.connect(self.abrir_notas)
+        
+        fila_superior.addWidget(boton_notas)
         fila_superior.addWidget(boton_lista_pasadas)
         fila_superior.addWidget(QLabel("Fecha:"))
         fila_superior.addWidget(self.selector_fecha)
@@ -268,3 +273,7 @@ class VentanaPrincipal(QWidget):
         self.lista_pasadas = ListaPasadas()
         self.lista_pasadas.destroyed.connect(self.cargar_tabla)
         self.lista_pasadas.show()
+    
+    def abrir_notas(self):
+        self.notas = NotasDiarias()
+        self.notas.show()

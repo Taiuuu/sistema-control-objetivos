@@ -17,14 +17,15 @@ def calcular_reporte(anio, mes):
     objetivos = cursor.fetchall()
 
     resultados = []
+    total_dias = calendar.monthrange(anio, mes)[1]
 
     for o in objetivos:
         obj_id, nombre, inicio, fin, dias_str = o
         dias_semana = [int(d) for d in dias_str.split(",")]
 
         dias_esperados = 0
-        dias_cumplidos = 0
-        total_dias = calendar.monthrange(anio, mes)[1]
+        dias_controlados = 0
+        dias_sin_control = 0
 
         for dia in range(1, total_dias + 1):
             fecha = f"{anio}-{mes:02d}-{dia:02d}"
@@ -43,12 +44,15 @@ def calcular_reporte(anio, mes):
                 SELECT COUNT(*) FROM pasadas
                 WHERE fecha = ? AND objetivo_id = ?
             ''', (fecha, obj_id))
+
             if cursor.fetchone()[0] > 0:
-                dias_cumplidos += 1
+                dias_controlados += 1
+            else:
+                dias_sin_control += 1
 
         if dias_esperados > 0:
-            porcentaje = (dias_cumplidos / dias_esperados) * 100
-            resultados.append((nombre, dias_esperados, dias_cumplidos, porcentaje))
+            porcentaje = (dias_controlados / dias_esperados) * 100
+            resultados.append((nombre, dias_controlados, dias_sin_control, porcentaje))
 
     conexion.close()
     return resultados
@@ -100,11 +104,11 @@ class ReporteMensual(QWidget):
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(4)
         self.tabla.setHorizontalHeaderLabels([
-            "Objetivo", "Días esperados", "Días cumplidos", "Cumplimiento"
+            "Objetivo", "Días controlados", "Días sin control", "Porcentaje"
         ])
         self.tabla.setColumnWidth(0, 220)
-        self.tabla.setColumnWidth(1, 120)
-        self.tabla.setColumnWidth(2, 120)
+        self.tabla.setColumnWidth(1, 130)
+        self.tabla.setColumnWidth(2, 130)
         self.tabla.setColumnWidth(3, 110)
         layout.addWidget(self.tabla)
 
@@ -126,6 +130,7 @@ class ReporteMensual(QWidget):
             color = QColor("#90EE90") if r[3] >= 80 else QColor("#FF6B6B")
             for col in range(4):
                 self.tabla.item(i, col).setBackground(color)
+                self.tabla.item(i, col).setForeground(QColor("#000000"))
 
     def exportar_excel(self):
         mes = self.selector_mes.currentIndex() + 1
