@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QMessageBox
+    QWidget, QVBoxLayout, QLabel,
+    QLineEdit, QPushButton, QMessageBox, QHBoxLayout
 )
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtCore import Qt
 import sqlite3
 import bcrypt
@@ -33,13 +33,38 @@ def verificar_login(username, password):
     return None
 
 
+def campo_password_con_ojito(placeholder):
+    contenedor = QWidget()
+    layout = QHBoxLayout(contenedor)
+    layout.setContentsMargins(0, 0, 0, 0)
+
+    input_pw = QLineEdit()
+    input_pw.setPlaceholderText(placeholder)
+    input_pw.setEchoMode(QLineEdit.EchoMode.Password)
+    input_pw.setFixedHeight(40)
+
+    boton_ojo = QPushButton("👁")
+    boton_ojo.setFixedSize(40, 40)
+    boton_ojo.setCheckable(True)
+    boton_ojo.toggled.connect(
+        lambda checked: input_pw.setEchoMode(
+            QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
+        )
+    )
+
+    layout.addWidget(input_pw)
+    layout.addWidget(boton_ojo)
+
+    return contenedor, input_pw
+
+
 class LoginWindow(QWidget):
 
     def __init__(self, on_login_exitoso):
         super().__init__()
         self.on_login_exitoso = on_login_exitoso
         self.setWindowTitle("V.E.S.P Organizations")
-        self.setFixedSize(400, 500)
+        self.setFixedSize(400, 520)
 
         layout = QVBoxLayout()
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -70,17 +95,11 @@ class LoginWindow(QWidget):
         self.input_usuario = QLineEdit()
         self.input_usuario.setPlaceholderText("Usuario")
         self.input_usuario.setFixedHeight(40)
-        self.input_usuario.setStyleSheet("padding: 5px 10px; font-size: 14px;")
         layout.addWidget(self.input_usuario)
 
-        # Contraseña
-        self.input_password = QLineEdit()
-        self.input_password.setPlaceholderText("Contraseña")
-        self.input_password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.input_password.setFixedHeight(40)
-        self.input_password.setStyleSheet("padding: 5px 10px; font-size: 14px;")
-        self.input_password.returnPressed.connect(self.intentar_login)
-        layout.addWidget(self.input_password)
+        # Contraseña con ojito
+        contenedor_pw, self.input_password = campo_password_con_ojito("Contraseña")
+        layout.addWidget(contenedor_pw)
 
         # Boton entrar
         boton_entrar = QPushButton("Entrar")
@@ -100,8 +119,9 @@ class LoginWindow(QWidget):
         boton_entrar.clicked.connect(self.intentar_login)
         layout.addWidget(boton_entrar)
 
-        layout.addSpacing(10)
+        self.input_password.returnPressed.connect(self.intentar_login)
 
+        layout.addSpacing(10)
         self.setLayout(layout)
 
     def intentar_login(self):

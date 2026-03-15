@@ -1,0 +1,22 @@
+# ENTORNO VIRTUAL
+venv/
+env/
+# BASE DE DATOS LOCAL
+*.db
+# ARCHIVOS DE PYTHON
+__pycache__/
+*.pyc
+# ARCHIVOS TEMPORALES
+*.log
+*.tmp
+# CONFIGURACION DE VS CODE
+.vscode/
+# ARCHIVOS DEL SISTEMA
+.DS_Store
+Thumbs.db
+# BACKUPS
+backups/
+# PYINSTALLER
+build/
+dist/
+*.spec

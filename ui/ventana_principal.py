@@ -1,10 +1,10 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QLabel,
-    QPushButton, QDateEdit, QComboBox
+    QPushButton, QDateEdit, QComboBox, QMessageBox
 )
-from PyQt6.QtCore import QDate
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import QDate, QTimer, QEvent
+from PyQt6.QtGui import QColor, QPixmap, QIcon
 from services.reportes import obtener_objetivos_del_dia
 from ui.form_objetivo import FormObjetivo
 from ui.form_supervisor import FormSupervisor
@@ -13,15 +13,14 @@ from ui.form_de_turno import FormTurno
 from ui.lista_objetivos import ListaObjetivos
 from ui.lista_supervisores import ListaSupervisores
 from ui.reporte_mensual import ReporteMensual
-from models.objetivos import dar_de_baja_objetivo
 from ui.lista_pasadas import ListaPasadas
 from ui.notas_diarias import NotasDiarias
-from ui.gestionar_usuarios import GestionarUsuarios
-from PyQt6.QtCore import QTimer
-from services.backup import hacer_backup
 from ui.vista_logs import VistaLogs
+from ui.gestionar_usuarios import GestionarUsuarios
+from models.objetivos import dar_de_baja_objetivo
+from services.backup import hacer_backup
+from services.logger import registrar_accion
 import sqlite3
-
 
 
 def contar_pasadas(fecha, objetivo_id, turno=None, supervisor_id=None):
@@ -87,6 +86,15 @@ def cargar_supervisores():
     return resultado
 
 
+def obtener_nombre_usuario(usuario_id):
+    conexion = sqlite3.connect('seguridad.db')
+    cursor = conexion.cursor()
+    cursor.execute('SELECT username FROM usuarios WHERE id = ?', (usuario_id,))
+    resultado = cursor.fetchone()
+    conexion.close()
+    return resultado[0] if resultado else "Usuario"
+
+
 class VentanaPrincipal(QWidget):
 
     def __init__(self, usuario_id=None, rol=None, on_login_exitoso=None):
@@ -94,8 +102,34 @@ class VentanaPrincipal(QWidget):
         self.rol = rol
         self.on_login_exitoso = on_login_exitoso
         super().__init__()
+        self.setWindowTitle("VESP Control de Objetivos")
+        self.setGeometry(100, 100, 1100, 550)
+        self.setWindowIcon(QIcon("assets/vesp.png"))
 
         layout = QVBoxLayout()
+
+        # Barra superior con logo y bienvenida
+        barra_top = QHBoxLayout()
+
+        logo = QLabel()
+        pixmap = QPixmap("assets/vesp.png").scaled(45, 45, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation) if hasattr(self, '_qt_imported') else QPixmap("assets/vesp.png")
+        from PyQt6.QtCore import Qt
+        pixmap = QPixmap("assets/vesp.png").scaled(45, 45, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        logo.setPixmap(pixmap)
+
+        titulo = QLabel("V.E.S.P Organizations")
+        titulo.setStyleSheet("font-size: 16px; font-weight: bold; color: #4CAF50;")
+
+        nombre_usuario = obtener_nombre_usuario(usuario_id)
+        bienvenida = QLabel(f"Bienvenido, {nombre_usuario}")
+        bienvenida.setStyleSheet("font-size: 12px; color: #888;")
+
+        barra_top.addWidget(logo)
+        barra_top.addWidget(titulo)
+        barra_top.addStretch()
+        barra_top.addWidget(bienvenida)
+
+        layout.addLayout(barra_top)
 
         # Fila superior con fecha y botones
         fila_superior = QHBoxLayout()
@@ -125,28 +159,15 @@ class VentanaPrincipal(QWidget):
         boton_lista_supervisores = QPushButton("Ver supervisores")
         boton_lista_supervisores.clicked.connect(self.abrir_lista_supervisores)
 
-        boton_reporte = QPushButton("Reporte mensual")
-        boton_reporte.clicked.connect(self.abrir_reporte_mensual)
-        
         boton_lista_pasadas = QPushButton("Ver pasadas")
         boton_lista_pasadas.clicked.connect(self.abrir_lista_pasadas)
-        
+
         boton_notas = QPushButton("Notas del día")
         boton_notas.clicked.connect(self.abrir_notas)
-        
-        if self.rol == "admin":
-            boton_usuarios = QPushButton("Gestionar usuarios")
-            boton_usuarios.clicked.connect(self.abrir_gestionar_usuarios)
-            fila_superior.addWidget(boton_usuarios)
-        
-        if self.rol == "admin":
-            boton_logs = QPushButton("Historial")
-            boton_logs.clicked.connect(self.abrir_logs)
-            fila_superior.addWidget(boton_logs)
 
+        boton_reporte = QPushButton("Reporte mensual")
+        boton_reporte.clicked.connect(self.abrir_reporte_mensual)
 
-        fila_superior.addWidget(boton_notas)
-        fila_superior.addWidget(boton_lista_pasadas)
         fila_superior.addWidget(QLabel("Fecha:"))
         fila_superior.addWidget(self.selector_fecha)
         fila_superior.addWidget(boton_buscar)
@@ -157,16 +178,21 @@ class VentanaPrincipal(QWidget):
         fila_superior.addWidget(boton_turno)
         fila_superior.addWidget(boton_lista_objetivos)
         fila_superior.addWidget(boton_lista_supervisores)
+        fila_superior.addWidget(boton_lista_pasadas)
+        fila_superior.addWidget(boton_notas)
         fila_superior.addWidget(boton_reporte)
+
+        if self.rol == "admin":
+            boton_usuarios = QPushButton("Gestionar usuarios")
+            boton_usuarios.clicked.connect(self.abrir_gestionar_usuarios)
+            fila_superior.addWidget(boton_usuarios)
+
+            boton_logs = QPushButton("Historial")
+            boton_logs.clicked.connect(self.abrir_logs)
+            fila_superior.addWidget(boton_logs)
 
         layout.addLayout(fila_superior)
 
-        # Timer de inactividad - 15 minutos
-        self.timer_inactividad = QTimer()
-        self.timer_inactividad.setInterval(15 * 60 * 1000)
-        self.timer_inactividad.timeout.connect(self.cerrar_por_inactividad)
-        self.timer_inactividad.start()
-       
         # Fila de filtros
         fila_filtros = QHBoxLayout()
 
@@ -213,6 +239,47 @@ class VentanaPrincipal(QWidget):
         self.objetivos_actuales = []
         self.cargar_tabla()
 
+        # Timer inactividad 15 minutos
+        self.timer_inactividad = QTimer()
+        self.timer_inactividad.setInterval(15 * 60 * 1000)
+        self.timer_inactividad.timeout.connect(self.cerrar_por_inactividad)
+        self.timer_inactividad.start()
+
+    def event(self, evento):
+        if evento.type() in (
+            QEvent.Type.MouseMove,
+            QEvent.Type.KeyPress,
+            QEvent.Type.MouseButtonPress
+        ):
+            self.timer_inactividad.start()
+        return super().event(evento)
+
+    def cerrar_por_inactividad(self):
+        hacer_backup()
+        QMessageBox.information(
+            self,
+            "Sesión cerrada",
+            "La sesión se cerró por inactividad. Se realizó un backup automático."
+        )
+        registrar_accion(self.usuario_id, "Sesión cerrada por inactividad")
+        self.close()
+        from ui.login import LoginWindow
+        self.login = LoginWindow(self.on_login_exitoso)
+        self.login.show()
+
+    def closeEvent(self, evento):
+        confirmar = QMessageBox.question(
+            self,
+            "Confirmar salida",
+            "¿Seguro que querés cerrar el sistema?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if confirmar == QMessageBox.StandardButton.Yes:
+            registrar_accion(self.usuario_id, "Cerró el sistema")
+            evento.accept()
+        else:
+            evento.ignore()
+
     def cargar_tabla(self):
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
         turno = self.filtro_turno.currentText()
@@ -256,7 +323,6 @@ class VentanaPrincipal(QWidget):
             self.tabla.setCellWidget(i, 5, boton_baja)
 
     def dar_de_baja(self, objetivo_id):
-        from services.logger import registrar_accion
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
         dar_de_baja_objetivo(objetivo_id, fecha)
         registrar_accion(self.usuario_id, f"Dio de baja objetivo id={objetivo_id}")
@@ -289,46 +355,23 @@ class VentanaPrincipal(QWidget):
         self.lista_supervisores = ListaSupervisores()
         self.lista_supervisores.show()
 
-    def abrir_reporte_mensual(self):
-        self.reporte_mensual = ReporteMensual()
-        self.reporte_mensual.show()
-    
     def abrir_lista_pasadas(self):
         self.lista_pasadas = ListaPasadas()
         self.lista_pasadas.destroyed.connect(self.cargar_tabla)
         self.lista_pasadas.show()
-    
+
     def abrir_notas(self):
         self.notas = NotasDiarias()
         self.notas.show()
+
+    def abrir_reporte_mensual(self):
+        self.reporte_mensual = ReporteMensual()
+        self.reporte_mensual.show()
 
     def abrir_gestionar_usuarios(self):
         self.gestionar_usuarios = GestionarUsuarios()
         self.gestionar_usuarios.show()
 
-    def event(self, evento):
-        from PyQt6.QtCore import QEvent
-        if evento.type() in (
-            QEvent.Type.MouseMove,
-            QEvent.Type.KeyPress,
-            QEvent.Type.MouseButtonPress
-        ):
-            self.timer_inactividad.start()
-        return super().event(evento)
-
-    def cerrar_por_inactividad(self):
-        from PyQt6.QtWidgets import QMessageBox
-        hacer_backup()
-        QMessageBox.information(
-            self,
-            "Sesión cerrada",
-            "La sesión se cerró por inactividad. Se realizó un backup automático."
-        )
-        self.close()
-        from ui.login import LoginWindow
-        self.login = LoginWindow(self.on_login_exitoso)
-        self.login.show()
-    
     def abrir_logs(self):
         self.logs = VistaLogs()
         self.logs.show()
