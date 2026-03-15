@@ -1,10 +1,8 @@
-import sys
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QLabel,
-    QPushButton, QDateEdit,
+    QPushButton, QDateEdit, QComboBox
 )
-from ui.reporte_mensual import ReporteMensual
 from PyQt6.QtCore import QDate
 from PyQt6.QtGui import QColor
 from services.reportes import obtener_objetivos_del_dia
@@ -13,18 +11,36 @@ from ui.form_supervisor import FormSupervisor
 from ui.form_pasada import FormPasada
 from ui.lista_objetivos import ListaObjetivos
 from ui.lista_supervisores import ListaSupervisores
+from ui.reporte_mensual import ReporteMensual
 from models.objetivos import dar_de_baja_objetivo
 import sqlite3
 
 
-def contar_pasadas(fecha, objetivo_id):
+def contar_pasadas(fecha, objetivo_id, turno=None, supervisor_id=None):
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
-    cursor.execute('''
-        SELECT COUNT(*) FROM pasadas
-        WHERE fecha = ? AND objetivo_id = ?
-    ''', (fecha, objetivo_id))
+
+    query = 'SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?'
+    params = [fecha, objetivo_id]
+
+    if turno:
+        query += ' AND turno = ?'
+        params.append(turno)
+    if supervisor_id:
+        query += ' AND supervisor_id = ?'
+        params.append(supervisor_id)
+
+    cursor.execute(query, params)
     resultado = cursor.fetchone()[0]
+    conexion.close()
+    return resultado
+
+
+def cargar_supervisores():
+    conexion = sqlite3.connect('seguridad.db')
+    cursor = conexion.cursor()
+    cursor.execute('SELECT id, nombre FROM supervisores')
+    resultado = cursor.fetchall()
     conexion.close()
     return resultado
 
@@ -34,11 +50,11 @@ class VentanaPrincipal(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Sistema de control de objetivos")
-        self.setGeometry(100, 100, 900, 500)
+        self.setGeometry(100, 100, 1000, 500)
 
         layout = QVBoxLayout()
 
-        # Fila superior
+        # Fila superior con fecha y botones
         fila_superior = QHBoxLayout()
 
         self.selector_fecha = QDateEdit()
@@ -65,8 +81,7 @@ class VentanaPrincipal(QWidget):
 
         boton_reporte = QPushButton("Reporte mensual")
         boton_reporte.clicked.connect(self.abrir_reporte_mensual)
-        
-        fila_superior.addWidget(boton_reporte)
+
         fila_superior.addWidget(QLabel("Fecha:"))
         fila_superior.addWidget(self.selector_fecha)
         fila_superior.addWidget(boton_buscar)
@@ -76,8 +91,37 @@ class VentanaPrincipal(QWidget):
         fila_superior.addWidget(boton_pasada)
         fila_superior.addWidget(boton_lista_objetivos)
         fila_superior.addWidget(boton_lista_supervisores)
+        fila_superior.addWidget(boton_reporte)
 
         layout.addLayout(fila_superior)
+
+        # Fila de filtros
+        fila_filtros = QHBoxLayout()
+
+        self.filtro_turno = QComboBox()
+        self.filtro_turno.addItems(["Todos los turnos", "dia", "noche"])
+
+        self.filtro_supervisor = QComboBox()
+        self.filtro_supervisor.addItem("Todos los supervisores", None)
+        for s in cargar_supervisores():
+            self.filtro_supervisor.addItem(s[1], s[0])
+
+        self.filtro_estado = QComboBox()
+        self.filtro_estado.addItems(["Todos", "OK", "FALTA"])
+
+        boton_filtrar = QPushButton("Filtrar")
+        boton_filtrar.clicked.connect(self.cargar_tabla)
+
+        fila_filtros.addWidget(QLabel("Turno:"))
+        fila_filtros.addWidget(self.filtro_turno)
+        fila_filtros.addWidget(QLabel("Supervisor:"))
+        fila_filtros.addWidget(self.filtro_supervisor)
+        fila_filtros.addWidget(QLabel("Estado:"))
+        fila_filtros.addWidget(self.filtro_estado)
+        fila_filtros.addWidget(boton_filtrar)
+        fila_filtros.addStretch()
+
+        layout.addLayout(fila_filtros)
 
         # Tabla
         self.tabla = QTableWidget()
@@ -95,14 +139,26 @@ class VentanaPrincipal(QWidget):
 
     def cargar_tabla(self):
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
+        turno = self.filtro_turno.currentText()
+        turno = None if turno == "Todos los turnos" else turno
+        supervisor_id = self.filtro_supervisor.currentData()
+        filtro_estado = self.filtro_estado.currentText()
+
         self.objetivos_actuales = obtener_objetivos_del_dia(fecha)
 
-        self.tabla.setRowCount(len(self.objetivos_actuales))
-
-        for i, o in enumerate(self.objetivos_actuales):
-            pasadas = contar_pasadas(fecha, o[0])
+        filas = []
+        for o in self.objetivos_actuales:
+            pasadas = contar_pasadas(fecha, o[0], turno, supervisor_id)
             estado = "OK" if pasadas > 0 else "FALTA"
 
+            if filtro_estado != "Todos" and estado != filtro_estado:
+                continue
+
+            filas.append((o, pasadas, estado))
+
+        self.tabla.setRowCount(len(filas))
+
+        for i, (o, pasadas, estado) in enumerate(filas):
             self.tabla.setItem(i, 0, QTableWidgetItem(o[1]))
             self.tabla.setItem(i, 1, QTableWidgetItem(str(pasadas)))
             self.tabla.setItem(i, 2, QTableWidgetItem(estado))
