@@ -4,6 +4,7 @@ from ui.login import LoginWindow
 from ui.ventana_principal import VentanaPrincipal
 from database.db import crear_base_datos
 from services.backup import hacer_backup
+from services.actualizador import verificar_actualizacion
 import sys
 
 
@@ -90,21 +91,18 @@ def iniciar_app():
     aplicar_tema_oscuro(app)
 
     def on_login_exitoso(usuario_id, rol):
+        from services.sesion import iniciar_sesion
+        from PyQt6.QtCore import QTimer
+        iniciar_sesion(usuario_id, rol)
         global ventana_principal
-        ventana_principal = VentanaPrincipal(usuario_id, rol)
+        ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso)
         ventana_principal.show()
+        QTimer.singleShot(1000, lambda: verificar_actualizacion(ventana_principal))
 
     login = LoginWindow(on_login_exitoso)
     login.show()
 
     sys.exit(app.exec())
-
-def on_login_exitoso(usuario_id, rol):
-    from services.sesion import iniciar_sesion
-    iniciar_sesion(usuario_id, rol)
-    global ventana_principal
-    ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso)
-    ventana_principal.show()
 
 
 iniciar_app()

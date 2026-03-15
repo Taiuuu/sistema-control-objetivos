@@ -64,7 +64,8 @@ class LoginWindow(QWidget):
         super().__init__()
         self.on_login_exitoso = on_login_exitoso
         self.setWindowTitle("V.E.S.P Organizations")
-        self.setFixedSize(400, 520)
+        self.setFixedSize(400, 540)
+        self.setWindowIcon(QIcon("assets/vesp.png"))
 
         layout = QVBoxLayout()
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -89,7 +90,17 @@ class LoginWindow(QWidget):
         subtitulo.setStyleSheet("font-size: 12px; color: #888;")
         layout.addWidget(subtitulo)
 
-        layout.addSpacing(20)
+        # Version
+        try:
+            version = open("version.txt").read().strip()
+        except Exception:
+            version = ""
+        version_label = QLabel(f"v{version}")
+        version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        version_label.setStyleSheet("font-size: 10px; color: #555;")
+        layout.addWidget(version_label)
+
+        layout.addSpacing(10)
 
         # Usuario
         self.input_usuario = QLineEdit()
