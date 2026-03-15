@@ -1,93 +1,134 @@
-import sqlite3
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Módulo de conexión y creación de base de datos (SQLite)
+# =============================================================================
 
-def crear_base_datos():
-    conexion = sqlite3.connect('seguridad.db')
+import sqlite3
+import bcrypt
+
+
+# =============================================================================
+# CONEXIÓN
+# =============================================================================
+
+DB_PATH = "seguridad.db"
+
+
+def conectar() -> sqlite3.Connection:
+    """Retorna una conexión activa a la base de datos."""
+    return sqlite3.connect(DB_PATH)
+
+
+# =============================================================================
+# CREACIÓN DE TABLAS
+# =============================================================================
+
+def crear_base_datos() -> None:
+    """
+    Crea todas las tablas del sistema si no existen.
+    También inserta el usuario admin por defecto en el primer uso.
+    """
+    conexion = conectar()
     cursor = conexion.cursor()
 
-    # Tabla de Objetivos
-    cursor.execute('''
+    # Objetivos: lugares que deben ser controlados
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS objetivos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre       TEXT    NOT NULL,
             fecha_inicio TEXT,
-            fecha_fin TEXT,
-            dias_semana TEXT
+            fecha_fin    TEXT,
+            dias_semana  TEXT
         )
-    ''')
+    """)
 
-    # Tabla de Supervisores
-    cursor.execute('''
+    # Supervisores: personas que realizan los controles
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS supervisores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id     INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT NOT NULL
         )
-    ''')
+    """)
 
-    # Tabla de Pasadas
-    cursor.execute('''
+    # Pasadas: cada registro de control de un supervisor sobre un objetivo
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS pasadas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fecha TEXT,
-            hora TEXT,
-            turno TEXT,
-            objetivo_id INTEGER,
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha         TEXT,
+            hora          TEXT,
+            turno         TEXT,
+            objetivo_id   INTEGER,
             supervisor_id INTEGER,
-            FOREIGN KEY (objetivo_id) REFERENCES objetivos(id),
+            FOREIGN KEY (objetivo_id)   REFERENCES objetivos(id),
             FOREIGN KEY (supervisor_id) REFERENCES supervisores(id)
         )
-    ''')
-    #Tabla para guardar qué dos supervisores estaban de turno cada día
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS equipos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fecha TEXT,
-        turno TEXT,
-        supervisor1_id INTEGER,
-        supervisor2_id INTEGER,
-        FOREIGN KEY (supervisor1_id) REFERENCES supervisores(id),
-        FOREIGN KEY (supervisor2_id) REFERENCES supervisores(id)
-        )
-    ''')
-    #Tabla para notas
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS notas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fecha TEXT,
-        nota TEXT
-        )
-    ''')
-    #Tabla de Usuarios
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL,
-        rol TEXT NOT NULL DEFAULT 'operador',
-        debe_cambiar_password INTEGER DEFAULT 1
-        )
-    ''')
+    """)
 
-    # Crear usuario admin por defecto si no existe
-    cursor.execute("SELECT COUNT(*) FROM usuarios")
-    if cursor.fetchone()[0] == 0:
-        import bcrypt
-        password_hash = bcrypt.hashpw("0000".encode(), bcrypt.gensalt()).decode()
-        cursor.execute('''
-            INSERT INTO usuarios (username, password, rol, debe_cambiar_password)
-            VALUES (?, ?, ?, ?)
-        ''', ("admin", password_hash, "admin", 1))
-    #LOGS
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+    # Equipos: los dos supervisores asignados a cada turno por día
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS equipos (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha           TEXT,
+            turno           TEXT,
+            supervisor1_id  INTEGER,
+            supervisor2_id  INTEGER,
+            FOREIGN KEY (supervisor1_id) REFERENCES supervisores(id),
+            FOREIGN KEY (supervisor2_id) REFERENCES supervisores(id)
+        )
+    """)
+
+    # Notas: observaciones o incidentes registrados por día
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS notas (
+            id    INTEGER PRIMARY KEY AUTOINCREMENT,
             fecha TEXT,
-            hora TEXT,
+            nota  TEXT
+        )
+    """)
+
+    # Usuarios: cuentas de acceso al sistema
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+            username              TEXT    NOT NULL UNIQUE,
+            password              TEXT    NOT NULL,
+            rol                   TEXT    NOT NULL DEFAULT 'operador',
+            debe_cambiar_password INTEGER DEFAULT 1
+        )
+    """)
+
+    # Logs: registro de todas las acciones realizadas en el sistema
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS logs (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha      TEXT,
+            hora       TEXT,
             usuario_id INTEGER,
-            accion TEXT,
+            accion     TEXT,
             FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
         )
-    ''')
+    """)
+
+    _crear_admin_si_no_existe(cursor)
+
     conexion.commit()
     conexion.close()
+    print("Base de datos iniciada correctamente.")
 
-    print("Base de datos creada exitosamente.")
+
+# =============================================================================
+# USUARIO ADMIN POR DEFECTO
+# =============================================================================
+
+def _crear_admin_si_no_existe(cursor: sqlite3.Cursor) -> None:
+    """
+    Crea el usuario admin con contraseña 0000 si no hay ningún usuario registrado.
+    El admin deberá cambiar la contraseña en el primer inicio de sesión.
+    """
+    cursor.execute("SELECT COUNT(*) FROM usuarios")
+    if cursor.fetchone()[0] == 0:
+        password_hash = bcrypt.hashpw(b"0000", bcrypt.gensalt()).decode()
+        cursor.execute("""
+            INSERT INTO usuarios (username, password, rol, debe_cambiar_password)
+            VALUES (?, ?, ?, ?)
+        """, ("admin", password_hash, "admin", 1))

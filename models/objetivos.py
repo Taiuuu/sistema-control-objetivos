@@ -1,41 +1,59 @@
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Módulo de gestión de objetivos
+# =============================================================================
+
 import sqlite3
+from database.db import DB_PATH
 
-def agregar_objetivo(nombre, fecha_inicio, fecha_fin, dias_semana):
-    conexion = sqlite3.connect('seguridad.db')
+
+# =============================================================================
+# ALTA
+# =============================================================================
+
+def agregar_objetivo(nombre: str, fecha_inicio: str, fecha_fin: str | None, dias_semana: str) -> None:
+    """
+    Registra un nuevo objetivo en el sistema.
+    dias_semana: string con números separados por coma (ej: '1,2,3' = lunes, martes, miércoles)
+    fecha_fin: puede ser None si el objetivo no tiene fecha de finalización definida
+    """
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
-
-    cursor.execute('''
+    cursor.execute("""
         INSERT INTO objetivos (nombre, fecha_inicio, fecha_fin, dias_semana)
         VALUES (?, ?, ?, ?)
-    ''', (nombre, fecha_inicio, fecha_fin, dias_semana))
-
+    """, (nombre, fecha_inicio, fecha_fin, dias_semana))
     conexion.commit()
     conexion.close()
-    print(f"Objetivo '{nombre}' agregado correctamente.")
 
-def listar_objetivos():
-    conexion = sqlite3.connect('seguridad.db')
+
+# =============================================================================
+# CONSULTA
+# =============================================================================
+
+def listar_objetivos() -> list:
+    """Retorna todos los objetivos registrados en el sistema."""
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
-
-    cursor.execute('SELECT * FROM objetivos')
-    objetivos = cursor.fetchall()
-
+    cursor.execute("SELECT * FROM objetivos")
+    resultado = cursor.fetchall()
     conexion.close()
+    return resultado
 
-    if not objetivos:
-        print("No hay objetivos cargados.")
-    else:
-        for o in objetivos:
-            print(f"{o[0]} - {o[1]} | Inicio: {o[2]} | Fin: {o[3]} | Días: {o[4]}")
 
-def dar_de_baja_objetivo(objetivo_id, fecha_fin):
-    conexion = sqlite3.connect('seguridad.db')
+# =============================================================================
+# BAJA
+# =============================================================================
+
+def dar_de_baja_objetivo(objetivo_id: int, fecha_fin: str) -> None:
+    """
+    Registra la fecha de finalización de un objetivo.
+    A partir de esa fecha el objetivo deja de aparecer en el control diario.
+    """
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
-
-    cursor.execute('''
+    cursor.execute("""
         UPDATE objetivos SET fecha_fin = ? WHERE id = ?
-    ''', (fecha_fin, objetivo_id))
-
+    """, (fecha_fin, objetivo_id))
     conexion.commit()
     conexion.close()
-    print(f"Objetivo dado de baja correctamente.")

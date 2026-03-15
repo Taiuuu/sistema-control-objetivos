@@ -1,37 +1,50 @@
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Módulo de registro de pasadas (turnos)
+# =============================================================================
+
 import sqlite3
+from database.db import DB_PATH
 
-def registrar_turno(fecha, hora, turno, objetivo_id, supervisor_id):
-    conexion = sqlite3.connect('seguridad.db')
+
+# =============================================================================
+# ALTA
+# =============================================================================
+
+def registrar_turno(fecha: str, hora: str, turno: str, objetivo_id: int, supervisor_id: int) -> None:
+    """
+    Registra una pasada de un supervisor por un objetivo.
+    turno: 'dia' o 'noche'
+    """
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
-
-    cursor.execute('''
+    cursor.execute("""
         INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id)
         VALUES (?, ?, ?, ?, ?)
-    ''', (fecha, hora, turno, objetivo_id, supervisor_id))
-
+    """, (fecha, hora, turno, objetivo_id, supervisor_id))
     conexion.commit()
     conexion.close()
-    print(f"Turno registrado correctamente.")
 
-def listar_turnos_del_dia(fecha):
-    conexion = sqlite3.connect('seguridad.db')
+
+# =============================================================================
+# CONSULTA
+# =============================================================================
+
+def listar_turnos_del_dia(fecha: str) -> list:
+    """
+    Retorna todas las pasadas registradas para una fecha dada,
+    incluyendo nombre del objetivo y del supervisor.
+    """
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
-
-    cursor.execute('''
+    cursor.execute("""
         SELECT p.id, p.hora, p.turno, o.nombre, s.nombre
         FROM pasadas p
         JOIN objetivos o ON p.objetivo_id = o.id
         JOIN supervisores s ON p.supervisor_id = s.id
         WHERE p.fecha = ?
-    ''', (fecha,))
-
-    turnos = cursor.fetchall()
+        ORDER BY p.hora
+    """, (fecha,))
+    resultado = cursor.fetchall()
     conexion.close()
-
-    if not turnos:
-        print(f"No hay turnos registrados para {fecha}.")
-    else:
-        for t in turnos:
-            print(f"{t[0]} | {t[1]} | {t[2]} | Objetivo: {t[3]} | Supervisor: {t[4]}")
-    
-    from services.logger import registrar_accion
+    return resultado

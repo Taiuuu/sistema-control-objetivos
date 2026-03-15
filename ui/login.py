@@ -1,23 +1,33 @@
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Pantalla de inicio de sesión
+# =============================================================================
+
+import sqlite3
+import bcrypt
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel,
     QLineEdit, QPushButton, QMessageBox, QHBoxLayout
 )
 from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtCore import Qt
-import sqlite3
-import bcrypt
 
 
-def verificar_login(username, password):
+# =============================================================================
+# AUTENTICACIÓN
+# =============================================================================
+
+def verificar_login(username: str, password: str) -> tuple | None:
+    """
+    Verifica las credenciales del usuario contra la base de datos.
+    Retorna (id, rol, debe_cambiar_password) si son correctas, None si no.
+    """
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
-
-    cursor.execute('''
+    cursor.execute("""
         SELECT id, rol, debe_cambiar_password, password
-        FROM usuarios
-        WHERE username = ?
-    ''', (username,))
-
+        FROM usuarios WHERE username = ?
+    """, (username,))
     resultado = cursor.fetchone()
     conexion.close()
 
@@ -33,7 +43,12 @@ def verificar_login(username, password):
     return None
 
 
-def campo_password_con_ojito(placeholder):
+# =============================================================================
+# COMPONENTE: CAMPO CONTRASEÑA CON OJITO
+# =============================================================================
+
+def campo_password_con_ojito(placeholder: str) -> tuple:
+    """Retorna un contenedor con campo de contraseña y botón para mostrar/ocultar."""
     contenedor = QWidget()
     layout = QHBoxLayout(contenedor)
     layout.setContentsMargins(0, 0, 0, 0)
@@ -58,6 +73,10 @@ def campo_password_con_ojito(placeholder):
     return contenedor, input_pw
 
 
+# =============================================================================
+# VENTANA DE LOGIN
+# =============================================================================
+
 class LoginWindow(QWidget):
 
     def __init__(self, on_login_exitoso):
@@ -73,13 +92,16 @@ class LoginWindow(QWidget):
 
         # Logo
         logo_label = QLabel()
-        pixmap = QPixmap("assets/vesp.png")
-        pixmap = pixmap.scaled(180, 180, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        pixmap = QPixmap("assets/vesp.png").scaled(
+            180, 180,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
         logo_label.setPixmap(pixmap)
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(logo_label)
 
-        # Nombre empresa
+        # Nombre y subtítulo
         nombre_label = QLabel("V.E.S.P Organizations")
         nombre_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         nombre_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #4CAF50;")
@@ -90,7 +112,7 @@ class LoginWindow(QWidget):
         subtitulo.setStyleSheet("font-size: 12px; color: #888;")
         layout.addWidget(subtitulo)
 
-        # Version
+        # Versión actual
         try:
             version = open("version.txt").read().strip()
         except Exception:
@@ -102,17 +124,16 @@ class LoginWindow(QWidget):
 
         layout.addSpacing(10)
 
-        # Usuario
+        # Campos de usuario y contraseña
         self.input_usuario = QLineEdit()
         self.input_usuario.setPlaceholderText("Usuario")
         self.input_usuario.setFixedHeight(40)
         layout.addWidget(self.input_usuario)
 
-        # Contraseña con ojito
         contenedor_pw, self.input_password = campo_password_con_ojito("Contraseña")
         layout.addWidget(contenedor_pw)
 
-        # Boton entrar
+        # Botón entrar
         boton_entrar = QPushButton("Entrar")
         boton_entrar.setFixedHeight(40)
         boton_entrar.setStyleSheet("""
@@ -123,19 +144,17 @@ class LoginWindow(QWidget):
                 font-weight: bold;
                 border-radius: 4px;
             }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
+            QPushButton:hover { background-color: #45a049; }
         """)
         boton_entrar.clicked.connect(self.intentar_login)
-        layout.addWidget(boton_entrar)
-
         self.input_password.returnPressed.connect(self.intentar_login)
+        layout.addWidget(boton_entrar)
 
         layout.addSpacing(10)
         self.setLayout(layout)
 
-    def intentar_login(self):
+    def intentar_login(self) -> None:
+        """Valida las credenciales y redirige según el estado del usuario."""
         username = self.input_usuario.text().strip()
         password = self.input_password.text()
 
@@ -156,20 +175,22 @@ class LoginWindow(QWidget):
         registrar_accion(usuario_id, "Inicio de sesión")
 
         if debe_cambiar:
-            self.pedir_nueva_password(usuario_id)
+            self._pedir_nueva_password(usuario_id)
         else:
             self.on_login_exitoso(usuario_id, rol)
             self.close()
 
-    def pedir_nueva_password(self, usuario_id):
+    def _pedir_nueva_password(self, usuario_id: int) -> None:
+        """Abre la pantalla de cambio de contraseña obligatorio."""
         from ui.cambiar_password import CambiarPassword
-        self.cambiar_pw = CambiarPassword(usuario_id, lambda: self.login_post_cambio(usuario_id))
+        self.cambiar_pw = CambiarPassword(usuario_id, lambda: self._login_post_cambio(usuario_id))
         self.cambiar_pw.show()
 
-    def login_post_cambio(self, usuario_id):
+    def _login_post_cambio(self, usuario_id: int) -> None:
+        """Completa el login después de que el usuario cambió su contraseña."""
         conexion = sqlite3.connect('seguridad.db')
         cursor = conexion.cursor()
-        cursor.execute('SELECT rol FROM usuarios WHERE id = ?', (usuario_id,))
+        cursor.execute("SELECT rol FROM usuarios WHERE id = ?", (usuario_id,))
         rol = cursor.fetchone()[0]
         conexion.close()
         self.on_login_exitoso(usuario_id, rol)

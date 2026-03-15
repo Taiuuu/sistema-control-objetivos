@@ -1,29 +1,43 @@
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Archivo principal de entrada de la aplicación
+# =============================================================================
+
+import sys
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QPalette, QColor
+from PyQt6.QtCore import QTimer
+
 from ui.login import LoginWindow
 from ui.ventana_principal import VentanaPrincipal
 from database.db import crear_base_datos
 from services.backup import hacer_backup
 from services.actualizador import verificar_actualizacion
-import sys
 
 
-def aplicar_tema_oscuro(app):
+# =============================================================================
+# TEMA VISUAL
+# =============================================================================
+
+def aplicar_tema_oscuro(app: QApplication) -> None:
+    """Aplica el tema oscuro corporativo a toda la aplicación."""
     app.setStyle("Fusion")
+
     palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor(30, 30, 30))
-    palette.setColor(QPalette.ColorRole.WindowText, QColor(220, 220, 220))
-    palette.setColor(QPalette.ColorRole.Base, QColor(45, 45, 45))
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(55, 55, 55))
-    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(30, 30, 30))
-    palette.setColor(QPalette.ColorRole.ToolTipText, QColor(220, 220, 220))
-    palette.setColor(QPalette.ColorRole.Text, QColor(220, 220, 220))
-    palette.setColor(QPalette.ColorRole.Button, QColor(55, 55, 55))
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor(220, 220, 220))
-    palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 100, 100))
-    palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+    palette.setColor(QPalette.ColorRole.Window,          QColor(30, 30, 30))
+    palette.setColor(QPalette.ColorRole.WindowText,      QColor(220, 220, 220))
+    palette.setColor(QPalette.ColorRole.Base,            QColor(45, 45, 45))
+    palette.setColor(QPalette.ColorRole.AlternateBase,   QColor(55, 55, 55))
+    palette.setColor(QPalette.ColorRole.ToolTipBase,     QColor(30, 30, 30))
+    palette.setColor(QPalette.ColorRole.ToolTipText,     QColor(220, 220, 220))
+    palette.setColor(QPalette.ColorRole.Text,            QColor(220, 220, 220))
+    palette.setColor(QPalette.ColorRole.Button,          QColor(55, 55, 55))
+    palette.setColor(QPalette.ColorRole.ButtonText,      QColor(220, 220, 220))
+    palette.setColor(QPalette.ColorRole.BrightText,      QColor(255, 100, 100))
+    palette.setColor(QPalette.ColorRole.Highlight,       QColor(42, 130, 218))
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
     app.setPalette(palette)
+
     app.setStyleSheet("""
         QWidget {
             font-family: Segoe UI;
@@ -83,20 +97,33 @@ def aplicar_tema_oscuro(app):
     """)
 
 
-def iniciar_app():
+# =============================================================================
+# INICIO DE SESIÓN
+# =============================================================================
+
+def iniciar_app() -> None:
+    """
+    Punto de entrada principal.
+    Inicializa la base de datos, realiza backup y lanza la pantalla de login.
+    """
     crear_base_datos()
     hacer_backup()
 
     app = QApplication(sys.argv)
     aplicar_tema_oscuro(app)
 
-    def on_login_exitoso(usuario_id, rol):
+    ventana_principal = None
+
+    def on_login_exitoso(usuario_id: int, rol: str) -> None:
+        """Callback ejecutado tras un login exitoso. Abre la ventana principal."""
         from services.sesion import iniciar_sesion
-        from PyQt6.QtCore import QTimer
         iniciar_sesion(usuario_id, rol)
-        global ventana_principal
+
+        nonlocal ventana_principal
         ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso)
         ventana_principal.show()
+
+        # Verificar actualizaciones con delay para que cargue la ventana primero
         QTimer.singleShot(1000, lambda: verificar_actualizacion(ventana_principal))
 
     login = LoginWindow(on_login_exitoso)
@@ -105,4 +132,9 @@ def iniciar_app():
     sys.exit(app.exec())
 
 
-iniciar_app()
+# =============================================================================
+# ENTRADA
+# =============================================================================
+
+if __name__ == "__main__":
+    iniciar_app()

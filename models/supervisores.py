@@ -1,30 +1,36 @@
-from database.db import crear_base_datos
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Módulo de gestión de supervisores
+# =============================================================================
+
 import sqlite3
+from database.db import DB_PATH
 
-def agregar_supervisor(nombre):
-    conexion = sqlite3.connect('seguridad.db')
+
+# =============================================================================
+# ALTA
+# =============================================================================
+
+def agregar_supervisor(nombre: str) -> None:
+    """Registra un nuevo supervisor en el sistema."""
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
-
-    cursor.execute('''
-        INSERT INTO supervisores (nombre)
-        VALUES (?)
-    ''', (nombre,))
-
+    cursor.execute("""
+        INSERT INTO supervisores (nombre) VALUES (?)
+    """, (nombre,))
     conexion.commit()
     conexion.close()
-    print(f"Supervisor '{nombre}' agregado correctamente.")
 
-def listar_supervisores():
-    conexion = sqlite3.connect('seguridad.db')
+
+# =============================================================================
+# CONSULTA
+# =============================================================================
+
+def listar_supervisores() -> list:
+    """Retorna todos los supervisores registrados en el sistema."""
+    conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
-
-    cursor.execute('SELECT * FROM supervisores')
-    supervisores = cursor.fetchall()
-
+    cursor.execute("SELECT * FROM supervisores")
+    resultado = cursor.fetchall()
     conexion.close()
-
-    if not supervisores:
-        print("No hay supervisores cargados.")
-    else:
-        for s in supervisores:
-            print(f"{s[0]} - {s[1]}")
+    return resultado

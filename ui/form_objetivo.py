@@ -1,4 +1,9 @@
-import sys
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Formulario para agregar objetivos
+# =============================================================================
+
+import sqlite3
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel,
     QLineEdit, QPushButton, QCheckBox, QDateEdit, QMessageBox
@@ -7,59 +12,56 @@ from PyQt6.QtCore import QDate
 from models.objetivos import agregar_objetivo
 
 
+# Mapeo de días de la semana a su número (formato ISO: 1=lunes, 7=domingo)
+DIAS_MAP = {
+    "Lunes": "1", "Martes": "2", "Miércoles": "3",
+    "Jueves": "4", "Viernes": "5", "Sábado": "6", "Domingo": "7"
+}
+
+
+# =============================================================================
+# FORMULARIO DE OBJETIVO
+# =============================================================================
+
 class FormObjetivo(QWidget):
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Agregar objetivo")
-        self.setGeometry(300, 300, 400, 400)
+        self.setGeometry(300, 300, 400, 420)
 
         layout = QVBoxLayout()
 
-        # Nombre
+        # Nombre del objetivo
         layout.addWidget(QLabel("Nombre del objetivo:"))
         self.input_nombre = QLineEdit()
         layout.addWidget(self.input_nombre)
 
-        # Fecha inicio
+        # Fecha de inicio de cobertura
         layout.addWidget(QLabel("Fecha inicio:"))
         self.input_inicio = QDateEdit()
         self.input_inicio.setDate(QDate.currentDate())
         self.input_inicio.setCalendarPopup(True)
         layout.addWidget(self.input_inicio)
 
-        # Dias de cobertura
+        # Días de cobertura semanal
         layout.addWidget(QLabel("Días de cobertura:"))
-        self.dias = {
-            "Lunes": QCheckBox("Lunes"),
-            "Martes": QCheckBox("Martes"),
-            "Miércoles": QCheckBox("Miércoles"),
-            "Jueves": QCheckBox("Jueves"),
-            "Viernes": QCheckBox("Viernes"),
-            "Sábado": QCheckBox("Sábado"),
-            "Domingo": QCheckBox("Domingo"),
-        }
+        self.dias = {dia: QCheckBox(dia) for dia in DIAS_MAP}
         for checkbox in self.dias.values():
             layout.addWidget(checkbox)
 
-        # Boton guardar
         boton_guardar = QPushButton("Guardar objetivo")
-        boton_guardar.clicked.connect(self.guardar)
+        boton_guardar.clicked.connect(self._guardar)
         layout.addWidget(boton_guardar)
 
         self.setLayout(layout)
 
-    def guardar(self):
+    def _guardar(self) -> None:
+        """Valida los datos y registra el nuevo objetivo en la base de datos."""
         nombre = self.input_nombre.text().strip()
         inicio = self.input_inicio.date().toString("yyyy-MM-dd")
-
-        dias_map = {
-            "Lunes": "1", "Martes": "2", "Miércoles": "3",
-            "Jueves": "4", "Viernes": "5", "Sábado": "6", "Domingo": "7"
-        }
-
         dias_seleccionados = [
-            dias_map[dia] for dia, cb in self.dias.items() if cb.isChecked()
+            DIAS_MAP[dia] for dia, cb in self.dias.items() if cb.isChecked()
         ]
 
         if not nombre:
