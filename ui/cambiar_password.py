@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QPushButton, QMessageBox
 )
 import sqlite3
-import hashlib
+import bcrypt
 
 
 class CambiarPassword(QWidget):
@@ -54,7 +54,7 @@ class CambiarPassword(QWidget):
             QMessageBox.warning(self, "Error", "La contraseña debe tener al menos 4 caracteres.")
             return
 
-        password_hash = hashlib.sha256(nueva.encode()).hexdigest()
+        password_hash = bcrypt.hashpw(nueva.encode(), bcrypt.gensalt()).decode()
 
         conexion = sqlite3.connect('seguridad.db')
         cursor = conexion.cursor()

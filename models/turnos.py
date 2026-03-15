@@ -33,3 +33,5 @@ def listar_turnos_del_dia(fecha):
     else:
         for t in turnos:
             print(f"{t[0]} | {t[1]} | {t[2]} | Objetivo: {t[3]} | Supervisor: {t[4]}")
+    
+    from services.logger import registrar_accion

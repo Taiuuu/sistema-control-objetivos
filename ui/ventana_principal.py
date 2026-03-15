@@ -17,6 +17,8 @@ from models.objetivos import dar_de_baja_objetivo
 from ui.lista_pasadas import ListaPasadas
 from ui.notas_diarias import NotasDiarias
 from ui.gestionar_usuarios import GestionarUsuarios
+from PyQt6.QtCore import QTimer
+from services.backup import hacer_backup
 import sqlite3
 
 
@@ -86,9 +88,10 @@ def cargar_supervisores():
 
 class VentanaPrincipal(QWidget):
 
-    def __init__(self, usuario_id=None, rol=None):
+    def __init__(self, usuario_id=None, rol=None, on_login_exitoso=None):
         self.usuario_id = usuario_id
         self.rol = rol
+        self.on_login_exitoso = on_login_exitoso
         super().__init__()
 
         layout = QVBoxLayout()
@@ -152,6 +155,12 @@ class VentanaPrincipal(QWidget):
 
         layout.addLayout(fila_superior)
 
+        # Timer de inactividad - 15 minutos
+        self.timer_inactividad = QTimer()
+        self.timer_inactividad.setInterval(15 * 60 * 1000)
+        self.timer_inactividad.timeout.connect(self.cerrar_por_inactividad)
+        self.timer_inactividad.start()
+       
         # Fila de filtros
         fila_filtros = QHBoxLayout()
 
@@ -241,8 +250,10 @@ class VentanaPrincipal(QWidget):
             self.tabla.setCellWidget(i, 5, boton_baja)
 
     def dar_de_baja(self, objetivo_id):
+        from services.logger import registrar_accion
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
         dar_de_baja_objetivo(objetivo_id, fecha)
+        registrar_accion(self.usuario_id, f"Dio de baja objetivo id={objetivo_id}")
         self.cargar_tabla()
 
     def abrir_form_objetivo(self):
@@ -288,3 +299,26 @@ class VentanaPrincipal(QWidget):
     def abrir_gestionar_usuarios(self):
         self.gestionar_usuarios = GestionarUsuarios()
         self.gestionar_usuarios.show()
+
+    def event(self, evento):
+    from PyQt6.QtCore import QEvent
+    if evento.type() in (
+        QEvent.Type.MouseMove,
+        QEvent.Type.KeyPress,
+        QEvent.Type.MouseButtonPress
+    ):
+        self.timer_inactividad.start()
+    return super().event(evento)
+
+    def cerrar_por_inactividad(self):
+        from PyQt6.QtWidgets import QMessageBox
+        hacer_backup()
+        QMessageBox.information(
+            self,
+            "Sesión cerrada",
+            "La sesión se cerró por inactividad. Se realizó un backup automático."
+        )
+        self.close()
+        from ui.login import LoginWindow
+        self.login = LoginWindow(self.on_login_exitoso)
+        self.login.show()

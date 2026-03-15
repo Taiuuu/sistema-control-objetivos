@@ -5,24 +5,32 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
 import sqlite3
-import hashlib
+import bcrypt
 
 
 def verificar_login(username, password):
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
 
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
-
     cursor.execute('''
-        SELECT id, rol, debe_cambiar_password
+        SELECT id, rol, debe_cambiar_password, password
         FROM usuarios
-        WHERE username = ? AND password = ?
-    ''', (username, password_hash))
+        WHERE username = ?
+    ''', (username,))
 
     resultado = cursor.fetchone()
     conexion.close()
-    return resultado
+
+    if not resultado:
+        return None
+
+    try:
+        if bcrypt.checkpw(password.encode(), resultado[3].encode()):
+            return (resultado[0], resultado[1], resultado[2])
+    except Exception:
+        pass
+
+    return None
 
 
 class LoginWindow(QWidget):
@@ -112,6 +120,9 @@ class LoginWindow(QWidget):
             return
 
         usuario_id, rol, debe_cambiar = resultado
+
+        from services.logger import registrar_accion
+        registrar_accion(usuario_id, "Inicio de sesión")
 
         if debe_cambiar:
             self.pedir_nueva_password(usuario_id)

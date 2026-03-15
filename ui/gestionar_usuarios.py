@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QComboBox, QMessageBox
 )
 import sqlite3
-import hashlib
+import bcrypt
 
 
 def cargar_usuarios():
@@ -25,7 +25,7 @@ def eliminar_usuario(usuario_id):
 
 
 def resetear_password(usuario_id):
-    password_hash = hashlib.sha256("0000".encode()).hexdigest()
+    password_hash = bcrypt.hashpw("0000".encode(), bcrypt.gensalt()).decode()
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
     cursor.execute('''
@@ -105,7 +105,7 @@ class GestionarUsuarios(QWidget):
             QMessageBox.warning(self, "Error", "El nombre de usuario no puede estar vacío.")
             return
 
-        password_hash = hashlib.sha256("0000".encode()).hexdigest()
+        password_hash = bcrypt.hashpw("0000".encode(), bcrypt.gensalt()).decode()
 
         try:
             conexion = sqlite3.connect('seguridad.db')

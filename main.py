@@ -3,6 +3,7 @@ from PyQt6.QtGui import QPalette, QColor
 from ui.login import LoginWindow
 from ui.ventana_principal import VentanaPrincipal
 from database.db import crear_base_datos
+from services.backup import hacer_backup
 import sys
 
 
@@ -83,6 +84,8 @@ def aplicar_tema_oscuro(app):
 
 def iniciar_app():
     crear_base_datos()
+    hacer_backup()
+
     app = QApplication(sys.argv)
     aplicar_tema_oscuro(app)
 
@@ -95,6 +98,11 @@ def iniciar_app():
     login.show()
 
     sys.exit(app.exec())
+
+def on_login_exitoso(usuario_id, rol):
+    global ventana_principal
+    ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso)
+    ventana_principal.show()
 
 
 iniciar_app()

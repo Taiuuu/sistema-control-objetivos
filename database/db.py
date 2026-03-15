@@ -70,13 +70,23 @@ def crear_base_datos():
     # Crear usuario admin por defecto si no existe
     cursor.execute("SELECT COUNT(*) FROM usuarios")
     if cursor.fetchone()[0] == 0:
-        import hashlib
-        password_hash = hashlib.sha256("0000".encode()).hexdigest()
+        import bcrypt
+        password_hash = bcrypt.hashpw("0000".encode(), bcrypt.gensalt()).decode()
         cursor.execute('''
             INSERT INTO usuarios (username, password, rol, debe_cambiar_password)
             VALUES (?, ?, ?, ?)
         ''', ("admin", password_hash, "admin", 1))
-    
+    #LOGS
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha TEXT,
+            hora TEXT,
+            usuario_id INTEGER,
+            accion TEXT,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        )
+    ''')
     conexion.commit()
     conexion.close()
 
