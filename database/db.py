@@ -36,6 +36,18 @@ def crear_base_datos():
             FOREIGN KEY (supervisor_id) REFERENCES supervisores(id)
         )
     ''')
+    #Tabla para guardar qué dos supervisores estaban de turno cada día
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS equipos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fecha TEXT,
+        turno TEXT,
+        supervisor1_id INTEGER,
+        supervisor2_id INTEGER,
+        FOREIGN KEY (supervisor1_id) REFERENCES supervisores(id),
+        FOREIGN KEY (supervisor2_id) REFERENCES supervisores(id)
+        )
+    ''')
 
     conexion.commit()
     conexion.close()
