@@ -23,6 +23,7 @@ from models.objetivos import dar_de_baja_objetivo
 from services.backup import hacer_backup
 from services.logger import registrar_accion
 from database.db import DB_PATH
+from services.assets import ruta_asset
 import sqlite3
 
 

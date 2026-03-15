@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
-
+from services.assets import ruta_asset
 
 # Listado completo de atajos de teclado del sistema
 SHORTCUTS = [
