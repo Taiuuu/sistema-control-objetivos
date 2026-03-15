@@ -14,7 +14,9 @@ from ui.lista_objetivos import ListaObjetivos
 from ui.lista_supervisores import ListaSupervisores
 from ui.reporte_mensual import ReporteMensual
 from models.objetivos import dar_de_baja_objetivo
+from ui.lista_pasadas import ListaPasadas
 import sqlite3
+
 
 
 def contar_pasadas(fecha, objetivo_id, turno=None, supervisor_id=None):
@@ -119,7 +121,11 @@ class VentanaPrincipal(QWidget):
 
         boton_reporte = QPushButton("Reporte mensual")
         boton_reporte.clicked.connect(self.abrir_reporte_mensual)
-
+        
+        boton_lista_pasadas = QPushButton("Ver pasadas")
+        boton_lista_pasadas.clicked.connect(self.abrir_lista_pasadas)
+        
+        fila_superior.addWidget(boton_lista_pasadas)
         fila_superior.addWidget(QLabel("Fecha:"))
         fila_superior.addWidget(self.selector_fecha)
         fila_superior.addWidget(boton_buscar)
@@ -257,3 +263,8 @@ class VentanaPrincipal(QWidget):
     def abrir_reporte_mensual(self):
         self.reporte_mensual = ReporteMensual()
         self.reporte_mensual.show()
+    
+    def abrir_lista_pasadas(self):
+        self.lista_pasadas = ListaPasadas()
+        self.lista_pasadas.destroyed.connect(self.cargar_tabla)
+        self.lista_pasadas.show()
