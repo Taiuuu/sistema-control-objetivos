@@ -1,9 +1,10 @@
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QPalette, QColor
-from PyQt6.QtCore import Qt
+from ui.login import LoginWindow
 from ui.ventana_principal import VentanaPrincipal
 from database.db import crear_base_datos
 import sys
+
 
 def aplicar_tema_oscuro(app):
     app.setStyle("Fusion")
@@ -79,10 +80,21 @@ def aplicar_tema_oscuro(app):
         }
     """)
 
-crear_base_datos()
 
-app = QApplication(sys.argv)
-aplicar_tema_oscuro(app)
-ventana = VentanaPrincipal()
-ventana.show()
-sys.exit(app.exec())
+def iniciar_app():
+    crear_base_datos()
+    app = QApplication(sys.argv)
+    aplicar_tema_oscuro(app)
+
+    def on_login_exitoso(usuario_id, rol):
+        global ventana_principal
+        ventana_principal = VentanaPrincipal(usuario_id, rol)
+        ventana_principal.show()
+
+    login = LoginWindow(on_login_exitoso)
+    login.show()
+
+    sys.exit(app.exec())
+
+
+iniciar_app()

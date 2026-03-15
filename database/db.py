@@ -56,6 +56,26 @@ def crear_base_datos():
         nota TEXT
         )
     ''')
+    #Tabla de Usuarios
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        rol TEXT NOT NULL DEFAULT 'operador',
+        debe_cambiar_password INTEGER DEFAULT 1
+        )
+    ''')
+
+    # Crear usuario admin por defecto si no existe
+    cursor.execute("SELECT COUNT(*) FROM usuarios")
+    if cursor.fetchone()[0] == 0:
+        import hashlib
+        password_hash = hashlib.sha256("0000".encode()).hexdigest()
+        cursor.execute('''
+            INSERT INTO usuarios (username, password, rol, debe_cambiar_password)
+            VALUES (?, ?, ?, ?)
+        ''', ("admin", password_hash, "admin", 1))
     
     conexion.commit()
     conexion.close()

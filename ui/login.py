@@ -1,0 +1,134 @@
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QLineEdit, QPushButton, QMessageBox
+)
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt
+import sqlite3
+import hashlib
+
+
+def verificar_login(username, password):
+    conexion = sqlite3.connect('seguridad.db')
+    cursor = conexion.cursor()
+
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+    cursor.execute('''
+        SELECT id, rol, debe_cambiar_password
+        FROM usuarios
+        WHERE username = ? AND password = ?
+    ''', (username, password_hash))
+
+    resultado = cursor.fetchone()
+    conexion.close()
+    return resultado
+
+
+class LoginWindow(QWidget):
+
+    def __init__(self, on_login_exitoso):
+        super().__init__()
+        self.on_login_exitoso = on_login_exitoso
+        self.setWindowTitle("V.E.S.P Organizations")
+        self.setFixedSize(400, 500)
+
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(15)
+
+        # Logo
+        logo_label = QLabel()
+        pixmap = QPixmap("assets/vesp.png")
+        pixmap = pixmap.scaled(180, 180, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        logo_label.setPixmap(pixmap)
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(logo_label)
+
+        # Nombre empresa
+        nombre_label = QLabel("V.E.S.P Organizations")
+        nombre_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        nombre_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #4CAF50;")
+        layout.addWidget(nombre_label)
+
+        subtitulo = QLabel("Seguridad Privada")
+        subtitulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitulo.setStyleSheet("font-size: 12px; color: #888;")
+        layout.addWidget(subtitulo)
+
+        layout.addSpacing(20)
+
+        # Usuario
+        self.input_usuario = QLineEdit()
+        self.input_usuario.setPlaceholderText("Usuario")
+        self.input_usuario.setFixedHeight(40)
+        self.input_usuario.setStyleSheet("padding: 5px 10px; font-size: 14px;")
+        layout.addWidget(self.input_usuario)
+
+        # Contraseña
+        self.input_password = QLineEdit()
+        self.input_password.setPlaceholderText("Contraseña")
+        self.input_password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.input_password.setFixedHeight(40)
+        self.input_password.setStyleSheet("padding: 5px 10px; font-size: 14px;")
+        self.input_password.returnPressed.connect(self.intentar_login)
+        layout.addWidget(self.input_password)
+
+        # Boton entrar
+        boton_entrar = QPushButton("Entrar")
+        boton_entrar.setFixedHeight(40)
+        boton_entrar.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        boton_entrar.clicked.connect(self.intentar_login)
+        layout.addWidget(boton_entrar)
+
+        layout.addSpacing(10)
+
+        self.setLayout(layout)
+
+    def intentar_login(self):
+        username = self.input_usuario.text().strip()
+        password = self.input_password.text()
+
+        if not username or not password:
+            QMessageBox.warning(self, "Error", "Completá usuario y contraseña.")
+            return
+
+        resultado = verificar_login(username, password)
+
+        if not resultado:
+            QMessageBox.warning(self, "Error", "Usuario o contraseña incorrectos.")
+            self.input_password.clear()
+            return
+
+        usuario_id, rol, debe_cambiar = resultado
+
+        if debe_cambiar:
+            self.pedir_nueva_password(usuario_id)
+        else:
+            self.on_login_exitoso(usuario_id, rol)
+            self.close()
+
+    def pedir_nueva_password(self, usuario_id):
+        from ui.cambiar_password import CambiarPassword
+        self.cambiar_pw = CambiarPassword(usuario_id, lambda: self.login_post_cambio(usuario_id))
+        self.cambiar_pw.show()
+
+    def login_post_cambio(self, usuario_id):
+        conexion = sqlite3.connect('seguridad.db')
+        cursor = conexion.cursor()
+        cursor.execute('SELECT rol FROM usuarios WHERE id = ?', (usuario_id,))
+        rol = cursor.fetchone()[0]
+        conexion.close()
+        self.on_login_exitoso(usuario_id, rol)
+        self.close()

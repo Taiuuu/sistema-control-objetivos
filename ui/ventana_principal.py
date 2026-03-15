@@ -16,6 +16,7 @@ from ui.reporte_mensual import ReporteMensual
 from models.objetivos import dar_de_baja_objetivo
 from ui.lista_pasadas import ListaPasadas
 from ui.notas_diarias import NotasDiarias
+from ui.gestionar_usuarios import GestionarUsuarios
 import sqlite3
 
 
@@ -85,10 +86,10 @@ def cargar_supervisores():
 
 class VentanaPrincipal(QWidget):
 
-    def __init__(self):
+    def __init__(self, usuario_id=None, rol=None):
+        self.usuario_id = usuario_id
+        self.rol = rol
         super().__init__()
-        self.setWindowTitle("Sistema de control de objetivos")
-        self.setGeometry(100, 100, 1100, 500)
 
         layout = QVBoxLayout()
 
@@ -129,6 +130,12 @@ class VentanaPrincipal(QWidget):
         boton_notas = QPushButton("Notas del día")
         boton_notas.clicked.connect(self.abrir_notas)
         
+        if self.rol == "admin":
+            boton_usuarios = QPushButton("Gestionar usuarios")
+            boton_usuarios.clicked.connect(self.abrir_gestionar_usuarios)
+            fila_superior.addWidget(boton_usuarios)
+
+
         fila_superior.addWidget(boton_notas)
         fila_superior.addWidget(boton_lista_pasadas)
         fila_superior.addWidget(QLabel("Fecha:"))
@@ -277,3 +284,7 @@ class VentanaPrincipal(QWidget):
     def abrir_notas(self):
         self.notas = NotasDiarias()
         self.notas.show()
+
+    def abrir_gestionar_usuarios(self):
+        self.gestionar_usuarios = GestionarUsuarios()
+        self.gestionar_usuarios.show()
