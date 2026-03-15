@@ -1,12 +1,11 @@
-"""
-Entry point for the `sistema-control-objetivos` application.
-"""
+from PyQt6.QtWidgets import QApplication
+from ui.ventana_principal import VentanaPrincipal
+from database.db import crear_base_datos
+import sys
 
-def main():
-    """Main function for the program."""
-    # TODO: añadir la lógica principal aquí
-    print("Sistema de control de objetivos iniciado.")
+crear_base_datos()
 
-
-if __name__ == "__main__":
-    main()
+app = QApplication(sys.argv)
+ventana = VentanaPrincipal()
+ventana.show()
+sys.exit(app.exec())

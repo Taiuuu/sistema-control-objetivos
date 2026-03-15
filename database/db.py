@@ -1,27 +1,21 @@
 import sqlite3
 
 def crear_base_datos():
-    conexion = sqlite3.connect('usuarios.db')
+    conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
-    
-    #Tabla de Objetivos
+
+    # Tabla de Objetivos
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS usuarios (
+        CREATE TABLE IF NOT EXISTS objetivos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT NOT NULL,
             fecha_inicio TEXT,
             fecha_fin TEXT,
-            lunes INTEGER,
-            martes INTEGER,
-            miercoles INTEGER,
-            jueves INTEGER,
-            viernes INTEGER,
-            sabado INTEGER,
-            domingo INTEGER,
+            dias_semana TEXT
         )
     ''')
-    
-    #Tabla de Supervisores
+
+    # Tabla de Supervisores
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS supervisores (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,11 +23,12 @@ def crear_base_datos():
         )
     ''')
 
-    #Tabla de Pasadas
+    # Tabla de Pasadas
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS pasadas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             fecha TEXT,
+            hora TEXT,
             turno TEXT,
             objetivo_id INTEGER,
             supervisor_id INTEGER,
@@ -46,4 +41,3 @@ def crear_base_datos():
     conexion.close()
 
     print("Base de datos creada exitosamente.")
-    
