@@ -19,6 +19,7 @@ from ui.notas_diarias import NotasDiarias
 from ui.gestionar_usuarios import GestionarUsuarios
 from PyQt6.QtCore import QTimer
 from services.backup import hacer_backup
+from ui.vista_logs import VistaLogs
 import sqlite3
 
 
@@ -137,6 +138,11 @@ class VentanaPrincipal(QWidget):
             boton_usuarios = QPushButton("Gestionar usuarios")
             boton_usuarios.clicked.connect(self.abrir_gestionar_usuarios)
             fila_superior.addWidget(boton_usuarios)
+        
+        if self.rol == "admin":
+            boton_logs = QPushButton("Historial")
+            boton_logs.clicked.connect(self.abrir_logs)
+            fila_superior.addWidget(boton_logs)
 
 
         fila_superior.addWidget(boton_notas)
@@ -301,14 +307,14 @@ class VentanaPrincipal(QWidget):
         self.gestionar_usuarios.show()
 
     def event(self, evento):
-    from PyQt6.QtCore import QEvent
-    if evento.type() in (
-        QEvent.Type.MouseMove,
-        QEvent.Type.KeyPress,
-        QEvent.Type.MouseButtonPress
-    ):
-        self.timer_inactividad.start()
-    return super().event(evento)
+        from PyQt6.QtCore import QEvent
+        if evento.type() in (
+            QEvent.Type.MouseMove,
+            QEvent.Type.KeyPress,
+            QEvent.Type.MouseButtonPress
+        ):
+            self.timer_inactividad.start()
+        return super().event(evento)
 
     def cerrar_por_inactividad(self):
         from PyQt6.QtWidgets import QMessageBox
@@ -322,3 +328,7 @@ class VentanaPrincipal(QWidget):
         from ui.login import LoginWindow
         self.login = LoginWindow(self.on_login_exitoso)
         self.login.show()
+    
+    def abrir_logs(self):
+        self.logs = VistaLogs()
+        self.logs.show()
