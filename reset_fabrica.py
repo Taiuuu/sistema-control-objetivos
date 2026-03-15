@@ -29,12 +29,12 @@ def reset_fabrica():
     # Resetear los contadores de autoincremento
     conn.execute("DELETE FROM sqlite_sequence")
 
-    # Recrear usuario admin por defecto
+    # Recrear usuario admin por defecto sin requerir cambio de contraseña
     password_hash = bcrypt.hashpw(b"0000", bcrypt.gensalt()).decode()
     conn.execute("""
         INSERT INTO usuarios (username, password, rol, debe_cambiar_password)
         VALUES (?, ?, ?, ?)
-    """, ("admin", password_hash, "admin", 1))
+    """, ("admin", password_hash, "admin", 0))
 
     conn.commit()
     conn.close()

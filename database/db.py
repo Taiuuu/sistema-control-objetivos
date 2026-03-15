@@ -123,7 +123,7 @@ def crear_base_datos() -> None:
 def _crear_admin_si_no_existe(cursor: sqlite3.Cursor) -> None:
     """
     Crea el usuario admin con contraseña 0000 si no hay ningún usuario registrado.
-    El admin deberá cambiar la contraseña en el primer inicio de sesión.
+    El admin no necesita cambiar la contraseña al primer inicio.
     """
     cursor.execute("SELECT COUNT(*) FROM usuarios")
     if cursor.fetchone()[0] == 0:
@@ -131,4 +131,4 @@ def _crear_admin_si_no_existe(cursor: sqlite3.Cursor) -> None:
         cursor.execute("""
             INSERT INTO usuarios (username, password, rol, debe_cambiar_password)
             VALUES (?, ?, ?, ?)
-        """, ("admin", password_hash, "admin", 1))
+        """, ("admin", password_hash, "admin", 0))
