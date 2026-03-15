@@ -18,8 +18,10 @@ Permite registrar y visualizar en tiempo real qué objetivos fueron controlados 
 - **Python 3**
 - **PyQt6** — Interfaz gráfica de escritorio
 - **SQLite** — Base de datos local
+- **bcrypt** — Encriptación de contraseñas
 - **openpyxl** — Exportación a Excel
 - **reportlab** — Exportación a PDF
+- **requests** — Verificación de actualizaciones
 
 ---
 
@@ -27,13 +29,13 @@ Permite registrar y visualizar en tiempo real qué objetivos fueron controlados 
 
 ### 1. Clonar el repositorio
 ```bash
-git clone https://github.com/tuusuario/sistema-control-objetivos.git
+git clone https://github.com/Taiuuu/sistema-control-objetivos.git
 cd sistema-control-objetivos
 ```
 
 ### 2. Instalar dependencias
 ```bash
-pip install PyQt6 openpyxl reportlab
+pip install PyQt6 openpyxl reportlab bcrypt requests
 ```
 
 ### 3. Ejecutar el sistema
@@ -41,35 +43,108 @@ pip install PyQt6 openpyxl reportlab
 python main.py
 ```
 
+### 4. Credenciales por defecto
+```
+Usuario: admin
+Contraseña: 0000
+```
+
+Al primer inicio se pedirá cambiar la contraseña.
+
 ---
 
-## Cómo usar el sistema
+## Funcionalidades
 
-### Configuración inicial
-1. Agregar supervisores desde el botón **Agregar supervisor**
-2. Agregar objetivos desde el botón **Agregar objetivo** indicando nombre, fecha de inicio y días de cobertura
+- Control diario de objetivos con estado por turno (día/noche)
+- Registro de equipos de turno (dos supervisores por turno)
+- Registro de pasadas con filtro automático por equipo de turno
+- Tabla principal con colores de estado en tiempo real
+- Filtros por turno, supervisor y estado
+- Buscador de objetivos en tiempo real
+- Notas y observaciones diarias
+- Reporte mensual de cumplimiento por objetivo
+- Exportación de reportes a Excel y PDF con logo corporativo
+- Sistema de usuarios con roles (admin/operador)
+- Historial de acciones (logs de auditoría)
+- Backup automático diario de la base de datos
+- Cierre de sesión automático por inactividad con backup previo
+- Auto-actualización desde GitHub
+- Atajos de teclado para operaciones frecuentes
 
-### Uso diario
-1. Registrar el equipo de turno del día con **Registrar turno**
-2. Registrar cada pasada con **Registrar pasada**
-3. Visualizar el estado del día en la tabla principal con colores:
-   - 🟢 **Verde** — Pasaron los dos turnos
-   - 🟡 **Amarillo** — Faltó un turno
-   - 🔴 **Rojo** — No pasó nadie
+---
 
-### Reportes
-- Generar reporte mensual de cumplimiento por objetivo
-- Exportar a Excel o PDF
+## Atajos de teclado
 
-### Notas
-- Registrar incidentes o novedades del día desde **Notas del día**
+| Atajo | Acción |
+|-------|--------|
+| Ctrl + P | Registrar pasada |
+| Ctrl + O | Agregar objetivo |
+| Ctrl + S | Agregar supervisor |
+| Ctrl + T | Registrar turno |
+| Ctrl + N | Notas del día |
+| Ctrl + R | Reporte mensual |
+| Ctrl + B | Actualizar tabla |
+| Ctrl + H | Ayuda |
+
+---
+
+## Reset de fábrica
+
+Para borrar todos los datos y dejar el sistema como nuevo:
+```bash
+python reset_fabrica.py
+```
 
 ---
 
 ## Seguridad
 
-El sistema es de uso exclusivo interno de **V.E.S.P Organizations**.
-Los datos almacenados son privados y confidenciales.
+- Contraseñas encriptadas con **bcrypt**
+- Sistema de roles (admin/operador)
+- Historial completo de acciones
+- Backup automático diario
+- Cierre de sesión por inactividad
+
+---
+
+## Estructura del proyecto
+```
+sistema-control-objetivos/
+├── main.py
+├── version.txt
+├── reset_fabrica.py
+├── assets/
+│   └── vesp.png
+├── database/
+│   └── db.py
+├── models/
+│   ├── objetivos.py
+│   ├── supervisores.py
+│   └── turnos.py
+├── services/
+│   ├── actualizador.py
+│   ├── backup.py
+│   ├── exportar.py
+│   ├── logger.py
+│   ├── reportes.py
+│   └── sesion.py
+└── ui/
+    ├── ayuda.py
+    ├── cambiar_password.py
+    ├── form_de_turno.py
+    ├── form_objetivo.py
+    ├── form_pasada.py
+    ├── form_supervisor.py
+    ├── gestionar_usuarios.py
+    ├── lista_objetivos.py
+    ├── lista_pasadas.py
+    ├── lista_supervisores.py
+    ├── login.py
+    ├── notas_diarias.py
+    ├── reporte_mensual.py
+    ├── ventana_principal.py
+    └── vista_logs.py
+```
 
 ---
 
