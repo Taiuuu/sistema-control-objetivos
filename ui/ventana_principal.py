@@ -1,9 +1,10 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QLabel,
-    QPushButton, QDateEdit, QComboBox, QMessageBox
+    QPushButton, QDateEdit, QComboBox, QMessageBox,
+    QFrame, QSizePolicy
 )
-from PyQt6.QtCore import QDate, QTimer, QEvent
+from PyQt6.QtCore import QDate, QTimer, QEvent, Qt
 from PyQt6.QtGui import QColor, QPixmap, QIcon
 from services.reportes import obtener_objetivos_del_dia
 from ui.form_objetivo import FormObjetivo
@@ -26,17 +27,14 @@ import sqlite3
 def contar_pasadas(fecha, objetivo_id, turno=None, supervisor_id=None):
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
-
     query = 'SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?'
     params = [fecha, objetivo_id]
-
     if turno:
         query += ' AND turno = ?'
         params.append(turno)
     if supervisor_id:
         query += ' AND supervisor_id = ?'
         params.append(supervisor_id)
-
     cursor.execute(query, params)
     resultado = cursor.fetchone()[0]
     conexion.close()
@@ -46,7 +44,6 @@ def contar_pasadas(fecha, objetivo_id, turno=None, supervisor_id=None):
 def obtener_estado_detallado(fecha, objetivo_id):
     pasadas_dia = contar_pasadas(fecha, objetivo_id, turno="dia")
     pasadas_noche = contar_pasadas(fecha, objetivo_id, turno="noche")
-
     if pasadas_dia > 0 and pasadas_noche > 0:
         return "Pasaron los dos", "#90EE90"
     elif pasadas_dia > 0 and pasadas_noche == 0:
@@ -60,7 +57,6 @@ def obtener_estado_detallado(fecha, objetivo_id):
 def obtener_equipo(fecha, turno):
     conexion = sqlite3.connect('seguridad.db')
     cursor = conexion.cursor()
-
     cursor.execute('''
         SELECT s1.nombre, s2.nombre
         FROM equipos e
@@ -68,10 +64,8 @@ def obtener_equipo(fecha, turno):
         JOIN supervisores s2 ON e.supervisor2_id = s2.id
         WHERE e.fecha = ? AND e.turno = ?
     ''', (fecha, turno))
-
     resultado = cursor.fetchone()
     conexion.close()
-
     if resultado:
         return f"{resultado[0]} y {resultado[1]}"
     return "-"
@@ -103,35 +97,122 @@ class VentanaPrincipal(QWidget):
         self.on_login_exitoso = on_login_exitoso
         super().__init__()
         self.setWindowTitle("VESP Control de Objetivos")
-        self.setGeometry(100, 100, 1100, 550)
+        self.setGeometry(100, 100, 1200, 600)
         self.setWindowIcon(QIcon("assets/vesp.png"))
 
-        layout = QVBoxLayout()
+        # Layout principal horizontal
+        layout_principal = QHBoxLayout()
+        layout_principal.setSpacing(0)
+        layout_principal.setContentsMargins(0, 0, 0, 0)
 
-        # Barra superior con logo y bienvenida
-        barra_top = QHBoxLayout()
+        # PANEL LATERAL
+        panel_lateral = QFrame()
+        panel_lateral.setFixedWidth(180)
+        panel_lateral.setStyleSheet("background-color: #1a1a1a; border-right: 1px solid #333;")
+        layout_lateral = QVBoxLayout(panel_lateral)
+        layout_lateral.setSpacing(4)
+        layout_lateral.setContentsMargins(8, 12, 8, 12)
 
-        logo = QLabel()
-        pixmap = QPixmap("assets/vesp.png").scaled(45, 45, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation) if hasattr(self, '_qt_imported') else QPixmap("assets/vesp.png")
-        from PyQt6.QtCore import Qt
-        pixmap = QPixmap("assets/vesp.png").scaled(45, 45, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-        logo.setPixmap(pixmap)
+        # Logo y nombre en panel lateral
+        logo_label = QLabel()
+        pixmap = QPixmap("assets/vesp.png").scaled(60, 60, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        logo_label.setPixmap(pixmap)
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout_lateral.addWidget(logo_label)
 
-        titulo = QLabel("V.E.S.P Organizations")
-        titulo.setStyleSheet("font-size: 16px; font-weight: bold; color: #4CAF50;")
+        titulo_lateral = QLabel("V.E.S.P")
+        titulo_lateral.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        titulo_lateral.setStyleSheet("color: #4CAF50; font-size: 14px; font-weight: bold;")
+        layout_lateral.addWidget(titulo_lateral)
 
+        subtitulo_lateral = QLabel("Organizations")
+        subtitulo_lateral.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitulo_lateral.setStyleSheet("color: #888; font-size: 10px;")
+        layout_lateral.addWidget(subtitulo_lateral)
+
+        # Separador
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("color: #333;")
+        layout_lateral.addWidget(sep)
+        layout_lateral.addSpacing(4)
+
+        # Botones del menu
+        estilo_boton = """
+            QPushButton {
+                background-color: transparent;
+                color: #cccccc;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 12px;
+                text-align: left;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #2a2a2a;
+                color: white;
+            }
+            QPushButton:pressed {
+                background-color: #4CAF50;
+                color: white;
+            }
+        """
+
+        def boton_menu(texto, accion):
+            b = QPushButton(texto)
+            b.setStyleSheet(estilo_boton)
+            b.clicked.connect(accion)
+            return b
+
+        layout_lateral.addWidget(boton_menu("Control diario", self.cargar_tabla))
+        layout_lateral.addWidget(boton_menu("Registrar pasada", self.abrir_form_pasada))
+        layout_lateral.addWidget(boton_menu("Registrar turno", self.abrir_form_turno))
+
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.Shape.HLine)
+        sep2.setStyleSheet("color: #333;")
+        layout_lateral.addWidget(sep2)
+
+        layout_lateral.addWidget(boton_menu("Agregar objetivo", self.abrir_form_objetivo))
+        layout_lateral.addWidget(boton_menu("Ver objetivos", self.abrir_lista_objetivos))
+        layout_lateral.addWidget(boton_menu("Agregar supervisor", self.abrir_form_supervisor))
+        layout_lateral.addWidget(boton_menu("Ver supervisores", self.abrir_lista_supervisores))
+
+        sep3 = QFrame()
+        sep3.setFrameShape(QFrame.Shape.HLine)
+        sep3.setStyleSheet("color: #333;")
+        layout_lateral.addWidget(sep3)
+
+        layout_lateral.addWidget(boton_menu("Ver pasadas", self.abrir_lista_pasadas))
+        layout_lateral.addWidget(boton_menu("Notas del día", self.abrir_notas))
+        layout_lateral.addWidget(boton_menu("Reporte mensual", self.abrir_reporte_mensual))
+
+        if self.rol == "admin":
+            sep4 = QFrame()
+            sep4.setFrameShape(QFrame.Shape.HLine)
+            sep4.setStyleSheet("color: #333;")
+            layout_lateral.addWidget(sep4)
+            layout_lateral.addWidget(boton_menu("Gestionar usuarios", self.abrir_gestionar_usuarios))
+            layout_lateral.addWidget(boton_menu("Historial", self.abrir_logs))
+
+        layout_lateral.addStretch()
+
+        # Usuario logueado abajo
         nombre_usuario = obtener_nombre_usuario(usuario_id)
-        bienvenida = QLabel(f"Bienvenido, {nombre_usuario}")
-        bienvenida.setStyleSheet("font-size: 12px; color: #888;")
+        usuario_label = QLabel(f"👤 {nombre_usuario}")
+        usuario_label.setStyleSheet("color: #888; font-size: 11px; padding: 4px;")
+        usuario_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout_lateral.addWidget(usuario_label)
 
-        barra_top.addWidget(logo)
-        barra_top.addWidget(titulo)
-        barra_top.addStretch()
-        barra_top.addWidget(bienvenida)
+        layout_principal.addWidget(panel_lateral)
 
-        layout.addLayout(barra_top)
+        # PANEL DERECHO
+        panel_derecho = QWidget()
+        layout_derecho = QVBoxLayout(panel_derecho)
+        layout_derecho.setContentsMargins(12, 12, 12, 12)
+        layout_derecho.setSpacing(8)
 
-        # Fila superior con fecha y botones
+        # Fila de fecha y filtros
         fila_superior = QHBoxLayout()
 
         self.selector_fecha = QDateEdit()
@@ -140,61 +221,6 @@ class VentanaPrincipal(QWidget):
 
         boton_buscar = QPushButton("Buscar")
         boton_buscar.clicked.connect(self.cargar_tabla)
-
-        boton_objetivo = QPushButton("Agregar objetivo")
-        boton_objetivo.clicked.connect(self.abrir_form_objetivo)
-
-        boton_supervisor = QPushButton("Agregar supervisor")
-        boton_supervisor.clicked.connect(self.abrir_form_supervisor)
-
-        boton_pasada = QPushButton("Registrar pasada")
-        boton_pasada.clicked.connect(self.abrir_form_pasada)
-
-        boton_turno = QPushButton("Registrar turno")
-        boton_turno.clicked.connect(self.abrir_form_turno)
-
-        boton_lista_objetivos = QPushButton("Ver objetivos")
-        boton_lista_objetivos.clicked.connect(self.abrir_lista_objetivos)
-
-        boton_lista_supervisores = QPushButton("Ver supervisores")
-        boton_lista_supervisores.clicked.connect(self.abrir_lista_supervisores)
-
-        boton_lista_pasadas = QPushButton("Ver pasadas")
-        boton_lista_pasadas.clicked.connect(self.abrir_lista_pasadas)
-
-        boton_notas = QPushButton("Notas del día")
-        boton_notas.clicked.connect(self.abrir_notas)
-
-        boton_reporte = QPushButton("Reporte mensual")
-        boton_reporte.clicked.connect(self.abrir_reporte_mensual)
-
-        fila_superior.addWidget(QLabel("Fecha:"))
-        fila_superior.addWidget(self.selector_fecha)
-        fila_superior.addWidget(boton_buscar)
-        fila_superior.addStretch()
-        fila_superior.addWidget(boton_objetivo)
-        fila_superior.addWidget(boton_supervisor)
-        fila_superior.addWidget(boton_pasada)
-        fila_superior.addWidget(boton_turno)
-        fila_superior.addWidget(boton_lista_objetivos)
-        fila_superior.addWidget(boton_lista_supervisores)
-        fila_superior.addWidget(boton_lista_pasadas)
-        fila_superior.addWidget(boton_notas)
-        fila_superior.addWidget(boton_reporte)
-
-        if self.rol == "admin":
-            boton_usuarios = QPushButton("Gestionar usuarios")
-            boton_usuarios.clicked.connect(self.abrir_gestionar_usuarios)
-            fila_superior.addWidget(boton_usuarios)
-
-            boton_logs = QPushButton("Historial")
-            boton_logs.clicked.connect(self.abrir_logs)
-            fila_superior.addWidget(boton_logs)
-
-        layout.addLayout(fila_superior)
-
-        # Fila de filtros
-        fila_filtros = QHBoxLayout()
 
         self.filtro_turno = QComboBox()
         self.filtro_turno.addItems(["Todos los turnos", "dia", "noche"])
@@ -210,16 +236,20 @@ class VentanaPrincipal(QWidget):
         boton_filtrar = QPushButton("Filtrar")
         boton_filtrar.clicked.connect(self.cargar_tabla)
 
-        fila_filtros.addWidget(QLabel("Turno:"))
-        fila_filtros.addWidget(self.filtro_turno)
-        fila_filtros.addWidget(QLabel("Supervisor:"))
-        fila_filtros.addWidget(self.filtro_supervisor)
-        fila_filtros.addWidget(QLabel("Estado:"))
-        fila_filtros.addWidget(self.filtro_estado)
-        fila_filtros.addWidget(boton_filtrar)
-        fila_filtros.addStretch()
+        fila_superior.addWidget(QLabel("Fecha:"))
+        fila_superior.addWidget(self.selector_fecha)
+        fila_superior.addWidget(boton_buscar)
+        fila_superior.addSpacing(20)
+        fila_superior.addWidget(QLabel("Turno:"))
+        fila_superior.addWidget(self.filtro_turno)
+        fila_superior.addWidget(QLabel("Supervisor:"))
+        fila_superior.addWidget(self.filtro_supervisor)
+        fila_superior.addWidget(QLabel("Estado:"))
+        fila_superior.addWidget(self.filtro_estado)
+        fila_superior.addWidget(boton_filtrar)
+        fila_superior.addStretch()
 
-        layout.addLayout(fila_filtros)
+        layout_derecho.addLayout(fila_superior)
 
         # Tabla
         self.tabla = QTableWidget()
@@ -227,15 +257,18 @@ class VentanaPrincipal(QWidget):
         self.tabla.setHorizontalHeaderLabels([
             "Objetivo", "Turno día", "Turno noche", "Pasadas", "Estado", "Dar de baja"
         ])
-        self.tabla.setColumnWidth(0, 200)
-        self.tabla.setColumnWidth(1, 150)
-        self.tabla.setColumnWidth(2, 150)
+        self.tabla.setColumnWidth(0, 220)
+        self.tabla.setColumnWidth(1, 160)
+        self.tabla.setColumnWidth(2, 160)
         self.tabla.setColumnWidth(3, 80)
-        self.tabla.setColumnWidth(4, 130)
+        self.tabla.setColumnWidth(4, 140)
         self.tabla.setColumnWidth(5, 120)
-        layout.addWidget(self.tabla)
+        self.tabla.setAlternatingRowColors(True)
+        layout_derecho.addWidget(self.tabla)
 
-        self.setLayout(layout)
+        layout_principal.addWidget(panel_derecho)
+        self.setLayout(layout_principal)
+
         self.objetivos_actuales = []
         self.cargar_tabla()
 
@@ -288,7 +321,6 @@ class VentanaPrincipal(QWidget):
         filtro_estado = self.filtro_estado.currentText()
 
         self.objetivos_actuales = obtener_objetivos_del_dia(fecha)
-
         equipo_dia = obtener_equipo(fecha, "dia")
         equipo_noche = obtener_equipo(fecha, "noche")
 
