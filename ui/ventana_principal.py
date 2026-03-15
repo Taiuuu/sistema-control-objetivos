@@ -2,8 +2,9 @@ import sys
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QLabel,
-    QPushButton, QDateEdit
+    QPushButton, QDateEdit,
 )
+from ui.reporte_mensual import ReporteMensual
 from PyQt6.QtCore import QDate
 from PyQt6.QtGui import QColor
 from services.reportes import obtener_objetivos_del_dia
@@ -62,6 +63,10 @@ class VentanaPrincipal(QWidget):
         boton_lista_supervisores = QPushButton("Ver supervisores")
         boton_lista_supervisores.clicked.connect(self.abrir_lista_supervisores)
 
+        boton_reporte = QPushButton("Reporte mensual")
+        boton_reporte.clicked.connect(self.abrir_reporte_mensual)
+        
+        fila_superior.addWidget(boton_reporte)
         fila_superior.addWidget(QLabel("Fecha:"))
         fila_superior.addWidget(self.selector_fecha)
         fila_superior.addWidget(boton_buscar)
@@ -136,3 +141,7 @@ class VentanaPrincipal(QWidget):
     def abrir_lista_supervisores(self):
         self.lista_supervisores = ListaSupervisores()
         self.lista_supervisores.show()
+
+    def abrir_reporte_mensual(self):
+        self.reporte_mensual = ReporteMensual()
+        self.reporte_mensual.show()
