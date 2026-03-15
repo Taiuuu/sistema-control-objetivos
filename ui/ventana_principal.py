@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QFrame, QSizePolicy
 )
 from PyQt6.QtCore import QDate, QTimer, QEvent, Qt
-from PyQt6.QtGui import QColor, QPixmap, QIcon
+from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
 from services.reportes import obtener_objetivos_del_dia
 from ui.form_objetivo import FormObjetivo
 from ui.form_supervisor import FormSupervisor
@@ -18,6 +18,7 @@ from ui.lista_pasadas import ListaPasadas
 from ui.notas_diarias import NotasDiarias
 from ui.vista_logs import VistaLogs
 from ui.gestionar_usuarios import GestionarUsuarios
+from ui.ayuda import Ayuda
 from models.objetivos import dar_de_baja_objetivo
 from services.backup import hacer_backup
 from services.logger import registrar_accion
@@ -100,20 +101,18 @@ class VentanaPrincipal(QWidget):
         self.setGeometry(100, 100, 1200, 600)
         self.setWindowIcon(QIcon("assets/vesp.png"))
 
-        # Layout principal horizontal
         layout_principal = QHBoxLayout()
         layout_principal.setSpacing(0)
         layout_principal.setContentsMargins(0, 0, 0, 0)
 
         # PANEL LATERAL
         panel_lateral = QFrame()
-        panel_lateral.setFixedWidth(180)
+        panel_lateral.setFixedWidth(190)
         panel_lateral.setStyleSheet("background-color: #1a1a1a; border-right: 1px solid #333;")
         layout_lateral = QVBoxLayout(panel_lateral)
         layout_lateral.setSpacing(4)
         layout_lateral.setContentsMargins(8, 12, 8, 12)
 
-        # Logo y nombre en panel lateral
         logo_label = QLabel()
         pixmap = QPixmap("assets/vesp.png").scaled(60, 60, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         logo_label.setPixmap(pixmap)
@@ -130,14 +129,12 @@ class VentanaPrincipal(QWidget):
         subtitulo_lateral.setStyleSheet("color: #888; font-size: 10px;")
         layout_lateral.addWidget(subtitulo_lateral)
 
-        # Separador
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet("color: #333;")
         layout_lateral.addWidget(sep)
         layout_lateral.addSpacing(4)
 
-        # Botones del menu
         estilo_boton = """
             QPushButton {
                 background-color: transparent;
@@ -158,24 +155,24 @@ class VentanaPrincipal(QWidget):
             }
         """
 
-        def boton_menu(texto, accion):
-            b = QPushButton(texto)
+        def boton_menu(texto, accion, shortcut=None):
+            b = QPushButton(texto if not shortcut else f"{texto}  {shortcut}")
             b.setStyleSheet(estilo_boton)
             b.clicked.connect(accion)
             return b
 
-        layout_lateral.addWidget(boton_menu("Control diario", self.cargar_tabla))
-        layout_lateral.addWidget(boton_menu("Registrar pasada", self.abrir_form_pasada))
-        layout_lateral.addWidget(boton_menu("Registrar turno", self.abrir_form_turno))
+        layout_lateral.addWidget(boton_menu("Control diario", self.cargar_tabla, "Ctrl+B"))
+        layout_lateral.addWidget(boton_menu("Registrar pasada", self.abrir_form_pasada, "Ctrl+P"))
+        layout_lateral.addWidget(boton_menu("Registrar turno", self.abrir_form_turno, "Ctrl+T"))
 
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.HLine)
         sep2.setStyleSheet("color: #333;")
         layout_lateral.addWidget(sep2)
 
-        layout_lateral.addWidget(boton_menu("Agregar objetivo", self.abrir_form_objetivo))
+        layout_lateral.addWidget(boton_menu("Agregar objetivo", self.abrir_form_objetivo, "Ctrl+O"))
         layout_lateral.addWidget(boton_menu("Ver objetivos", self.abrir_lista_objetivos))
-        layout_lateral.addWidget(boton_menu("Agregar supervisor", self.abrir_form_supervisor))
+        layout_lateral.addWidget(boton_menu("Agregar supervisor", self.abrir_form_supervisor, "Ctrl+S"))
         layout_lateral.addWidget(boton_menu("Ver supervisores", self.abrir_lista_supervisores))
 
         sep3 = QFrame()
@@ -184,8 +181,9 @@ class VentanaPrincipal(QWidget):
         layout_lateral.addWidget(sep3)
 
         layout_lateral.addWidget(boton_menu("Ver pasadas", self.abrir_lista_pasadas))
-        layout_lateral.addWidget(boton_menu("Notas del día", self.abrir_notas))
-        layout_lateral.addWidget(boton_menu("Reporte mensual", self.abrir_reporte_mensual))
+        layout_lateral.addWidget(boton_menu("Notas del día", self.abrir_notas, "Ctrl+N"))
+        layout_lateral.addWidget(boton_menu("Reporte mensual", self.abrir_reporte_mensual, "Ctrl+R"))
+        layout_lateral.addWidget(boton_menu("Ayuda", self.abrir_ayuda, "Ctrl+H"))
 
         if self.rol == "admin":
             sep4 = QFrame()
@@ -197,7 +195,6 @@ class VentanaPrincipal(QWidget):
 
         layout_lateral.addStretch()
 
-        # Usuario logueado abajo
         nombre_usuario = obtener_nombre_usuario(usuario_id)
         usuario_label = QLabel(f"👤 {nombre_usuario}")
         usuario_label.setStyleSheet("color: #888; font-size: 11px; padding: 4px;")
@@ -212,7 +209,6 @@ class VentanaPrincipal(QWidget):
         layout_derecho.setContentsMargins(12, 12, 12, 12)
         layout_derecho.setSpacing(8)
 
-        # Fila de fecha y filtros
         fila_superior = QHBoxLayout()
 
         self.selector_fecha = QDateEdit()
@@ -251,7 +247,6 @@ class VentanaPrincipal(QWidget):
 
         layout_derecho.addLayout(fila_superior)
 
-        # Tabla
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(6)
         self.tabla.setHorizontalHeaderLabels([
@@ -271,6 +266,16 @@ class VentanaPrincipal(QWidget):
 
         self.objetivos_actuales = []
         self.cargar_tabla()
+
+        # Shortcuts
+        QShortcut(QKeySequence("Ctrl+P"), self).activated.connect(self.abrir_form_pasada)
+        QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self.abrir_form_objetivo)
+        QShortcut(QKeySequence("Ctrl+S"), self).activated.connect(self.abrir_form_supervisor)
+        QShortcut(QKeySequence("Ctrl+T"), self).activated.connect(self.abrir_form_turno)
+        QShortcut(QKeySequence("Ctrl+N"), self).activated.connect(self.abrir_notas)
+        QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self.abrir_reporte_mensual)
+        QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(self.cargar_tabla)
+        QShortcut(QKeySequence("Ctrl+H"), self).activated.connect(self.abrir_ayuda)
 
         # Timer inactividad 15 minutos
         self.timer_inactividad = QTimer()
@@ -451,3 +456,11 @@ class VentanaPrincipal(QWidget):
         else:
             self.logs.raise_()
             self.logs.activateWindow()
+
+    def abrir_ayuda(self):
+        if not hasattr(self, 'ayuda') or not self.ayuda.isVisible():
+            self.ayuda = Ayuda()
+            self.ayuda.show()
+        else:
+            self.ayuda.raise_()
+            self.ayuda.activateWindow()
