@@ -64,9 +64,8 @@ class FormTurno(QWidget):
         # Turno (día o noche)
         layout.addWidget(QLabel("Turno:"))
         self.input_turno = QComboBox()
-        self.input_turno.addItems(["dia", "noche"])
+        self.input_turno.addItems(["diurno", "nocturno"])
         layout.addWidget(self.input_turno)
-
         supervisores = _cargar_supervisores()
 
         # Primer supervisor del equipo

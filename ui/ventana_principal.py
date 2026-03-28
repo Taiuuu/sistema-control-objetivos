@@ -1,3 +1,8 @@
+# =============================================================================
+# VESP Organizations - Sistema de Control de Objetivos
+# Ventana principal del sistema
+# =============================================================================
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QLabel,
@@ -22,12 +27,17 @@ from ui.ayuda import Ayuda
 from models.objetivos import dar_de_baja_objetivo
 from services.backup import hacer_backup
 from services.logger import registrar_accion
-from database.db import DB_PATH
 from services.assets import ruta_asset
+from database.db import DB_PATH
 import sqlite3
 
 
-def contar_pasadas(fecha, objetivo_id, turno=None, supervisor_id=None):
+# =============================================================================
+# FUNCIONES DE CONSULTA
+# =============================================================================
+
+def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_id: int = None) -> int:
+    """Cuenta las pasadas de un objetivo en una fecha, con filtros opcionales."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     query = 'SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?'
@@ -44,9 +54,10 @@ def contar_pasadas(fecha, objetivo_id, turno=None, supervisor_id=None):
     return resultado
 
 
-def obtener_estado_detallado(fecha, objetivo_id):
-    pasadas_dia = contar_pasadas(fecha, objetivo_id, turno="dia")
-    pasadas_noche = contar_pasadas(fecha, objetivo_id, turno="noche")
+def obtener_estado_detallado(fecha: str, objetivo_id: int) -> tuple:
+    """Retorna el estado de cobertura del objetivo y su color correspondiente."""
+    pasadas_dia = contar_pasadas(fecha, objetivo_id, turno="diurno")
+    pasadas_noche = contar_pasadas(fecha, objetivo_id, turno="nocturno")
     if pasadas_dia > 0 and pasadas_noche > 0:
         return "Pasaron los dos", "#90EE90"
     elif pasadas_dia > 0 and pasadas_noche == 0:
@@ -57,16 +68,17 @@ def obtener_estado_detallado(fecha, objetivo_id):
         return "No pasó nadie", "#FF6B6B"
 
 
-def obtener_equipo(fecha, turno):
+def obtener_equipo(fecha: str, turno: str) -> str:
+    """Retorna los nombres del equipo asignado a un turno en una fecha."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
-    cursor.execute('''
+    cursor.execute("""
         SELECT s1.nombre, s2.nombre
         FROM equipos e
         JOIN supervisores s1 ON e.supervisor1_id = s1.id
         JOIN supervisores s2 ON e.supervisor2_id = s2.id
         WHERE e.fecha = ? AND e.turno = ?
-    ''', (fecha, turno))
+    """, (fecha, turno))
     resultado = cursor.fetchone()
     conexion.close()
     if resultado:
@@ -74,7 +86,8 @@ def obtener_equipo(fecha, turno):
     return "-"
 
 
-def cargar_supervisores():
+def cargar_supervisores() -> list:
+    """Retorna todos los supervisores registrados."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute('SELECT id, nombre FROM supervisores')
@@ -83,7 +96,8 @@ def cargar_supervisores():
     return resultado
 
 
-def obtener_nombre_usuario(usuario_id):
+def obtener_nombre_usuario(usuario_id: int) -> str:
+    """Retorna el nombre de usuario dado su ID."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute('SELECT username FROM usuarios WHERE id = ?', (usuario_id,))
@@ -91,6 +105,10 @@ def obtener_nombre_usuario(usuario_id):
     conexion.close()
     return resultado[0] if resultado else "Usuario"
 
+
+# =============================================================================
+# VENTANA PRINCIPAL
+# =============================================================================
 
 class VentanaPrincipal(QWidget):
 
@@ -100,7 +118,7 @@ class VentanaPrincipal(QWidget):
         self.on_login_exitoso = on_login_exitoso
         super().__init__()
         self.setWindowTitle("VESP Control de Objetivos")
-        self.setGeometry(100, 100, 1200, 600)
+        self.setGeometry(100, 100, 1300, 600)
         self.setWindowIcon(QIcon(ruta_asset("assets/vesp.png")))
 
         layout_principal = QHBoxLayout()
@@ -116,7 +134,10 @@ class VentanaPrincipal(QWidget):
         layout_lateral.setContentsMargins(8, 12, 8, 12)
 
         logo_label = QLabel()
-        pixmap = QPixmap(ruta_asset("assets/vesp.png")).scaled(60, 60, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        pixmap = QPixmap(ruta_asset("assets/vesp.png")).scaled(
+            60, 60, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
         logo_label.setPixmap(pixmap)
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout_lateral.addWidget(logo_label)
@@ -222,7 +243,7 @@ class VentanaPrincipal(QWidget):
         boton_buscar.clicked.connect(self.cargar_tabla)
 
         self.filtro_turno = QComboBox()
-        self.filtro_turno.addItems(["Todos los turnos", "dia", "noche"])
+        self.filtro_turno.addItems(["Todos los turnos", "diurno", "nocturno"])
 
         self.filtro_supervisor = QComboBox()
         self.filtro_supervisor.addItem("Todos los supervisores", None)
@@ -230,7 +251,10 @@ class VentanaPrincipal(QWidget):
             self.filtro_supervisor.addItem(s[1], s[0])
 
         self.filtro_estado = QComboBox()
-        self.filtro_estado.addItems(["Todos", "OK", "FALTA"])
+        self.filtro_estado.addItems([
+            "Todos", "Pasaron los dos", "No pasó nadie",
+            "No pasó día", "No pasó noche"
+        ])
 
         boton_filtrar = QPushButton("Filtrar")
         boton_filtrar.clicked.connect(self.cargar_tabla)
@@ -258,18 +282,22 @@ class VentanaPrincipal(QWidget):
 
         layout_derecho.addLayout(fila_superior)
 
-        # Tabla
+        # Tabla con columnas separadas para día y noche
         self.tabla = QTableWidget()
-        self.tabla.setColumnCount(6)
+        self.tabla.setColumnCount(7)
         self.tabla.setHorizontalHeaderLabels([
-            "Objetivo", "Turno día", "Turno noche", "Pasadas", "Estado", "Dar de baja"
+            "Objetivo",
+            "Equipo diurno", "Pasadas día",
+            "Equipo nocturno", "Pasadas noche",
+            "Estado", "Acción"
         ])
-        self.tabla.setColumnWidth(0, 220)
-        self.tabla.setColumnWidth(1, 160)
-        self.tabla.setColumnWidth(2, 160)
-        self.tabla.setColumnWidth(3, 80)
-        self.tabla.setColumnWidth(4, 140)
-        self.tabla.setColumnWidth(5, 120)
+        self.tabla.setColumnWidth(0, 200)
+        self.tabla.setColumnWidth(1, 150)
+        self.tabla.setColumnWidth(2, 90)
+        self.tabla.setColumnWidth(3, 150)
+        self.tabla.setColumnWidth(4, 90)
+        self.tabla.setColumnWidth(5, 130)
+        self.tabla.setColumnWidth(6, 100)
         self.tabla.setAlternatingRowColors(True)
         layout_derecho.addWidget(self.tabla)
 
@@ -304,11 +332,11 @@ class VentanaPrincipal(QWidget):
             self.timer_inactividad.start()
         return super().event(evento)
 
-    def cerrar_por_inactividad(self):
+    def cerrar_por_inactividad(self) -> None:
+        """Cierra la sesión por inactividad y realiza un backup previo."""
         hacer_backup()
         QMessageBox.information(
-            self,
-            "Sesión cerrada",
+            self, "Sesión cerrada",
             "La sesión se cerró por inactividad. Se realizó un backup automático."
         )
         registrar_accion(self.usuario_id, "Sesión cerrada por inactividad")
@@ -317,10 +345,10 @@ class VentanaPrincipal(QWidget):
         self.login = LoginWindow(self.on_login_exitoso)
         self.login.show()
 
-    def closeEvent(self, evento):
+    def closeEvent(self, evento) -> None:
+        """Pide confirmación antes de cerrar el sistema."""
         confirmar = QMessageBox.question(
-            self,
-            "Confirmar salida",
+            self, "Confirmar salida",
             "¿Seguro que querés cerrar el sistema?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
@@ -330,7 +358,8 @@ class VentanaPrincipal(QWidget):
         else:
             evento.ignore()
 
-    def cargar_tabla(self):
+    def cargar_tabla(self) -> None:
+        """Carga los objetivos del día con sus pasadas diurnas y nocturnas separadas."""
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
         turno = self.filtro_turno.currentText()
         turno = None if turno == "Todos los turnos" else turno
@@ -339,47 +368,54 @@ class VentanaPrincipal(QWidget):
         texto_busqueda = self.buscador.text().strip().lower()
 
         self.objetivos_actuales = obtener_objetivos_del_dia(fecha)
-        equipo_dia = obtener_equipo(fecha, "dia")
-        equipo_noche = obtener_equipo(fecha, "noche")
+        equipo_dia = obtener_equipo(fecha, "diurno")
+        equipo_noche = obtener_equipo(fecha, "nocturno")
 
         filas = []
         for o in self.objetivos_actuales:
             if texto_busqueda and texto_busqueda not in o[1].lower():
                 continue
 
-            pasadas = contar_pasadas(fecha, o[0], turno, supervisor_id)
+            pasadas_dia = contar_pasadas(fecha, o[0], turno="diurno", supervisor_id=supervisor_id if turno == "diurno" else None)
+            pasadas_noche = contar_pasadas(fecha, o[0], turno="nocturno", supervisor_id=supervisor_id if turno == "nocturno" else None)
             estado_detallado, color_hex = obtener_estado_detallado(fecha, o[0])
 
-            if filtro_estado == "OK" and estado_detallado != "Pasaron los dos":
-                continue
-            if filtro_estado == "FALTA" and estado_detallado == "Pasaron los dos":
+            if filtro_estado != "Todos" and estado_detallado != filtro_estado:
                 continue
 
-            filas.append((o, pasadas, estado_detallado, color_hex))
+            filas.append((o, pasadas_dia, pasadas_noche, estado_detallado, color_hex))
 
         self.tabla.setRowCount(len(filas))
 
-        for i, (o, pasadas, estado_detallado, color_hex) in enumerate(filas):
+        for i, (o, pasadas_dia, pasadas_noche, estado_detallado, color_hex) in enumerate(filas):
             self.tabla.setItem(i, 0, QTableWidgetItem(o[1]))
             self.tabla.setItem(i, 1, QTableWidgetItem(equipo_dia))
-            self.tabla.setItem(i, 2, QTableWidgetItem(equipo_noche))
-            self.tabla.setItem(i, 3, QTableWidgetItem(str(pasadas)))
-            self.tabla.setItem(i, 4, QTableWidgetItem(estado_detallado))
+            self.tabla.setItem(i, 2, QTableWidgetItem(str(pasadas_dia)))
+            self.tabla.setItem(i, 3, QTableWidgetItem(equipo_noche))
+            self.tabla.setItem(i, 4, QTableWidgetItem(str(pasadas_noche)))
+            self.tabla.setItem(i, 5, QTableWidgetItem(estado_detallado))
 
             color = QColor(color_hex)
-            for col in range(5):
+            for col in range(6):
                 self.tabla.item(i, col).setBackground(color)
                 self.tabla.item(i, col).setForeground(QColor("#000000"))
 
             boton_baja = QPushButton("Dar de baja")
             boton_baja.clicked.connect(lambda checked, obj_id=o[0]: self.dar_de_baja(obj_id))
-            self.tabla.setCellWidget(i, 5, boton_baja)
+            self.tabla.setCellWidget(i, 6, boton_baja)
 
-    def dar_de_baja(self, objetivo_id):
-        fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
-        dar_de_baja_objetivo(objetivo_id, fecha)
-        registrar_accion(self.usuario_id, f"Dio de baja objetivo id={objetivo_id}")
-        self.cargar_tabla()
+    def dar_de_baja(self, objetivo_id: int) -> None:
+        """Da de baja un objetivo tras confirmación."""
+        confirmar = QMessageBox.question(
+            self, "Confirmar",
+            "¿Seguro que querés dar de baja este objetivo?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if confirmar == QMessageBox.StandardButton.Yes:
+            fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
+            dar_de_baja_objetivo(objetivo_id, fecha)
+            registrar_accion(self.usuario_id, f"Dio de baja objetivo id={objetivo_id}")
+            self.cargar_tabla()
 
     def abrir_form_objetivo(self):
         if not hasattr(self, 'form_objetivo') or not self.form_objetivo.isVisible():
@@ -400,7 +436,7 @@ class VentanaPrincipal(QWidget):
 
     def abrir_form_pasada(self):
         if not hasattr(self, 'form_pasada') or not self.form_pasada.isVisible():
-            self.form_pasada = FormPasada()
+            self.form_pasada = FormPasada(fecha_inicial=self.selector_fecha.date().toString("yyyy-MM-dd"))
             self.form_pasada.destroyed.connect(self.cargar_tabla)
             self.form_pasada.show()
         else:

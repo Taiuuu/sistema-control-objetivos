@@ -12,9 +12,6 @@ from PyQt6.QtCore import QDate, QTime
 from models.turnos import registrar_turno
 from database.db import DB_PATH
 
-# =============================================================================
-# CONSULTAS A BASE DE DATOS
-# =============================================================================
 
 def _cargar_objetivos() -> list:
     """Retorna todos los objetivos registrados."""
@@ -28,12 +25,11 @@ def _cargar_objetivos() -> list:
 
 def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
     """
-    Retorna los supervisores asignados al turno de una fecha dada.
-    Si no hay equipo registrado para ese turno, retorna todos los supervisores.
+    Retorna los supervisores del equipo asignado al turno de esa fecha.
+    Si no hay equipo registrado retorna todos los supervisores.
     """
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
-
     cursor.execute("""
         SELECT s1.id, s1.nombre, s2.id, s2.nombre
         FROM equipos e
@@ -41,14 +37,12 @@ def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
         JOIN supervisores s2 ON e.supervisor2_id = s2.id
         WHERE e.fecha = ? AND e.turno = ?
     """, (fecha, turno))
-
     equipo = cursor.fetchone()
     conexion.close()
 
     if equipo:
         return [(equipo[0], equipo[1]), (equipo[2], equipo[3])]
 
-    # Si no hay equipo registrado para ese turno retorna todos
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, nombre FROM supervisores")
@@ -57,47 +51,46 @@ def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
     return resultado
 
 
-# =============================================================================
-# FORMULARIO DE PASADA
-# =============================================================================
-
 class FormPasada(QWidget):
 
-    def __init__(self):
+    def __init__(self, fecha_inicial: str = None):
         super().__init__()
         self.setWindowTitle("Registrar pasada")
-        self.setGeometry(300, 300, 350, 350)
+        self.setGeometry(300, 300, 350, 320)
 
         layout = QVBoxLayout()
 
-        # Fecha de la pasada
+        # Fecha - usa la fecha del control diario si se pasa
         layout.addWidget(QLabel("Fecha:"))
         self.input_fecha = QDateEdit()
-        self.input_fecha.setDate(QDate.currentDate())
+        if fecha_inicial:
+            self.input_fecha.setDate(QDate.fromString(fecha_inicial, "yyyy-MM-dd"))
+        else:
+            self.input_fecha.setDate(QDate.currentDate())
         self.input_fecha.setCalendarPopup(True)
         layout.addWidget(self.input_fecha)
 
-        # Hora de la pasada
-        layout.addWidget(QLabel("Hora:"))
+        # Hora opcional
+        layout.addWidget(QLabel("Hora (opcional):"))
         self.input_hora = QTimeEdit()
         self.input_hora.setTime(QTime.currentTime())
         layout.addWidget(self.input_hora)
 
-        # Turno - al cambiar actualiza la lista de supervisores
+        # Turno - ahora diurno/nocturno
         layout.addWidget(QLabel("Turno:"))
         self.input_turno = QComboBox()
-        self.input_turno.addItems(["dia", "noche"])
+        self.input_turno.addItems(["diurno", "nocturno"])
         self.input_turno.currentTextChanged.connect(self._actualizar_supervisores)
         layout.addWidget(self.input_turno)
 
-        # Objetivo controlado
+        # Objetivo
         layout.addWidget(QLabel("Objetivo:"))
         self.input_objetivo = QComboBox()
         for o in _cargar_objetivos():
             self.input_objetivo.addItem(o[1], o[0])
         layout.addWidget(self.input_objetivo)
 
-        # Supervisor que realizó la pasada
+        # Supervisor filtrado por turno
         layout.addWidget(QLabel("Supervisor:"))
         self.input_supervisor = QComboBox()
         layout.addWidget(self.input_supervisor)
@@ -107,22 +100,14 @@ class FormPasada(QWidget):
         layout.addWidget(boton_guardar)
 
         self.setLayout(layout)
-
-        # Cargar supervisores del turno inicial
         self._actualizar_supervisores()
-
-        # Actualizar supervisores también al cambiar la fecha
         self.input_fecha.dateChanged.connect(lambda: self._actualizar_supervisores())
 
     def _actualizar_supervisores(self) -> None:
-        """
-        Actualiza la lista de supervisores según el turno y fecha seleccionados.
-        Muestra solo los del equipo registrado para ese turno, o todos si no hay equipo.
-        """
+        """Actualiza la lista de supervisores según el turno y fecha seleccionados."""
         fecha = self.input_fecha.date().toString("yyyy-MM-dd")
         turno = self.input_turno.currentText()
         supervisores = _cargar_supervisores_del_turno(fecha, turno)
-
         self.input_supervisor.clear()
         for s in supervisores:
             self.input_supervisor.addItem(s[1], s[0])
@@ -153,3 +138,4 @@ class FormPasada(QWidget):
         )
 
         QMessageBox.information(self, "Listo", "Pasada registrada correctamente.")
+        self.close()
