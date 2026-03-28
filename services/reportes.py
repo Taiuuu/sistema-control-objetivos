@@ -20,11 +20,12 @@ def obtener_objetivos_del_dia(fecha: str) -> list:
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
 
+    # Traer todos los objetivos sin filtrar por fecha en SQL
+    # para manejar el filtro en Python con comparación exacta de strings
     cursor.execute("""
-        SELECT id, nombre, dias_semana
+        SELECT id, nombre, dias_semana, fecha_inicio, fecha_fin
         FROM objetivos
-        WHERE fecha_inicio <= ? AND (fecha_fin >= ? OR fecha_fin IS NULL)
-    """, (fecha, fecha))
+    """)
 
     objetivos = cursor.fetchall()
     conexion.close()
@@ -32,10 +33,24 @@ def obtener_objetivos_del_dia(fecha: str) -> list:
     fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
     dia_semana = fecha_dt.isoweekday()
 
-    return [
-        o for o in objetivos
-        if dia_semana in [int(d) for d in o[2].split(",")]
-    ]
+    resultado = []
+    for o in objetivos:
+        obj_id, nombre, dias_semana_str, fecha_inicio, fecha_fin = o
+
+        # Verificar rango de fechas
+        if fecha_inicio and fecha < fecha_inicio:
+            continue
+        if fecha_fin and fecha > fecha_fin:
+            continue
+
+        # Verificar día de cobertura
+        dias = [int(d) for d in dias_semana_str.split(",")]
+        if dia_semana not in dias:
+            continue
+
+        resultado.append((obj_id, nombre, dias_semana_str))
+
+    return resultado
 
 
 def objetivo_corresponde(fecha: str, dias: str) -> bool:
@@ -82,7 +97,7 @@ def reporte_mensual(anio: int, mes: int) -> None:
             fecha = f"{anio}-{mes:02d}-{dia:02d}"
             fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
 
-            if fecha < inicio:
+            if inicio and fecha < inicio:
                 continue
             if fin and fecha > fin:
                 continue
