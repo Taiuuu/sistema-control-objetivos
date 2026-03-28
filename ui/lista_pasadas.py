@@ -124,7 +124,7 @@ class DialogoEditarPasada(QDialog):
         # Turno
         layout.addWidget(QLabel("Turno:"))
         self.input_turno = QComboBox()
-        self.input_turno.addItems(["dia", "noche"])
+        self.filtro_turno.addItems(["Todos", "diurno", "nocturno"])
         self.input_turno.setCurrentText(turno)
         layout.addWidget(self.input_turno)
 
