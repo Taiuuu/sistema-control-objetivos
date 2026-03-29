@@ -13,6 +13,8 @@ from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtCore import Qt
 from database.db import DB_PATH
 from services.assets import ruta_asset
+from ui.animaciones import animar_aparecer
+
 
 # =============================================================================
 # AUTENTICACIÓN
@@ -153,6 +155,7 @@ class LoginWindow(QWidget):
 
         layout.addSpacing(10)
         self.setLayout(layout)
+        animar_aparecer(self)
 
     def intentar_login(self) -> None:
         """Valida las credenciales y redirige según el estado del usuario."""

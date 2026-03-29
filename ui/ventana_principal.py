@@ -31,6 +31,7 @@ from services.backup import hacer_backup
 from services.logger import registrar_accion
 from services.assets import ruta_asset
 from database.db import DB_PATH
+from ui.animaciones import animar_tabla
 import sqlite3
 
 
@@ -329,6 +330,7 @@ class VentanaPrincipal(QWidget):
 
         self.objetivos_actuales = []
         self.cargar_tabla()
+        animar_tabla(self.tabla)
 
         # Shortcuts
         QShortcut(QKeySequence("Ctrl+P"), self).activated.connect(self.abrir_form_pasada)

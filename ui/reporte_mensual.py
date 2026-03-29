@@ -14,15 +14,15 @@ from PyQt6.QtGui import QColor
 from services.exportar import exportar_excel, exportar_pdf
 from database.db import DB_PATH
 
+
 # =============================================================================
 # CÁLCULO DEL REPORTE
 # =============================================================================
 
 def calcular_reporte(anio: int, mes: int) -> list:
     """
-    Calcula el cumplimiento mensual por objetivo.
-    Para cada objetivo retorna: (nombre, días controlados, días sin control, porcentaje).
-    Solo considera los días que corresponden según la cobertura configurada.
+    Calcula el cumplimiento mensual por objetivo con pasadas diurnas y nocturnas separadas.
+    Retorna lista de (nombre, dias_controlados_dia, dias_controlados_noche, dias_sin_control, porcentaje).
     """
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
@@ -36,14 +36,15 @@ def calcular_reporte(anio: int, mes: int) -> list:
         obj_id, nombre, inicio, fin, dias_str = o
         dias_semana = [int(d) for d in dias_str.split(",")]
         dias_esperados = 0
-        dias_controlados = 0
+        dias_con_dia = 0
+        dias_con_noche = 0
         dias_sin_control = 0
 
         for dia in range(1, total_dias + 1):
             fecha = f"{anio}-{mes:02d}-{dia:02d}"
             fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
 
-            if fecha < inicio:
+            if inicio and fecha < inicio:
                 continue
             if fin and fecha > fin:
                 continue
@@ -51,18 +52,30 @@ def calcular_reporte(anio: int, mes: int) -> list:
                 continue
 
             dias_esperados += 1
-            cursor.execute("""
-                SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?
-            """, (fecha, obj_id))
 
-            if cursor.fetchone()[0] > 0:
-                dias_controlados += 1
-            else:
+            cursor.execute("""
+                SELECT COUNT(*) FROM pasadas
+                WHERE fecha = ? AND objetivo_id = ? AND turno = 'diurno'
+            """, (fecha, obj_id))
+            tuvo_dia = cursor.fetchone()[0] > 0
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM pasadas
+                WHERE fecha = ? AND objetivo_id = ? AND turno = 'nocturno'
+            """, (fecha, obj_id))
+            tuvo_noche = cursor.fetchone()[0] > 0
+
+            if tuvo_dia:
+                dias_con_dia += 1
+            if tuvo_noche:
+                dias_con_noche += 1
+            if not tuvo_dia and not tuvo_noche:
                 dias_sin_control += 1
 
         if dias_esperados > 0:
+            dias_controlados = dias_esperados - dias_sin_control
             porcentaje = (dias_controlados / dias_esperados) * 100
-            resultados.append((nombre, dias_controlados, dias_sin_control, porcentaje))
+            resultados.append((nombre, dias_con_dia, dias_con_noche, dias_sin_control, porcentaje))
 
     conexion.close()
     return resultados
@@ -77,11 +90,10 @@ class ReporteMensual(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Reporte mensual")
-        self.setGeometry(200, 200, 650, 400)
+        self.setGeometry(200, 200, 800, 450)
 
         layout = QVBoxLayout()
 
-        # Selectores de mes y año
         fila = QHBoxLayout()
 
         self.selector_mes = QComboBox()
@@ -117,40 +129,44 @@ class ReporteMensual(QWidget):
         fila.addWidget(boton_pdf)
         layout.addLayout(fila)
 
-        # Tabla de resultados
         self.tabla = QTableWidget()
-        self.tabla.setColumnCount(4)
+        self.tabla.setColumnCount(6)
         self.tabla.setHorizontalHeaderLabels([
-            "Objetivo", "Días controlados", "Días sin control", "Porcentaje"
+            "Objetivo", "Días c/ diurno", "Días c/ nocturno",
+            "Días sin control", "Porcentaje", "Estado"
         ])
         self.tabla.setColumnWidth(0, 220)
-        self.tabla.setColumnWidth(1, 130)
-        self.tabla.setColumnWidth(2, 130)
-        self.tabla.setColumnWidth(3, 110)
+        self.tabla.setColumnWidth(1, 110)
+        self.tabla.setColumnWidth(2, 120)
+        self.tabla.setColumnWidth(3, 120)
+        self.tabla.setColumnWidth(4, 90)
+        self.tabla.setColumnWidth(5, 100)
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
 
     def _generar(self) -> None:
-        """Calcula y muestra el reporte en la tabla. Verde >= 80%, rojo < 80%."""
+        """Calcula y muestra el reporte en la tabla."""
         mes = self.selector_mes.currentIndex() + 1
         anio = int(self.selector_anio.currentText())
         resultados = calcular_reporte(anio, mes)
 
         self.tabla.setRowCount(len(resultados))
         for i, r in enumerate(resultados):
+            estado = "CUMPLE" if r[4] >= 80 else "NO CUMPLE"
             self.tabla.setItem(i, 0, QTableWidgetItem(r[0]))
             self.tabla.setItem(i, 1, QTableWidgetItem(str(r[1])))
             self.tabla.setItem(i, 2, QTableWidgetItem(str(r[2])))
-            self.tabla.setItem(i, 3, QTableWidgetItem(f"{r[3]:.1f}%"))
+            self.tabla.setItem(i, 3, QTableWidgetItem(str(r[3])))
+            self.tabla.setItem(i, 4, QTableWidgetItem(f"{r[4]:.1f}%"))
+            self.tabla.setItem(i, 5, QTableWidgetItem(estado))
 
-            color = QColor("#90EE90") if r[3] >= 80 else QColor("#FF6B6B")
-            for col in range(4):
+            color = QColor("#90EE90") if r[4] >= 80 else QColor("#FF6B6B")
+            for col in range(6):
                 self.tabla.item(i, col).setBackground(color)
                 self.tabla.item(i, col).setForeground(QColor("#000000"))
 
     def _exportar_excel(self) -> None:
-        """Abre un diálogo para guardar el reporte como archivo Excel."""
         mes = self.selector_mes.currentIndex() + 1
         anio = int(self.selector_anio.currentText())
         ruta, _ = QFileDialog.getSaveFileName(
@@ -162,7 +178,6 @@ class ReporteMensual(QWidget):
             exportar_excel(anio, mes, ruta)
 
     def _exportar_pdf(self) -> None:
-        """Abre un diálogo para guardar el reporte como archivo PDF."""
         mes = self.selector_mes.currentIndex() + 1
         anio = int(self.selector_anio.currentText())
         ruta, _ = QFileDialog.getSaveFileName(
