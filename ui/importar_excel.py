@@ -54,8 +54,10 @@ def _normalizar_fecha(fecha_raw) -> str:
     """Convierte distintos formatos de fecha a yyyy-MM-dd."""
     if isinstance(fecha_raw, datetime.datetime):
         return fecha_raw.strftime("%Y-%m-%d")
+    if isinstance(fecha_raw, datetime.date):
+        return fecha_raw.strftime("%Y-%m-%d")
     if isinstance(fecha_raw, str):
-        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y"):
             try:
                 return datetime.datetime.strptime(fecha_raw, fmt).strftime("%Y-%m-%d")
             except Exception:
@@ -68,20 +70,25 @@ def importar_bloque(cursor, ws, turno: str, col_supervisor: int,
                     col_fecha: int | None, fila_inicio: int) -> tuple:
     """
     Importa un bloque de pasadas (diurno o nocturno) desde el Excel.
+    La fecha se lee de la misma fila en la columna indicada.
     Retorna (pasadas_importadas, errores).
     """
     pasadas = 0
     errores = []
+    fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d")
 
     for fila_num, fila in enumerate(ws.iter_rows(min_row=fila_inicio, values_only=True), fila_inicio):
         try:
             if not fila or all(v is None for v in fila):
                 continue
 
-            objetivo_nombre = str(fila[col_objetivo - 1]).strip() if fila[col_objetivo - 1] else None
-            supervisor_nombre = str(fila[col_supervisor - 1]).strip() if fila[col_supervisor - 1] else ""
-            veces_raw = fila[col_veces - 1]
-            fecha_raw = fila[col_fecha - 1] if col_fecha else None
+            # Leer fecha de la columna configurada en esa misma fila
+            if col_fecha and len(fila) >= col_fecha and fila[col_fecha - 1] is not None:
+                fecha_actual = _normalizar_fecha(fila[col_fecha - 1])
+
+            objetivo_nombre = str(fila[col_objetivo - 1]).strip() if len(fila) >= col_objetivo and fila[col_objetivo - 1] else None
+            supervisor_nombre = str(fila[col_supervisor - 1]).strip() if col_supervisor and len(fila) >= col_supervisor and fila[col_supervisor - 1] else ""
+            veces_raw = fila[col_veces - 1] if len(fila) >= col_veces else None
 
             if not objetivo_nombre or objetivo_nombre.lower() in ("none", "objetivo", ""):
                 continue
@@ -94,7 +101,6 @@ def importar_bloque(cursor, ws, turno: str, col_supervisor: int,
             if veces == 0:
                 continue
 
-            fecha = _normalizar_fecha(fecha_raw)
             objetivo_id = _obtener_o_crear_objetivo(cursor, objetivo_nombre)
             supervisor_id = _obtener_o_crear_supervisor(cursor, supervisor_nombre)
 
@@ -102,7 +108,7 @@ def importar_bloque(cursor, ws, turno: str, col_supervisor: int,
                 cursor.execute("""
                     INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id)
                     VALUES (?, ?, ?, ?, ?)
-                """, (fecha, "No especificado", turno, objetivo_id, supervisor_id))
+                """, (fecha_actual, "No especificado", turno, objetivo_id, supervisor_id))
 
             pasadas += veces
 
@@ -133,8 +139,9 @@ class ImportarExcel(QWidget):
 
         desc = QLabel(
             "El Excel tiene dos bloques: uno para turno diurno y otro para nocturno.\n"
-            "Indicá en qué columna está cada dato para cada bloque.\n"
-            "Las columnas se numeran desde 1 (A=1, B=2, C=3...)"
+            "Indicá en qué columna está cada dato.\n"
+            "Las columnas se numeran desde 1 (A=1, B=2, C=3...)\n"
+            "La fecha se lee de la misma fila en la columna indicada."
         )
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc.setStyleSheet("color: #888; font-size: 11px;")
@@ -173,10 +180,10 @@ class ImportarExcel(QWidget):
         layout.addWidget(label_diurno)
 
         grid_diurno = QHBoxLayout()
+        self.diurno_fecha = self._combo_col("Fecha:", 1, grid_diurno)
         self.diurno_supervisor = self._combo_col("Supervisor:", 3, grid_diurno)
         self.diurno_objetivo = self._combo_col("Objetivo:", 4, grid_diurno)
         self.diurno_veces = self._combo_col("Veces:", 6, grid_diurno)
-        self.diurno_fecha = self._combo_col_opcional("Fecha:", grid_diurno)
         layout.addLayout(grid_diurno)
 
         layout.addSpacing(8)
@@ -187,10 +194,10 @@ class ImportarExcel(QWidget):
         layout.addWidget(label_nocturno)
 
         grid_nocturno = QHBoxLayout()
+        self.nocturno_fecha = self._combo_col("Fecha:", 1, grid_nocturno)
         self.nocturno_supervisor = self._combo_col("Supervisor:", 8, grid_nocturno)
         self.nocturno_objetivo = self._combo_col("Objetivo:", 9, grid_nocturno)
         self.nocturno_veces = self._combo_col("Veces:", 10, grid_nocturno)
-        self.nocturno_fecha = self._combo_col_opcional("Fecha:", grid_nocturno)
         layout.addLayout(grid_nocturno)
 
         layout.addSpacing(10)
@@ -215,16 +222,6 @@ class ImportarExcel(QWidget):
         combo = QComboBox()
         combo.addItems([str(i) for i in range(1, 21)])
         combo.setCurrentIndex(default - 1)
-        col_layout.addWidget(combo)
-        layout.addLayout(col_layout)
-        return combo
-
-    def _combo_col_opcional(self, label: str, layout) -> QComboBox:
-        """Crea un combo de selección de columna opcional."""
-        col_layout = QVBoxLayout()
-        col_layout.addWidget(QLabel(label))
-        combo = QComboBox()
-        combo.addItems(["No hay"] + [str(i) for i in range(1, 21)])
         col_layout.addWidget(combo)
         layout.addLayout(col_layout)
         return combo
@@ -256,20 +253,16 @@ class ImportarExcel(QWidget):
             self.log.clear()
             self.log.append("Importando bloque diurno...")
 
-            diurno_fecha = None if self.diurno_fecha.currentText() == "No hay" else int(self.diurno_fecha.currentText())
-            nocturno_fecha = None if self.nocturno_fecha.currentText() == "No hay" else int(self.nocturno_fecha.currentText())
-
             pasadas_dia, errores_dia = importar_bloque(
                 cursor, ws, "diurno",
                 col_supervisor=int(self.diurno_supervisor.currentText()),
                 col_objetivo=int(self.diurno_objetivo.currentText()),
                 col_veces=int(self.diurno_veces.currentText()),
-                col_fecha=diurno_fecha,
+                col_fecha=int(self.diurno_fecha.currentText()),
                 fila_inicio=self.fila_inicio.value()
             )
 
             self.log.append(f"✓ Diurno: {pasadas_dia} pasadas importadas.")
-
             self.log.append("Importando bloque nocturno...")
 
             pasadas_noche, errores_noche = importar_bloque(
@@ -277,7 +270,7 @@ class ImportarExcel(QWidget):
                 col_supervisor=int(self.nocturno_supervisor.currentText()),
                 col_objetivo=int(self.nocturno_objetivo.currentText()),
                 col_veces=int(self.nocturno_veces.currentText()),
-                col_fecha=nocturno_fecha,
+                col_fecha=int(self.nocturno_fecha.currentText()),
                 fila_inicio=self.fila_inicio.value()
             )
 
@@ -296,7 +289,10 @@ class ImportarExcel(QWidget):
 
             from services.logger import registrar_accion
             from services.sesion import get_usuario_id
-            registrar_accion(get_usuario_id(), f"Importó Excel: {total} pasadas ({pasadas_dia} diurnas, {pasadas_noche} nocturnas)")
+            registrar_accion(
+                get_usuario_id(),
+                f"Importó Excel: {total} pasadas ({pasadas_dia} diurnas, {pasadas_noche} nocturnas)"
+            )
 
             QMessageBox.information(
                 self, "Listo",
