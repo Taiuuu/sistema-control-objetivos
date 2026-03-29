@@ -30,6 +30,7 @@ from services.logger import registrar_accion
 from services.assets import ruta_asset
 from database.db import DB_PATH
 from ui.transferir_datos import TransferirDatos
+from ui.importar_excel import ImportarExcel
 import sqlite3
 
 
@@ -207,6 +208,7 @@ class VentanaPrincipal(QWidget):
         layout_lateral.addWidget(boton_menu("Ver pasadas", self.abrir_lista_pasadas))
         layout_lateral.addWidget(boton_menu("Notas del día", self.abrir_notas, "Ctrl+N"))
         layout_lateral.addWidget(boton_menu("Transferir datos", self.abrir_transferir_datos))
+        layout_lateral.addWidget(boton_menu("Importar Excel", self.abrir_importar_excel))
         layout_lateral.addWidget(boton_menu("Reporte mensual", self.abrir_reporte_mensual, "Ctrl+R"))
         layout_lateral.addWidget(boton_menu("Ayuda", self.abrir_ayuda, "Ctrl+H"))
 
@@ -526,3 +528,11 @@ class VentanaPrincipal(QWidget):
         else:
             self.transferir_datos.raise_()
             self.transferir_datos.activateWindow()
+
+    def abrir_importar_excel(self):
+        if not hasattr(self, 'importar_excel') or not self.importar_excel.isVisible():
+            self.importar_excel = ImportarExcel()
+            self.importar_excel.show()
+        else:
+            self.importar_excel.raise_()
+            self.importar_excel.activateWindow()
