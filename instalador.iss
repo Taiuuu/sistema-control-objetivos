@@ -1,5 +1,5 @@
 #define MyAppName "VESP Control"
-#define MyAppVersion "0.9.0"
+#define MyAppVersion "0.9.5"
 #define MyAppPublisher "V.E.S.P Organizations"
 #define MyAppExeName "VESP Control.exe"
 
