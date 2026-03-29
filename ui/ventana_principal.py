@@ -371,7 +371,7 @@ class VentanaPrincipal(QWidget):
         filtro_estado = self.filtro_estado.currentText()
         texto_busqueda = self.buscador.text().strip().lower()
 
-        self.objetivos_actuales = obtener_objetivos_del_dia(fecha)
+        self.objetivos_actuales = sorted(obtener_objetivos_del_dia(fecha), key=lambda o: o[1].lower())
         equipo_dia = obtener_equipo(fecha, "diurno")
         equipo_noche = obtener_equipo(fecha, "nocturno")
 
