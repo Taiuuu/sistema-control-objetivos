@@ -29,6 +29,7 @@ from services.backup import hacer_backup
 from services.logger import registrar_accion
 from services.assets import ruta_asset
 from database.db import DB_PATH
+from ui.transferir_datos import TransferirDatos
 import sqlite3
 
 
@@ -205,6 +206,7 @@ class VentanaPrincipal(QWidget):
 
         layout_lateral.addWidget(boton_menu("Ver pasadas", self.abrir_lista_pasadas))
         layout_lateral.addWidget(boton_menu("Notas del día", self.abrir_notas, "Ctrl+N"))
+        layout_lateral.addWidget(boton_menu("Transferir datos", self.abrir_transferir_datos))
         layout_lateral.addWidget(boton_menu("Reporte mensual", self.abrir_reporte_mensual, "Ctrl+R"))
         layout_lateral.addWidget(boton_menu("Ayuda", self.abrir_ayuda, "Ctrl+H"))
 
@@ -516,3 +518,11 @@ class VentanaPrincipal(QWidget):
         else:
             self.ayuda.raise_()
             self.ayuda.activateWindow()
+            
+    def abrir_transferir_datos(self):
+        if not hasattr(self, 'transferir_datos') or not self.transferir_datos.isVisible():
+            self.transferir_datos = TransferirDatos()
+            self.transferir_datos.show()
+        else:
+            self.transferir_datos.raise_()
+            self.transferir_datos.activateWindow()
