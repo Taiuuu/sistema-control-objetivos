@@ -321,9 +321,9 @@ class VentanaPrincipal(QWidget):
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(self.cargar_tabla)
         QShortcut(QKeySequence("Ctrl+H"), self).activated.connect(self.abrir_ayuda)
 
-        # Timer inactividad 15 minutos
+        # Timer inactividad 20 minutos
         self.timer_inactividad = QTimer()
-        self.timer_inactividad.setInterval(15 * 60 * 1000)
+        self.timer_inactividad.setInterval(20 * 60 * 1000)
         self.timer_inactividad.timeout.connect(self.cerrar_por_inactividad)
         self.timer_inactividad.start()
 
