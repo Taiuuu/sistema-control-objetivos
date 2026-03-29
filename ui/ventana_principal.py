@@ -7,10 +7,10 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QLabel,
     QPushButton, QDateEdit, QComboBox, QMessageBox,
-    QFrame, QLineEdit
+    QFrame, QLineEdit, QSizePolicy
 )
-from PyQt6.QtCore import QDate, QTimer, QEvent, Qt
-from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
+from PyQt6.QtCore import QDate, QTimer, QEvent, Qt, QPropertyAnimation, QEasingCurve, QRect
+from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence, QFont
 from services.reportes import obtener_objetivos_del_dia
 from ui.form_objetivo import FormObjetivo
 from ui.form_supervisor import FormSupervisor
@@ -24,13 +24,13 @@ from ui.notas_diarias import NotasDiarias
 from ui.vista_logs import VistaLogs
 from ui.gestionar_usuarios import GestionarUsuarios
 from ui.ayuda import Ayuda
+from ui.transferir_datos import TransferirDatos
+from ui.importar_excel import ImportarExcel
 from models.objetivos import dar_de_baja_objetivo
 from services.backup import hacer_backup
 from services.logger import registrar_accion
 from services.assets import ruta_asset
 from database.db import DB_PATH
-from ui.transferir_datos import TransferirDatos
-from ui.importar_excel import ImportarExcel
 import sqlite3
 
 
@@ -39,7 +39,6 @@ import sqlite3
 # =============================================================================
 
 def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_id: int = None) -> int:
-    """Cuenta las pasadas de un objetivo en una fecha, con filtros opcionales."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     query = 'SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?'
@@ -57,7 +56,6 @@ def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_i
 
 
 def obtener_estado_detallado(fecha: str, objetivo_id: int) -> tuple:
-    """Retorna el estado de cobertura del objetivo y su color correspondiente."""
     pasadas_dia = contar_pasadas(fecha, objetivo_id, turno="diurno")
     pasadas_noche = contar_pasadas(fecha, objetivo_id, turno="nocturno")
     if pasadas_dia > 0 and pasadas_noche > 0:
@@ -71,7 +69,6 @@ def obtener_estado_detallado(fecha: str, objetivo_id: int) -> tuple:
 
 
 def obtener_equipo(fecha: str, turno: str) -> str:
-    """Retorna los nombres del equipo asignado a un turno en una fecha."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
@@ -89,7 +86,6 @@ def obtener_equipo(fecha: str, turno: str) -> str:
 
 
 def cargar_supervisores() -> list:
-    """Retorna todos los supervisores registrados."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute('SELECT id, nombre FROM supervisores')
@@ -99,7 +95,6 @@ def cargar_supervisores() -> list:
 
 
 def obtener_nombre_usuario(usuario_id: int) -> str:
-    """Retorna el nombre de usuario dado su ID."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute('SELECT username FROM usuarios WHERE id = ?', (usuario_id,))
@@ -114,10 +109,13 @@ def obtener_nombre_usuario(usuario_id: int) -> str:
 
 class VentanaPrincipal(QWidget):
 
-    def __init__(self, usuario_id=None, rol=None, on_login_exitoso=None):
+    def __init__(self, usuario_id=None, rol=None, on_login_exitoso=None, app=None, alternar_tema_fn=None):
         self.usuario_id = usuario_id
         self.rol = rol
         self.on_login_exitoso = on_login_exitoso
+        self.app = app
+        self.alternar_tema_fn = alternar_tema_fn
+        self.zoom_nivel = 13  # Tamaño de fuente base
         super().__init__()
         self.setWindowTitle("VESP Control de Objetivos")
         self.setGeometry(100, 100, 1300, 600)
@@ -207,9 +205,9 @@ class VentanaPrincipal(QWidget):
 
         layout_lateral.addWidget(boton_menu("Ver pasadas", self.abrir_lista_pasadas))
         layout_lateral.addWidget(boton_menu("Notas del día", self.abrir_notas, "Ctrl+N"))
+        layout_lateral.addWidget(boton_menu("Reporte mensual", self.abrir_reporte_mensual, "Ctrl+R"))
         layout_lateral.addWidget(boton_menu("Transferir datos", self.abrir_transferir_datos))
         layout_lateral.addWidget(boton_menu("Importar Excel", self.abrir_importar_excel))
-        layout_lateral.addWidget(boton_menu("Reporte mensual", self.abrir_reporte_mensual, "Ctrl+R"))
         layout_lateral.addWidget(boton_menu("Ayuda", self.abrir_ayuda, "Ctrl+H"))
 
         if self.rol == "admin":
@@ -221,6 +219,28 @@ class VentanaPrincipal(QWidget):
             layout_lateral.addWidget(boton_menu("Historial", self.abrir_logs))
 
         layout_lateral.addStretch()
+
+        # Botones de zoom y tema
+        fila_zoom = QHBoxLayout()
+        btn_zoom_menos = QPushButton("A-")
+        btn_zoom_menos.setFixedSize(35, 28)
+        btn_zoom_menos.setToolTip("Reducir zoom")
+        btn_zoom_menos.clicked.connect(self._zoom_menos)
+
+        btn_zoom_mas = QPushButton("A+")
+        btn_zoom_mas.setFixedSize(35, 28)
+        btn_zoom_mas.setToolTip("Aumentar zoom")
+        btn_zoom_mas.clicked.connect(self._zoom_mas)
+
+        fila_zoom.addWidget(btn_zoom_menos)
+        fila_zoom.addWidget(btn_zoom_mas)
+        layout_lateral.addLayout(fila_zoom)
+
+        # Botón modo claro/oscuro
+        self.btn_tema = QPushButton("☀ Modo claro")
+        self.btn_tema.setStyleSheet(estilo_boton)
+        self.btn_tema.clicked.connect(self._alternar_tema)
+        layout_lateral.addWidget(self.btn_tema)
 
         nombre_usuario = obtener_nombre_usuario(usuario_id)
         usuario_label = QLabel(f"👤 {nombre_usuario}")
@@ -236,7 +256,6 @@ class VentanaPrincipal(QWidget):
         layout_derecho.setContentsMargins(12, 12, 12, 12)
         layout_derecho.setSpacing(8)
 
-        # Fila superior con fecha y filtros
         fila_superior = QHBoxLayout()
 
         self.selector_fecha = QDateEdit()
@@ -286,7 +305,6 @@ class VentanaPrincipal(QWidget):
 
         layout_derecho.addLayout(fila_superior)
 
-        # Tabla con columnas separadas para día y noche
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(7)
         self.tabla.setHorizontalHeaderLabels([
@@ -303,6 +321,7 @@ class VentanaPrincipal(QWidget):
         self.tabla.setColumnWidth(5, 130)
         self.tabla.setColumnWidth(6, 100)
         self.tabla.setAlternatingRowColors(True)
+        self.tabla.setSortingEnabled(True)
         layout_derecho.addWidget(self.tabla)
 
         layout_principal.addWidget(panel_derecho)
@@ -320,12 +339,51 @@ class VentanaPrincipal(QWidget):
         QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self.abrir_reporte_mensual)
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(self.cargar_tabla)
         QShortcut(QKeySequence("Ctrl+H"), self).activated.connect(self.abrir_ayuda)
+        QShortcut(QKeySequence("Ctrl+="), self).activated.connect(self._zoom_mas)
+        QShortcut(QKeySequence("Ctrl+-"), self).activated.connect(self._zoom_menos)
 
-        # Timer inactividad 20 minutos
+        # Timer inactividad
         self.timer_inactividad = QTimer()
-        self.timer_inactividad.setInterval(20 * 60 * 1000)
+        self.timer_inactividad.setInterval(30 * 60 * 1000)
         self.timer_inactividad.timeout.connect(self.cerrar_por_inactividad)
         self.timer_inactividad.start()
+
+    # =============================================================================
+    # ZOOM
+    # =============================================================================
+
+    def _zoom_mas(self) -> None:
+        """Aumenta el tamaño de fuente de toda la aplicación."""
+        if self.zoom_nivel < 20:
+            self.zoom_nivel += 1
+            self._aplicar_zoom()
+
+    def _zoom_menos(self) -> None:
+        """Reduce el tamaño de fuente de toda la aplicación."""
+        if self.zoom_nivel > 9:
+            self.zoom_nivel -= 1
+            self._aplicar_zoom()
+
+    def _aplicar_zoom(self) -> None:
+        """Aplica el nivel de zoom actual."""
+        if self.app:
+            stylesheet_actual = self.app.styleSheet()
+            import re
+            nuevo = re.sub(r'font-size: \d+px;', f'font-size: {self.zoom_nivel}px;', stylesheet_actual)
+            self.app.setStyleSheet(nuevo)
+
+    # =============================================================================
+    # TEMA
+    # =============================================================================
+
+    def _alternar_tema(self) -> None:
+        """Alterna entre modo claro y oscuro."""
+        if self.alternar_tema_fn and self.app:
+            self.alternar_tema_fn(self.app, self)
+
+    # =============================================================================
+    # EVENTOS
+    # =============================================================================
 
     def event(self, evento):
         if evento.type() in (
@@ -337,7 +395,6 @@ class VentanaPrincipal(QWidget):
         return super().event(evento)
 
     def cerrar_por_inactividad(self) -> None:
-        """Cierra la sesión por inactividad y realiza un backup previo."""
         hacer_backup()
         QMessageBox.information(
             self, "Sesión cerrada",
@@ -350,7 +407,6 @@ class VentanaPrincipal(QWidget):
         self.login.show()
 
     def closeEvent(self, evento) -> None:
-        """Pide confirmación antes de cerrar el sistema."""
         confirmar = QMessageBox.question(
             self, "Confirmar salida",
             "¿Seguro que querés cerrar el sistema?",
@@ -362,8 +418,12 @@ class VentanaPrincipal(QWidget):
         else:
             evento.ignore()
 
+    # =============================================================================
+    # TABLA PRINCIPAL
+    # =============================================================================
+
     def cargar_tabla(self) -> None:
-        """Carga los objetivos del día con sus pasadas diurnas y nocturnas separadas."""
+        """Carga los objetivos del día con pasadas diurnas y nocturnas separadas."""
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
         turno = self.filtro_turno.currentText()
         turno = None if turno == "Todos los turnos" else turno
@@ -371,7 +431,10 @@ class VentanaPrincipal(QWidget):
         filtro_estado = self.filtro_estado.currentText()
         texto_busqueda = self.buscador.text().strip().lower()
 
-        self.objetivos_actuales = sorted(obtener_objetivos_del_dia(fecha), key=lambda o: o[1].lower())
+        self.objetivos_actuales = sorted(
+            obtener_objetivos_del_dia(fecha),
+            key=lambda o: o[1].lower()
+        )
         equipo_dia = obtener_equipo(fecha, "diurno")
         equipo_noche = obtener_equipo(fecha, "nocturno")
 
@@ -380,8 +443,10 @@ class VentanaPrincipal(QWidget):
             if texto_busqueda and texto_busqueda not in o[1].lower():
                 continue
 
-            pasadas_dia = contar_pasadas(fecha, o[0], turno="diurno", supervisor_id=supervisor_id if turno == "diurno" else None)
-            pasadas_noche = contar_pasadas(fecha, o[0], turno="nocturno", supervisor_id=supervisor_id if turno == "nocturno" else None)
+            pasadas_dia = contar_pasadas(fecha, o[0], turno="diurno",
+                supervisor_id=supervisor_id if turno == "diurno" else None)
+            pasadas_noche = contar_pasadas(fecha, o[0], turno="nocturno",
+                supervisor_id=supervisor_id if turno == "nocturno" else None)
             estado_detallado, color_hex = obtener_estado_detallado(fecha, o[0])
 
             if filtro_estado != "Todos" and estado_detallado != filtro_estado:
@@ -409,7 +474,6 @@ class VentanaPrincipal(QWidget):
             self.tabla.setCellWidget(i, 6, boton_baja)
 
     def dar_de_baja(self, objetivo_id: int) -> None:
-        """Da de baja un objetivo tras confirmación."""
         confirmar = QMessageBox.question(
             self, "Confirmar",
             "¿Seguro que querés dar de baja este objetivo?",
@@ -420,6 +484,10 @@ class VentanaPrincipal(QWidget):
             dar_de_baja_objetivo(objetivo_id, fecha)
             registrar_accion(self.usuario_id, f"Dio de baja objetivo id={objetivo_id}")
             self.cargar_tabla()
+
+    # =============================================================================
+    # ABRIR VENTANAS
+    # =============================================================================
 
     def abrir_form_objetivo(self):
         if not hasattr(self, 'form_objetivo') or not self.form_objetivo.isVisible():
@@ -520,7 +588,7 @@ class VentanaPrincipal(QWidget):
         else:
             self.ayuda.raise_()
             self.ayuda.activateWindow()
-            
+
     def abrir_transferir_datos(self):
         if not hasattr(self, 'transferir_datos') or not self.transferir_datos.isVisible():
             self.transferir_datos = TransferirDatos()

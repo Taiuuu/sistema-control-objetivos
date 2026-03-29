@@ -4,9 +4,10 @@
 # =============================================================================
 
 import sys
+import os
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QPalette, QColor
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, QPropertyAnimation, QEasingCurve
 
 from ui.login import LoginWindow
 from ui.ventana_principal import VentanaPrincipal
@@ -94,7 +95,114 @@ def aplicar_tema_oscuro(app: QApplication) -> None:
             background-color: #1e1e1e;
             color: #dcdcdc;
         }
+        QScrollBar:vertical {
+            background: #2a2a2a;
+            width: 8px;
+            border-radius: 4px;
+        }
+        QScrollBar::handle:vertical {
+            background: #555;
+            border-radius: 4px;
+        }
+        QScrollBar::handle:vertical:hover {
+            background: #2a82da;
+        }
+        QScrollBar:horizontal {
+            background: #2a2a2a;
+            height: 8px;
+            border-radius: 4px;
+        }
+        QScrollBar::handle:horizontal {
+            background: #555;
+            border-radius: 4px;
+        }
     """)
+
+
+def aplicar_tema_claro(app: QApplication) -> None:
+    """Aplica el tema claro a toda la aplicación."""
+    app.setStyle("Fusion")
+
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window,          QColor(245, 245, 245))
+    palette.setColor(QPalette.ColorRole.WindowText,      QColor(30, 30, 30))
+    palette.setColor(QPalette.ColorRole.Base,            QColor(255, 255, 255))
+    palette.setColor(QPalette.ColorRole.AlternateBase,   QColor(235, 235, 235))
+    palette.setColor(QPalette.ColorRole.Text,            QColor(30, 30, 30))
+    palette.setColor(QPalette.ColorRole.Button,          QColor(225, 225, 225))
+    palette.setColor(QPalette.ColorRole.ButtonText,      QColor(30, 30, 30))
+    palette.setColor(QPalette.ColorRole.Highlight,       QColor(42, 130, 218))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
+    app.setPalette(palette)
+
+    app.setStyleSheet("""
+        QWidget {
+            font-family: Segoe UI;
+            font-size: 13px;
+        }
+        QPushButton {
+            background-color: #e0e0e0;
+            color: #1e1e1e;
+            border: 1px solid #bbb;
+            border-radius: 4px;
+            padding: 5px 12px;
+        }
+        QPushButton:hover {
+            background-color: #d0d0d0;
+            border: 1px solid #2a82da;
+        }
+        QPushButton:pressed {
+            background-color: #2a82da;
+            color: white;
+        }
+        QTableWidget {
+            gridline-color: #ccc;
+            border: 1px solid #ccc;
+            background-color: white;
+        }
+        QHeaderView::section {
+            background-color: #e0e0e0;
+            color: #1e1e1e;
+            padding: 5px;
+            border: 1px solid #ccc;
+            font-weight: bold;
+        }
+        QFrame {
+            background-color: #f0f0f0;
+        }
+        QScrollBar:vertical {
+            background: #e0e0e0;
+            width: 8px;
+            border-radius: 4px;
+        }
+        QScrollBar::handle:vertical {
+            background: #aaa;
+            border-radius: 4px;
+        }
+        QScrollBar::handle:vertical:hover {
+            background: #2a82da;
+        }
+    """)
+
+
+# =============================================================================
+# ESTADO GLOBAL DEL TEMA
+# =============================================================================
+
+tema_actual = "oscuro"
+
+
+def alternar_tema(app: QApplication, ventana) -> None:
+    """Alterna entre tema oscuro y claro."""
+    global tema_actual
+    if tema_actual == "oscuro":
+        aplicar_tema_claro(app)
+        tema_actual = "claro"
+        ventana.btn_tema.setText("🌙 Modo oscuro")
+    else:
+        aplicar_tema_oscuro(app)
+        tema_actual = "oscuro"
+        ventana.btn_tema.setText("☀ Modo claro")
 
 
 # =============================================================================
@@ -102,10 +210,7 @@ def aplicar_tema_oscuro(app: QApplication) -> None:
 # =============================================================================
 
 def iniciar_app() -> None:
-    """
-    Punto de entrada principal.
-    Inicializa la base de datos, realiza backup y lanza la pantalla de login.
-    """
+    """Punto de entrada principal."""
     crear_base_datos()
     hacer_backup()
 
@@ -115,15 +220,13 @@ def iniciar_app() -> None:
     ventana_principal = None
 
     def on_login_exitoso(usuario_id: int, rol: str) -> None:
-        """Callback ejecutado tras un login exitoso. Abre la ventana principal."""
         from services.sesion import iniciar_sesion
         iniciar_sesion(usuario_id, rol)
 
         nonlocal ventana_principal
-        ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso)
+        ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso, app, alternar_tema)
         ventana_principal.show()
 
-        # Verificar actualizaciones con delay para que cargue la ventana primero
         QTimer.singleShot(1000, lambda: verificar_actualizacion(ventana_principal))
 
     login = LoginWindow(on_login_exitoso)
