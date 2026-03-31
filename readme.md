@@ -1,7 +1,7 @@
 # Sistema de Control de Objetivos
 ### V.E.S.P Organizations – Seguridad Privada
 
-![Logo](assets/vesp_logo.png)
+![Logo](assets/vesp.png)
 
 ---
 
