@@ -6,28 +6,23 @@
 import sqlite3
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel,
-    QPushButton, QComboBox, QDateEdit, QTimeEdit, QMessageBox
+    QPushButton, QComboBox, QDateEdit, QTimeEdit, QMessageBox, QCheckBox
 )
 from PyQt6.QtCore import QDate, QTime
-from models.turnos import registrar_turno
+from models.turnos import registrar_turno, registrar_turno_ambos
 from database.db import DB_PATH
 
 
 def _cargar_objetivos() -> list:
-    """Retorna todos los objetivos registrados."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
-    cursor.execute("SELECT id, nombre FROM objetivos")
+    cursor.execute("SELECT id, nombre FROM objetivos WHERE fecha_fin IS NULL OR fecha_fin >= date('now')")
     resultado = cursor.fetchall()
     conexion.close()
     return resultado
 
 
 def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
-    """
-    Retorna los supervisores del equipo asignado al turno de esa fecha.
-    Si no hay equipo registrado retorna todos los supervisores.
-    """
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
@@ -51,51 +46,61 @@ def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
     return resultado
 
 
+def _tiene_equipo_registrado(fecha: str, turno: str) -> bool:
+    conexion = sqlite3.connect(DB_PATH)
+    cursor = conexion.cursor()
+    cursor.execute("SELECT COUNT(*) FROM equipos WHERE fecha = ? AND turno = ?", (fecha, turno))
+    resultado = cursor.fetchone()[0]
+    conexion.close()
+    return resultado > 0
+
+
 class FormPasada(QWidget):
 
-    def __init__(self, fecha_inicial: str = None):
+    def __init__(self):
         super().__init__()
         self.setWindowTitle("Registrar pasada")
-        self.setGeometry(300, 300, 350, 320)
+        self.setGeometry(300, 300, 370, 420)
 
         layout = QVBoxLayout()
 
-        # Fecha - usa la fecha del control diario si se pasa
         layout.addWidget(QLabel("Fecha:"))
         self.input_fecha = QDateEdit()
-        if fecha_inicial:
-            self.input_fecha.setDate(QDate.fromString(fecha_inicial, "yyyy-MM-dd"))
-        else:
-            self.input_fecha.setDate(QDate.currentDate())
+        self.input_fecha.setDate(QDate.currentDate())
         self.input_fecha.setCalendarPopup(True)
         layout.addWidget(self.input_fecha)
 
-        # Hora opcional
-        layout.addWidget(QLabel("Hora (opcional):"))
+        self.check_hora = QCheckBox("Registrar hora")
+        self.check_hora.setChecked(True)
+        self.check_hora.toggled.connect(self._toggle_hora)
+        layout.addWidget(self.check_hora)
+
         self.input_hora = QTimeEdit()
         self.input_hora.setTime(QTime.currentTime())
         layout.addWidget(self.input_hora)
 
-        # Turno - ahora diurno/nocturno
         layout.addWidget(QLabel("Turno:"))
         self.input_turno = QComboBox()
-        self.input_turno.addItems(["diurno", "nocturno"])
+        self.input_turno.addItems(["dia", "noche"])
         self.input_turno.currentTextChanged.connect(self._actualizar_supervisores)
         layout.addWidget(self.input_turno)
 
-        # Objetivo
         layout.addWidget(QLabel("Objetivo:"))
         self.input_objetivo = QComboBox()
         for o in _cargar_objetivos():
             self.input_objetivo.addItem(o[1], o[0])
         layout.addWidget(self.input_objetivo)
 
-        # Supervisor filtrado por turno
         layout.addWidget(QLabel("Supervisor:"))
         self.input_supervisor = QComboBox()
         layout.addWidget(self.input_supervisor)
 
+        self.label_ambos_info = QLabel("")
+        self.label_ambos_info.setStyleSheet("color: #888; font-size: 11px;")
+        layout.addWidget(self.label_ambos_info)
+
         boton_guardar = QPushButton("Registrar pasada")
+        boton_guardar.setFixedHeight(40)
         boton_guardar.clicked.connect(self._guardar)
         layout.addWidget(boton_guardar)
 
@@ -103,39 +108,62 @@ class FormPasada(QWidget):
         self._actualizar_supervisores()
         self.input_fecha.dateChanged.connect(lambda: self._actualizar_supervisores())
 
+    def _toggle_hora(self, checked: bool) -> None:
+        self.input_hora.setVisible(checked)
+
     def _actualizar_supervisores(self) -> None:
-        """Actualiza la lista de supervisores según el turno y fecha seleccionados."""
         fecha = self.input_fecha.date().toString("yyyy-MM-dd")
         turno = self.input_turno.currentText()
         supervisores = _cargar_supervisores_del_turno(fecha, turno)
+        tiene_equipo = _tiene_equipo_registrado(fecha, turno)
+
         self.input_supervisor.clear()
+        self.label_ambos_info.setText("")
+
+        if tiene_equipo and len(supervisores) == 2:
+            self.input_supervisor.addItem(
+                f"Ambos ({supervisores[0][1]} y {supervisores[1][1]})",
+                ("ambos", supervisores[0][0], supervisores[1][0])
+            )
+            self.label_ambos_info.setText("↑ Seleccioná 'Ambos' si fueron juntos")
+
         for s in supervisores:
             self.input_supervisor.addItem(s[1], s[0])
 
     def _guardar(self) -> None:
-        """Registra la pasada en la base de datos y loguea la acción."""
         fecha = self.input_fecha.date().toString("yyyy-MM-dd")
-        hora = self.input_hora.time().toString("HH:mm")
+        hora = self.input_hora.time().toString("HH:mm") if self.check_hora.isChecked() else None
         turno = self.input_turno.currentText()
         objetivo_id = self.input_objetivo.currentData()
-        supervisor_id = self.input_supervisor.currentData()
+        supervisor_data = self.input_supervisor.currentData()
         objetivo_nombre = self.input_objetivo.currentText()
-        supervisor_nombre = self.input_supervisor.currentText()
 
-        if not objetivo_id or not supervisor_id:
+        if not objetivo_id or supervisor_data is None:
             QMessageBox.warning(self, "Error", "Seleccioná un objetivo y un supervisor.")
             return
 
-        registrar_turno(fecha, hora, turno, objetivo_id, supervisor_id)
-
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id
-        registrar_accion(
-            get_usuario_id(),
-            f"Registró pasada - Objetivo: {objetivo_nombre} | "
-            f"Supervisor: {supervisor_nombre} | Turno: {turno} | "
-            f"Fecha: {fecha} | Hora: {hora}"
-        )
 
-        QMessageBox.information(self, "Listo", "Pasada registrada correctamente.")
-        self.close()
+        hora_log = hora if hora else "sin hora"
+
+        if isinstance(supervisor_data, tuple) and supervisor_data[0] == "ambos":
+            _, sup1_id, sup2_id = supervisor_data
+            registrar_turno_ambos(fecha, hora, turno, objetivo_id, sup1_id, sup2_id)
+            registrar_accion(
+                get_usuario_id(),
+                f"Registró pasada (ambos) - Objetivo: {objetivo_nombre} | "
+                f"Turno: {turno} | Fecha: {fecha} | Hora: {hora_log}"
+            )
+            QMessageBox.information(self, "Listo", "Pasada registrada para los dos supervisores.")
+        else:
+            supervisor_id = supervisor_data
+            supervisor_nombre = self.input_supervisor.currentText()
+            registrar_turno(fecha, hora, turno, objetivo_id, supervisor_id)
+            registrar_accion(
+                get_usuario_id(),
+                f"Registró pasada - Objetivo: {objetivo_nombre} | "
+                f"Supervisor: {supervisor_nombre} | Turno: {turno} | "
+                f"Fecha: {fecha} | Hora: {hora_log}"
+            )
+            QMessageBox.information(self, "Listo", "Pasada registrada correctamente.")

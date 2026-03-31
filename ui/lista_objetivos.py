@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QPushButton, QMessageBox, QDialog,
     QLabel, QLineEdit, QDateEdit, QCheckBox, QDialogButtonBox
 )
-from PyQt6.QtCore import QDate
+from PyQt6.QtCore import QDate, Qt
 from database.db import DB_PATH
 from models.objetivos import dar_de_baja_objetivo
 
@@ -25,12 +25,7 @@ DIAS_NOMBRES = {
 }
 
 
-# =============================================================================
-# CONSULTAS A BASE DE DATOS
-# =============================================================================
-
 def _cargar_objetivos() -> list:
-    """Retorna todos los objetivos registrados con sus datos completos."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
@@ -39,21 +34,17 @@ def _cargar_objetivos() -> list:
     return resultado
 
 
-def _actualizar_objetivo(objetivo_id: int, nombre: str, fecha_inicio: str, dias_semana: str) -> None:
-    """Actualiza los datos de un objetivo existente."""
+def _actualizar_objetivo(objetivo_id: int, nombre: str, fecha_inicio: str,
+                          fecha_fin: str | None, dias_semana: str) -> None:
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
-        UPDATE objetivos SET nombre = ?, fecha_inicio = ?, dias_semana = ?
+        UPDATE objetivos SET nombre = ?, fecha_inicio = ?, fecha_fin = ?, dias_semana = ?
         WHERE id = ?
-    """, (nombre, fecha_inicio, dias_semana, objetivo_id))
+    """, (nombre, fecha_inicio, fecha_fin, dias_semana, objetivo_id))
     conexion.commit()
     conexion.close()
 
-
-# =============================================================================
-# DIÁLOGO DE EDICIÓN
-# =============================================================================
 
 class DialogoEditarObjetivo(QDialog):
 
@@ -61,7 +52,7 @@ class DialogoEditarObjetivo(QDialog):
         super().__init__(parent)
         self.objetivo_id = objetivo[0]
         self.setWindowTitle("Editar objetivo")
-        self.setFixedSize(380, 420)
+        self.setFixedSize(400, 480)
 
         layout = QVBoxLayout()
 
@@ -76,6 +67,21 @@ class DialogoEditarObjetivo(QDialog):
         self.input_inicio.setCalendarPopup(True)
         self.input_inicio.setDate(QDate.fromString(objetivo[2], "yyyy-MM-dd"))
         layout.addWidget(self.input_inicio)
+
+        # Fecha fin opcional
+        self.check_fin = QCheckBox("Tiene fecha de finalización:")
+        self.check_fin.setChecked(objetivo[3] is not None)
+        self.check_fin.toggled.connect(self._toggle_fecha_fin)
+        layout.addWidget(self.check_fin)
+
+        self.input_fin = QDateEdit()
+        self.input_fin.setCalendarPopup(True)
+        if objetivo[3]:
+            self.input_fin.setDate(QDate.fromString(objetivo[3], "yyyy-MM-dd"))
+        else:
+            self.input_fin.setDate(QDate.currentDate())
+        self.input_fin.setEnabled(objetivo[3] is not None)
+        layout.addWidget(self.input_fin)
 
         # Días de cobertura
         layout.addWidget(QLabel("Días de cobertura:"))
@@ -98,10 +104,13 @@ class DialogoEditarObjetivo(QDialog):
 
         self.setLayout(layout)
 
+    def _toggle_fecha_fin(self, checked: bool) -> None:
+        self.input_fin.setEnabled(checked)
+
     def _guardar(self) -> None:
-        """Valida y guarda los cambios del objetivo."""
         nombre = self.input_nombre.text().strip()
         inicio = self.input_inicio.date().toString("yyyy-MM-dd")
+        fin = self.input_fin.date().toString("yyyy-MM-dd") if self.check_fin.isChecked() else None
         dias_seleccionados = [
             DIAS_NOMBRES[dia] for dia, cb in self.dias.items() if cb.isChecked()
         ]
@@ -114,30 +123,31 @@ class DialogoEditarObjetivo(QDialog):
             QMessageBox.warning(self, "Error", "Seleccioná al menos un día.")
             return
 
+        if fin and fin < inicio:
+            QMessageBox.warning(self, "Error", "La fecha fin no puede ser anterior al inicio.")
+            return
+
         dias_str = ",".join(dias_seleccionados)
-        _actualizar_objetivo(self.objetivo_id, nombre, inicio, dias_str)
+        _actualizar_objetivo(self.objetivo_id, nombre, inicio, fin, dias_str)
 
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id
         registrar_accion(
             get_usuario_id(),
-            f"Editó objetivo id={self.objetivo_id} - Nombre: {nombre} | Inicio: {inicio} | Días: {dias_str}"
+            f"Editó objetivo id={self.objetivo_id} - Nombre: {nombre} | "
+            f"Inicio: {inicio} | Fin: {fin or 'Sin fecha'} | Días: {dias_str}"
         )
 
         QMessageBox.information(self, "Listo", "Objetivo actualizado correctamente.")
         self.accept()
 
 
-# =============================================================================
-# PANTALLA DE LISTADO DE OBJETIVOS
-# =============================================================================
-
 class ListaObjetivos(QWidget):
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Listado de objetivos")
-        self.setGeometry(200, 200, 800, 400)
+        self.setGeometry(200, 200, 850, 400)
 
         layout = QVBoxLayout()
 
@@ -146,10 +156,10 @@ class ListaObjetivos(QWidget):
         self.tabla.setHorizontalHeaderLabels([
             "Nombre", "Inicio", "Fin", "Días", "Editar", "Dar de baja"
         ])
-        self.tabla.setColumnWidth(0, 200)
+        self.tabla.setColumnWidth(0, 220)
         self.tabla.setColumnWidth(1, 100)
         self.tabla.setColumnWidth(2, 100)
-        self.tabla.setColumnWidth(3, 180)
+        self.tabla.setColumnWidth(3, 200)
         self.tabla.setColumnWidth(4, 80)
         self.tabla.setColumnWidth(5, 100)
         layout.addWidget(self.tabla)
@@ -158,13 +168,12 @@ class ListaObjetivos(QWidget):
         self._cargar_tabla()
 
     def _cargar_tabla(self) -> None:
-        """Carga todos los objetivos en la tabla."""
         objetivos = _cargar_objetivos()
         self.tabla.setRowCount(len(objetivos))
 
         for i, o in enumerate(objetivos):
             dias_texto = ", ".join([DIAS_MAP.get(d, d) for d in o[4].split(",")])
-            fin_texto = o[3] if o[3] else "Activo"
+            fin_texto = o[3] if o[3] else "Sin fecha fin"
 
             self.tabla.setItem(i, 0, QTableWidgetItem(o[1]))
             self.tabla.setItem(i, 1, QTableWidgetItem(o[2]))
@@ -177,17 +186,17 @@ class ListaObjetivos(QWidget):
 
             if not o[3]:
                 boton_baja = QPushButton("Dar de baja")
-                boton_baja.clicked.connect(lambda checked, obj_id=o[0], nombre=o[1]: self._dar_de_baja(obj_id, nombre))
+                boton_baja.clicked.connect(
+                    lambda checked, obj_id=o[0], nombre=o[1]: self._dar_de_baja(obj_id, nombre)
+                )
                 self.tabla.setCellWidget(i, 5, boton_baja)
 
     def _editar(self, objetivo: tuple) -> None:
-        """Abre el diálogo de edición para el objetivo seleccionado."""
-        dialogo = DialogoEditarObjetivo(objetivo, self)
-        if dialogo.exec():
+        self.dialogo_edicion = DialogoEditarObjetivo(objetivo, self)
+        if self.dialogo_edicion.exec():
             self._cargar_tabla()
 
     def _dar_de_baja(self, objetivo_id: int, nombre: str) -> None:
-        """Da de baja un objetivo tras confirmación."""
         confirmar = QMessageBox.question(
             self, "Confirmar",
             f"¿Seguro que querés dar de baja '{nombre}'?",
@@ -199,7 +208,10 @@ class ListaObjetivos(QWidget):
 
             from services.logger import registrar_accion
             from services.sesion import get_usuario_id
-            registrar_accion(get_usuario_id(), f"Dio de baja objetivo: {nombre} | Fecha: {fecha_hoy}")
+            registrar_accion(
+                get_usuario_id(),
+                f"Dio de baja objetivo: {nombre} | Fecha: {fecha_hoy}"
+            )
 
             QMessageBox.information(self, "Listo", "Objetivo dado de baja correctamente.")
             self._cargar_tabla()

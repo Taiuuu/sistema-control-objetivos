@@ -8,20 +8,16 @@ import datetime
 from database.db import DB_PATH
 
 
-# =============================================================================
-# CONTROL DIARIO
-# =============================================================================
-
 def obtener_objetivos_del_dia(fecha: str) -> list:
     """
     Retorna los objetivos que corresponden ser controlados en una fecha dada.
-    Filtra por rango de vigencia y días de cobertura configurados.
+    - Solo muestra objetivos cuya fecha_inicio <= fecha
+    - Si tiene fecha_fin, solo muestra si fecha <= fecha_fin
+    - Si no tiene fecha_fin, se muestra indefinidamente
     """
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
 
-    # Traer todos los objetivos sin filtrar por fecha en SQL
-    # para manejar el filtro en Python con comparación exacta de strings
     cursor.execute("""
         SELECT id, nombre, dias_semana, fecha_inicio, fecha_fin
         FROM objetivos
@@ -37,13 +33,12 @@ def obtener_objetivos_del_dia(fecha: str) -> list:
     for o in objetivos:
         obj_id, nombre, dias_semana_str, fecha_inicio, fecha_fin = o
 
-        # Verificar rango de fechas
         if fecha_inicio and fecha < fecha_inicio:
             continue
+
         if fecha_fin and fecha > fecha_fin:
             continue
 
-        # Verificar día de cobertura
         dias = [int(d) for d in dias_semana_str.split(",")]
         if dia_semana not in dias:
             continue
@@ -64,15 +59,8 @@ def objetivo_corresponde(fecha: str, dias: str) -> bool:
     return dia in dias_lista
 
 
-# =============================================================================
-# REPORTE MENSUAL (consola)
-# =============================================================================
-
 def reporte_mensual(anio: int, mes: int) -> None:
-    """
-    Imprime en consola el reporte de cumplimiento mensual por objetivo.
-    Para reportes con interfaz gráfica o exportación usar services/exportar.py
-    """
+    """Imprime en consola el reporte de cumplimiento mensual por objetivo."""
     import calendar
 
     conexion = sqlite3.connect(DB_PATH)
