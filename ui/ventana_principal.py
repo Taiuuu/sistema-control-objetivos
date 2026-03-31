@@ -350,6 +350,12 @@ class VentanaPrincipal(QWidget):
         self.timer_inactividad.timeout.connect(self.cerrar_por_inactividad)
         self.timer_inactividad.start()
 
+        # Timer de refresco automático cada 30 segundos
+        self.timer_refresco = QTimer()
+        self.timer_refresco.setInterval(30 * 1000)
+        self.timer_refresco.timeout.connect(self.cargar_tabla)
+        self.timer_refresco.start()
+
     # =============================================================================
     # ZOOM
     # =============================================================================
@@ -511,7 +517,7 @@ class VentanaPrincipal(QWidget):
     def abrir_form_pasada(self):
         if not hasattr(self, 'form_pasada') or not self.form_pasada.isVisible():
             self.form_pasada = FormPasada(fecha_inicial=self.selector_fecha.date().toString("yyyy-MM-dd"))
-            self.form_pasada.destroyed.connect(self.cargar_tabla)
+            self.form_pasada.pasada_registrada.connect(self.cargar_tabla)
             self.form_pasada.show()
         else:
             self.form_pasada.raise_()
