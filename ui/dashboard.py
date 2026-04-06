@@ -1,12 +1,13 @@
 # =============================================================================
 # VESP Organizations - Sistema de Control de Objetivos
-# SoloDashboard con métricas y gráficos
+# Dashboard con métricas y gráficos
 # =============================================================================
 
 import sqlite3
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QFrame, QProgressBar, QGridLayout, QGroupBox
+    QFrame, QProgressBar, QGridLayout, QGroupBox,
+    QSizePolicy, QScrollArea
 )
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QColor
@@ -20,7 +21,8 @@ class TarjetaMetrica(QWidget):
 
     def __init__(self, titulo: str, valor: str, color: str = "#2a82da"):
         super().__init__()
-        self.setFixedSize(180, 80)
+        self.setMinimumSize(160, 80)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)
@@ -30,15 +32,15 @@ class TarjetaMetrica(QWidget):
         titulo_label.setStyleSheet("font-size: 11px; color: #666; font-weight: bold;")
         titulo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        valor_label = QLabel(valor)
-        valor_label.setStyleSheet(f"""
+        self.valor_label = QLabel(valor)
+        self.valor_label.setStyleSheet(f"""
             font-size: 24px; font-weight: bold; color: {color};
             font-family: 'Segoe UI';
         """)
-        valor_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.valor_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout.addWidget(titulo_label)
-        layout.addWidget(valor_label)
+        layout.addWidget(self.valor_label)
 
         self.setStyleSheet(f"""
             TarjetaMetrica {{
@@ -51,6 +53,9 @@ class TarjetaMetrica(QWidget):
                 background-color: {color}05;
             }}
         """)
+
+    def setText(self, texto: str) -> None:
+        self.valor_label.setText(texto)
 
 
 class BarraProgresoTurno(QWidget):
@@ -116,7 +121,12 @@ class Dashboard(QWidget):
 
     def setup_ui(self):
         """Configura la interfaz del dashboard."""
-        layout_principal = QVBoxLayout(self)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+
+        contenido = QWidget()
+        layout_principal = QVBoxLayout(contenido)
         layout_principal.setSpacing(15)
         layout_principal.setContentsMargins(20, 20, 20, 20)
 
@@ -150,23 +160,31 @@ class Dashboard(QWidget):
         self.setup_panel_detalles(layout_inferior)
 
         layout_principal.addLayout(layout_inferior)
+        scroll_area.setWidget(contenido)
+
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.addWidget(scroll_area)
 
     def setup_metricas_principales(self, parent_layout):
         """Configura las tarjetas de métricas principales."""
-        layout_metricas = QHBoxLayout()
+        layout_metricas = QGridLayout()
         layout_metricas.setSpacing(15)
 
-        # Crear tarjetas de métricas (se actualizarán con datos reales)
         self.tarjeta_total = TarjetaMetrica("Total Objetivos", "0", "#2a82da")
         self.tarjeta_cumplidos = TarjetaMetrica("Cumplidos", "0", "#28a745")
         self.tarjeta_pendientes = TarjetaMetrica("Pendientes", "0", "#ffc107")
         self.tarjeta_criticos = TarjetaMetrica("Críticos", "0", "#dc3545")
 
-        layout_metricas.addWidget(self.tarjeta_total)
-        layout_metricas.addWidget(self.tarjeta_cumplidos)
-        layout_metricas.addWidget(self.tarjeta_pendientes)
-        layout_metricas.addWidget(self.tarjeta_criticos)
-        layout_metricas.addStretch()
+        layout_metricas.addWidget(self.tarjeta_total, 0, 0)
+        layout_metricas.addWidget(self.tarjeta_cumplidos, 0, 1)
+        layout_metricas.addWidget(self.tarjeta_pendientes, 1, 0)
+        layout_metricas.addWidget(self.tarjeta_criticos, 1, 1)
+
+        layout_metricas.setColumnStretch(0, 1)
+        layout_metricas.setColumnStretch(1, 1)
+        layout_metricas.setRowStretch(0, 0)
+        layout_metricas.setRowStretch(1, 0)
 
         parent_layout.addLayout(layout_metricas)
 
@@ -188,6 +206,7 @@ class Dashboard(QWidget):
             }
         """)
 
+        grupo_turnos.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         layout_turnos = QVBoxLayout(grupo_turnos)
         layout_turnos.setSpacing(10)
 
@@ -219,6 +238,7 @@ class Dashboard(QWidget):
             }
         """)
 
+        grupo_detalles.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         layout_detalles = QVBoxLayout(grupo_detalles)
 
         # Estado general

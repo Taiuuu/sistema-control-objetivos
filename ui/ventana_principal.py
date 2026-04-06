@@ -205,7 +205,7 @@ class VentanaPrincipal(QWidget):
             return b
 
         layout_lateral.addWidget(boton_menu("Control diario", self.cargar_tabla, "Ctrl+B"))
-        layout_lateral.addWidget(boton_menu("SoloDashboard", self.abrir_dashboard, "Ctrl+D"))
+        layout_lateral.addWidget(boton_menu("Dashboard", self.abrir_dashboard, "Ctrl+D"))
         layout_lateral.addWidget(boton_menu("Registrar pasada", self.abrir_form_pasada, "Ctrl+P"))
         layout_lateral.addWidget(boton_menu("Registrar turno", self.abrir_form_turno, "Ctrl+T"))
 
