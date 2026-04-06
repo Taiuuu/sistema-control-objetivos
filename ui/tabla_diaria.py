@@ -55,8 +55,10 @@ class TablaDiaria(QWidget):
         self.tabla.setColumnWidth(1, 80)
         self.tabla.setColumnWidth(2, 80)
         self.tabla.setColumnWidth(3, 120)
-        # Asegurar que la tabla sea visible
-        self.tabla.setVisible(True)
+        self.tabla.setMinimumSize(600, 200)
+        self.tabla.setShowGrid(True)
+        self.tabla.setAlternatingRowColors(True)
+        self.tabla.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
@@ -67,12 +69,8 @@ class TablaDiaria(QWidget):
             fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
             objetivos = obtener_objetivos_del_dia(fecha)
 
-            # Limpiar completamente la tabla antes de recargar
-            self.tabla.clearContents()
-            # Limpiar widgets de celda existentes
-            for row in range(self.tabla.rowCount()):
-                self.tabla.removeCellWidget(row, 3)
-            self.tabla.setRowCount(0)
+            self.tabla.setUpdatesEnabled(False)
+            self._limpiar_tabla()
 
             if objetivos:
                 self.tabla.setRowCount(len(objetivos))
@@ -85,7 +83,6 @@ class TablaDiaria(QWidget):
                     self.tabla.setItem(i, 1, QTableWidgetItem(str(pasadas)))
                     self.tabla.setItem(i, 2, QTableWidgetItem(estado))
 
-                    # Combo box para acciones
                     combo_accion = QComboBox()
                     combo_accion.addItem("Seleccionar acción")
                     combo_accion.addItem("Dar de baja")
@@ -96,29 +93,34 @@ class TablaDiaria(QWidget):
                     )
                     self.tabla.setCellWidget(i, 3, combo_accion)
 
-                    # Colorear la fila
                     color = QColor("#90EE90") if pasadas > 0 else QColor("#FF6B6B")
                     for col in range(3):
                         self.tabla.item(i, col).setBackground(color)
 
-            # Forzar actualización de la tabla para asegurar que se renderice correctamente
-            self.tabla.update()
-            self.tabla.repaint()
-            self.tabla.viewport().update()
-            QApplication.processEvents()  # Procesar eventos pendientes para asegurar actualización completa
-
-            # Ajustar tamaño de columnas y filas
+            self.tabla.setUpdatesEnabled(True)
             self.tabla.resizeColumnsToContents()
             self.tabla.resizeRowsToContents()
-
-            # Actualizar el widget padre
+            self.tabla.update()
+            self.tabla.viewport().repaint()
+            QApplication.processEvents()
             self.update()
-            self.tabla.show()  # Asegurar que la tabla sea visible
 
         except Exception as e:
             print(f"Error al cargar tabla: {e}")
             import traceback
             traceback.print_exc()
+
+    def _limpiar_tabla(self):
+        """Elimina widgets y contenido previo de la tabla sin romper el renderizado."""
+        row_count = self.tabla.rowCount()
+        for row in range(row_count):
+            widget = self.tabla.cellWidget(row, 3)
+            if widget is not None:
+                self.tabla.removeCellWidget(row, 3)
+                widget.deleteLater()
+
+        self.tabla.clearContents()
+        self.tabla.setRowCount(0)
 
     def _ejecutar_accion(self, index: int, objetivo_id: int, objetivo_nombre: str, combo: QComboBox) -> None:
         """Ejecuta la acción seleccionada para un objetivo."""
