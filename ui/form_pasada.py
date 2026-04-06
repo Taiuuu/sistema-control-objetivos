@@ -12,6 +12,7 @@ from PyQt6.QtCore import QDate, QTime, pyqtSignal
 from models.turnos import registrar_turno
 from ui.animaciones import animar_entrada
 from database.db import DB_PATH
+from services.validaciones import validar_pasada, ErrorValidacion
 
 
 def _cargar_objetivos() -> list:
@@ -137,6 +138,12 @@ class FormPasada(QWidget):
 
         if not objetivo_id or not supervisor_id:
             QMessageBox.warning(self, "Error", "Seleccioná un objetivo y un supervisor.")
+            return
+
+        try:
+            validar_pasada(fecha, hora, turno, objetivo_id, supervisor_id)
+        except ErrorValidacion as e:
+            QMessageBox.warning(self, "Error de Validación", str(e))
             return
 
         registrar_turno(fecha, hora, turno, objetivo_id, supervisor_id)

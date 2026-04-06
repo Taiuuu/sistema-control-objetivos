@@ -29,6 +29,7 @@ from ui.transferir_datos import TransferirDatos
 from ui.importar_excel import ImportarExcel
 from ui.dashboard import Dashboard
 from ui.vista_auditoria import VistaAuditoria
+from ui.vista_validaciones import VistaValidaciones
 from models.objetivos import dar_de_baja_objetivo
 from services.tema import obtener_tema_actual
 from services.backup import hacer_backup
@@ -239,6 +240,7 @@ class VentanaPrincipal(QWidget):
             layout_lateral.addWidget(sep4)
             layout_lateral.addWidget(boton_menu("Gestionar usuarios", self.abrir_gestionar_usuarios))
             layout_lateral.addWidget(boton_menu("Historial", self.abrir_logs))
+            layout_lateral.addWidget(boton_menu("Validaciones BD", self.abrir_validaciones))
             layout_lateral.addWidget(boton_menu("Auditoría detallada", self.abrir_auditoria))
 
         layout_lateral.addStretch()
@@ -787,6 +789,16 @@ class VentanaPrincipal(QWidget):
         else:
             self.logs.raise_()
             self.logs.activateWindow()
+
+    def abrir_validaciones(self):
+        if not hasattr(self, 'validaciones') or not self.validaciones.isVisible():
+            self.validaciones = VistaValidaciones(self.usuario_actual)
+            self.validaciones.setWindowTitle("Validaciones e Integridad de BD")
+            self.validaciones.setGeometry(100, 100, 1000, 600)
+            self.validaciones.show()
+        else:
+            self.validaciones.raise_()
+            self.validaciones.activateWindow()
 
     def abrir_ayuda(self):
         if not hasattr(self, 'ayuda') or not self.ayuda.isVisible():

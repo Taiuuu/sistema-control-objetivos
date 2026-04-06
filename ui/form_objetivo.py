@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QDate
 from ui.animaciones import animar_entrada
 from models.objetivos import agregar_objetivo
+from services.validaciones import validar_objetivo, ErrorValidacion
 
 
 # Mapeo de días de la semana a su número (formato ISO: 1=lunes, 7=domingo)
@@ -66,15 +67,18 @@ class FormObjetivo(QWidget):
             DIAS_MAP[dia] for dia, cb in self.dias.items() if cb.isChecked()
         ]
 
-        if not nombre:
-            QMessageBox.warning(self, "Error", "El nombre no puede estar vacío.")
-            return
-
         if not dias_seleccionados:
             QMessageBox.warning(self, "Error", "Seleccioná al menos un día.")
             return
 
         dias_str = ",".join(dias_seleccionados)
+        
+        try:
+            validar_objetivo(nombre, dias_str)
+        except ErrorValidacion as e:
+            QMessageBox.warning(self, "Error de Validación", str(e))
+            return
+        
         agregar_objetivo(nombre, inicio, None, dias_str)
 
         from services.logger import registrar_accion

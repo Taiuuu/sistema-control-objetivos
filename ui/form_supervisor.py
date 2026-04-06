@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QPushButton, QMessageBox
 )
 from models.supervisores import agregar_supervisor
+from services.validaciones import validar_supervisor, ErrorValidacion
 
 
 # =============================================================================
@@ -37,8 +38,10 @@ class FormSupervisor(QWidget):
         """Valida y registra el nuevo supervisor en la base de datos."""
         nombre = self.input_nombre.text().strip()
 
-        if not nombre:
-            QMessageBox.warning(self, "Error", "El nombre no puede estar vacío.")
+        try:
+            validar_supervisor(nombre)
+        except ErrorValidacion as e:
+            QMessageBox.warning(self, "Error de Validación", str(e))
             return
 
         agregar_supervisor(nombre)
