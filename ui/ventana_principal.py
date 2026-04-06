@@ -24,9 +24,7 @@ from ui.lista_pasadas import ListaPasadas
 from ui.notas_diarias import NotasDiarias
 from ui.vista_logs import VistaLogs
 from ui.gestionar_usuarios import GestionarUsuarios
-from ui.ayuda import Ayuda
-from ui.transferir_datos import TransferirDatos
-from ui.importar_excel import ImportarExcel
+from ui.dashboard import SoloDashboard
 from models.objetivos import dar_de_baja_objetivo
 from services.tema import obtener_tema_actual
 from services.backup import hacer_backup
@@ -204,6 +202,7 @@ class VentanaPrincipal(QWidget):
             return b
 
         layout_lateral.addWidget(boton_menu("Control diario", self.cargar_tabla, "Ctrl+B"))
+        layout_lateral.addWidget(boton_menu("SoloDashboard", self.abrir_dashboard, "Ctrl+D"))
         layout_lateral.addWidget(boton_menu("Registrar pasada", self.abrir_form_pasada, "Ctrl+P"))
         layout_lateral.addWidget(boton_menu("Registrar turno", self.abrir_form_turno, "Ctrl+T"))
 
@@ -375,6 +374,7 @@ class VentanaPrincipal(QWidget):
         QShortcut(QKeySequence("Ctrl+N"), self).activated.connect(self.abrir_notas)
         QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self.abrir_reporte_mensual)
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(self.cargar_tabla)
+        QShortcut(QKeySequence("Ctrl+D"), self).activated.connect(self.abrir_dashboard)
         QShortcut(QKeySequence("Ctrl+H"), self).activated.connect(self.abrir_ayuda)
         QShortcut(QKeySequence("Ctrl+="), self).activated.connect(self._zoom_mas)
         QShortcut(QKeySequence("Ctrl+-"), self).activated.connect(self._zoom_menos)
@@ -750,6 +750,14 @@ class VentanaPrincipal(QWidget):
         else:
             self.notas.raise_()
             self.notas.activateWindow()
+
+    def abrir_dashboard(self):
+        if not hasattr(self, 'dashboard') or not self.dashboard.isVisible():
+            self.dashboard = SoloDashboard()
+            self.dashboard.show()
+        else:
+            self.dashboard.raise_()
+            self.dashboard.activateWindow()
 
     def abrir_reporte_mensual(self):
         if not hasattr(self, 'reporte_mensual') or not self.reporte_mensual.isVisible():
