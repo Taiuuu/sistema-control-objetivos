@@ -28,6 +28,7 @@ from ui.ayuda import Ayuda
 from ui.transferir_datos import TransferirDatos
 from ui.importar_excel import ImportarExcel
 from models.objetivos import dar_de_baja_objetivo
+from services.tema import obtener_tema_actual
 from services.backup import hacer_backup
 from services.logger import registrar_accion
 from services.assets import ruta_asset
@@ -124,6 +125,7 @@ class VentanaPrincipal(QWidget):
         self.zoom_nivel = 13
         super().__init__()
         self.setWindowTitle("VESP Control de Objetivos")
+        self.setWindowFlags(Qt.WindowType.Window)
         self.move(100, 100)
         self.resize(1300, 600)
         self.setMinimumSize(900, 500)
@@ -136,7 +138,13 @@ class VentanaPrincipal(QWidget):
         # PANEL LATERAL
         panel_lateral = QFrame()
         panel_lateral.setFixedWidth(190)
-        panel_lateral.setStyleSheet("background-color: #1a1a1a; border-right: 1px solid #333;")
+        if obtener_tema_actual() == "oscuro":
+            panel_bg = "#1a1a1a"
+            panel_border = "#333"
+        else:
+            panel_bg = "#e8e8e8"
+            panel_border = "#ccc"
+        panel_lateral.setStyleSheet(f"background-color: {panel_bg}; border-right: 1px solid {panel_border};")
         layout_lateral = QVBoxLayout(panel_lateral)
         layout_lateral.setSpacing(4)
         layout_lateral.setContentsMargins(8, 12, 8, 12)
@@ -152,17 +160,20 @@ class VentanaPrincipal(QWidget):
 
         titulo_lateral = QLabel("V.E.S.P")
         titulo_lateral.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        titulo_lateral.setStyleSheet("color: #4CAF50; font-size: 14px; font-weight: bold;")
+        titulo_color = "#4CAF50" if obtener_tema_actual() == "oscuro" else "#2E7D32"
+        titulo_lateral.setStyleSheet(f"color: {titulo_color}; font-size: 14px; font-weight: bold;")
         layout_lateral.addWidget(titulo_lateral)
 
         subtitulo_lateral = QLabel("Organizations")
         subtitulo_lateral.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitulo_lateral.setStyleSheet("color: #888; font-size: 10px;")
+        subtitulo_color = "#888" if obtener_tema_actual() == "oscuro" else "#666"
+        subtitulo_lateral.setStyleSheet(f"color: {subtitulo_color}; font-size: 10px;")
         layout_lateral.addWidget(subtitulo_lateral)
 
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet("color: #333;")
+        sep_color = "#333" if obtener_tema_actual() == "oscuro" else "#ccc"
+        sep.setStyleSheet(f"color: {sep_color};")
         layout_lateral.addWidget(sep)
         layout_lateral.addSpacing(4)
 
@@ -198,7 +209,7 @@ class VentanaPrincipal(QWidget):
 
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.HLine)
-        sep2.setStyleSheet("color: #333;")
+        sep2.setStyleSheet(f"color: {sep_color};")
         layout_lateral.addWidget(sep2)
 
         layout_lateral.addWidget(boton_menu("Agregar objetivo", self.abrir_form_objetivo, "Ctrl+O"))
@@ -208,7 +219,7 @@ class VentanaPrincipal(QWidget):
 
         sep3 = QFrame()
         sep3.setFrameShape(QFrame.Shape.HLine)
-        sep3.setStyleSheet("color: #333;")
+        sep3.setStyleSheet(f"color: {sep_color};")
         layout_lateral.addWidget(sep3)
 
         layout_lateral.addWidget(boton_menu("Ver pasadas", self.abrir_lista_pasadas))
@@ -221,7 +232,7 @@ class VentanaPrincipal(QWidget):
         if self.rol == "admin":
             sep4 = QFrame()
             sep4.setFrameShape(QFrame.Shape.HLine)
-            sep4.setStyleSheet("color: #333;")
+            sep4.setStyleSheet(f"color: {sep_color};")
             layout_lateral.addWidget(sep4)
             layout_lateral.addWidget(boton_menu("Gestionar usuarios", self.abrir_gestionar_usuarios))
             layout_lateral.addWidget(boton_menu("Historial", self.abrir_logs))
@@ -252,7 +263,8 @@ class VentanaPrincipal(QWidget):
 
         nombre_usuario = obtener_nombre_usuario(usuario_id)
         usuario_label = QLabel(f"👤 {nombre_usuario}")
-        usuario_label.setStyleSheet("color: #888; font-size: 11px; padding: 4px;")
+        usuario_color = "#888" if obtener_tema_actual() == "oscuro" else "#666"
+        usuario_label.setStyleSheet(f"color: {usuario_color}; font-size: 11px; padding: 4px;")
         usuario_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout_lateral.addWidget(usuario_label)
 
@@ -431,13 +443,37 @@ class VentanaPrincipal(QWidget):
     # =============================================================================
 
     def event(self, evento):
-        if evento.type() in (
-            QEvent.Type.MouseMove,
-            QEvent.Type.KeyPress,
-            QEvent.Type.MouseButtonPress
-        ):
+        try:
+            if evento.type() in (
+                QEvent.Type.MouseMove,
+                QEvent.Type.KeyPress,
+                QEvent.Type.MouseButtonPress
+            ):
+                self.timer_inactividad.start()
+            return super().event(evento)
+        except Exception as e:
+            print(f"Error en event handling: {e}")
+            return super().event(evento)
+
+    def moveEvent(self, evento):
+        """Maneja el evento de movimiento de ventana."""
+        try:
+            # Reiniciar timer de inactividad cuando se mueve la ventana
             self.timer_inactividad.start()
-        return super().event(evento)
+            super().moveEvent(evento)
+        except Exception as e:
+            print(f"Error en moveEvent: {e}")
+            super().moveEvent(evento)
+
+    def resizeEvent(self, evento):
+        """Maneja el evento de redimensionamiento de ventana."""
+        try:
+            # Reiniciar timer de inactividad cuando se redimensiona la ventana
+            self.timer_inactividad.start()
+            super().resizeEvent(evento)
+        except Exception as e:
+            print(f"Error en resizeEvent: {e}")
+            super().resizeEvent(evento)
 
     def cerrar_por_inactividad(self) -> None:
         hacer_backup()

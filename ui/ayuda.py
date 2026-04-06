@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QHeaderView
 )
 from PyQt6.QtCore import Qt
+from services.tema import obtener_tema_actual
 from PyQt6.QtGui import QPixmap
 from services.assets import ruta_asset
 
@@ -49,12 +50,14 @@ class Ayuda(QWidget):
 
         titulo = QLabel("Atajos de teclado")
         titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        titulo.setStyleSheet("font-size: 16px; font-weight: bold; color: #4CAF50;")
+        titulo_color = "#4CAF50" if obtener_tema_actual() == "oscuro" else "#2E7D32"
+        titulo.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {titulo_color};")
         layout.addWidget(titulo)
 
         subtitulo = QLabel("Usá estos atajos para trabajar más rápido")
         subtitulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitulo.setStyleSheet("font-size: 11px; color: #888;")
+        subtitulo_color = "#888" if obtener_tema_actual() == "oscuro" else "#666"
+        subtitulo.setStyleSheet(f"font-size: 11px; color: {subtitulo_color};")
         layout.addWidget(subtitulo)
 
         tabla = QTableWidget()
@@ -78,7 +81,8 @@ class Ayuda(QWidget):
 
         nota = QLabel("Tip: los atajos funcionan desde la ventana principal.")
         nota.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        nota.setStyleSheet("font-size: 10px; color: #666; padding: 8px;")
+        nota_color = "#666" if obtener_tema_actual() == "oscuro" else "#888"
+        nota.setStyleSheet(f"font-size: 10px; color: {nota_color}; padding: 8px;")
         layout.addWidget(nota)
 
         self.setLayout(layout)
