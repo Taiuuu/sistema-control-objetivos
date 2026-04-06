@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QDate, QTimer, QEvent, Qt
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
 from services.reportes import obtener_objetivos_del_dia
+from ui.animaciones import animar_entrada, animar_tabla
 from ui.form_objetivo import FormObjetivo
 from ui.form_supervisor import FormSupervisor
 from ui.form_pasada import FormPasada
@@ -348,6 +349,7 @@ class VentanaPrincipal(QWidget):
 
         self.objetivos_actuales = []
         self.cargar_tabla()
+        animar_entrada(self)
 
         # Shortcuts
         QShortcut(QKeySequence("Ctrl+P"), self).activated.connect(self.abrir_form_pasada)
@@ -511,6 +513,8 @@ class VentanaPrincipal(QWidget):
             boton_baja = QPushButton("Dar de baja")
             boton_baja.clicked.connect(lambda checked, obj_id=o[0]: self.dar_de_baja(obj_id))
             self.tabla.setCellWidget(i, 6, boton_baja)
+
+        animar_tabla(self.tabla)
 
     def dar_de_baja(self, objetivo_id: int) -> None:
         confirmar = QMessageBox.question(

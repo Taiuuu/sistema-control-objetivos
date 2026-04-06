@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QPushButton, QCheckBox, QDateEdit, QMessageBox
 )
 from PyQt6.QtCore import QDate
+from ui.animaciones import animar_entrada
 from models.objetivos import agregar_objetivo
 
 
@@ -55,6 +56,7 @@ class FormObjetivo(QWidget):
         layout.addWidget(boton_guardar)
 
         self.setLayout(layout)
+        animar_entrada(self)
 
     def _guardar(self) -> None:
         """Valida los datos y registra el nuevo objetivo en la base de datos."""

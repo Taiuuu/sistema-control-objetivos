@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QDate, QTime, pyqtSignal
 from models.turnos import registrar_turno
+from ui.animaciones import animar_entrada
 from database.db import DB_PATH
 
 
@@ -109,6 +110,7 @@ class FormPasada(QWidget):
         layout.addWidget(boton_guardar)
 
         self.setLayout(layout)
+        animar_entrada(self)
         self._actualizar_supervisores()
         self.input_fecha.dateChanged.connect(lambda: self._actualizar_supervisores())
 

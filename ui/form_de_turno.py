@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QComboBox, QDateEdit, QMessageBox
 )
 from PyQt6.QtCore import QDate
+from ui.animaciones import animar_entrada
 from database.db import DB_PATH
 
 # =============================================================================
@@ -87,6 +88,7 @@ class FormTurno(QWidget):
         layout.addWidget(boton_guardar)
 
         self.setLayout(layout)
+        animar_entrada(self)
 
     def _guardar(self) -> None:
         """Valida y registra el equipo de turno en la base de datos."""
