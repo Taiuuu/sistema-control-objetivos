@@ -5,6 +5,7 @@
 
 import sqlite3
 from database.db import DB_PATH
+from services.cache import invalidar_objetivos
 
 
 # =============================================================================
@@ -25,6 +26,9 @@ def agregar_objetivo(nombre: str, fecha_inicio: str, fecha_fin: str | None, dias
     """, (nombre, fecha_inicio, fecha_fin, dias_semana))
     conexion.commit()
     conexion.close()
+    
+    # Invalidar caché
+    invalidar_objetivos()
 
 
 # =============================================================================
@@ -57,3 +61,6 @@ def dar_de_baja_objetivo(objetivo_id: int, fecha_fin: str) -> None:
     """, (fecha_fin, objetivo_id))
     conexion.commit()
     conexion.close()
+    
+    # Invalidar caché
+    invalidar_objetivos()

@@ -4,6 +4,7 @@
 # =============================================================================
 
 import sqlite3
+from services.cache import obtener_supervisores_cache
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel,
     QPushButton, QComboBox, QDateEdit, QMessageBox
@@ -17,13 +18,8 @@ from database.db import DB_PATH
 # =============================================================================
 
 def _cargar_supervisores() -> list:
-    """Retorna todos los supervisores registrados."""
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute("SELECT id, nombre FROM supervisores")
-    resultado = cursor.fetchall()
-    conexion.close()
-    return resultado
+    """Retorna todos los supervisores registrados (usa caché)."""
+    return obtener_supervisores_cache(generar_si_falta=True)
 
 
 def _guardar_equipo_turno(fecha: str, turno: str, sup1_id: int, sup2_id: int) -> None:

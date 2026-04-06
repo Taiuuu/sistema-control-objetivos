@@ -5,6 +5,7 @@
 
 import sqlite3
 from database.db import DB_PATH
+from services.cache import invalidar_supervisores
 
 
 # =============================================================================
@@ -20,6 +21,9 @@ def agregar_supervisor(nombre: str) -> None:
     """, (nombre,))
     conexion.commit()
     conexion.close()
+    
+    # Invalidar caché
+    invalidar_supervisores()
 
 
 # =============================================================================

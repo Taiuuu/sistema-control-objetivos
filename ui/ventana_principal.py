@@ -30,6 +30,7 @@ from ui.importar_excel import ImportarExcel
 from ui.dashboard import Dashboard
 from ui.vista_auditoria import VistaAuditoria
 from ui.vista_validaciones import VistaValidaciones
+from ui.vista_cache import VistaCache
 from models.objetivos import dar_de_baja_objetivo
 from services.tema import obtener_tema_actual
 from services.backup import hacer_backup
@@ -240,6 +241,7 @@ class VentanaPrincipal(QWidget):
             layout_lateral.addWidget(sep4)
             layout_lateral.addWidget(boton_menu("Gestionar usuarios", self.abrir_gestionar_usuarios))
             layout_lateral.addWidget(boton_menu("Historial", self.abrir_logs))
+            layout_lateral.addWidget(boton_menu("Monitor de Caché", self.abrir_cache))
             layout_lateral.addWidget(boton_menu("Validaciones BD", self.abrir_validaciones))
             layout_lateral.addWidget(boton_menu("Auditoría detallada", self.abrir_auditoria))
 
@@ -789,6 +791,16 @@ class VentanaPrincipal(QWidget):
         else:
             self.logs.raise_()
             self.logs.activateWindow()
+
+    def abrir_cache(self):
+        if not hasattr(self, 'cache_monitor') or not self.cache_monitor.isVisible():
+            self.cache_monitor = VistaCache(self.usuario_actual)
+            self.cache_monitor.setWindowTitle("Monitor de Caché Inteligente")
+            self.cache_monitor.setGeometry(100, 100, 1000, 600)
+            self.cache_monitor.show()
+        else:
+            self.cache_monitor.raise_()
+            self.cache_monitor.activateWindow()
 
     def abrir_validaciones(self):
         if not hasattr(self, 'validaciones') or not self.validaciones.isVisible():
