@@ -97,13 +97,11 @@ class TablaDiaria(QWidget):
                     for col in range(3):
                         self.tabla.item(i, col).setBackground(color)
 
+            sorting_enabled = self.tabla.isSortingEnabled()
+            self.tabla.setSortingEnabled(False)
             self.tabla.setUpdatesEnabled(True)
-            self.tabla.resizeColumnsToContents()
-            self.tabla.resizeRowsToContents()
+            self.tabla.setSortingEnabled(sorting_enabled)
             self.tabla.update()
-            self.tabla.viewport().repaint()
-            QApplication.processEvents()
-            self.update()
 
         except Exception as e:
             print(f"Error al cargar tabla: {e}")

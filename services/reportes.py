@@ -21,7 +21,9 @@ def obtener_objetivos_del_dia(fecha: str) -> list:
     cursor.execute("""
         SELECT id, nombre, dias_semana, fecha_inicio, fecha_fin
         FROM objetivos
-    """)
+        WHERE (fecha_inicio IS NULL OR fecha_inicio <= ?)
+          AND (fecha_fin IS NULL OR fecha_fin >= ?)
+    """, (fecha, fecha))
 
     objetivos = cursor.fetchall()
     conexion.close()

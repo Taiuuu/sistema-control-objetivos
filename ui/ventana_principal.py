@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QDate, QTimer, QEvent, Qt
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
 from services.reportes import obtener_objetivos_del_dia
-from ui.animaciones import animar_entrada, animar_tabla
+from ui.animaciones import animar_entrada
 from ui.form_objetivo import FormObjetivo
 from ui.form_supervisor import FormSupervisor
 from ui.form_pasada import FormPasada
@@ -503,6 +503,84 @@ class VentanaPrincipal(QWidget):
     # TABLA PRINCIPAL
     # =============================================================================
 
+    def _limpiar_tabla(self) -> None:
+        """Elimina widgets y contenido previo de la tabla antes de recargar."""
+        row_count = self.tabla.rowCount()
+        for row in range(row_count):
+            widget = self.tabla.cellWidget(row, 6)
+            if widget is not None:
+                self.tabla.removeCellWidget(row, 6)
+                widget.deleteLater()
+
+        self.tabla.clearContents()
+        self.tabla.setRowCount(0)
+
+    def _obtener_pasadas_agrupadas(
+        self,
+        fecha: str,
+        turno: str = None,
+        supervisor_id: int = None
+    ) -> dict[int, int]:
+        """Retorna el conteo de pasadas por objetivo para un turno y supervisor opcionales."""
+        conexion = sqlite3.connect(DB_PATH)
+        cursor = conexion.cursor()
+
+        query = "SELECT objetivo_id, COUNT(*) FROM pasadas WHERE fecha = ?"
+        params = [fecha]
+        if turno:
+            query += " AND turno = ?"
+            params.append(turno)
+        if supervisor_id:
+            query += " AND supervisor_id = ?"
+            params.append(supervisor_id)
+        query += " GROUP BY objetivo_id"
+
+        cursor.execute(query, params)
+        resultados = dict(cursor.fetchall())
+        conexion.close()
+        return resultados
+
+    def _obtener_todas_pasadas_por_turno(self, fecha: str, supervisor_id: int = None) -> tuple[dict[int, int], dict[int, int]]:
+        """Retorna conteos de pasadas diurnas y nocturnas en una sola consulta."""
+        conexion = sqlite3.connect(DB_PATH)
+        cursor = conexion.cursor()
+
+        query = """
+            SELECT objetivo_id, turno, COUNT(*)
+            FROM pasadas
+            WHERE fecha = ?
+        """
+        params = [fecha]
+        if supervisor_id:
+            query += " AND supervisor_id = ?"
+            params.append(supervisor_id)
+        query += " GROUP BY objetivo_id, turno"
+
+        cursor.execute(query, params)
+        resultados = cursor.fetchall()
+        conexion.close()
+
+        pasadas_dia = {}
+        pasadas_noche = {}
+
+        for obj_id, turno, count in resultados:
+            if turno == "diurno":
+                pasadas_dia[obj_id] = count
+            elif turno == "nocturno":
+                pasadas_noche[obj_id] = count
+
+        return pasadas_dia, pasadas_noche
+
+    def _obtener_estado_detallado(self, pasadas_dia: int, pasadas_noche: int) -> tuple[str, str]:
+        """Calcula el estado y color a partir de los conteos de pasadas."""
+        if pasadas_dia > 0 and pasadas_noche > 0:
+            return "Pasaron los dos", "#90EE90"
+        if pasadas_dia > 0 and pasadas_noche == 0:
+            return "No pasó noche", "#FFD700"
+        if pasadas_dia == 0 and pasadas_noche > 0:
+            return "No pasó día", "#FFD700"
+        return "No pasó nadie", "#FF6B6B"
+
     def cargar_tabla(self) -> None:
         """Carga los objetivos del día con pasadas diurnas y nocturnas separadas."""
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
@@ -519,16 +597,45 @@ class VentanaPrincipal(QWidget):
         equipo_dia = obtener_equipo(fecha, "diurno")
         equipo_noche = obtener_equipo(fecha, "nocturno")
 
+        sorting_enabled = self.tabla.isSortingEnabled()
+        self.tabla.setSortingEnabled(False)
+        self.tabla.setUpdatesEnabled(False)
+        self._limpiar_tabla()
+
+        # Obtener todas las pasadas en una sola consulta
+        pasadas_dia_totales, pasadas_noche_totales = self._obtener_todas_pasadas_por_turno(fecha)
+
+        # Aplicar filtros de turno y supervisor si es necesario
+        if turno == "diurno":
+            if supervisor_id:
+                pasadas_dia_filtradas, _ = self._obtener_todas_pasadas_por_turno(fecha, supervisor_id)
+                pasadas_noche_filtradas = pasadas_noche_totales
+            else:
+                pasadas_dia_filtradas = pasadas_dia_totales
+                pasadas_noche_filtradas = pasadas_noche_totales
+        elif turno == "nocturno":
+            if supervisor_id:
+                _, pasadas_noche_filtradas = self._obtener_todas_pasadas_por_turno(fecha, supervisor_id)
+                pasadas_dia_filtradas = pasadas_dia_totales
+            else:
+                pasadas_dia_filtradas = pasadas_dia_totales
+                pasadas_noche_filtradas = pasadas_noche_totales
+        else:
+            pasadas_dia_filtradas = pasadas_dia_totales
+            pasadas_noche_filtradas = pasadas_noche_totales
+
         filas = []
         for o in self.objetivos_actuales:
-            if texto_busqueda and texto_busqueda not in o[1].lower():
+            nombre_lower = o[1].lower()
+            if texto_busqueda and texto_busqueda not in nombre_lower:
                 continue
 
-            pasadas_dia = contar_pasadas(fecha, o[0], turno="diurno",
-                supervisor_id=supervisor_id if turno == "diurno" else None)
-            pasadas_noche = contar_pasadas(fecha, o[0], turno="nocturno",
-                supervisor_id=supervisor_id if turno == "nocturno" else None)
-            estado_detallado, color_hex = obtener_estado_detallado(fecha, o[0])
+            pasadas_dia = pasadas_dia_filtradas.get(o[0], 0)
+            pasadas_noche = pasadas_noche_filtradas.get(o[0], 0)
+            estado_detallado, color_hex = self._obtener_estado_detallado(
+                pasadas_dia_totales.get(o[0], 0),
+                pasadas_noche_totales.get(o[0], 0)
+            )
 
             if filtro_estado != "Todos" and estado_detallado != filtro_estado:
                 continue
@@ -554,7 +661,9 @@ class VentanaPrincipal(QWidget):
             boton_baja.clicked.connect(lambda checked, obj_id=o[0]: self.dar_de_baja(obj_id))
             self.tabla.setCellWidget(i, 6, boton_baja)
 
-        animar_tabla(self.tabla)
+        self.tabla.setUpdatesEnabled(True)
+        self.tabla.setSortingEnabled(sorting_enabled)
+        self.tabla.update()
 
     def dar_de_baja(self, objetivo_id: int) -> None:
         confirmar = QMessageBox.question(
