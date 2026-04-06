@@ -105,6 +105,36 @@ def crear_base_datos() -> None:
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS auditoria (
+            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha                TEXT        NOT NULL,
+            hora                 TEXT        NOT NULL,
+            usuario_id           INTEGER,
+            tipo_operacion       TEXT        NOT NULL,
+            tabla                TEXT,
+            registro_id          INTEGER,
+            valores_anteriores   TEXT,
+            valores_nuevos       TEXT,
+            detalles             TEXT,
+            estado               TEXT        DEFAULT 'EXITOSO',
+            timestamp_creacion   TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON auditoria(fecha DESC)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_auditoria_usuario ON auditoria(usuario_id)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_auditoria_tabla ON auditoria(tabla, registro_id)
+    """)
+
     _crear_admin_si_no_existe(cursor)
 
     conexion.commit()

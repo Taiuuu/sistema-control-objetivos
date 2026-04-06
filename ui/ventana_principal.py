@@ -28,6 +28,7 @@ from ui.ayuda import Ayuda
 from ui.transferir_datos import TransferirDatos
 from ui.importar_excel import ImportarExcel
 from ui.dashboard import Dashboard
+from ui.vista_auditoria import VistaAuditoria
 from models.objetivos import dar_de_baja_objetivo
 from services.tema import obtener_tema_actual
 from services.backup import hacer_backup
@@ -238,6 +239,7 @@ class VentanaPrincipal(QWidget):
             layout_lateral.addWidget(sep4)
             layout_lateral.addWidget(boton_menu("Gestionar usuarios", self.abrir_gestionar_usuarios))
             layout_lateral.addWidget(boton_menu("Historial", self.abrir_logs))
+            layout_lateral.addWidget(boton_menu("Auditoría detallada", self.abrir_auditoria))
 
         layout_lateral.addStretch()
 
