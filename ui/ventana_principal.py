@@ -31,6 +31,7 @@ from ui.dashboard import Dashboard
 from ui.vista_auditoria import VistaAuditoria
 from ui.vista_validaciones import VistaValidaciones
 from ui.vista_cache import VistaCache
+from ui.vista_indexacion import VistaIndexacion
 from models.objetivos import dar_de_baja_objetivo
 from services.tema import obtener_tema_actual
 from services.backup import hacer_backup
@@ -242,6 +243,7 @@ class VentanaPrincipal(QWidget):
             layout_lateral.addWidget(boton_menu("Gestionar usuarios", self.abrir_gestionar_usuarios))
             layout_lateral.addWidget(boton_menu("Historial", self.abrir_logs))
             layout_lateral.addWidget(boton_menu("Monitor de Caché", self.abrir_cache))
+            layout_lateral.addWidget(boton_menu("Optimización de BD", self.abrir_indexacion))
             layout_lateral.addWidget(boton_menu("Validaciones BD", self.abrir_validaciones))
             layout_lateral.addWidget(boton_menu("Auditoría detallada", self.abrir_auditoria))
 
@@ -801,6 +803,16 @@ class VentanaPrincipal(QWidget):
         else:
             self.cache_monitor.raise_()
             self.cache_monitor.activateWindow()
+
+    def abrir_indexacion(self):
+        if not hasattr(self, 'indexacion') or not self.indexacion.isVisible():
+            self.indexacion = VistaIndexacion(self.usuario_actual)
+            self.indexacion.setWindowTitle("Optimización de Índices y Rendimiento")
+            self.indexacion.setGeometry(100, 100, 1200, 700)
+            self.indexacion.show()
+        else:
+            self.indexacion.raise_()
+            self.indexacion.activateWindow()
 
     def abrir_validaciones(self):
         if not hasattr(self, 'validaciones') or not self.validaciones.isVisible():
