@@ -1,6 +1,6 @@
 # =============================================================================
 # VESP Organizations - Sistema de Control de Objetivos
-# Dashboard Ejecutivo con métricas y gráficos
+# SoloDashboard con métricas y gráficos
 # =============================================================================
 
 import sqlite3
@@ -96,12 +96,12 @@ class BarraProgresoTurno(QWidget):
         layout.addWidget(detalle)
 
 
-class SoloDashboard(QWidget):
-    """SoloDashboard principal con métricas de seguridad."""
+class Dashboard(QWidget):
+    """Dashboard principal con métricas de seguridad."""
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("SoloDashboard - VESP Control")
+        self.setWindowTitle("Dashboard - VESP Control")
         self.setGeometry(200, 200, 1000, 700)
         self.setMinimumSize(800, 600)
 
@@ -121,7 +121,7 @@ class SoloDashboard(QWidget):
         layout_principal.setContentsMargins(20, 20, 20, 20)
 
         # Título
-        titulo = QLabel("Dashboard Ejecutivo de Seguridad")
+        titulo = QLabel("Dashboard de Seguridad")
         titulo.setStyleSheet("""
             font-size: 24px; font-weight: bold; color: #2a82da;
             margin-bottom: 10px;

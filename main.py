@@ -15,6 +15,7 @@ from database.db import crear_base_datos
 from services.backup import hacer_backup
 from services.actualizador import verificar_actualizacion
 from services.tema import obtener_tema_actual, establecer_tema_actual
+from services.api_rest import iniciar_api_rest
 
 
 # =============================================================================
@@ -245,6 +246,7 @@ def iniciar_app() -> None:
     """Punto de entrada principal."""
     crear_base_datos()
     hacer_backup()
+    iniciar_api_rest()
 
     app = QApplication(sys.argv)
     aplicar_tema_oscuro(app)

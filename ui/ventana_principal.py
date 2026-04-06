@@ -24,7 +24,10 @@ from ui.lista_pasadas import ListaPasadas
 from ui.notas_diarias import NotasDiarias
 from ui.vista_logs import VistaLogs
 from ui.gestionar_usuarios import GestionarUsuarios
-from ui.dashboard import SoloDashboard
+from ui.ayuda import Ayuda
+from ui.transferir_datos import TransferirDatos
+from ui.importar_excel import ImportarExcel
+from ui.dashboard import Dashboard
 from models.objetivos import dar_de_baja_objetivo
 from services.tema import obtener_tema_actual
 from services.backup import hacer_backup
@@ -753,7 +756,7 @@ class VentanaPrincipal(QWidget):
 
     def abrir_dashboard(self):
         if not hasattr(self, 'dashboard') or not self.dashboard.isVisible():
-            self.dashboard = SoloDashboard()
+            self.dashboard = Dashboard()
             self.dashboard.show()
         else:
             self.dashboard.raise_()
