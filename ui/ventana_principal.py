@@ -7,10 +7,10 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QLabel,
     QPushButton, QDateEdit, QComboBox, QMessageBox,
-    QFrame, QLineEdit, QSizePolicy
+    QFrame, QLineEdit
 )
-from PyQt6.QtCore import QDate, QTimer, QEvent, Qt, QPropertyAnimation, QEasingCurve, QRect
-from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence, QFont
+from PyQt6.QtCore import QDate, QTimer, QEvent, Qt
+from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
 from services.reportes import obtener_objetivos_del_dia
 from ui.form_objetivo import FormObjetivo
 from ui.form_supervisor import FormSupervisor
@@ -31,7 +31,6 @@ from services.backup import hacer_backup
 from services.logger import registrar_accion
 from services.assets import ruta_asset
 from database.db import DB_PATH
-from ui.animaciones import animar_tabla
 import sqlite3
 
 
@@ -40,6 +39,7 @@ import sqlite3
 # =============================================================================
 
 def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_id: int = None) -> int:
+    """Cuenta las pasadas de un objetivo en una fecha con filtros opcionales."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     query = 'SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?'
@@ -57,6 +57,7 @@ def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_i
 
 
 def obtener_estado_detallado(fecha: str, objetivo_id: int) -> tuple:
+    """Retorna el estado de cobertura del objetivo y su color."""
     pasadas_dia = contar_pasadas(fecha, objetivo_id, turno="diurno")
     pasadas_noche = contar_pasadas(fecha, objetivo_id, turno="nocturno")
     if pasadas_dia > 0 and pasadas_noche > 0:
@@ -70,6 +71,7 @@ def obtener_estado_detallado(fecha: str, objetivo_id: int) -> tuple:
 
 
 def obtener_equipo(fecha: str, turno: str) -> str:
+    """Retorna los nombres del equipo asignado a un turno en una fecha."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
@@ -87,6 +89,7 @@ def obtener_equipo(fecha: str, turno: str) -> str:
 
 
 def cargar_supervisores() -> list:
+    """Retorna todos los supervisores registrados."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute('SELECT id, nombre FROM supervisores')
@@ -96,6 +99,7 @@ def cargar_supervisores() -> list:
 
 
 def obtener_nombre_usuario(usuario_id: int) -> str:
+    """Retorna el nombre de usuario dado su ID."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute('SELECT username FROM usuarios WHERE id = ?', (usuario_id,))
@@ -116,7 +120,7 @@ class VentanaPrincipal(QWidget):
         self.on_login_exitoso = on_login_exitoso
         self.app = app
         self.alternar_tema_fn = alternar_tema_fn
-        self.zoom_nivel = 13  # Tamaño de fuente base
+        self.zoom_nivel = 13
         super().__init__()
         self.setWindowTitle("VESP Control de Objetivos")
         self.setGeometry(100, 100, 1300, 600)
@@ -221,16 +225,16 @@ class VentanaPrincipal(QWidget):
 
         layout_lateral.addStretch()
 
-        # Botones de zoom y tema
+        # Botones zoom
         fila_zoom = QHBoxLayout()
         btn_zoom_menos = QPushButton("A-")
         btn_zoom_menos.setFixedSize(35, 28)
-        btn_zoom_menos.setToolTip("Reducir zoom")
+        btn_zoom_menos.setToolTip("Reducir zoom (Ctrl+-)")
         btn_zoom_menos.clicked.connect(self._zoom_menos)
 
         btn_zoom_mas = QPushButton("A+")
         btn_zoom_mas.setFixedSize(35, 28)
-        btn_zoom_mas.setToolTip("Aumentar zoom")
+        btn_zoom_mas.setToolTip("Aumentar zoom (Ctrl+=)")
         btn_zoom_mas.clicked.connect(self._zoom_mas)
 
         fila_zoom.addWidget(btn_zoom_menos)
@@ -257,11 +261,22 @@ class VentanaPrincipal(QWidget):
         layout_derecho.setContentsMargins(12, 12, 12, 12)
         layout_derecho.setSpacing(8)
 
+        # Fila superior con fecha y filtros
         fila_superior = QHBoxLayout()
 
         self.selector_fecha = QDateEdit()
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.setCalendarPopup(True)
+
+        boton_fecha_anterior = QPushButton("◀")
+        boton_fecha_anterior.setFixedWidth(30)
+        boton_fecha_anterior.setToolTip("Día anterior (Ctrl+←)")
+        boton_fecha_anterior.clicked.connect(self._fecha_anterior)
+
+        boton_fecha_siguiente = QPushButton("▶")
+        boton_fecha_siguiente.setFixedWidth(30)
+        boton_fecha_siguiente.setToolTip("Día siguiente (Ctrl+→)")
+        boton_fecha_siguiente.clicked.connect(self._fecha_siguiente)
 
         boton_buscar = QPushButton("Buscar")
         boton_buscar.clicked.connect(self.cargar_tabla)
@@ -289,7 +304,9 @@ class VentanaPrincipal(QWidget):
         self.buscador.textChanged.connect(self.cargar_tabla)
 
         fila_superior.addWidget(QLabel("Fecha:"))
+        fila_superior.addWidget(boton_fecha_anterior)
         fila_superior.addWidget(self.selector_fecha)
+        fila_superior.addWidget(boton_fecha_siguiente)
         fila_superior.addWidget(boton_buscar)
         fila_superior.addSpacing(20)
         fila_superior.addWidget(QLabel("Turno:"))
@@ -306,6 +323,7 @@ class VentanaPrincipal(QWidget):
 
         layout_derecho.addLayout(fila_superior)
 
+        # Tabla
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(7)
         self.tabla.setHorizontalHeaderLabels([
@@ -330,7 +348,6 @@ class VentanaPrincipal(QWidget):
 
         self.objetivos_actuales = []
         self.cargar_tabla()
-        animar_tabla(self.tabla)
 
         # Shortcuts
         QShortcut(QKeySequence("Ctrl+P"), self).activated.connect(self.abrir_form_pasada)
@@ -343,6 +360,8 @@ class VentanaPrincipal(QWidget):
         QShortcut(QKeySequence("Ctrl+H"), self).activated.connect(self.abrir_ayuda)
         QShortcut(QKeySequence("Ctrl+="), self).activated.connect(self._zoom_mas)
         QShortcut(QKeySequence("Ctrl+-"), self).activated.connect(self._zoom_menos)
+        QShortcut(QKeySequence("Ctrl+Left"), self).activated.connect(self._fecha_anterior)
+        QShortcut(QKeySequence("Ctrl+Right"), self).activated.connect(self._fecha_siguiente)
 
         # Timer inactividad
         self.timer_inactividad = QTimer()
@@ -350,7 +369,7 @@ class VentanaPrincipal(QWidget):
         self.timer_inactividad.timeout.connect(self.cerrar_por_inactividad)
         self.timer_inactividad.start()
 
-        # Timer de refresco automático cada 30 segundos
+        # Timer refresco automático cada 30 segundos
         self.timer_refresco = QTimer()
         self.timer_refresco.setInterval(30 * 1000)
         self.timer_refresco.timeout.connect(self.cargar_tabla)
@@ -361,22 +380,19 @@ class VentanaPrincipal(QWidget):
     # =============================================================================
 
     def _zoom_mas(self) -> None:
-        """Aumenta el tamaño de fuente de toda la aplicación."""
         if self.zoom_nivel < 20:
             self.zoom_nivel += 1
             self._aplicar_zoom()
 
     def _zoom_menos(self) -> None:
-        """Reduce el tamaño de fuente de toda la aplicación."""
         if self.zoom_nivel > 9:
             self.zoom_nivel -= 1
             self._aplicar_zoom()
 
     def _aplicar_zoom(self) -> None:
-        """Aplica el nivel de zoom actual."""
         if self.app:
-            stylesheet_actual = self.app.styleSheet()
             import re
+            stylesheet_actual = self.app.styleSheet()
             nuevo = re.sub(r'font-size: \d+px;', f'font-size: {self.zoom_nivel}px;', stylesheet_actual)
             self.app.setStyleSheet(nuevo)
 
@@ -385,9 +401,24 @@ class VentanaPrincipal(QWidget):
     # =============================================================================
 
     def _alternar_tema(self) -> None:
-        """Alterna entre modo claro y oscuro."""
         if self.alternar_tema_fn and self.app:
             self.alternar_tema_fn(self.app, self)
+
+    # =============================================================================
+    # FECHA
+    # =============================================================================
+
+    def _fecha_anterior(self) -> None:
+        """Retrocede un día y recarga la tabla."""
+        fecha = self.selector_fecha.date().addDays(-1)
+        self.selector_fecha.setDate(fecha)
+        self.cargar_tabla()
+
+    def _fecha_siguiente(self) -> None:
+        """Avanza un día y recarga la tabla."""
+        fecha = self.selector_fecha.date().addDays(1)
+        self.selector_fecha.setDate(fecha)
+        self.cargar_tabla()
 
     # =============================================================================
     # EVENTOS
@@ -516,7 +547,9 @@ class VentanaPrincipal(QWidget):
 
     def abrir_form_pasada(self):
         if not hasattr(self, 'form_pasada') or not self.form_pasada.isVisible():
-            self.form_pasada = FormPasada(fecha_inicial=self.selector_fecha.date().toString("yyyy-MM-dd"))
+            self.form_pasada = FormPasada(
+                fecha_inicial=self.selector_fecha.date().toString("yyyy-MM-dd")
+            )
             self.form_pasada.pasada_registrada.connect(self.cargar_tabla)
             self.form_pasada.show()
         else:

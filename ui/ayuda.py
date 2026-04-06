@@ -11,7 +11,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from services.assets import ruta_asset
 
-# Listado completo de atajos de teclado del sistema
+
 SHORTCUTS = [
     ("Ctrl + P", "Registrar pasada"),
     ("Ctrl + O", "Agregar objetivo"),
@@ -21,23 +21,22 @@ SHORTCUTS = [
     ("Ctrl + R", "Reporte mensual"),
     ("Ctrl + B", "Actualizar tabla principal"),
     ("Ctrl + H", "Abrir esta ayuda"),
+    ("Ctrl + =", "Aumentar zoom"),
+    ("Ctrl + -", "Reducir zoom"),
+    ("Ctrl + ←", "Día anterior"),
+    ("Ctrl + →", "Día siguiente"),
 ]
 
-
-# =============================================================================
-# PANTALLA DE AYUDA
-# =============================================================================
 
 class Ayuda(QWidget):
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Ayuda - Atajos de teclado")
-        self.setGeometry(300, 300, 500, 500)
+        self.setGeometry(300, 300, 500, 550)
 
         layout = QVBoxLayout()
 
-        # Logo
         logo = QLabel()
         pixmap = QPixmap(ruta_asset("assets/vesp.png")).scaled(
             60, 60,
@@ -48,7 +47,6 @@ class Ayuda(QWidget):
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(logo)
 
-        # Título
         titulo = QLabel("Atajos de teclado")
         titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         titulo.setStyleSheet("font-size: 16px; font-weight: bold; color: #4CAF50;")
@@ -59,7 +57,6 @@ class Ayuda(QWidget):
         subtitulo.setStyleSheet("font-size: 11px; color: #888;")
         layout.addWidget(subtitulo)
 
-        # Tabla de shortcuts
         tabla = QTableWidget()
         tabla.setColumnCount(2)
         tabla.setHorizontalHeaderLabels(["Atajo", "Acción"])
@@ -79,7 +76,6 @@ class Ayuda(QWidget):
 
         layout.addWidget(tabla)
 
-        # Nota al pie
         nota = QLabel("Tip: los atajos funcionan desde la ventana principal.")
         nota.setAlignment(Qt.AlignmentFlag.AlignCenter)
         nota.setStyleSheet("font-size: 10px; color: #666; padding: 8px;")
