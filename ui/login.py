@@ -86,7 +86,9 @@ class LoginWindow(QWidget):
         super().__init__()
         self.on_login_exitoso = on_login_exitoso
         self.setWindowTitle("V.E.S.P Organizations")
-        self.setFixedSize(400, 540)
+        self.move(100, 100)
+        self.resize(400, 540)
+        self.setMinimumSize(360, 520)
         self.setWindowIcon(QIcon(ruta_asset("assets/vesp.png")))
 
         layout = QVBoxLayout()

@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QLabel,
     QPushButton, QDateEdit, QComboBox, QMessageBox,
-    QFrame, QLineEdit
+    QFrame, QLineEdit, QHeaderView
 )
 from PyQt6.QtCore import QDate, QTimer, QEvent, Qt
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
@@ -124,7 +124,9 @@ class VentanaPrincipal(QWidget):
         self.zoom_nivel = 13
         super().__init__()
         self.setWindowTitle("VESP Control de Objetivos")
-        self.setGeometry(100, 100, 1300, 600)
+        self.move(100, 100)
+        self.resize(1300, 600)
+        self.setMinimumSize(900, 500)
         self.setWindowIcon(QIcon(ruta_asset("assets/vesp.png")))
 
         layout_principal = QHBoxLayout()
@@ -342,6 +344,8 @@ class VentanaPrincipal(QWidget):
         self.tabla.setColumnWidth(6, 100)
         self.tabla.setAlternatingRowColors(True)
         self.tabla.setSortingEnabled(True)
+        self.tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.tabla.horizontalHeader().setStretchLastSection(True)
         layout_derecho.addWidget(self.tabla)
 
         layout_principal.addWidget(panel_derecho)
