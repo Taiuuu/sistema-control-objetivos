@@ -55,7 +55,7 @@ jobs:
 
     - name: Build installer
       run: |
-        iscc instalador.iss
+        Source: "dist\VESP_Control.exe"; DestDir: "{app}"
     
     - name: Create Release
       uses: softprops/action-gh-release@v1
