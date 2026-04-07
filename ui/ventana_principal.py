@@ -885,3 +885,6 @@ class VentanaPrincipal(QWidget):
         else:
             self.sincronizacion.raise_()
             self.sincronizacion.activateWindow()
+
+    def abrir_auditoria(self):
+        print("Función auditoría no implementada aún")
