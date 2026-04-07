@@ -6,6 +6,7 @@
 import sqlite3
 from database.db import DB_PATH
 from services.cache import invalidar_objetivos
+from services.sincronizacion import notificar_cambio
 
 
 # =============================================================================
@@ -24,8 +25,18 @@ def agregar_objetivo(nombre: str, fecha_inicio: str, fecha_fin: str | None, dias
         INSERT INTO objetivos (nombre, fecha_inicio, fecha_fin, dias_semana)
         VALUES (?, ?, ?, ?)
     """, (nombre, fecha_inicio, fecha_fin, dias_semana))
+    objetivo_id = cursor.lastrowid
     conexion.commit()
     conexion.close()
+    
+    # Notificar cambio para sincronización
+    notificar_cambio("objetivos", "INSERT", {
+        "id": objetivo_id,
+        "nombre": nombre,
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin,
+        "dias_semana": dias_semana
+    })
     
     # Invalidar caché
     invalidar_objetivos()
@@ -61,6 +72,12 @@ def dar_de_baja_objetivo(objetivo_id: int, fecha_fin: str) -> None:
     """, (fecha_fin, objetivo_id))
     conexion.commit()
     conexion.close()
+    
+    # Notificar cambio para sincronización
+    notificar_cambio("objetivos", "UPDATE", {
+        "id": objetivo_id,
+        "fecha_fin": fecha_fin
+    })
     
     # Invalidar caché
     invalidar_objetivos()

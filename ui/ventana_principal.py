@@ -32,11 +32,13 @@ from ui.vista_auditoria import VistaAuditoria
 from ui.vista_validaciones import VistaValidaciones
 from ui.vista_cache import VistaCache
 from ui.vista_indexacion import VistaIndexacion
+from ui.vista_sincronizacion import VistaSincronizacion
 from models.objetivos import dar_de_baja_objetivo
 from services.tema import obtener_tema_actual
 from services.backup import hacer_backup
 from services.logger import registrar_accion
 from services.assets import ruta_asset
+from services.sincronizacion import obtener_sincronizador
 from database.db import DB_PATH
 import sqlite3
 
@@ -246,6 +248,7 @@ class VentanaPrincipal(QWidget):
             layout_lateral.addWidget(boton_menu("Optimización de BD", self.abrir_indexacion))
             layout_lateral.addWidget(boton_menu("Validaciones BD", self.abrir_validaciones))
             layout_lateral.addWidget(boton_menu("Auditoría detallada", self.abrir_auditoria))
+            layout_lateral.addWidget(boton_menu("Sincronización", self.abrir_sincronizacion))
 
         layout_lateral.addStretch()
 
@@ -404,6 +407,12 @@ class VentanaPrincipal(QWidget):
         self.timer_refresco.timeout.connect(self.cargar_tabla)
         self.timer_refresco.start()
 
+        # Inicializar sincronizador de datos
+        self.sincronizador = obtener_sincronizador()
+        self.sincronizador.datos_cambiados.connect(self._on_datos_cambiados)
+        self.sincronizador.tabla_actualizar.connect(self._on_tabla_actualizar)
+        self.sincronizador.cache_invalidado.connect(self._on_cache_invalidado)
+
     # =============================================================================
     # ZOOM
     # =============================================================================
@@ -432,6 +441,25 @@ class VentanaPrincipal(QWidget):
     def _alternar_tema(self) -> None:
         if self.alternar_tema_fn and self.app:
             self.alternar_tema_fn(self.app, self)
+
+    # =============================================================================
+    # SINCRONIZACIÓN
+    # =============================================================================
+
+    def _on_datos_cambiados(self, tabla, operacion, datos):
+        """Maneja cambios de datos para refrescar la tabla principal."""
+        if tabla in ['objetivos', 'supervisores', 'pasadas', 'equipos']:
+            self.cargar_tabla()
+
+    def _on_tabla_actualizar(self, nombre_tabla):
+        """Maneja solicitud de actualización de tabla específica."""
+        if nombre_tabla == 'principal':
+            self.cargar_tabla()
+
+    def _on_cache_invalidado(self, patron):
+        """Maneja invalidación de caché."""
+        # El caché se maneja automáticamente en los servicios
+        pass
 
     # =============================================================================
     # FECHA
@@ -847,3 +875,13 @@ class VentanaPrincipal(QWidget):
         else:
             self.importar_excel.raise_()
             self.importar_excel.activateWindow()
+
+    def abrir_sincronizacion(self):
+        if not hasattr(self, 'sincronizacion') or not self.sincronizacion.isVisible():
+            self.sincronizacion = VistaSincronizacion(self.usuario_actual)
+            self.sincronizacion.setWindowTitle("Monitoreo de Sincronización de Datos")
+            self.sincronizacion.setGeometry(100, 100, 1200, 700)
+            self.sincronizacion.show()
+        else:
+            self.sincronizacion.raise_()
+            self.sincronizacion.activateWindow()

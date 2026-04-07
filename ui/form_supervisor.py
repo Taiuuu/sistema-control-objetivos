@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
 )
 from models.supervisores import agregar_supervisor
 from services.validaciones import validar_supervisor, ErrorValidacion
+from services.sincronizacion import notificar_cambio
 
 
 # =============================================================================
@@ -45,7 +46,10 @@ class FormSupervisor(QWidget):
             return
 
         agregar_supervisor(nombre)
-
+        # Notificar cambio para sincronización
+        notificar_cambio("supervisores", "INSERT", {
+            "nombre": nombre
+        })
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id
         registrar_accion(get_usuario_id(), f"Agregó supervisor: {nombre}")

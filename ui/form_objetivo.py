@@ -12,6 +12,7 @@ from PyQt6.QtCore import QDate
 from ui.animaciones import animar_entrada
 from models.objetivos import agregar_objetivo
 from services.validaciones import validar_objetivo, ErrorValidacion
+from services.sincronizacion import notificar_cambio
 
 
 # Mapeo de días de la semana a su número (formato ISO: 1=lunes, 7=domingo)
@@ -80,6 +81,13 @@ class FormObjetivo(QWidget):
             return
         
         agregar_objetivo(nombre, inicio, None, dias_str)
+
+        # Notificar cambio para sincronización
+        notificar_cambio("objetivos", "INSERT", {
+            "nombre": nombre,
+            "fecha_inicio": inicio,
+            "dias_semana": dias_str
+        })
 
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id

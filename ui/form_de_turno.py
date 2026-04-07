@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QDate
 from ui.animaciones import animar_entrada
 from database.db import DB_PATH
+from services.sincronizacion import notificar_cambio
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
@@ -98,5 +99,14 @@ class FormTurno(QWidget):
             return
 
         _guardar_equipo_turno(fecha, turno, sup1_id, sup2_id)
+
+        # Notificar cambio para sincronización
+        notificar_cambio("equipos", "INSERT", {
+            "fecha": fecha,
+            "turno": turno,
+            "supervisor1_id": sup1_id,
+            "supervisor2_id": sup2_id
+        })
+
         QMessageBox.information(self, "Listo", "Turno registrado correctamente.")
         self.close()

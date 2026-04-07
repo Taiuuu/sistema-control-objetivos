@@ -6,6 +6,7 @@
 import sqlite3
 from database.db import DB_PATH
 from services.cache import invalidar_supervisores
+from services.sincronizacion import notificar_cambio
 
 
 # =============================================================================
@@ -19,15 +20,15 @@ def agregar_supervisor(nombre: str) -> None:
     cursor.execute("""
         INSERT INTO supervisores (nombre) VALUES (?)
     """, (nombre,))
+    supervisor_id = cursor.lastrowid
     conexion.commit()
     conexion.close()
-    
-    # Invalidar caché
-    invalidar_supervisores()
 
-
-# =============================================================================
-# CONSULTA
+    # Notificar cambio para sincronización
+    notificar_cambio("supervisores", "INSERT", {
+        "id": supervisor_id,
+        "nombre": nombre
+    })
 # =============================================================================
 
 def listar_supervisores() -> list:
