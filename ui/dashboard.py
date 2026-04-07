@@ -14,6 +14,7 @@ from PyQt6.QtGui import QColor
 from services.reportes import obtener_objetivos_del_dia
 from database.db import DB_PATH
 from ui.animaciones import animar_entrada
+from services.sincronizacion import obtener_sincronizador
 
 
 class TarjetaMetrica(QWidget):
@@ -118,6 +119,10 @@ class Dashboard(QWidget):
         self.setup_ui()
         self.actualizar_datos()
         animar_entrada(self)
+
+        # Conectar señales de sincronización
+        self.sincronizador = obtener_sincronizador()
+        self.sincronizador.datos_cambiados.connect(self._on_datos_cambiados)
 
     def setup_ui(self):
         """Configura la interfaz del dashboard."""
@@ -434,3 +439,8 @@ class Dashboard(QWidget):
         """Detiene el timer al cerrar la ventana."""
         self.timer_actualizacion.stop()
         super().closeEvent(event)
+
+    def _on_datos_cambiados(self, tabla, operacion, datos):
+        """Maneja cambios de datos para refrescar el dashboard."""
+        if tabla in ["objetivos", "supervisores", "pasadas", "equipos"]:
+            self.actualizar_datos()

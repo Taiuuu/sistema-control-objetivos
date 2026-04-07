@@ -14,7 +14,6 @@ from ui.animaciones import animar_entrada
 from database.db import DB_PATH
 from services.validaciones import validar_pasada, ErrorValidacion
 from services.cache import obtener_objetivos_cache, obtener_supervisores_cache
-from services.sincronizacion import notificar_cambio
 
 
 def _cargar_objetivos() -> list:
@@ -144,17 +143,6 @@ class FormPasada(QWidget):
             return
 
         registrar_turno(fecha, hora, turno, objetivo_id, supervisor_id)
-
-        # Notificar cambio para sincronización
-        notificar_cambio("pasadas", "INSERT", {
-            "fecha": fecha,
-            "hora": hora,
-            "turno": turno,
-            "objetivo_id": objetivo_id,
-            "supervisor_id": supervisor_id,
-            "objetivo_nombre": objetivo_nombre,
-            "supervisor_nombre": supervisor_nombre
-        })
 
         # Recordar el turno para la próxima pasada
         _ultimo_turno = turno

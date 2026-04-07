@@ -8,7 +8,7 @@ from datetime import datetime
 import threading
 
 
-class Sincronizador(QObject):
+class SincronizadorDatos(QObject):
     """
     Sistema central de sincronización de datos entre módulos.
     Maneja señales para mantener consistencia entre formularios, tablas y caché.
@@ -128,10 +128,10 @@ class Sincronizador(QObject):
 # INSTANCIA GLOBAL
 # =============================================================================
 
-_sincronizador_global = Sincronizador()
+_sincronizador_global = SincronizadorDatos()
 
 
-def obtener_sincronizador() -> Sincronizador:
+def obtener_sincronizador() -> SincronizadorDatos:
     """Retorna la instancia global del sincronizador."""
     return _sincronizador_global
 

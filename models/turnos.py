@@ -5,6 +5,7 @@
 
 import sqlite3
 from database.db import DB_PATH
+from services.sincronizacion import notificar_cambio
 
 
 def registrar_turno(fecha: str, hora: str | None, turno: str, objetivo_id: int, supervisor_id: int) -> None:
@@ -14,12 +15,19 @@ def registrar_turno(fecha: str, hora: str | None, turno: str, objetivo_id: int, 
         INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id)
         VALUES (?, ?, ?, ?, ?)
     """, (fecha, hora, turno, objetivo_id, supervisor_id))
+    pasada_id = cursor.lastrowid
     conexion.commit()
     conexion.close()
 
-
-def registrar_turno_ambos(fecha: str, hora: str | None, turno: str, objetivo_id: int,
-                          supervisor1_id: int, supervisor2_id: int) -> None:
+    # Notificar cambio para sincronización
+    notificar_cambio("pasadas", "INSERT", {
+        "id": pasada_id,
+        "fecha": fecha,
+        "hora": hora,
+        "turno": turno,
+        "objetivo_id": objetivo_id,
+        "supervisor_id": supervisor_id
+    })
     """Registra una pasada para los dos supervisores del turno al mismo tiempo."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()

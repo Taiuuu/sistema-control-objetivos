@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QPushButton, QMessageBox
 )
 from database.db import DB_PATH
+from services.sincronizacion import obtener_sincronizador
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
@@ -56,6 +57,10 @@ class ListaSupervisores(QWidget):
         self.setLayout(layout)
         self._cargar_tabla()
 
+        # Conectar señales de sincronización
+        self.sincronizador = obtener_sincronizador()
+        self.sincronizador.datos_cambiados.connect(self._on_datos_cambiados)
+
     def _cargar_tabla(self) -> None:
         """Carga todos los supervisores en la tabla."""
         supervisores = _cargar_supervisores()
@@ -80,4 +85,9 @@ class ListaSupervisores(QWidget):
             from services.sesion import get_usuario_id
             _eliminar_supervisor(supervisor_id)
             registrar_accion(get_usuario_id(), f"Eliminó supervisor: {nombre}")
+            self._cargar_tabla()
+
+    def _on_datos_cambiados(self, tabla, operacion, datos):
+        """Maneja cambios de datos para refrescar la tabla."""
+        if tabla == "supervisores":
             self._cargar_tabla()
