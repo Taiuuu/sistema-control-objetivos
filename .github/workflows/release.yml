@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Extract version from tag
+      id: tag_name
+      run: |
+        $VERSION = ${{ github.ref }} -replace 'refs/tags/v', ''
+        echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install PyInstaller inno-setup-compiler
+    
+    - name: Update version in code
+      run: |
+        python -c "
+        import os
+        version = '${{ env.VERSION }}'
+        
+        # Update version.txt
+        with open('version.txt', 'w') as f:
+            f.write(version)
+        
+        # Update api/app.py
+        with open('api/app.py', 'r') as f:
+            content = f.read()
+        content = content.replace('1.0.0', version)
+        with open('api/app.py', 'w') as f:
+            f.write(content)
+        "
+    
+    - name: Build executable
+      run: |
+        python -m PyInstaller "VESP Control.spec" --onefile
+    
+    - name: Build installer
+      run: |
+        iscc.exe instalador.iss /DMyAppVersion=${{ env.VERSION }}
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dist/VESP Control.exe
+          Output/VESP_Control_Instalador.exe
+        draft: false
+        prerelease: false
+        body: |
+          # VESP Control v${{ env.VERSION }}
+          
+          ## Changes
+          - See commit history for detailed changes
+          
+          ## Installation
+          Download the installer (.exe) and run it to install VESP Control.
+          
+          ## Default Credentials
+          - Username: admin
+          - Password: 0000
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Notify release
+      run: |
+        echo "Release v${{ github.ref }} completed!"
