@@ -8,10 +8,12 @@ import datetime
 import calendar
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QTableWidget, QTableWidgetItem, QComboBox, QFileDialog
+    QPushButton, QTableWidget, QTableWidgetItem, QComboBox, QFileDialog, QMessageBox
 )
 from PyQt6.QtGui import QColor
+from services.background_task import run_background_task
 from services.exportar import exportar_excel, exportar_pdf
+from services.reportes import generar_reporte_mensual
 from database.db import DB_PATH
 
 
@@ -111,23 +113,26 @@ class ReporteMensual(QWidget):
             self.selector_anio.addItem(str(a))
         self.selector_anio.setCurrentText(str(anio_actual))
 
-        boton_generar = QPushButton("Generar reporte")
-        boton_generar.clicked.connect(self._generar)
+        self.boton_generar = QPushButton("Generar reporte")
+        self.boton_generar.clicked.connect(self._generar)
 
-        boton_excel = QPushButton("Exportar Excel")
-        boton_excel.clicked.connect(self._exportar_excel)
+        self.boton_excel = QPushButton("Exportar Excel")
+        self.boton_excel.clicked.connect(self._exportar_excel)
 
-        boton_pdf = QPushButton("Exportar PDF")
-        boton_pdf.clicked.connect(self._exportar_pdf)
+        self.boton_pdf = QPushButton("Exportar PDF")
+        self.boton_pdf.clicked.connect(self._exportar_pdf)
 
         fila.addWidget(QLabel("Mes:"))
         fila.addWidget(self.selector_mes)
         fila.addWidget(QLabel("Año:"))
         fila.addWidget(self.selector_anio)
-        fila.addWidget(boton_generar)
-        fila.addWidget(boton_excel)
-        fila.addWidget(boton_pdf)
+        fila.addWidget(self.boton_generar)
+        fila.addWidget(self.boton_excel)
+        fila.addWidget(self.boton_pdf)
         layout.addLayout(fila)
+
+        self.estado_label = QLabel("Listo")
+        layout.addWidget(self.estado_label)
 
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(6)
@@ -145,26 +150,51 @@ class ReporteMensual(QWidget):
 
         self.setLayout(layout)
 
+    def _set_controls_enabled(self, enabled: bool) -> None:
+        self.selector_mes.setEnabled(enabled)
+        self.selector_anio.setEnabled(enabled)
+        self.boton_generar.setEnabled(enabled)
+        self.boton_excel.setEnabled(enabled)
+        self.boton_pdf.setEnabled(enabled)
+
     def _generar(self) -> None:
         """Calcula y muestra el reporte en la tabla."""
         mes = self.selector_mes.currentIndex() + 1
         anio = int(self.selector_anio.currentText())
-        resultados = calcular_reporte(anio, mes)
 
-        self.tabla.setRowCount(len(resultados))
-        for i, r in enumerate(resultados):
-            estado = "CUMPLE" if r[4] >= 80 else "NO CUMPLE"
-            self.tabla.setItem(i, 0, QTableWidgetItem(r[0]))
-            self.tabla.setItem(i, 1, QTableWidgetItem(str(r[1])))
-            self.tabla.setItem(i, 2, QTableWidgetItem(str(r[2])))
-            self.tabla.setItem(i, 3, QTableWidgetItem(str(r[3])))
-            self.tabla.setItem(i, 4, QTableWidgetItem(f"{r[4]:.1f}%"))
+        self._set_controls_enabled(False)
+        self.estado_label.setText("Generando reporte...")
+
+        task = run_background_task(generar_reporte_mensual, anio, mes)
+        task.signals.finished.connect(self._on_reporte_generado)
+        task.signals.error.connect(self._on_error)
+
+    def _on_reporte_generado(self, resultados: dict) -> None:
+        self.tabla.setUpdatesEnabled(False)
+        self.tabla.clearContents()
+        self.tabla.setRowCount(len(resultados['objetivos']))
+        for i, r in enumerate(resultados['objetivos']):
+            estado = "CUMPLE" if r['cumplimiento'] >= 80 else "NO CUMPLE"
+            self.tabla.setItem(i, 0, QTableWidgetItem(r['nombre']))
+            self.tabla.setItem(i, 1, QTableWidgetItem(str(r['dias_con_dia'])))
+            self.tabla.setItem(i, 2, QTableWidgetItem(str(r['dias_con_noche'])))
+            self.tabla.setItem(i, 3, QTableWidgetItem(str(r['dias_sin_control'])))
+            self.tabla.setItem(i, 4, QTableWidgetItem(f"{r['cumplimiento']:.1f}%"))
             self.tabla.setItem(i, 5, QTableWidgetItem(estado))
 
-            color = QColor("#90EE90") if r[4] >= 80 else QColor("#FF6B6B")
+            color = QColor("#90EE90") if r['cumplimiento'] >= 80 else QColor("#FF6B6B")
             for col in range(6):
                 self.tabla.item(i, col).setBackground(color)
                 self.tabla.item(i, col).setForeground(QColor("#000000"))
+
+        self.tabla.setUpdatesEnabled(True)
+        self.estado_label.setText("Reporte generado")
+        self._set_controls_enabled(True)
+
+    def _on_error(self, mensaje: str) -> None:
+        QMessageBox.critical(self, "Error", mensaje)
+        self.estado_label.setText("Error al generar reporte")
+        self._set_controls_enabled(True)
 
     def _exportar_excel(self) -> None:
         mes = self.selector_mes.currentIndex() + 1
@@ -175,7 +205,11 @@ class ReporteMensual(QWidget):
             "Excel (*.xlsx)"
         )
         if ruta:
-            exportar_excel(anio, mes, ruta)
+            self._set_controls_enabled(False)
+            self.estado_label.setText("Exportando a Excel...")
+            task = run_background_task(exportar_excel, anio, mes, ruta)
+            task.signals.finished.connect(lambda _: self._on_export_exitoso(ruta))
+            task.signals.error.connect(self._on_error)
 
     def _exportar_pdf(self) -> None:
         mes = self.selector_mes.currentIndex() + 1
@@ -186,4 +220,13 @@ class ReporteMensual(QWidget):
             "PDF (*.pdf)"
         )
         if ruta:
-            exportar_pdf(anio, mes, ruta)
+            self._set_controls_enabled(False)
+            self.estado_label.setText("Exportando a PDF...")
+            task = run_background_task(exportar_pdf, anio, mes, ruta)
+            task.signals.finished.connect(lambda _: self._on_export_exitoso(ruta))
+            task.signals.error.connect(self._on_error)
+
+    def _on_export_exitoso(self, ruta: str) -> None:
+        QMessageBox.information(self, "Exportación completa", f"Archivo guardado en: {ruta}")
+        self.estado_label.setText("Exportación completada")
+        self._set_controls_enabled(True)

@@ -114,6 +114,7 @@ def reporte_mensual(anio: int, mes: int) -> None:
 def generar_reporte_mensual(anio: int, mes: int) -> dict:
     """Genera y retorna el reporte de cumplimiento mensual por objetivo."""
     import calendar
+    from collections import defaultdict
 
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
@@ -122,6 +123,21 @@ def generar_reporte_mensual(anio: int, mes: int) -> dict:
     objetivos = cursor.fetchall()
 
     total_dias = calendar.monthrange(anio, mes)[1]
+    fecha_inicio_mes = f"{anio}-{mes:02d}-01"
+    fecha_fin_mes = f"{anio}-{mes:02d}-{total_dias:02d}"
+
+    cursor.execute("""
+        SELECT fecha, objetivo_id, turno, COUNT(*)
+        FROM pasadas
+        WHERE fecha BETWEEN ? AND ?
+        GROUP BY fecha, objetivo_id, turno
+    """, (fecha_inicio_mes, fecha_fin_mes))
+    pasadas_raw = cursor.fetchall()
+
+    pasadas_por_objetivo = defaultdict(lambda: defaultdict(lambda: {'diurno': 0, 'nocturno': 0}))
+    for fecha, objetivo_id, turno, cantidad in pasadas_raw:
+        pasadas_por_objetivo[objetivo_id][fecha][turno] = cantidad
+
     reporte = {
         'anio': anio,
         'mes': mes,
@@ -130,9 +146,11 @@ def generar_reporte_mensual(anio: int, mes: int) -> dict:
 
     for o in objetivos:
         obj_id, nombre, inicio, fin, dias_str = o
-        dias_semana = [int(d) for d in dias_str.split(",")]
+        dias_semana = [int(d.strip()) for d in dias_str.split(",") if d.strip()]
         dias_esperados = 0
-        dias_cumplidos = 0
+        dias_con_dia = 0
+        dias_con_noche = 0
+        dias_sin_control = 0
 
         for dia in range(1, total_dias + 1):
             fecha = f"{anio}-{mes:02d}-{dia:02d}"
@@ -146,22 +164,26 @@ def generar_reporte_mensual(anio: int, mes: int) -> dict:
                 continue
 
             dias_esperados += 1
+            turno_data = pasadas_por_objetivo[obj_id][fecha]
+            tuvo_dia = turno_data['diurno'] > 0
+            tuvo_noche = turno_data['nocturno'] > 0
 
-            cursor.execute("""
-                SELECT COUNT(*) FROM pasadas
-                WHERE fecha = ? AND objetivo_id = ?
-            """, (fecha, obj_id))
-
-            if cursor.fetchone()[0] > 0:
-                dias_cumplidos += 1
+            if tuvo_dia:
+                dias_con_dia += 1
+            if tuvo_noche:
+                dias_con_noche += 1
+            if not tuvo_dia and not tuvo_noche:
+                dias_sin_control += 1
 
         if dias_esperados > 0:
-            porcentaje = (dias_cumplidos / dias_esperados) * 100
+            porcentaje = (dias_esperados - dias_sin_control) / dias_esperados * 100
             reporte['objetivos'].append({
                 'id': obj_id,
                 'nombre': nombre,
                 'dias_esperados': dias_esperados,
-                'dias_cumplidos': dias_cumplidos,
+                'dias_con_dia': dias_con_dia,
+                'dias_con_noche': dias_con_noche,
+                'dias_sin_control': dias_sin_control,
                 'cumplimiento': round(porcentaje, 1)
             })
 

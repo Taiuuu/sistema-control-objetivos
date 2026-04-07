@@ -3,9 +3,7 @@
 # Módulo de exportación de reportes a Excel y PDF
 # =============================================================================
 
-import sqlite3
 import datetime
-import calendar
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 from openpyxl.drawing.image import Image as XLImage
@@ -14,7 +12,7 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
-from database.db import DB_PATH
+from services.reportes import generar_reporte_mensual
 
 
 MESES = [
@@ -24,62 +22,18 @@ MESES = [
 
 
 def _obtener_datos_reporte(anio: int, mes: int) -> list:
-    """Calcula cumplimiento mensual con diurno/nocturno separados."""
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
-    objetivos = cursor.fetchall()
-
-    resultados = []
-    total_dias = calendar.monthrange(anio, mes)[1]
-
-    for o in objetivos:
-        obj_id, nombre, inicio, fin, dias_str = o
-        dias_semana = [int(d) for d in dias_str.split(",")]
-        dias_esperados = 0
-        dias_con_dia = 0
-        dias_con_noche = 0
-        dias_sin_control = 0
-
-        for dia in range(1, total_dias + 1):
-            fecha = f"{anio}-{mes:02d}-{dia:02d}"
-            fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
-
-            if inicio and fecha < inicio:
-                continue
-            if fin and fecha > fin:
-                continue
-            if fecha_dt.isoweekday() not in dias_semana:
-                continue
-
-            dias_esperados += 1
-
-            cursor.execute("""
-                SELECT COUNT(*) FROM pasadas
-                WHERE fecha = ? AND objetivo_id = ? AND turno = 'diurno'
-            """, (fecha, obj_id))
-            tuvo_dia = cursor.fetchone()[0] > 0
-
-            cursor.execute("""
-                SELECT COUNT(*) FROM pasadas
-                WHERE fecha = ? AND objetivo_id = ? AND turno = 'nocturno'
-            """, (fecha, obj_id))
-            tuvo_noche = cursor.fetchone()[0] > 0
-
-            if tuvo_dia:
-                dias_con_dia += 1
-            if tuvo_noche:
-                dias_con_noche += 1
-            if not tuvo_dia and not tuvo_noche:
-                dias_sin_control += 1
-
-        if dias_esperados > 0:
-            dias_controlados = dias_esperados - dias_sin_control
-            porcentaje = (dias_controlados / dias_esperados) * 100
-            resultados.append((nombre, dias_con_dia, dias_con_noche, dias_sin_control, porcentaje))
-
-    conexion.close()
-    return resultados
+    """Obtiene el resumen de reporte mensual reutilizando la lógica central."""
+    reporte = generar_reporte_mensual(anio, mes)
+    return [
+        (
+            objetivo['nombre'],
+            objetivo['dias_con_dia'],
+            objetivo['dias_con_noche'],
+            objetivo['dias_sin_control'],
+            objetivo['cumplimiento']
+        )
+        for objetivo in reporte['objetivos']
+    ]
 
 
 def exportar_excel(anio: int, mes: int, ruta: str) -> None:
