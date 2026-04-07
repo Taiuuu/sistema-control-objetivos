@@ -26,8 +26,6 @@ def verificar_login(username: str, password: str) -> tuple | None:
     Verifica las credenciales del usuario contra la base de datos.
     Retorna (id, rol, debe_cambiar_password) si son correctas, None si no.
     """
-    from services.encriptacion import validar_contrasena_fuerte
-
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
@@ -42,11 +40,7 @@ def verificar_login(username: str, password: str) -> tuple | None:
 
     try:
         if bcrypt.checkpw(password.encode(), resultado[3].encode()):
-            # Validar fuerza de contraseña (solo para usuarios existentes)
-            es_fuerte, _ = validar_contrasena_fuerte(password)
-            if not es_fuerte:
-                # Marcar que debe cambiar contraseña si no es fuerte
-                return (resultado[0], resultado[1], 1)
+            # Retornar solo lo que esté configurado en la BD, sin forzar cambios por fortaleza
             return (resultado[0], resultado[1], resultado[2])
     except Exception:
         pass
