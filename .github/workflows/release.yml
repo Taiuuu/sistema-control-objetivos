@@ -17,64 +17,54 @@ jobs:
       with:
         python-version: '3.11'
     
-    - name: Extract version from tag
-      id: tag_name
-      run: |
-        $VERSION = ${{ github.ref }} -replace 'refs/tags/v', ''
-        echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+    - name: Set VERSION from tag
+      shell: bash
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
     
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install PyInstaller inno-setup-compiler
+        pip install PyInstaller
     
     - name: Update version in code
+      shell: python
       run: |
-        python -c "
         import os
-        version = '${{ env.VERSION }}'
-        
-        # Update version.txt
-        with open('version.txt', 'w') as f:
+
+        version = os.environ["VERSION"]
+
+        with open("version.txt", "w") as f:
             f.write(version)
-        
-        # Update api/app.py
-        with open('api/app.py', 'r') as f:
+
+        with open("api/app.py", "r") as f:
             content = f.read()
-        content = content.replace('1.0.0', version)
-        with open('api/app.py', 'w') as f:
+
+        content = content.replace("1.0.0", version)
+
+        with open("api/app.py", "w") as f:
             f.write(content)
-        "
     
     - name: Build executable
       run: |
-        python -m PyInstaller "VESP Control.spec" --onefile
+        python -m PyInstaller "VESP Control.spec"
     
     - name: Build installer
       run: |
-        iscc.exe instalador.iss /DMyAppVersion=${{ env.VERSION }}
+        iscc instalador.iss
     
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          dist/VESP Control.exe
-          Output/VESP_Control_Instalador.exe
+          dist/*.exe
+          Output/*.exe
         draft: false
         prerelease: false
         body: |
-          # VESP Control v${{ env.VERSION }}
+          VESP Control ${{ github.ref_name }}
           
-          ## Changes
-          - See commit history for detailed changes
-          
-          ## Installation
-          Download the installer (.exe) and run it to install VESP Control.
-          
-          ## Default Credentials
-          - Username: admin
-          - Password: 0000
+          Descargar el instalador y ejecutar.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -84,5 +74,4 @@ jobs:
     
     steps:
     - name: Notify release
-      run: |
-        echo "Release v${{ github.ref }} completed!"
+      run: echo "Release ${{ github.ref_name }} completed!"
