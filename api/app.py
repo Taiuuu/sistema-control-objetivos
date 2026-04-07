@@ -36,5 +36,15 @@ CORS(app)
 # Registrar rutas
 register_routes(app)
 
+@app.route('/')
+def index():
+    """Página de bienvenida de la API."""
+    return {
+        'message': 'VESP Control de Objetivos API',
+        'version': '1.0.0',
+        'status': 'running',
+        'docs': 'Ver README.md para documentación'
+    }, 200
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

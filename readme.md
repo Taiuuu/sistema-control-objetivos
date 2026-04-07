@@ -11,7 +11,7 @@ Sistema de escritorio desarrollado para reemplazar el control manual en Excel de
 
 Permite registrar y visualizar en tiempo real qué objetivos fueron controlados durante el día, qué supervisores estaban de turno, cuántas pasadas se realizaron por turno y generar reportes mensuales de cumplimiento.
 
-**Versión actual: 2.0** - Con API REST avanzada y sincronización en tiempo real.
+**Versión actual: 1.0.0** - Con API REST avanzada y sincronización en tiempo real.
 
 ---
 
