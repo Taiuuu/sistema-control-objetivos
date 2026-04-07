@@ -7,11 +7,11 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QLabel,
     QPushButton, QDateEdit, QComboBox, QMessageBox,
-    QFrame, QLineEdit, QHeaderView
+    QFrame, QLineEdit, QHeaderView, QScrollArea,
+    QToolButton, QSizePolicy, QSpacerItem
 )
-from PyQt6.QtCore import QDate, QTimer, QEvent, Qt
+from PyQt6.QtCore import QDate, QTimer, QEvent, Qt, QSize, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
-from PyQt6.QtWidgets import QSizePolicy
 from services.reportes import obtener_objetivos_del_dia
 from ui.animaciones import animar_entrada
 from ui.form_objetivo import FormObjetivo
@@ -49,7 +49,6 @@ import sqlite3
 # =============================================================================
 
 def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_id: int = None) -> int:
-    """Cuenta las pasadas de un objetivo en una fecha con filtros opcionales."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     query = 'SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?'
@@ -67,7 +66,6 @@ def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_i
 
 
 def obtener_estado_detallado(fecha: str, objetivo_id: int) -> tuple:
-    """Retorna el estado de cobertura del objetivo y su color."""
     pasadas_dia = contar_pasadas(fecha, objetivo_id, turno="diurno")
     pasadas_noche = contar_pasadas(fecha, objetivo_id, turno="nocturno")
     if pasadas_dia > 0 and pasadas_noche > 0:
@@ -81,7 +79,6 @@ def obtener_estado_detallado(fecha: str, objetivo_id: int) -> tuple:
 
 
 def obtener_equipo(fecha: str, turno: str) -> str:
-    """Retorna los nombres del equipo asignado a un turno en una fecha."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
@@ -99,7 +96,6 @@ def obtener_equipo(fecha: str, turno: str) -> str:
 
 
 def cargar_supervisores() -> list:
-    """Retorna todos los supervisores registrados."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute('SELECT id, nombre FROM supervisores')
@@ -109,7 +105,6 @@ def cargar_supervisores() -> list:
 
 
 def obtener_nombre_usuario(usuario_id: int) -> str:
-    """Retorna el nombre de usuario dado su ID."""
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute('SELECT username FROM usuarios WHERE id = ?', (usuario_id,))
@@ -124,6 +119,10 @@ def obtener_nombre_usuario(usuario_id: int) -> str:
 
 class VentanaPrincipal(QWidget):
 
+    # Ancho expandido y colapsado del sidebar
+    SIDEBAR_EXPANDIDO = 220
+    SIDEBAR_COLAPSADO = 52
+
     def __init__(self, usuario_id=None, rol=None, on_login_exitoso=None, app=None, alternar_tema_fn=None):
         self.usuario_id = usuario_id
         self.rol = rol
@@ -131,201 +130,325 @@ class VentanaPrincipal(QWidget):
         self.app = app
         self.alternar_tema_fn = alternar_tema_fn
         self.zoom_nivel = 13
+        self._sidebar_expandido = True
+
         super().__init__()
         self.setWindowTitle("VESP Control de Objetivos")
         self.setWindowFlags(Qt.WindowType.Window)
         self.move(100, 100)
         self.resize(1300, 600)
-        self.setMinimumSize(900, 500)
+        # Mínimo más bajo para que funcione en ventanas chicas
+        self.setMinimumSize(700, 420)
         self.setWindowIcon(QIcon(ruta_asset("assets/vesp.png")))
 
         layout_principal = QHBoxLayout()
         layout_principal.setSpacing(0)
         layout_principal.setContentsMargins(0, 0, 0, 0)
 
+        # =====================================================================
         # PANEL LATERAL
-        panel_lateral = QFrame()
-        panel_lateral.setFixedWidth(260)
-        if obtener_tema_actual() == "oscuro":
-            panel_bg = "#1a1a1a"
-            panel_border = "#333"
-        else:
-            panel_bg = "#e8e8e8"
-            panel_border = "#ccc"
+        # =====================================================================
+        self.panel_lateral = QFrame()
+        self.panel_lateral.setFixedWidth(self.SIDEBAR_EXPANDIDO)
 
-        panel_lateral.setStyleSheet(f"background-color: {panel_bg}; border-right: 1px solid {panel_border};")
+        oscuro = obtener_tema_actual() == "oscuro"
+        panel_bg    = "#1a1a1a" if oscuro else "#e8e8e8"
+        panel_border = "#333"   if oscuro else "#ccc"
+        sep_color    = "#333"   if oscuro else "#ccc"
+        titulo_color = "#4CAF50" if oscuro else "#2E7D32"
+        subtitulo_color = "#888" if oscuro else "#666"
+        usuario_color   = "#888" if oscuro else "#666"
 
-        layout_lateral = QVBoxLayout(panel_lateral)
-        layout_lateral.setSpacing(6)
-        layout_lateral.setContentsMargins(10, 12, 10, 12)
+        self.panel_lateral.setStyleSheet(
+            f"background-color: {panel_bg}; border-right: 1px solid {panel_border};"
+        )
 
-        logo_label = QLabel()
+        layout_lateral = QVBoxLayout(self.panel_lateral)
+        layout_lateral.setSpacing(0)
+        layout_lateral.setContentsMargins(0, 0, 0, 0)
+
+        # ----- Cabecera con logo + botón colapsar -----
+        cabecera = QWidget()
+        cabecera.setFixedHeight(110)
+        cabecera.setStyleSheet(f"background-color: {panel_bg};")
+        lay_cabecera = QVBoxLayout(cabecera)
+        lay_cabecera.setContentsMargins(8, 10, 8, 4)
+        lay_cabecera.setSpacing(2)
+
+        # Botón colapsar (esquina superior derecha de la cabecera)
+        self.btn_colapsar = QToolButton()
+        self.btn_colapsar.setText("◀")
+        self.btn_colapsar.setFixedSize(22, 22)
+        self.btn_colapsar.setToolTip("Colapsar menú")
+        self.btn_colapsar.setStyleSheet("""
+            QToolButton {
+                background: transparent;
+                color: #888;
+                border: none;
+                font-size: 11px;
+            }
+            QToolButton:hover { color: white; }
+        """)
+        self.btn_colapsar.clicked.connect(self._toggle_sidebar)
+
+        fila_logo = QHBoxLayout()
+        fila_logo.setContentsMargins(0, 0, 0, 0)
+
+        self.logo_label = QLabel()
         pixmap = QPixmap(ruta_asset("assets/vesp.png")).scaled(
-            60, 60, Qt.AspectRatioMode.KeepAspectRatio,
+            40, 40, Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation
         )
-        logo_label.setPixmap(pixmap)
-        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout_lateral.addWidget(logo_label)
+        self.logo_label.setPixmap(pixmap)
+        self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        fila_logo.addWidget(self.logo_label)
+        fila_logo.addStretch()
+        fila_logo.addWidget(self.btn_colapsar)
+        lay_cabecera.addLayout(fila_logo)
 
-        titulo_lateral = QLabel("V.E.S.P")
-        titulo_lateral.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        titulo_color = "#4CAF50" if obtener_tema_actual() == "oscuro" else "#2E7D32"
-        titulo_lateral.setStyleSheet(f"color: {titulo_color}; font-size: 16px; font-weight: bold;")
-        layout_lateral.addWidget(titulo_lateral)
+        self.titulo_lateral = QLabel("V.E.S.P")
+        self.titulo_lateral.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.titulo_lateral.setStyleSheet(
+            f"color: {titulo_color}; font-size: 15px; font-weight: bold;"
+        )
+        lay_cabecera.addWidget(self.titulo_lateral)
 
-        subtitulo_lateral = QLabel("Organizations")
-        subtitulo_lateral.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitulo_color = "#888" if obtener_tema_actual() == "oscuro" else "#666"
-        subtitulo_lateral.setStyleSheet(f"color: {subtitulo_color}; font-size: 11px;")
-        layout_lateral.addWidget(subtitulo_lateral)
+        self.subtitulo_lateral = QLabel("Organizations")
+        self.subtitulo_lateral.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.subtitulo_lateral.setStyleSheet(
+            f"color: {subtitulo_color}; font-size: 10px;"
+        )
+        lay_cabecera.addWidget(self.subtitulo_lateral)
 
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        sep_color = "#333" if obtener_tema_actual() == "oscuro" else "#ccc"
-        sep.setStyleSheet(f"color: {sep_color};")
-        layout_lateral.addWidget(sep)
+        layout_lateral.addWidget(cabecera)
 
-        #BOTONES
-        estilo_boton = """
-            QPushButton {
+        sep_top = QFrame()
+        sep_top.setFrameShape(QFrame.Shape.HLine)
+        sep_top.setStyleSheet(f"color: {sep_color}; margin: 0px;")
+        layout_lateral.addWidget(sep_top)
+
+        # ----- Zona scrollable con los botones -----
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet("""
+            QScrollArea { border: none; background: transparent; }
+            QScrollBar:vertical {
+                width: 4px;
+                background: transparent;
+            }
+            QScrollBar::handle:vertical {
+                background: #555;
+                border-radius: 2px;
+                min-height: 20px;
+            }
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical { height: 0px; }
+        """)
+
+        contenedor_scroll = QWidget()
+        contenedor_scroll.setStyleSheet(f"background-color: {panel_bg};")
+        self.layout_scroll = QVBoxLayout(contenedor_scroll)
+        self.layout_scroll.setSpacing(2)
+        self.layout_scroll.setContentsMargins(6, 6, 6, 6)
+
+        estilo_boton = f"""
+            QPushButton {{
                 background-color: transparent;
-                color: #cccccc;
+                color: {'#cccccc' if oscuro else '#333333'};
                 border: none;
                 border-radius: 6px;
-                padding: 10px 14px;
+                padding: 8px 10px;
                 text-align: left;
-                font-size: 13px;
-                min-height: 38px;
-            }
-            QPushButton:hover {
-                background-color: #2a2a2a;
-                color: white;
-            }
-            QPushButton:pressed {
+                font-size: 12px;
+                min-height: 34px;
+            }}
+            QPushButton:hover {{
+                background-color: {'#2a2a2a' if oscuro else '#d0d0d0'};
+                color: {'white' if oscuro else '#111'};
+            }}
+            QPushButton:pressed {{
                 background-color: #4CAF50;
                 color: white;
-            }
+            }}
         """
 
-        #FUNCIÓN BOTÓN
-        def boton_menu(texto, accion, shortcut=None):
-            b = QPushButton(texto)
+        # Guardamos referencia a todos los botones para colapsar/expandir
+        self._botones_menu = []
 
+        def boton_menu(icono, texto, accion, shortcut=None):
+            b = QPushButton(f"{icono}  {texto}")
+            b.setProperty("icono", icono)
+            b.setProperty("texto_completo", f"{icono}  {texto}")
             if shortcut:
                 b.setToolTip(f"{texto} ({shortcut})")
-
+            else:
+                b.setToolTip(texto)
             b.setStyleSheet(estilo_boton)
             b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             b.clicked.connect(accion)
-
+            self._botones_menu.append(b)
             return b
 
-        # BOTONES
-        layout_lateral.addWidget(boton_menu("Control diario", self.cargar_tabla, "Ctrl+B"))
-        layout_lateral.addWidget(boton_menu("Dashboard", self.abrir_dashboard, "Ctrl+D"))
-        layout_lateral.addWidget(boton_menu("Registrar pasada", self.abrir_form_pasada, "Ctrl+P"))
-        layout_lateral.addWidget(boton_menu("Registrar turno", self.abrir_form_turno, "Ctrl+T"))
+        def separador():
+            s = QFrame()
+            s.setFrameShape(QFrame.Shape.HLine)
+            s.setStyleSheet(f"color: {sep_color}; margin: 3px 0px;")
+            return s
 
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.Shape.HLine)
-        sep2.setStyleSheet(f"color: {sep_color};")
-        layout_lateral.addWidget(sep2)
+        # Grupo principal
+        self.layout_scroll.addWidget(boton_menu("📋", "Control diario",     self.cargar_tabla,          "Ctrl+B"))
+        self.layout_scroll.addWidget(boton_menu("📊", "Dashboard",          self.abrir_dashboard,       "Ctrl+D"))
+        self.layout_scroll.addWidget(boton_menu("✅", "Registrar pasada",   self.abrir_form_pasada,     "Ctrl+P"))
+        self.layout_scroll.addWidget(boton_menu("🕐", "Registrar turno",    self.abrir_form_turno,      "Ctrl+T"))
 
-        layout_lateral.addWidget(boton_menu("Agregar objetivo", self.abrir_form_objetivo, "Ctrl+O"))
-        layout_lateral.addWidget(boton_menu("Ver objetivos", self.abrir_lista_objetivos))
-        layout_lateral.addWidget(boton_menu("Agregar supervisor", self.abrir_form_supervisor, "Ctrl+S"))
-        layout_lateral.addWidget(boton_menu("Ver supervisores", self.abrir_lista_supervisores))
+        self.layout_scroll.addWidget(separador())
 
-        sep3 = QFrame()
-        sep3.setFrameShape(QFrame.Shape.HLine)
-        sep3.setStyleSheet(f"color: {sep_color};")
-        layout_lateral.addWidget(sep3)
+        self.layout_scroll.addWidget(boton_menu("➕", "Agregar objetivo",   self.abrir_form_objetivo,   "Ctrl+O"))
+        self.layout_scroll.addWidget(boton_menu("📍", "Ver objetivos",      self.abrir_lista_objetivos))
+        self.layout_scroll.addWidget(boton_menu("👤", "Agregar supervisor", self.abrir_form_supervisor, "Ctrl+S"))
+        self.layout_scroll.addWidget(boton_menu("👥", "Ver supervisores",   self.abrir_lista_supervisores))
 
-        layout_lateral.addWidget(boton_menu("Ver pasadas", self.abrir_lista_pasadas))
-        layout_lateral.addWidget(boton_menu("Notas del día", self.abrir_notas, "Ctrl+N"))
-        layout_lateral.addWidget(boton_menu("Reporte mensual", self.abrir_reporte_mensual, "Ctrl+R"))
-        layout_lateral.addWidget(boton_menu("Transferir datos", self.abrir_transferir_datos))
-        layout_lateral.addWidget(boton_menu("Importar Excel", self.abrir_importar_excel))
-        layout_lateral.addWidget(boton_menu("Ayuda", self.abrir_ayuda, "Ctrl+H"))
+        self.layout_scroll.addWidget(separador())
+
+        self.layout_scroll.addWidget(boton_menu("🔍", "Ver pasadas",        self.abrir_lista_pasadas))
+        self.layout_scroll.addWidget(boton_menu("📝", "Notas del día",      self.abrir_notas,           "Ctrl+N"))
+        self.layout_scroll.addWidget(boton_menu("📅", "Reporte mensual",    self.abrir_reporte_mensual, "Ctrl+R"))
+        self.layout_scroll.addWidget(boton_menu("💾", "Transferir datos",   self.abrir_transferir_datos))
+        self.layout_scroll.addWidget(boton_menu("📥", "Importar Excel",     self.abrir_importar_excel))
+        self.layout_scroll.addWidget(boton_menu("❓", "Ayuda",              self.abrir_ayuda,           "Ctrl+H"))
 
         if self.rol == "admin":
-            sep4 = QFrame()
-            sep4.setFrameShape(QFrame.Shape.HLine)
-            sep4.setStyleSheet(f"color: {sep_color};")
-            layout_lateral.addWidget(sep4)
+            self.layout_scroll.addWidget(separador())
+            self.layout_scroll.addWidget(boton_menu("⚙️",  "Gestionar usuarios",   self.abrir_gestionar_usuarios))
+            self.layout_scroll.addWidget(boton_menu("📜",  "Historial",            self.abrir_logs))
+            self.layout_scroll.addWidget(boton_menu("🗄️",  "Monitor de Caché",     self.abrir_cache))
+            self.layout_scroll.addWidget(boton_menu("🔧",  "Optimización de BD",   self.abrir_indexacion))
+            self.layout_scroll.addWidget(boton_menu("🛡️",  "Validaciones BD",      self.abrir_validaciones))
+            self.layout_scroll.addWidget(boton_menu("🔎",  "Auditoría detallada",  self.abrir_auditoria))
+            self.layout_scroll.addWidget(boton_menu("🔄",  "Sincronización",       self.abrir_sincronizacion))
 
-            layout_lateral.addWidget(boton_menu("Gestionar usuarios", self.abrir_gestionar_usuarios))
-            layout_lateral.addWidget(boton_menu("Historial", self.abrir_logs))
-            layout_lateral.addWidget(boton_menu("Monitor de Caché", self.abrir_cache))
-            layout_lateral.addWidget(boton_menu("Optimización de BD", self.abrir_indexacion))
-            layout_lateral.addWidget(boton_menu("Validaciones BD", self.abrir_validaciones))
-            layout_lateral.addWidget(boton_menu("Auditoría detallada", self.abrir_auditoria))
-            layout_lateral.addWidget(boton_menu("Sincronización", self.abrir_sincronizacion))
+        self.layout_scroll.addStretch()
 
-        layout_lateral.addStretch()
-        # Botones zoom
+        scroll_area.setWidget(contenedor_scroll)
+        layout_lateral.addWidget(scroll_area, 1)
+
+        # ----- Zona inferior fija (zoom, tema, usuario) -----
+        zona_inferior = QWidget()
+        zona_inferior.setStyleSheet(f"background-color: {panel_bg};")
+        lay_inf = QVBoxLayout(zona_inferior)
+        lay_inf.setContentsMargins(6, 4, 6, 8)
+        lay_inf.setSpacing(4)
+
+        sep_inf = QFrame()
+        sep_inf.setFrameShape(QFrame.Shape.HLine)
+        sep_inf.setStyleSheet(f"color: {sep_color};")
+        lay_inf.addWidget(sep_inf)
+
+        # Fila zoom
         fila_zoom = QHBoxLayout()
-        btn_zoom_menos = QPushButton("A-")
-        btn_zoom_menos.setFixedSize(35, 28)
-        btn_zoom_menos.setToolTip("Reducir zoom (Ctrl+-)")
+        fila_zoom.setSpacing(4)
+
+        estilo_btn_pequeño = """
+            QPushButton {
+                background-color: transparent;
+                color: #888;
+                border: 1px solid #555;
+                border-radius: 4px;
+                font-size: 11px;
+                min-width: 30px;
+                min-height: 26px;
+            }
+            QPushButton:hover { color: white; border-color: #888; }
+        """
+
+        btn_zoom_menos = QPushButton("A−")
+        btn_zoom_menos.setToolTip("Reducir zoom (Ctrl+−)")
+        btn_zoom_menos.setStyleSheet(estilo_btn_pequeño)
         btn_zoom_menos.clicked.connect(self._zoom_menos)
 
         btn_zoom_mas = QPushButton("A+")
-        btn_zoom_mas.setFixedSize(35, 28)
         btn_zoom_mas.setToolTip("Aumentar zoom (Ctrl+=)")
+        btn_zoom_mas.setStyleSheet(estilo_btn_pequeño)
         btn_zoom_mas.clicked.connect(self._zoom_mas)
 
-        fila_zoom.addWidget(btn_zoom_menos)
-        fila_zoom.addWidget(btn_zoom_mas)
-        layout_lateral.addLayout(fila_zoom)
+        self.lbl_zoom = QLabel(f"{self.zoom_nivel}px")
+        self.lbl_zoom.setStyleSheet(f"color: {subtitulo_color}; font-size: 10px;")
+        self.lbl_zoom.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Botón modo claro/oscuro
-        self.btn_tema = QPushButton("☀ Modo claro")
+        fila_zoom.addWidget(btn_zoom_menos)
+        fila_zoom.addWidget(self.lbl_zoom)
+        fila_zoom.addWidget(btn_zoom_mas)
+        lay_inf.addLayout(fila_zoom)
+
+        # Botón tema
+        self.btn_tema = QPushButton("☀  Modo claro" if oscuro else "🌙  Modo oscuro")
         self.btn_tema.setStyleSheet(estilo_boton)
         self.btn_tema.clicked.connect(self._alternar_tema)
-        layout_lateral.addWidget(self.btn_tema)
+        lay_inf.addWidget(self.btn_tema)
 
+        # Etiqueta usuario
         nombre_usuario = obtener_nombre_usuario(usuario_id)
-        usuario_label = QLabel(f"👤 {nombre_usuario}")
-        usuario_color = "#888" if obtener_tema_actual() == "oscuro" else "#666"
-        usuario_label.setStyleSheet(f"color: {usuario_color}; font-size: 11px; padding: 4px;")
-        usuario_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout_lateral.addWidget(usuario_label)
+        self.usuario_label = QLabel(f"👤 {nombre_usuario}")
+        self.usuario_label.setStyleSheet(
+            f"color: {usuario_color}; font-size: 10px; padding: 2px;"
+        )
+        self.usuario_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.usuario_label.setWordWrap(True)
+        lay_inf.addWidget(self.usuario_label)
 
-        layout_principal.addWidget(panel_lateral)
+        layout_lateral.addWidget(zona_inferior)
 
+        layout_principal.addWidget(self.panel_lateral)
+
+        # =====================================================================
         # PANEL DERECHO
+        # =====================================================================
         panel_derecho = QWidget()
         layout_derecho = QVBoxLayout(panel_derecho)
-        layout_derecho.setContentsMargins(12, 12, 12, 12)
+        layout_derecho.setContentsMargins(10, 10, 10, 10)
         layout_derecho.setSpacing(8)
 
-        # Fila superior con fecha y filtros
-        fila_superior = QHBoxLayout()
+        # Fila superior: scroll horizontal para no cortar nada en ventanas chicas
+        scroll_filtros = QScrollArea()
+        scroll_filtros.setWidgetResizable(True)
+        scroll_filtros.setFixedHeight(46)
+        scroll_filtros.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_filtros.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_filtros.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+
+        widget_filtros = QWidget()
+        fila_superior = QHBoxLayout(widget_filtros)
+        fila_superior.setContentsMargins(0, 0, 0, 0)
+        fila_superior.setSpacing(6)
 
         self.selector_fecha = QDateEdit()
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.setCalendarPopup(True)
+        self.selector_fecha.setFixedWidth(110)
 
         boton_fecha_anterior = QPushButton("◀")
-        boton_fecha_anterior.setFixedWidth(30)
+        boton_fecha_anterior.setFixedWidth(28)
         boton_fecha_anterior.setToolTip("Día anterior (Ctrl+←)")
         boton_fecha_anterior.clicked.connect(self._fecha_anterior)
 
         boton_fecha_siguiente = QPushButton("▶")
-        boton_fecha_siguiente.setFixedWidth(30)
+        boton_fecha_siguiente.setFixedWidth(28)
         boton_fecha_siguiente.setToolTip("Día siguiente (Ctrl+→)")
         boton_fecha_siguiente.clicked.connect(self._fecha_siguiente)
 
         boton_buscar = QPushButton("Buscar")
+        boton_buscar.setFixedWidth(70)
         boton_buscar.clicked.connect(self.cargar_tabla)
 
         self.filtro_turno = QComboBox()
         self.filtro_turno.addItems(["Todos los turnos", "diurno", "nocturno"])
+        self.filtro_turno.setFixedWidth(130)
 
         self.filtro_supervisor = QComboBox()
         self.filtro_supervisor.addItem("Todos los supervisores", None)
+        self.filtro_supervisor.setFixedWidth(160)
         for s in cargar_supervisores():
             self.filtro_supervisor.addItem(s[1], s[0])
 
@@ -334,13 +457,15 @@ class VentanaPrincipal(QWidget):
             "Todos", "Pasaron los dos", "No pasó nadie",
             "No pasó día", "No pasó noche"
         ])
+        self.filtro_estado.setFixedWidth(150)
 
         boton_filtrar = QPushButton("Filtrar")
+        boton_filtrar.setFixedWidth(65)
         boton_filtrar.clicked.connect(self.cargar_tabla)
 
         self.buscador = QLineEdit()
         self.buscador.setPlaceholderText("Buscar objetivo...")
-        self.buscador.setFixedWidth(180)
+        self.buscador.setFixedWidth(160)
         self.buscador.textChanged.connect(self.cargar_tabla)
 
         fila_superior.addWidget(QLabel("Fecha:"))
@@ -348,7 +473,7 @@ class VentanaPrincipal(QWidget):
         fila_superior.addWidget(self.selector_fecha)
         fila_superior.addWidget(boton_fecha_siguiente)
         fila_superior.addWidget(boton_buscar)
-        fila_superior.addSpacing(20)
+        fila_superior.addSpacing(10)
         fila_superior.addWidget(QLabel("Turno:"))
         fila_superior.addWidget(self.filtro_turno)
         fila_superior.addWidget(QLabel("Supervisor:"))
@@ -356,14 +481,14 @@ class VentanaPrincipal(QWidget):
         fila_superior.addWidget(QLabel("Estado:"))
         fila_superior.addWidget(self.filtro_estado)
         fila_superior.addWidget(boton_filtrar)
-        fila_superior.addSpacing(20)
-        fila_superior.addWidget(QLabel("Buscar:"))
+        fila_superior.addSpacing(10)
         fila_superior.addWidget(self.buscador)
         fila_superior.addStretch()
 
-        layout_derecho.addLayout(fila_superior)
+        scroll_filtros.setWidget(widget_filtros)
+        layout_derecho.addWidget(scroll_filtros)
 
-        # Tabla
+        # Tabla principal
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(7)
         self.tabla.setHorizontalHeaderLabels([
@@ -385,7 +510,7 @@ class VentanaPrincipal(QWidget):
         self.tabla.horizontalHeader().setStretchLastSection(True)
         layout_derecho.addWidget(self.tabla)
 
-        layout_principal.addWidget(panel_derecho)
+        layout_principal.addWidget(panel_derecho, 1)
         self.setLayout(layout_principal)
 
         self.objetivos_actuales = []
@@ -404,8 +529,11 @@ class VentanaPrincipal(QWidget):
         QShortcut(QKeySequence("Ctrl+H"), self).activated.connect(self.abrir_ayuda)
         QShortcut(QKeySequence("Ctrl+="), self).activated.connect(self._zoom_mas)
         QShortcut(QKeySequence("Ctrl+-"), self).activated.connect(self._zoom_menos)
-        QShortcut(QKeySequence("Ctrl+Left"), self).activated.connect(self._fecha_anterior)
+        QShortcut(QKeySequence("Ctrl+Left"),  self).activated.connect(self._fecha_anterior)
         QShortcut(QKeySequence("Ctrl+Right"), self).activated.connect(self._fecha_siguiente)
+
+        # Shortcut para colapsar/expandir sidebar
+        QShortcut(QKeySequence("Ctrl+\\"), self).activated.connect(self._toggle_sidebar)
 
         # Timer inactividad
         self.timer_inactividad = QTimer()
@@ -419,11 +547,52 @@ class VentanaPrincipal(QWidget):
         self.timer_refresco.timeout.connect(self.cargar_tabla)
         self.timer_refresco.start()
 
-        # Inicializar sincronizador de datos
+        # Sincronizador
         self.sincronizador = obtener_sincronizador()
         self.sincronizador.datos_cambiados.connect(self._on_datos_cambiados)
         self.sincronizador.tabla_actualizar.connect(self._on_tabla_actualizar)
         self.sincronizador.cache_invalidado.connect(self._on_cache_invalidado)
+
+    # =============================================================================
+    # SIDEBAR COLAPSABLE
+    # =============================================================================
+
+    def _toggle_sidebar(self) -> None:
+        """Alterna el sidebar entre expandido y colapsado."""
+        if self._sidebar_expandido:
+            self._colapsar_sidebar()
+        else:
+            self._expandir_sidebar()
+
+    def _colapsar_sidebar(self) -> None:
+        self._sidebar_expandido = False
+        self.panel_lateral.setFixedWidth(self.SIDEBAR_COLAPSADO)
+        self.btn_colapsar.setText("▶")
+        self.btn_colapsar.setToolTip("Expandir menú (Ctrl+\\)")
+        self.titulo_lateral.hide()
+        self.subtitulo_lateral.hide()
+        self.usuario_label.hide()
+        self.btn_tema.hide()
+        self.lbl_zoom.hide()
+        # Mostrar solo icono en botones
+        for b in self._botones_menu:
+            icono = b.property("icono")
+            b.setText(icono or "•")
+            b.setToolTip(b.toolTip())  # tooltip ya fue seteado
+
+    def _expandir_sidebar(self) -> None:
+        self._sidebar_expandido = True
+        self.panel_lateral.setFixedWidth(self.SIDEBAR_EXPANDIDO)
+        self.btn_colapsar.setText("◀")
+        self.btn_colapsar.setToolTip("Colapsar menú (Ctrl+\\)")
+        self.titulo_lateral.show()
+        self.subtitulo_lateral.show()
+        self.usuario_label.show()
+        self.btn_tema.show()
+        self.lbl_zoom.show()
+        for b in self._botones_menu:
+            texto = b.property("texto_completo")
+            b.setText(texto or b.text())
 
     # =============================================================================
     # ZOOM
@@ -440,6 +609,7 @@ class VentanaPrincipal(QWidget):
             self._aplicar_zoom()
 
     def _aplicar_zoom(self) -> None:
+        self.lbl_zoom.setText(f"{self.zoom_nivel}px")
         if self.app:
             import re
             stylesheet_actual = self.app.styleSheet()
@@ -459,18 +629,14 @@ class VentanaPrincipal(QWidget):
     # =============================================================================
 
     def _on_datos_cambiados(self, tabla, operacion, datos):
-        """Maneja cambios de datos para refrescar la tabla principal."""
         if tabla in ['objetivos', 'supervisores', 'pasadas', 'equipos']:
             self.cargar_tabla()
 
     def _on_tabla_actualizar(self, nombre_tabla):
-        """Maneja solicitud de actualización de tabla específica."""
         if nombre_tabla == 'principal':
             self.cargar_tabla()
 
     def _on_cache_invalidado(self, patron):
-        """Maneja invalidación de caché."""
-        # El caché se maneja automáticamente en los servicios
         pass
 
     # =============================================================================
@@ -478,13 +644,11 @@ class VentanaPrincipal(QWidget):
     # =============================================================================
 
     def _fecha_anterior(self) -> None:
-        """Retrocede un día y recarga la tabla."""
         fecha = self.selector_fecha.date().addDays(-1)
         self.selector_fecha.setDate(fecha)
         self.cargar_tabla()
 
     def _fecha_siguiente(self) -> None:
-        """Avanza un día y recarga la tabla."""
         fecha = self.selector_fecha.date().addDays(1)
         self.selector_fecha.setDate(fecha)
         self.cargar_tabla()
@@ -507,9 +671,7 @@ class VentanaPrincipal(QWidget):
             return super().event(evento)
 
     def moveEvent(self, evento):
-        """Maneja el evento de movimiento de ventana."""
         try:
-            # Reiniciar timer de inactividad cuando se mueve la ventana
             self.timer_inactividad.start()
             super().moveEvent(evento)
         except Exception as e:
@@ -517,9 +679,7 @@ class VentanaPrincipal(QWidget):
             super().moveEvent(evento)
 
     def resizeEvent(self, evento):
-        """Maneja el evento de redimensionamiento de ventana."""
         try:
-            # Reiniciar timer de inactividad cuando se redimensiona la ventana
             self.timer_inactividad.start()
             super().resizeEvent(evento)
         except Exception as e:
@@ -555,27 +715,18 @@ class VentanaPrincipal(QWidget):
     # =============================================================================
 
     def _limpiar_tabla(self) -> None:
-        """Elimina widgets y contenido previo de la tabla antes de recargar."""
         row_count = self.tabla.rowCount()
         for row in range(row_count):
             widget = self.tabla.cellWidget(row, 6)
             if widget is not None:
                 self.tabla.removeCellWidget(row, 6)
                 widget.deleteLater()
-
         self.tabla.clearContents()
         self.tabla.setRowCount(0)
 
-    def _obtener_pasadas_agrupadas(
-        self,
-        fecha: str,
-        turno: str = None,
-        supervisor_id: int = None
-    ) -> dict[int, int]:
-        """Retorna el conteo de pasadas por objetivo para un turno y supervisor opcionales."""
+    def _obtener_pasadas_agrupadas(self, fecha: str, turno: str = None, supervisor_id: int = None) -> dict:
         conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
-
         query = "SELECT objetivo_id, COUNT(*) FROM pasadas WHERE fecha = ?"
         params = [fecha]
         if turno:
@@ -585,17 +736,14 @@ class VentanaPrincipal(QWidget):
             query += " AND supervisor_id = ?"
             params.append(supervisor_id)
         query += " GROUP BY objetivo_id"
-
         cursor.execute(query, params)
         resultados = dict(cursor.fetchall())
         conexion.close()
         return resultados
 
-    def _obtener_todas_pasadas_por_turno(self, fecha: str, supervisor_id: int = None) -> tuple[dict[int, int], dict[int, int]]:
-        """Retorna conteos de pasadas diurnas y nocturnas en una sola consulta."""
+    def _obtener_todas_pasadas_por_turno(self, fecha: str, supervisor_id: int = None) -> tuple:
         conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
-
         query = """
             SELECT objetivo_id, turno, COUNT(*)
             FROM pasadas
@@ -606,24 +754,19 @@ class VentanaPrincipal(QWidget):
             query += " AND supervisor_id = ?"
             params.append(supervisor_id)
         query += " GROUP BY objetivo_id, turno"
-
         cursor.execute(query, params)
         resultados = cursor.fetchall()
         conexion.close()
-
         pasadas_dia = {}
         pasadas_noche = {}
-
         for obj_id, turno, count in resultados:
             if turno == "diurno":
                 pasadas_dia[obj_id] = count
             elif turno == "nocturno":
                 pasadas_noche[obj_id] = count
-
         return pasadas_dia, pasadas_noche
 
-    def _obtener_estado_detallado(self, pasadas_dia: int, pasadas_noche: int) -> tuple[str, str]:
-        """Calcula el estado y color a partir de los conteos de pasadas."""
+    def _obtener_estado_detallado(self, pasadas_dia: int, pasadas_noche: int) -> tuple:
         if pasadas_dia > 0 and pasadas_noche > 0:
             return "Pasaron los dos", "#90EE90"
         if pasadas_dia > 0 and pasadas_noche == 0:
@@ -633,7 +776,6 @@ class VentanaPrincipal(QWidget):
         return "No pasó nadie", "#FF6B6B"
 
     def cargar_tabla(self) -> None:
-        """Carga los objetivos del día con pasadas diurnas y nocturnas separadas."""
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
         turno = self.filtro_turno.currentText()
         turno = None if turno == "Todos los turnos" else turno
@@ -645,7 +787,7 @@ class VentanaPrincipal(QWidget):
             obtener_objetivos_del_dia(fecha),
             key=lambda o: o[1].lower()
         )
-        equipo_dia = obtener_equipo(fecha, "diurno")
+        equipo_dia   = obtener_equipo(fecha, "diurno")
         equipo_noche = obtener_equipo(fecha, "nocturno")
 
         sorting_enabled = self.tabla.isSortingEnabled()
@@ -653,44 +795,38 @@ class VentanaPrincipal(QWidget):
         self.tabla.setUpdatesEnabled(False)
         self._limpiar_tabla()
 
-        # Obtener todas las pasadas en una sola consulta
         pasadas_dia_totales, pasadas_noche_totales = self._obtener_todas_pasadas_por_turno(fecha)
 
-        # Aplicar filtros de turno y supervisor si es necesario
         if turno == "diurno":
             if supervisor_id:
                 pasadas_dia_filtradas, _ = self._obtener_todas_pasadas_por_turno(fecha, supervisor_id)
                 pasadas_noche_filtradas = pasadas_noche_totales
             else:
-                pasadas_dia_filtradas = pasadas_dia_totales
+                pasadas_dia_filtradas   = pasadas_dia_totales
                 pasadas_noche_filtradas = pasadas_noche_totales
         elif turno == "nocturno":
             if supervisor_id:
                 _, pasadas_noche_filtradas = self._obtener_todas_pasadas_por_turno(fecha, supervisor_id)
                 pasadas_dia_filtradas = pasadas_dia_totales
             else:
-                pasadas_dia_filtradas = pasadas_dia_totales
+                pasadas_dia_filtradas   = pasadas_dia_totales
                 pasadas_noche_filtradas = pasadas_noche_totales
         else:
-            pasadas_dia_filtradas = pasadas_dia_totales
+            pasadas_dia_filtradas   = pasadas_dia_totales
             pasadas_noche_filtradas = pasadas_noche_totales
 
         filas = []
         for o in self.objetivos_actuales:
-            nombre_lower = o[1].lower()
-            if texto_busqueda and texto_busqueda not in nombre_lower:
+            if texto_busqueda and texto_busqueda not in o[1].lower():
                 continue
-
-            pasadas_dia = pasadas_dia_filtradas.get(o[0], 0)
+            pasadas_dia   = pasadas_dia_filtradas.get(o[0], 0)
             pasadas_noche = pasadas_noche_filtradas.get(o[0], 0)
             estado_detallado, color_hex = self._obtener_estado_detallado(
                 pasadas_dia_totales.get(o[0], 0),
                 pasadas_noche_totales.get(o[0], 0)
             )
-
             if filtro_estado != "Todos" and estado_detallado != filtro_estado:
                 continue
-
             filas.append((o, pasadas_dia, pasadas_noche, estado_detallado, color_hex))
 
         self.tabla.setRowCount(len(filas))
