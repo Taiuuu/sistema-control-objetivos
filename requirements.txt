@@ -1,0 +1,30 @@
+# VESP Control de Objetivos - Dependencias Python
+
+# Interfaz gráfica
+PyQt6==6.7.1
+PyQt6-Qt6==6.7.1
+
+# Base de datos
+sqlite3
+
+# API REST
+flask==3.0.3
+flask-jwt-extended==4.6.0
+flask-cors==4.0.1
+flask-limiter==3.8.0
+flask-sse==1.0.0
+
+# Serialización y documentación
+marshmallow==3.21.3
+apispec==6.6.1
+apispec-webframeworks==1.1.0
+
+# Utilidades
+requests==2.32.3
+openpyxl==3.1.2
+reportlab==4.2.0
+cryptography==42.0.8
+
+# Desarrollo (opcional)
+pytest==8.3.2
+black==24.4.2
