@@ -47,7 +47,7 @@ jobs:
     
     - name: Build executable
       run: |
-        python -m PyInstaller "VESP Control.spec"
+        pyinstaller --onefile --name VESP_Control api/app.py
     
     - name: Build installer
       run: |
