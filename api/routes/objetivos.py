@@ -8,6 +8,7 @@ from models.objetivos import (
     agregar_objetivo, listar_objetivos, obtener_objetivo,
     actualizar_objetivo, dar_de_baja_objetivo
 )
+from services.permisos import tiene_permiso
 
 objetivos_bp = Blueprint('objetivos', __name__)
 
@@ -15,6 +16,9 @@ objetivos_bp = Blueprint('objetivos', __name__)
 @jwt_required()
 def get_objetivos():
     """Obtener lista de objetivos."""
+    if not tiene_permiso('objetivos.ver'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
         objetivos = listar_objetivos()
         return jsonify([{
@@ -30,6 +34,9 @@ def get_objetivos():
 @jwt_required()
 def get_objetivo(id):
     """Obtener objetivo por ID."""
+    if not tiene_permiso('objetivos.ver'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
         obj = obtener_objetivo(id)
         if obj:
@@ -47,6 +54,9 @@ def get_objetivo(id):
 @jwt_required()
 def create_objetivo():
     """Crear nuevo objetivo."""
+    if not tiene_permiso('objetivos.crear'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
         data = request.get_json()
         nombre = data.get('nombre')
@@ -66,6 +76,9 @@ def create_objetivo():
 @jwt_required()
 def update_objetivo(id):
     """Actualizar objetivo."""
+    if not tiene_permiso('objetivos.editar'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
         data = request.get_json()
         nombre = data.get('nombre')
@@ -85,6 +98,9 @@ def update_objetivo(id):
 @jwt_required()
 def delete_objetivo(id):
     """Dar de baja objetivo."""
+    if not tiene_permiso('objetivos.eliminar'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
         dar_de_baja_objetivo(id)
         return jsonify({'message': 'Objetivo dado de baja'}), 200

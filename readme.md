@@ -74,6 +74,33 @@ Contraseña: 0000
 - Notas y observaciones diarias
 - Historial completo de todas las operaciones
 
+### Seguridad Avanzada
+- Sistema de roles granulares (Admin, Supervisor, Operador) con permisos específicos
+- Encriptación AES-256 para datos sensibles
+- Validación de contraseñas fuertes con políticas de seguridad
+- Sesiones con expiración automática (8 horas) y tokens seguros
+- Control de acceso basado en permisos para todas las operaciones
+
+#### Roles y Permisos
+
+**Administrador (Admin):**
+- Control total del sistema
+- Gestión de usuarios y permisos
+- Todas las operaciones CRUD
+- Configuración del sistema
+- Auditoría completa
+
+**Supervisor:**
+- Gestión de operaciones diarias
+- Control de objetivos y supervisores
+- Reportes y análisis
+- Notas y observaciones
+
+**Operador:**
+- Operaciones básicas de registro
+- Visualización de datos asignados
+- Funciones limitadas de consulta
+
 ### Reportes y Exportación
 - Reporte mensual de cumplimiento por objetivo
 - Reporte diario detallado
