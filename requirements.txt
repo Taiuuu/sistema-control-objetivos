@@ -5,7 +5,6 @@ PyQt6==6.7.1
 PyQt6-Qt6==6.7.1
 
 # Base de datos
-sqlite3
 
 # API REST
 flask==3.0.3
