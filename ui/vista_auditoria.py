@@ -17,7 +17,7 @@ from services.auditoria import (
     obtener_cambios_por_fecha, validar_integridad_auditoria,
     exportar_auditoria_csv, TipoOperacion
 )
-from services.sesion import obtener_usuario_id
+from services.sesion import get_usuario_id
 
 
 def _obtener_nombre_usuario(usuario_id: int | None) -> str:
