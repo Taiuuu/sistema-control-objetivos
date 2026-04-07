@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QDate, QTimer, QEvent, Qt
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
+from PyQt6.QtWidgets import QSizePolicy
 from services.reportes import obtener_objetivos_del_dia
 from ui.animaciones import animar_entrada
 from ui.form_objetivo import FormObjetivo
@@ -144,17 +145,19 @@ class VentanaPrincipal(QWidget):
 
         # PANEL LATERAL
         panel_lateral = QFrame()
-        panel_lateral.setFixedWidth(190)
+        panel_lateral.setFixedWidth(260)
         if obtener_tema_actual() == "oscuro":
             panel_bg = "#1a1a1a"
             panel_border = "#333"
         else:
             panel_bg = "#e8e8e8"
             panel_border = "#ccc"
+
         panel_lateral.setStyleSheet(f"background-color: {panel_bg}; border-right: 1px solid {panel_border};")
+
         layout_lateral = QVBoxLayout(panel_lateral)
-        layout_lateral.setSpacing(4)
-        layout_lateral.setContentsMargins(8, 12, 8, 12)
+        layout_lateral.setSpacing(6)
+        layout_lateral.setContentsMargins(10, 12, 10, 12)
 
         logo_label = QLabel()
         pixmap = QPixmap(ruta_asset("assets/vesp.png")).scaled(
@@ -168,13 +171,13 @@ class VentanaPrincipal(QWidget):
         titulo_lateral = QLabel("V.E.S.P")
         titulo_lateral.setAlignment(Qt.AlignmentFlag.AlignCenter)
         titulo_color = "#4CAF50" if obtener_tema_actual() == "oscuro" else "#2E7D32"
-        titulo_lateral.setStyleSheet(f"color: {titulo_color}; font-size: 14px; font-weight: bold;")
+        titulo_lateral.setStyleSheet(f"color: {titulo_color}; font-size: 16px; font-weight: bold;")
         layout_lateral.addWidget(titulo_lateral)
 
         subtitulo_lateral = QLabel("Organizations")
         subtitulo_lateral.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitulo_color = "#888" if obtener_tema_actual() == "oscuro" else "#666"
-        subtitulo_lateral.setStyleSheet(f"color: {subtitulo_color}; font-size: 10px;")
+        subtitulo_lateral.setStyleSheet(f"color: {subtitulo_color}; font-size: 11px;")
         layout_lateral.addWidget(subtitulo_lateral)
 
         sep = QFrame()
@@ -182,17 +185,18 @@ class VentanaPrincipal(QWidget):
         sep_color = "#333" if obtener_tema_actual() == "oscuro" else "#ccc"
         sep.setStyleSheet(f"color: {sep_color};")
         layout_lateral.addWidget(sep)
-        layout_lateral.addSpacing(4)
 
+        #BOTONES
         estilo_boton = """
             QPushButton {
                 background-color: transparent;
                 color: #cccccc;
                 border: none;
-                border-radius: 4px;
-                padding: 8px 12px;
+                border-radius: 6px;
+                padding: 10px 14px;
                 text-align: left;
-                font-size: 12px;
+                font-size: 13px;
+                min-height: 38px;
             }
             QPushButton:hover {
                 background-color: #2a2a2a;
@@ -204,12 +208,20 @@ class VentanaPrincipal(QWidget):
             }
         """
 
+        #FUNCIÓN BOTÓN
         def boton_menu(texto, accion, shortcut=None):
-            b = QPushButton(texto if not shortcut else f"{texto}  {shortcut}")
+            b = QPushButton(texto)
+
+            if shortcut:
+                b.setToolTip(f"{texto} ({shortcut})")
+
             b.setStyleSheet(estilo_boton)
+            b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             b.clicked.connect(accion)
+
             return b
 
+        # BOTONES
         layout_lateral.addWidget(boton_menu("Control diario", self.cargar_tabla, "Ctrl+B"))
         layout_lateral.addWidget(boton_menu("Dashboard", self.abrir_dashboard, "Ctrl+D"))
         layout_lateral.addWidget(boton_menu("Registrar pasada", self.abrir_form_pasada, "Ctrl+P"))
@@ -242,6 +254,7 @@ class VentanaPrincipal(QWidget):
             sep4.setFrameShape(QFrame.Shape.HLine)
             sep4.setStyleSheet(f"color: {sep_color};")
             layout_lateral.addWidget(sep4)
+
             layout_lateral.addWidget(boton_menu("Gestionar usuarios", self.abrir_gestionar_usuarios))
             layout_lateral.addWidget(boton_menu("Historial", self.abrir_logs))
             layout_lateral.addWidget(boton_menu("Monitor de Caché", self.abrir_cache))
@@ -251,7 +264,6 @@ class VentanaPrincipal(QWidget):
             layout_lateral.addWidget(boton_menu("Sincronización", self.abrir_sincronizacion))
 
         layout_lateral.addStretch()
-
         # Botones zoom
         fila_zoom = QHBoxLayout()
         btn_zoom_menos = QPushButton("A-")
