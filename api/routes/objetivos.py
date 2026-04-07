@@ -50,12 +50,14 @@ def create_objetivo():
     try:
         data = request.get_json()
         nombre = data.get('nombre')
-        descripcion = data.get('descripcion', '')
+        fecha_inicio = data.get('fecha_inicio')
+        fecha_fin = data.get('fecha_fin')
+        dias_semana = data.get('dias_semana', '1,2,3,4,5')  # Default L-V
 
-        if not nombre:
-            return jsonify({'error': 'Nombre requerido'}), 400
+        if not nombre or not fecha_inicio:
+            return jsonify({'error': 'Nombre y fecha_inicio requeridos'}), 400
 
-        agregar_objetivo(nombre, descripcion)
+        agregar_objetivo(nombre, fecha_inicio, fecha_fin, dias_semana)
         return jsonify({'message': 'Objetivo creado'}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -67,12 +69,14 @@ def update_objetivo(id):
     try:
         data = request.get_json()
         nombre = data.get('nombre')
-        descripcion = data.get('descripcion')
+        fecha_inicio = data.get('fecha_inicio')
+        fecha_fin = data.get('fecha_fin')
+        dias_semana = data.get('dias_semana')
 
-        if not nombre:
-            return jsonify({'error': 'Nombre requerido'}), 400
+        if not nombre or not fecha_inicio:
+            return jsonify({'error': 'Nombre y fecha_inicio requeridos'}), 400
 
-        actualizar_objetivo(id, nombre, descripcion)
+        actualizar_objetivo(id, nombre, fecha_inicio, fecha_fin, dias_semana)
         return jsonify({'message': 'Objetivo actualizado'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500

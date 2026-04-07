@@ -109,3 +109,91 @@ def reporte_mensual(anio: int, mes: int) -> None:
             print(f"{nombre:<20} {dias_esperados:<16} {dias_cumplidos:<16} {porcentaje:.1f}%")
 
     conexion.close()
+
+
+def generar_reporte_mensual(anio: int, mes: int) -> dict:
+    """Genera y retorna el reporte de cumplimiento mensual por objetivo."""
+    import calendar
+
+    conexion = sqlite3.connect(DB_PATH)
+    cursor = conexion.cursor()
+
+    cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
+    objetivos = cursor.fetchall()
+
+    total_dias = calendar.monthrange(anio, mes)[1]
+    reporte = {
+        'anio': anio,
+        'mes': mes,
+        'objetivos': []
+    }
+
+    for o in objetivos:
+        obj_id, nombre, inicio, fin, dias_str = o
+        dias_semana = [int(d) for d in dias_str.split(",")]
+        dias_esperados = 0
+        dias_cumplidos = 0
+
+        for dia in range(1, total_dias + 1):
+            fecha = f"{anio}-{mes:02d}-{dia:02d}"
+            fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
+
+            if inicio and fecha < inicio:
+                continue
+            if fin and fecha > fin:
+                continue
+            if fecha_dt.isoweekday() not in dias_semana:
+                continue
+
+            dias_esperados += 1
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM pasadas
+                WHERE fecha = ? AND objetivo_id = ?
+            """, (fecha, obj_id))
+
+            if cursor.fetchone()[0] > 0:
+                dias_cumplidos += 1
+
+        if dias_esperados > 0:
+            porcentaje = (dias_cumplidos / dias_esperados) * 100
+            reporte['objetivos'].append({
+                'id': obj_id,
+                'nombre': nombre,
+                'dias_esperados': dias_esperados,
+                'dias_cumplidos': dias_cumplidos,
+                'cumplimiento': round(porcentaje, 1)
+            })
+
+    conexion.close()
+    return reporte
+
+
+def generar_reporte_diario(fecha: str) -> dict:
+    """Genera y retorna el reporte diario de pasadas."""
+    conexion = sqlite3.connect(DB_PATH)
+    cursor = conexion.cursor()
+
+    cursor.execute("""
+        SELECT p.id, p.hora, p.turno, o.nombre, s.nombre
+        FROM pasadas p
+        JOIN objetivos o ON p.objetivo_id = o.id
+        JOIN supervisores s ON p.supervisor_id = s.id
+        WHERE p.fecha = ?
+        ORDER BY p.hora
+    """, (fecha,))
+
+    pasadas = cursor.fetchall()
+    conexion.close()
+
+    return {
+        'fecha': fecha,
+        'pasadas': [{
+            'id': p[0],
+            'hora': p[1],
+            'turno': p[2],
+            'objetivo': p[3],
+            'supervisor': p[4]
+        } for p in pasadas],
+        'total': len(pasadas)
+    }

@@ -6,6 +6,7 @@ from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 from typing import Dict, List, Callable, Any
 from datetime import datetime
 import threading
+import requests  # Para enviar a SSE si la API está corriendo
 
 
 class SincronizadorDatos(QObject):
@@ -57,11 +58,34 @@ class SincronizadorDatos(QObject):
         print(f"📢 Cambio notificado: {operacion} en {tabla}")
         self.datos_cambiados.emit(tabla, operacion, datos)
 
+        # Enviar notificación SSE si la API está disponible
+        self._enviar_sse(tabla, operacion, datos)
+
         # Invalidar caché automáticamente según tabla
         self._invalidar_cache_por_tabla(tabla)
 
         # Actualizar tablas relacionadas
         self._actualizar_tablas_relacionadas(tabla)
+
+    def _enviar_sse(self, tabla: str, operacion: str, datos: dict) -> None:
+        """Envía notificación SSE a la API."""
+        try:
+            payload = {
+                'tabla': tabla,
+                'operacion': operacion,
+                'datos': datos
+            }
+            # Intentar enviar a la API local (no bloqueante)
+            threading.Thread(target=self._post_sse, args=(payload,), daemon=True).start()
+        except Exception as e:
+            print(f"⚠️ Error enviando SSE: {e}")
+
+    def _post_sse(self, payload: dict) -> None:
+        """Envía el evento SSE en un hilo separado."""
+        try:
+            requests.post('http://127.0.0.1:5000/api/sse/publish', json=payload, timeout=1)
+        except:
+            pass  # Ignorar si la API no está corriendo
 
     def _invalidar_cache_por_tabla(self, tabla: str) -> None:
         """Invalida el caché según la tabla modificada."""
