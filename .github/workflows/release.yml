@@ -55,8 +55,16 @@ jobs:
 
     - name: Build installer
       run: |
-        Source: "dist\VESP_Control.exe"; DestDir: "{app}"
+        iscc instalador.iss
     
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-files
+        path: |
+          dist/*.exe
+          Output/*.exe
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:

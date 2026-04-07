@@ -1,10 +1,8 @@
-name: Build & Release
+name: Tests
 
 on:
   push:
     branches: [ main ]
-    tags:
-      - 'v*'
 
 jobs:
 
@@ -27,40 +25,3 @@ jobs:
     - name: Run tests
       run: |
         pytest tests/ -v || true
-
-
-  build:
-    needs: test
-    runs-on: windows-latest
-
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install PyInstaller
-    
-    - name: Build executable
-      run: |
-        python -m PyInstaller "VESP Control.spec"
-    
-    - name: Upload .exe
-      uses: actions/upload-artifact@v3
-      with:
-        name: VESP_Control
-        path: dist/*.exe
-
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: dist/*.exe
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
