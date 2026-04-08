@@ -208,39 +208,48 @@ def validar_equipo_no_duplicado(fecha: str, turno: str, excluir_id: Optional[int
 
 
 def validar_pasada_no_duplicada(
-    fecha: str, 
-    objetivo_id: int, 
-    turno: str, 
+    fecha: str,
+    hora: str,
+    objetivo_id: int,
+    turno: str,
     supervisor_id: int,
-    excluir_id: Optional[int] = None
+    excluir_id: Optional[int] = None,
+    minutos_minimos: int = 30
 ) -> None:
-    """Valida que no exista una pasada idéntica (misma fecha, obj, turno, supervisor)."""
+    """Bloquea solo si hay otra pasada del mismo supervisor/objetivo/turno
+    dentro de la ventana de minutos_minimos."""
     try:
+        from datetime import datetime, timedelta
+
+        hora_nueva = datetime.strptime(hora, "%H:%M:%S")
+        ventana_desde = (hora_nueva - timedelta(minutes=minutos_minimos)).strftime("%H:%M:%S")
+        ventana_hasta = (hora_nueva + timedelta(minutes=minutos_minimos)).strftime("%H:%M:%S")
+
         conn = conectar()
         cursor = conn.cursor()
-        
+
         query = """
-            SELECT id FROM pasadas 
+            SELECT id FROM pasadas
             WHERE fecha = ? AND objetivo_id = ? AND turno = ? AND supervisor_id = ?
+            AND hora BETWEEN ? AND ?
         """
-        params = [fecha, objetivo_id, turno, supervisor_id]
-        
+        params = [fecha, objetivo_id, turno, supervisor_id, ventana_desde, ventana_hasta]
+
         if excluir_id:
             query += " AND id != ?"
             params.append(excluir_id)
-        
+
         cursor.execute(query, params)
         if cursor.fetchone():
             raise ErrorValidacion(
-                f"Ya existe una pasada idéntica para {fecha} objetivo {objetivo_id} "
-                f"turno {turno} supervisor {supervisor_id}"
+                f"Ya registraste una pasada para este objetivo con el mismo supervisor "
+                f"hace menos de {minutos_minimos} minutos."
             )
         conn.close()
     except ErrorValidacion:
         raise
     except Exception as e:
         raise ErrorValidacion(f"Error validando duplicado de pasada: {e}")
-
 
 # =============================================================================
 # VALIDACIONES DE OBJETIVOS
@@ -295,7 +304,7 @@ def validar_pasada(
     if supervisor_id:
         validar_supervisor_existe(supervisor_id)
     
-    validar_pasada_no_duplicada(fecha, objetivo_id, turno, supervisor_id, excluir_pasada_id)
+    validar_pasada_no_duplicada(fecha, hora, objetivo_id, turno, supervisor_id, excluir_pasada_id)
 
 
 # =============================================================================
