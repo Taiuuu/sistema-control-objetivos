@@ -41,9 +41,9 @@ def validar_formato_fecha(fecha: str) -> None:
 
 
 def validar_formato_hora(hora: str) -> None:
-    """Valida que la hora esté en formato HH:MM:SS."""
-    if not re.match(r'^\d{2}:\d{2}:\d{2}$', hora):
-        raise ErrorValidacion(f"Hora inválida: '{hora}'. Usar formato HH:MM:SS")
+    """Valida que la hora esté en formato HH:MM"""
+    if not re.match(r'^\d{2}:\d{2}(:\d{2})?$', hora):
+        raise ErrorValidacion(f"Hora inválida: '{hora}'. Usar formato HH:MM")
 
 
 def validar_dias_semana(dias_semana: str) -> None:
@@ -282,7 +282,10 @@ def validar_pasada(
     validar_formato_fecha(fecha)
     
     validar_no_vacio(hora, "Hora")
+    if len(hora) == 5:
+        hora = hora + ":00"
     validar_formato_hora(hora)
+    
     
     if turno not in ["diurno", "nocturno"]:
         raise ErrorValidacion(f"Turno inválido: '{turno}'. Debe ser 'diurno' o 'nocturno'")

@@ -125,7 +125,7 @@ class FormPasada(QWidget):
         global _ultimo_turno
 
         fecha = self.input_fecha.date().toString("yyyy-MM-dd")
-        hora = self.input_hora.time().toString("HH:mm")
+        hora = self.input_hora.time().toString("HH:mm:ss")
         turno = self.input_turno.currentText()
         objetivo_id = self.input_objetivo.currentData()
         supervisor_id = self.input_supervisor.currentData()
