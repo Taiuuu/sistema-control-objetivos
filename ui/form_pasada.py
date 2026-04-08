@@ -10,45 +10,43 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QDate, QTime, pyqtSignal
 from models.turnos import registrar_turno
+from ui.animaciones import animar_entrada
 from database.db import DB_PATH
+from services.validaciones import validar_pasada, ErrorValidacion
+from services.cache import obtener_objetivos_cache, obtener_supervisores_cache
 
 
 def _cargar_objetivos() -> list:
-    """Retorna todos los objetivos registrados."""
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute("SELECT id, nombre FROM objetivos")
-    resultado = cursor.fetchall()
-    conexion.close()
-    return resultado
+    """Retorna todos los objetivos registrados (usa caché)."""
+    return obtener_objetivos_cache(generar_si_falta=True)
 
 
 def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
     """
     Retorna los supervisores del equipo asignado al turno de esa fecha.
-    Si no hay equipo registrado retorna todos los supervisores.
+    Si no hay equipo registrado retorna todos los supervisores (usa caché).
     """
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute("""
-        SELECT s1.id, s1.nombre, s2.id, s2.nombre
-        FROM equipos e
-        JOIN supervisores s1 ON e.supervisor1_id = s1.id
-        JOIN supervisores s2 ON e.supervisor2_id = s2.id
-        WHERE e.fecha = ? AND e.turno = ?
-    """, (fecha, turno))
-    equipo = cursor.fetchone()
-    conexion.close()
+    try:
+        conexion = sqlite3.connect(DB_PATH)
+        cursor = conexion.cursor()
+        cursor.execute("""
+            SELECT s1.id, s1.nombre, s2.id, s2.nombre
+            FROM equipos e
+            JOIN supervisores s1 ON e.supervisor1_id = s1.id
+            JOIN supervisores s2 ON e.supervisor2_id = s2.id
+            WHERE e.fecha = ? AND e.turno = ?
+        """, (fecha, turno))
+        equipo = cursor.fetchone()
+        conexion.close()
 
-    if equipo:
-        return [(equipo[0], equipo[1]), (equipo[2], equipo[3])]
+        if equipo:
+            return [(equipo[0], equipo[1]), (equipo[2], equipo[3])]
+    except:
+        pass
 
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute("SELECT id, nombre FROM supervisores")
-    resultado = cursor.fetchall()
-    conexion.close()
-    return resultado
+    # Usar caché para supervisores
+    supervisores = obtener_supervisores_cache(generar_si_falta=True)
+    return supervisores
 
 
 # Turno recordado entre registros
@@ -109,6 +107,7 @@ class FormPasada(QWidget):
         layout.addWidget(boton_guardar)
 
         self.setLayout(layout)
+        animar_entrada(self)
         self._actualizar_supervisores()
         self.input_fecha.dateChanged.connect(lambda: self._actualizar_supervisores())
 
@@ -126,7 +125,7 @@ class FormPasada(QWidget):
         global _ultimo_turno
 
         fecha = self.input_fecha.date().toString("yyyy-MM-dd")
-        hora = self.input_hora.time().toString("HH:mm")
+        hora = self.input_hora.time().toString("HH:mm:ss")
         turno = self.input_turno.currentText()
         objetivo_id = self.input_objetivo.currentData()
         supervisor_id = self.input_supervisor.currentData()
@@ -135,6 +134,12 @@ class FormPasada(QWidget):
 
         if not objetivo_id or not supervisor_id:
             QMessageBox.warning(self, "Error", "Seleccioná un objetivo y un supervisor.")
+            return
+
+        try:
+            validar_pasada(fecha, hora, turno, objetivo_id, supervisor_id)
+        except ErrorValidacion as e:
+            QMessageBox.warning(self, "Error de Validación", str(e))
             return
 
         registrar_turno(fecha, hora, turno, objetivo_id, supervisor_id)

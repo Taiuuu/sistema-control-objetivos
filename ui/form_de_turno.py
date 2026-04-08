@@ -4,41 +4,23 @@
 # =============================================================================
 
 import sqlite3
+from services.cache import obtener_supervisores_cache
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel,
     QPushButton, QComboBox, QDateEdit, QMessageBox
 )
 from PyQt6.QtCore import QDate
+from ui.animaciones import animar_entrada
 from database.db import DB_PATH
+from models.equipos import guardar_equipo_turno
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
 # =============================================================================
 
 def _cargar_supervisores() -> list:
-    """Retorna todos los supervisores registrados."""
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute("SELECT id, nombre FROM supervisores")
-    resultado = cursor.fetchall()
-    conexion.close()
-    return resultado
-
-
-def _guardar_equipo_turno(fecha: str, turno: str, sup1_id: int, sup2_id: int) -> None:
-    """
-    Registra los dos supervisores asignados a un turno en una fecha.
-    Si ya existe un equipo para esa fecha y turno lo reemplaza.
-    """
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute("DELETE FROM equipos WHERE fecha = ? AND turno = ?", (fecha, turno))
-    cursor.execute("""
-        INSERT INTO equipos (fecha, turno, supervisor1_id, supervisor2_id)
-        VALUES (?, ?, ?, ?)
-    """, (fecha, turno, sup1_id, sup2_id))
-    conexion.commit()
-    conexion.close()
+    """Retorna todos los supervisores registrados (usa caché)."""
+    return obtener_supervisores_cache(generar_si_falta=True)
 
 
 # =============================================================================
@@ -87,18 +69,20 @@ class FormTurno(QWidget):
         layout.addWidget(boton_guardar)
 
         self.setLayout(layout)
+        animar_entrada(self)
 
     def _guardar(self) -> None:
         """Valida y registra el equipo de turno en la base de datos."""
         fecha = self.input_fecha.date().toString("yyyy-MM-dd")
         turno = self.input_turno.currentText()
-        sup1_id = self.input_sup1.currentData()
-        sup2_id = self.input_sup2.currentData()
+        supervisor1_id = self.input_sup1.currentData()
+        supervisor2_id = self.input_sup2.currentData()
 
-        if sup1_id == sup2_id:
+        if supervisor1_id == supervisor2_id:
             QMessageBox.warning(self, "Error", "Los dos supervisores deben ser distintos.")
             return
 
-        _guardar_equipo_turno(fecha, turno, sup1_id, sup2_id)
+        guardar_equipo_turno(fecha, turno, supervisor1_id, supervisor2_id)
+
         QMessageBox.information(self, "Listo", "Turno registrado correctamente.")
         self.close()

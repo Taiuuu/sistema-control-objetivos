@@ -148,8 +148,11 @@ class TransferirDatos(QWidget):
 
             # Backup antes de importar
             from services.backup import hacer_backup
-            hacer_backup()
-            self.log.append("✓ Backup realizado antes de importar.")
+            backup_creado = hacer_backup()
+            if backup_creado:
+                self.log.append("✓ Backup realizado antes de importar.")
+            else:
+                self.log.append("✓ Ya existe un backup válido de la base actual; no se creó uno nuevo.")
 
             # Reemplazar base de datos
             shutil.copy2(ruta, DB_PATH)

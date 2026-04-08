@@ -5,6 +5,7 @@
 
 import sqlite3
 from database.db import DB_PATH
+from services.sincronizacion import notificar_cambio
 
 
 def registrar_turno(fecha: str, hora: str | None, turno: str, objetivo_id: int, supervisor_id: int) -> None:
@@ -14,10 +15,19 @@ def registrar_turno(fecha: str, hora: str | None, turno: str, objetivo_id: int, 
         INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id)
         VALUES (?, ?, ?, ?, ?)
     """, (fecha, hora, turno, objetivo_id, supervisor_id))
+    pasada_id = cursor.lastrowid
     conexion.commit()
     conexion.close()
 
-
+    # Notificar cambio para sincronización
+    notificar_cambio("pasadas", "INSERT", {
+        "id": pasada_id,
+        "fecha": fecha,
+        "hora": hora,
+        "turno": turno,
+        "objetivo_id": objetivo_id,
+        "supervisor_id": supervisor_id
+    })
 def registrar_turno_ambos(fecha: str, hora: str | None, turno: str, objetivo_id: int,
                           supervisor1_id: int, supervisor2_id: int) -> None:
     """Registra una pasada para los dos supervisores del turno al mismo tiempo."""
@@ -27,12 +37,32 @@ def registrar_turno_ambos(fecha: str, hora: str | None, turno: str, objetivo_id:
         INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id)
         VALUES (?, ?, ?, ?, ?)
     """, (fecha, hora, turno, objetivo_id, supervisor1_id))
+    pasada1_id = cursor.lastrowid
     cursor.execute("""
         INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id)
         VALUES (?, ?, ?, ?, ?)
     """, (fecha, hora, turno, objetivo_id, supervisor2_id))
+    pasada2_id = cursor.lastrowid
     conexion.commit()
     conexion.close()
+
+    # Notificar cambio para sincronización (dos pasadas)
+    notificar_cambio("pasadas", "INSERT", {
+        "id": pasada1_id,
+        "fecha": fecha,
+        "hora": hora,
+        "turno": turno,
+        "objetivo_id": objetivo_id,
+        "supervisor_id": supervisor1_id
+    })
+    notificar_cambio("pasadas", "INSERT", {
+        "id": pasada2_id,
+        "fecha": fecha,
+        "hora": hora,
+        "turno": turno,
+        "objetivo_id": objetivo_id,
+        "supervisor_id": supervisor2_id
+    })
 
 
 def listar_turnos_del_dia(fecha: str) -> list:

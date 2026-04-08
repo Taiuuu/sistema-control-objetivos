@@ -13,7 +13,8 @@ from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtCore import Qt
 from database.db import DB_PATH
 from services.assets import ruta_asset
-from ui.animaciones import animar_aparecer
+from ui.animaciones import animar_entrada
+from services.tema import obtener_tema_actual
 
 
 # =============================================================================
@@ -39,6 +40,7 @@ def verificar_login(username: str, password: str) -> tuple | None:
 
     try:
         if bcrypt.checkpw(password.encode(), resultado[3].encode()):
+            # Retornar solo lo que esté configurado en la BD, sin forzar cambios por fortaleza
             return (resultado[0], resultado[1], resultado[2])
     except Exception:
         pass
@@ -86,7 +88,9 @@ class LoginWindow(QWidget):
         super().__init__()
         self.on_login_exitoso = on_login_exitoso
         self.setWindowTitle("V.E.S.P Organizations")
-        self.setFixedSize(400, 540)
+        self.move(100, 100)
+        self.resize(400, 540)
+        self.setMinimumSize(360, 520)
         self.setWindowIcon(QIcon(ruta_asset("assets/vesp.png")))
 
         layout = QVBoxLayout()
@@ -107,12 +111,14 @@ class LoginWindow(QWidget):
         # Nombre y subtítulo
         nombre_label = QLabel("V.E.S.P Organizations")
         nombre_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        nombre_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #4CAF50;")
+        nombre_color = "#4CAF50" if obtener_tema_actual() == "oscuro" else "#2E7D32"
+        nombre_label.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {nombre_color};")
         layout.addWidget(nombre_label)
 
         subtitulo = QLabel("Seguridad Privada")
         subtitulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitulo.setStyleSheet("font-size: 12px; color: #888;")
+        subtitulo_color = "#888" if obtener_tema_actual() == "oscuro" else "#666"
+        subtitulo.setStyleSheet(f"font-size: 12px; color: {subtitulo_color};")
         layout.addWidget(subtitulo)
 
         # Versión actual
@@ -122,7 +128,8 @@ class LoginWindow(QWidget):
             version = ""
         version_label = QLabel(f"v{version}")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        version_label.setStyleSheet("font-size: 10px; color: #555;")
+        version_color = "#555" if obtener_tema_actual() == "oscuro" else "#777"
+        version_label.setStyleSheet(f"font-size: 10px; color: {version_color};")
         layout.addWidget(version_label)
 
         layout.addSpacing(10)
@@ -139,15 +146,21 @@ class LoginWindow(QWidget):
         # Botón entrar
         boton_entrar = QPushButton("Entrar")
         boton_entrar.setFixedHeight(40)
-        boton_entrar.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
+        if obtener_tema_actual() == "oscuro":
+            boton_bg = "#4CAF50"
+            boton_hover = "#45a049"
+        else:
+            boton_bg = "#2E7D32"
+            boton_hover = "#1B5E20"
+        boton_entrar.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {boton_bg};
                 color: white;
                 font-size: 14px;
                 font-weight: bold;
                 border-radius: 4px;
-            }
-            QPushButton:hover { background-color: #45a049; }
+            }}
+            QPushButton:hover {{ background-color: {boton_hover}; }}
         """)
         boton_entrar.clicked.connect(self.intentar_login)
         self.input_password.returnPressed.connect(self.intentar_login)
@@ -155,7 +168,7 @@ class LoginWindow(QWidget):
 
         layout.addSpacing(10)
         self.setLayout(layout)
-        animar_aparecer(self)
+        animar_entrada(self)
 
     def intentar_login(self) -> None:
         """Valida las credenciales y redirige según el estado del usuario."""

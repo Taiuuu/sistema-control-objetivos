@@ -14,6 +14,8 @@ from ui.ventana_principal import VentanaPrincipal
 from database.db import crear_base_datos
 from services.backup import hacer_backup
 from services.actualizador import verificar_actualizacion
+from services.tema import obtener_tema_actual, establecer_tema_actual
+from services.api_rest import iniciar_api_rest
 
 
 # =============================================================================
@@ -21,8 +23,8 @@ from services.actualizador import verificar_actualizacion
 # =============================================================================
 
 def aplicar_tema_oscuro(app: QApplication) -> None:
-    """Aplica el tema oscuro corporativo a toda la aplicación."""
     app.setStyle("Fusion")
+    app.setPalette(app.style().standardPalette())
 
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window,          QColor(30, 30, 30))
@@ -120,8 +122,8 @@ def aplicar_tema_oscuro(app: QApplication) -> None:
 
 
 def aplicar_tema_claro(app: QApplication) -> None:
-    """Aplica el tema claro a toda la aplicación."""
     app.setStyle("Fusion")
+    app.setPalette(app.style().standardPalette())
 
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window,          QColor(245, 245, 245))
@@ -133,8 +135,16 @@ def aplicar_tema_claro(app: QApplication) -> None:
     palette.setColor(QPalette.ColorRole.ButtonText,      QColor(30, 30, 30))
     palette.setColor(QPalette.ColorRole.Highlight,       QColor(42, 130, 218))
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
+    palette.setColor(QPalette.ColorRole.ToolTipBase,     QColor(255, 255, 220))
+    palette.setColor(QPalette.ColorRole.ToolTipText,     QColor(30, 30, 30))
+    palette.setColor(QPalette.ColorRole.BrightText,      QColor(255, 0, 0))
     app.setPalette(palette)
 
+    app.setStyleSheet("""...""")
+
+    for widget in app.allWidgets():
+        widget.update()
+        widget.repaint()
     app.setStyleSheet("""
         QWidget {
             font-family: Segoe UI;
@@ -159,6 +169,7 @@ def aplicar_tema_claro(app: QApplication) -> None:
             gridline-color: #ccc;
             border: 1px solid #ccc;
             background-color: white;
+            alternate-background-color: #f9f9f9;
         }
         QHeaderView::section {
             background-color: #e0e0e0;
@@ -182,6 +193,40 @@ def aplicar_tema_claro(app: QApplication) -> None:
         QScrollBar::handle:vertical:hover {
             background: #2a82da;
         }
+        QComboBox {
+            background-color: #f5f5f5;
+            color: #1e1e1e;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 3px 8px;
+        }
+        QDateEdit {
+            background-color: #f5f5f5;
+            color: #1e1e1e;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 3px 8px;
+        }
+        QLineEdit {
+            background-color: #f5f5f5;
+            color: #1e1e1e;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 3px 8px;
+        }
+        QMessageBox {
+            background-color: #f5f5f5;
+            color: #1e1e1e;
+        }
+        QScrollBar:horizontal {
+            background: #e0e0e0;
+            height: 8px;
+            border-radius: 4px;
+        }
+        QScrollBar::handle:horizontal {
+            background: #aaa;
+            border-radius: 4px;
+        }
     """)
 
 
@@ -189,19 +234,15 @@ def aplicar_tema_claro(app: QApplication) -> None:
 # ESTADO GLOBAL DEL TEMA
 # =============================================================================
 
-tema_actual = "oscuro"
-
-
 def alternar_tema(app: QApplication, ventana) -> None:
     """Alterna entre tema oscuro y claro."""
-    global tema_actual
-    if tema_actual == "oscuro":
+    if obtener_tema_actual() == "oscuro":
         aplicar_tema_claro(app)
-        tema_actual = "claro"
+        establecer_tema_actual("claro")
         ventana.btn_tema.setText("🌙 Modo oscuro")
     else:
         aplicar_tema_oscuro(app)
-        tema_actual = "oscuro"
+        establecer_tema_actual("oscuro")
         ventana.btn_tema.setText("☀ Modo claro")
 
 
@@ -213,6 +254,7 @@ def iniciar_app() -> None:
     """Punto de entrada principal."""
     crear_base_datos()
     hacer_backup()
+    iniciar_api_rest()
 
     app = QApplication(sys.argv)
     aplicar_tema_oscuro(app)

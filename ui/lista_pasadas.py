@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QDate, QTime
 from database.db import DB_PATH
+from services.sincronizacion import obtener_sincronizador
 
 
 def _cargar_pasadas(fecha: str) -> list:
@@ -205,6 +206,10 @@ class ListaPasadas(QWidget):
         self.setLayout(layout)
         self._cargar_tabla()
 
+        # Conectar señales de sincronización
+        self.sincronizador = obtener_sincronizador()
+        self.sincronizador.datos_cambiados.connect(self._on_datos_cambiados)
+
     def _cargar_tabla(self) -> None:
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
         pasadas = _cargar_pasadas(fecha)
@@ -249,4 +254,8 @@ class ListaPasadas(QWidget):
                     f"Turno: {info[3]} | Objetivo: {info[6]} | Supervisor: {info[7]}"
                 )
 
+            self._cargar_tabla()
+    def _on_datos_cambiados(self, tabla, operacion, datos):
+        """Maneja cambios de datos para refrescar la tabla."""
+        if tabla in ["pasadas", "objetivos", "supervisores"]:
             self._cargar_tabla()

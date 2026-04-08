@@ -105,6 +105,108 @@ def crear_base_datos() -> None:
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS auditoria (
+            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha                TEXT        NOT NULL,
+            hora                 TEXT        NOT NULL,
+            usuario_id           INTEGER,
+            tipo_operacion       TEXT        NOT NULL,
+            tabla                TEXT,
+            registro_id          INTEGER,
+            valores_anteriores   TEXT,
+            valores_nuevos       TEXT,
+            detalles             TEXT,
+            estado               TEXT        DEFAULT 'EXITOSO',
+            timestamp_creacion   TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON auditoria(fecha DESC)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_auditoria_usuario ON auditoria(usuario_id)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_auditoria_tabla ON auditoria(tabla, registro_id)
+    """)
+
+    # =========================================================================
+    # ÍNDICES OPTIMIZADOS PARA PERFORMANCE
+    # =========================================================================
+    # Pasadas - acceso frecuente por fecha
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_pasadas_fecha ON pasadas(fecha DESC)
+    """)
+    
+    # Pasadas - acceso frecuente por objetivo
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_pasadas_objetivo_id ON pasadas(objetivo_id)
+    """)
+    
+    # Pasadas - compound index para control diario (fecha + objetivo)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_pasadas_fecha_objetivo ON pasadas(fecha, objetivo_id)
+    """)
+    
+    # Pasadas - búsqueda por supervisor
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_pasadas_supervisor_id ON pasadas(supervisor_id)
+    """)
+    
+    # Pasadas - filtrado por turno
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_pasadas_turno ON pasadas(turno)
+    """)
+    
+    # Equipos - acceso para obtener equipo del día
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_equipos_fecha ON equipos(fecha)
+    """)
+    
+    # Equipos - compound index para búsqueda (fecha + turno)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_equipos_fecha_turno ON equipos(fecha, turno)
+    """)
+    
+    # Equipos - búsqueda por supervisor
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_equipos_supervisor1_id ON equipos(supervisor1_id)
+    """)
+    
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_equipos_supervisor2_id ON equipos(supervisor2_id)
+    """)
+    
+    # Auditoria - compound index para auditoría filtrada
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_usuario ON auditoria(fecha DESC, usuario_id)
+    """)
+    
+    # Objetivos - filtrado de objetivos activos
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_objetivos_fecha_fin ON objetivos(fecha_fin)
+    """)
+    
+    # Supervisores - búsqueda por nombre
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_supervisores_nombre ON supervisores(nombre)
+    """)
+    
+    # Logs - búsqueda por usuario
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_logs_usuario_id ON logs(usuario_id)
+    """)
+    
+    # Logs - búsqueda por fecha
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_logs_fecha ON logs(fecha DESC)
+    """)
+
     _crear_admin_si_no_existe(cursor)
 
     conexion.commit()

@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QDate, Qt
 from database.db import DB_PATH
 from models.objetivos import dar_de_baja_objetivo
+from services.sincronizacion import obtener_sincronizador
 
 
 DIAS_MAP = {
@@ -167,6 +168,10 @@ class ListaObjetivos(QWidget):
         self.setLayout(layout)
         self._cargar_tabla()
 
+        # Conectar señales de sincronización
+        self.sincronizador = obtener_sincronizador()
+        self.sincronizador.datos_cambiados.connect(self._on_datos_cambiados)
+
     def _cargar_tabla(self) -> None:
         objetivos = _cargar_objetivos()
         self.tabla.setRowCount(len(objetivos))
@@ -214,4 +219,9 @@ class ListaObjetivos(QWidget):
             )
 
             QMessageBox.information(self, "Listo", "Objetivo dado de baja correctamente.")
+            self._cargar_tabla()
+
+    def _on_datos_cambiados(self, tabla, operacion, datos):
+        """Maneja cambios de datos para refrescar la tabla."""
+        if tabla == "objetivos":
             self._cargar_tabla()
