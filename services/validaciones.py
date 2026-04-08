@@ -214,7 +214,7 @@ def validar_pasada_no_duplicada(
     turno: str,
     supervisor_id: int,
     excluir_id: Optional[int] = None,
-    minutos_minimos: int = 30
+    minutos_minimos: int = 5
 ) -> None:
     """Bloquea solo si hay otra pasada del mismo supervisor/objetivo/turno
     dentro de la ventana de minutos_minimos."""
