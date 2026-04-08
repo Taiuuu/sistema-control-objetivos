@@ -121,61 +121,61 @@ def obtener_nombre_usuario(usuario_id: int) -> str:
 # =============================================================================
 
 PALETA_OSCURA = {
-    "bg_sidebar":       "#111318",
-    "bg_sidebar_hover": "#1e2128",
-    "bg_main":          "#16181e",
-    "bg_header":        "#1a1d24",
-    "bg_tabla":         "#1e2128",
-    "bg_tabla_alt":     "#1a1d24",
-    "accent":           "#4ade80",
-    "accent_dark":      "#22c55e",
-    "accent_red":       "#f87171",
-    "accent_yellow":    "#fbbf24",
-    "text_primary":     "#f1f5f9",
-    "text_secondary":   "#94a3b8",
-    "text_muted":       "#475569",
-    "border":           "#2a2d36",
-    "border_light":     "#1e2128",
-    "btn_menu_text":    "#cbd5e1",
-    "btn_menu_hover":   "#2a2d36",
-    "scrollbar":        "#2a2d36",
-    "scrollbar_handle": "#3f4556",
-    "badge_bg":         "#1e2128",
-    "estado_verde_bg":  "#14532d",
-    "estado_verde_fg":  "#4ade80",
-    "estado_rojo_bg":   "#7f1d1d",
-    "estado_rojo_fg":   "#fca5a5",
-    "estado_amarillo_bg":"#78350f",
-    "estado_amarillo_fg":"#fcd34d",
+    "bg_sidebar":        "#111318",
+    "bg_sidebar_hover":  "#1e2128",
+    "bg_main":           "#16181e",
+    "bg_header":         "#1a1d24",
+    "bg_tabla":          "#1e2128",
+    "bg_tabla_alt":      "#1a1d24",
+    "accent":            "#4ade80",
+    "accent_dark":       "#22c55e",
+    "accent_red":        "#f87171",
+    "accent_yellow":     "#fbbf24",
+    "text_primary":      "#f1f5f9",
+    "text_secondary":    "#94a3b8",
+    "text_muted":        "#475569",
+    "border":            "#2a2d36",
+    "border_light":      "#1e2128",
+    "btn_menu_text":     "#cbd5e1",
+    "btn_menu_hover":    "#2a2d36",
+    "scrollbar":         "#2a2d36",
+    "scrollbar_handle":  "#3f4556",
+    "badge_bg":          "#1e2128",
+    "estado_verde_bg":   "#14532d",
+    "estado_verde_fg":   "#4ade80",
+    "estado_rojo_bg":    "#7f1d1d",
+    "estado_rojo_fg":    "#fca5a5",
+    "estado_amarillo_bg": "#78350f",
+    "estado_amarillo_fg": "#fcd34d",
 }
 
 PALETA_CLARA = {
-    "bg_sidebar":       "#f8fafc",
-    "bg_sidebar_hover": "#f1f5f9",
-    "bg_main":          "#ffffff",
-    "bg_header":        "#f8fafc",
-    "bg_tabla":         "#ffffff",
-    "bg_tabla_alt":     "#f8fafc",
-    "accent":           "#16a34a",
-    "accent_dark":      "#15803d",
-    "accent_red":       "#dc2626",
-    "accent_yellow":    "#d97706",
-    "text_primary":     "#0f172a",
-    "text_secondary":   "#475569",
-    "text_muted":       "#94a3b8",
-    "border":           "#e2e8f0",
-    "border_light":     "#f1f5f9",
-    "btn_menu_text":    "#334155",
-    "btn_menu_hover":   "#e2e8f0",
-    "scrollbar":        "#e2e8f0",
-    "scrollbar_handle": "#94a3b8",
-    "badge_bg":         "#f1f5f9",
-    "estado_verde_bg":  "#dcfce7",
-    "estado_verde_fg":  "#15803d",
-    "estado_rojo_bg":   "#fee2e2",
-    "estado_rojo_fg":   "#dc2626",
-    "estado_amarillo_bg":"#fef9c3",
-    "estado_amarillo_fg":"#b45309",
+    "bg_sidebar":        "#f8fafc",
+    "bg_sidebar_hover":  "#f1f5f9",
+    "bg_main":           "#ffffff",
+    "bg_header":         "#f8fafc",
+    "bg_tabla":          "#ffffff",
+    "bg_tabla_alt":      "#f8fafc",
+    "accent":            "#16a34a",
+    "accent_dark":       "#15803d",
+    "accent_red":        "#dc2626",
+    "accent_yellow":     "#d97706",
+    "text_primary":      "#0f172a",
+    "text_secondary":    "#475569",
+    "text_muted":        "#94a3b8",
+    "border":            "#e2e8f0",
+    "border_light":      "#f1f5f9",
+    "btn_menu_text":     "#334155",
+    "btn_menu_hover":    "#e2e8f0",
+    "scrollbar":         "#e2e8f0",
+    "scrollbar_handle":  "#94a3b8",
+    "badge_bg":          "#f1f5f9",
+    "estado_verde_bg":   "#dcfce7",
+    "estado_verde_fg":   "#15803d",
+    "estado_rojo_bg":    "#fee2e2",
+    "estado_rojo_fg":    "#dc2626",
+    "estado_amarillo_bg": "#fef9c3",
+    "estado_amarillo_fg": "#b45309",
 }
 
 
@@ -192,10 +192,10 @@ class BadgeEstado(QLabel):
     """Label con forma de pill para mostrar el estado de cobertura."""
 
     _MAPA = {
-        "Pasaron los dos":  ("estado_verde_bg",    "estado_verde_fg",    "✔  Pasaron los dos"),
-        "No pasó noche":    ("estado_amarillo_bg",  "estado_amarillo_fg", "🌙  No pasó noche"),
-        "No pasó día":      ("estado_amarillo_bg",  "estado_amarillo_fg", "☀  No pasó día"),
-        "No pasó nadie":    ("estado_rojo_bg",      "estado_rojo_fg",     "✖  No pasó nadie"),
+        "Pasaron los dos": ("estado_verde_bg",    "estado_verde_fg",    "✔  Pasaron los dos"),
+        "No pasó noche":   ("estado_amarillo_bg",  "estado_amarillo_fg", "🌙  No pasó noche"),
+        "No pasó día":     ("estado_amarillo_bg",  "estado_amarillo_fg", "☀  No pasó día"),
+        "No pasó nadie":   ("estado_rojo_bg",      "estado_rojo_fg",     "✖  No pasó nadie"),
     }
 
     def __init__(self, estado: str, oscuro: bool, parent=None):
@@ -274,9 +274,9 @@ class BotonMenu(QPushButton):
         self._aplicar_estilo()
 
     def _aplicar_estilo(self):
-        bg_activo = p("accent", self._oscuro)
+        bg_activo   = p("accent", self._oscuro)
         text_activo = "#ffffff"
-        bg_hover = p("btn_menu_hover", self._oscuro)
+        bg_hover    = p("btn_menu_hover", self._oscuro)
         text_normal = p("btn_menu_text", self._oscuro)
 
         if self._activo:
@@ -387,7 +387,6 @@ class VentanaPrincipal(QWidget):
         self._construir_sidebar(layout_raiz)
         self._construir_panel_derecho(layout_raiz)
 
-        # Fondo principal
         self.setStyleSheet(f"QWidget#VentanaPrincipal {{ background-color: {p('bg_main', self._oscuro)}; }}")
         self.setObjectName("VentanaPrincipal")
 
@@ -412,12 +411,10 @@ class VentanaPrincipal(QWidget):
         layout_lateral.setSpacing(0)
         layout_lateral.setContentsMargins(0, 0, 0, 0)
 
-        # --- Cabecera ---
         cabecera = self._construir_cabecera_sidebar()
         layout_lateral.addWidget(cabecera)
         layout_lateral.addWidget(crear_separador(oscuro))
 
-        # --- Scroll con botones ---
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -438,9 +435,9 @@ class VentanaPrincipal(QWidget):
             QScrollBar::sub-line:vertical {{ height: 0px; }}
         """)
 
-        contenedor_scroll = QWidget()
-        contenedor_scroll.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
-        self.layout_scroll = QVBoxLayout(contenedor_scroll)
+        self._contenedor_scroll = QWidget()
+        self._contenedor_scroll.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
+        self.layout_scroll = QVBoxLayout(self._contenedor_scroll)
         self.layout_scroll.setSpacing(2)
         self.layout_scroll.setContentsMargins(8, 8, 8, 8)
 
@@ -448,26 +445,24 @@ class VentanaPrincipal(QWidget):
         self._construir_botones_menu()
 
         self.layout_scroll.addStretch()
-        scroll_area.setWidget(contenedor_scroll)
+        scroll_area.setWidget(self._contenedor_scroll)
         layout_lateral.addWidget(scroll_area, 1)
 
-        # --- Zona inferior ---
-        zona_inferior = self._construir_zona_inferior()
-        layout_lateral.addWidget(zona_inferior)
+        self._zona_inferior = self._construir_zona_inferior()
+        layout_lateral.addWidget(self._zona_inferior)
 
         layout_raiz.addWidget(self.panel_lateral)
 
     def _construir_cabecera_sidebar(self) -> QWidget:
         oscuro = self._oscuro
-        cabecera = QWidget()
-        cabecera.setFixedHeight(100)
-        cabecera.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
+        self._cabecera_sidebar = QWidget()
+        self._cabecera_sidebar.setFixedHeight(100)
+        self._cabecera_sidebar.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
 
-        lay = QVBoxLayout(cabecera)
+        lay = QVBoxLayout(self._cabecera_sidebar)
         lay.setContentsMargins(10, 10, 10, 6)
         lay.setSpacing(2)
 
-        # Fila logo + botón colapsar
         self.btn_colapsar = QToolButton()
         self.btn_colapsar.setText("‹")
         self.btn_colapsar.setFixedSize(24, 24)
@@ -517,11 +512,10 @@ class VentanaPrincipal(QWidget):
             color: {p('text_muted', oscuro)};
             font-size: 10px;
             letter-spacing: 1px;
-            text-transform: uppercase;
         """)
         lay.addWidget(self.subtitulo_lateral)
 
-        return cabecera
+        return self._cabecera_sidebar
 
     def _construir_botones_menu(self):
         oscuro = self._oscuro
@@ -539,49 +533,47 @@ class VentanaPrincipal(QWidget):
             self.layout_scroll.addWidget(crear_separador(oscuro))
             self.layout_scroll.addSpacing(2)
 
-        # --- Grupo principal ---
-        self._btn_control  = add_btn("📋", "Control diario",     self.cargar_tabla,       "(Ctrl+B)")
-        self._btn_dashboard= add_btn("📊", "Dashboard",          self.abrir_dashboard,    "(Ctrl+D)")
-        self._btn_pasada   = add_btn("✅", "Registrar pasada",   self.abrir_form_pasada,  "(Ctrl+P)")
-        self._btn_turno    = add_btn("🕐", "Registrar turno",    self.abrir_form_turno,   "(Ctrl+T)")
+        self._btn_control   = add_btn("📋", "Control diario",     self.cargar_tabla,         "(Ctrl+B)")
+        self._btn_dashboard = add_btn("📊", "Dashboard",          self.abrir_dashboard,      "(Ctrl+D)")
+        self._btn_pasada    = add_btn("✅", "Registrar pasada",   self.abrir_form_pasada,    "(Ctrl+P)")
+        self._btn_turno     = add_btn("🕐", "Registrar turno",    self.abrir_form_turno,     "(Ctrl+T)")
 
         add_sep()
 
-        self._btn_add_obj  = add_btn("➕", "Agregar objetivo",   self.abrir_form_objetivo, "(Ctrl+O)")
-        add_btn("📍", "Ver objetivos",      self.abrir_lista_objetivos)
-        self._btn_add_sup  = add_btn("👤", "Agregar supervisor", self.abrir_form_supervisor, "(Ctrl+S)")
-        add_btn("👥", "Ver supervisores",   self.abrir_lista_supervisores)
+        self._btn_add_obj = add_btn("➕", "Agregar objetivo",    self.abrir_form_objetivo,  "(Ctrl+O)")
+        add_btn("📍", "Ver objetivos",       self.abrir_lista_objetivos)
+        self._btn_add_sup = add_btn("👤", "Agregar supervisor",  self.abrir_form_supervisor, "(Ctrl+S)")
+        add_btn("👥", "Ver supervisores",    self.abrir_lista_supervisores)
 
         add_sep()
 
-        add_btn("🔍", "Ver pasadas",        self.abrir_lista_pasadas)
-        add_btn("📝", "Notas del día",      self.abrir_notas,            "(Ctrl+N)")
-        add_btn("📅", "Reporte mensual",    self.abrir_reporte_mensual,  "(Ctrl+R)")
-        add_btn("💾", "Transferir datos",   self.abrir_transferir_datos)
-        add_btn("📥", "Importar Excel",     self.abrir_importar_excel)
-        add_btn("❓", "Ayuda",              self.abrir_ayuda,            "(Ctrl+H)")
+        add_btn("🔍", "Ver pasadas",         self.abrir_lista_pasadas)
+        add_btn("📝", "Notas del día",       self.abrir_notas,              "(Ctrl+N)")
+        add_btn("📅", "Reporte mensual",     self.abrir_reporte_mensual,    "(Ctrl+R)")
+        add_btn("💾", "Transferir datos",    self.abrir_transferir_datos)
+        add_btn("📥", "Importar Excel",      self.abrir_importar_excel)
+        add_btn("❓", "Ayuda",               self.abrir_ayuda,              "(Ctrl+H)")
 
         if self.rol == "admin":
             add_sep()
-            lbl_admin = QLabel("  ADMINISTRACIÓN")
-            lbl_admin.setStyleSheet(f"""
+            self._lbl_admin = QLabel("  ADMINISTRACIÓN")
+            self._lbl_admin.setStyleSheet(f"""
                 color: {p('text_muted', oscuro)};
                 font-size: 9px;
                 letter-spacing: 1.2px;
                 font-weight: 600;
                 padding: 4px 0 2px 4px;
             """)
-            self.layout_scroll.addWidget(lbl_admin)
-            add_btn("⚙️",  "Gestionar usuarios",  self.abrir_gestionar_usuarios)
-            add_btn("📜",  "Historial",            self.abrir_logs)
-            add_btn("🗄️",  "Monitor de Caché",     self.abrir_cache)
-            add_btn("🔧",  "Optimización de BD",   self.abrir_indexacion)
-            add_btn("🛡️",  "Validaciones BD",      self.abrir_validaciones)
-            add_btn("🔎",  "Auditoría detallada",  self.abrir_auditoria)
-            add_btn("🔄",  "Sincronización",       self.abrir_sincronizacion)
+            self.layout_scroll.addWidget(self._lbl_admin)
+            add_btn("⚙️",  "Gestionar usuarios", self.abrir_gestionar_usuarios)
+            add_btn("📜",  "Historial",           self.abrir_logs)
+            add_btn("🗄️",  "Monitor de Caché",    self.abrir_cache)
+            add_btn("🔧",  "Optimización de BD",  self.abrir_indexacion)
+            add_btn("🛡️",  "Validaciones BD",     self.abrir_validaciones)
+            add_btn("🔎",  "Auditoría detallada", self.abrir_auditoria)
+            add_btn("🔄",  "Sincronización",      self.abrir_sincronizacion)
 
     def _activar_boton(self, btn: BotonMenu, accion):
-        """Marca el botón activo y ejecuta la acción."""
         if self._boton_activo and self._boton_activo is not btn:
             self._boton_activo.set_activo(False)
         btn.set_activo(True)
@@ -598,7 +590,6 @@ class VentanaPrincipal(QWidget):
 
         lay.addWidget(crear_separador(oscuro))
 
-        # Fila zoom
         fila_zoom = QHBoxLayout()
         fila_zoom.setSpacing(4)
 
@@ -620,52 +611,35 @@ class VentanaPrincipal(QWidget):
             }}
         """
 
-        btn_menos = QPushButton("A−")
-        btn_menos.setToolTip("Reducir zoom (Ctrl+−)")
-        btn_menos.setStyleSheet(estilo_mini_btn)
-        btn_menos.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_menos.clicked.connect(self._zoom_menos)
+        self._btn_zoom_menos = QPushButton("A−")
+        self._btn_zoom_menos.setToolTip("Reducir zoom (Ctrl+−)")
+        self._btn_zoom_menos.setStyleSheet(estilo_mini_btn)
+        self._btn_zoom_menos.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_zoom_menos.clicked.connect(self._zoom_menos)
 
-        btn_mas = QPushButton("A+")
-        btn_mas.setToolTip("Aumentar zoom (Ctrl+=)")
-        btn_mas.setStyleSheet(estilo_mini_btn)
-        btn_mas.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_mas.clicked.connect(self._zoom_mas)
+        self._btn_zoom_mas = QPushButton("A+")
+        self._btn_zoom_mas.setToolTip("Aumentar zoom (Ctrl+=)")
+        self._btn_zoom_mas.setStyleSheet(estilo_mini_btn)
+        self._btn_zoom_mas.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_zoom_mas.clicked.connect(self._zoom_mas)
 
         self.lbl_zoom = QLabel(f"{self.zoom_nivel}px")
         self.lbl_zoom.setStyleSheet(f"color: {p('text_muted', oscuro)}; font-size: 10px;")
         self.lbl_zoom.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        fila_zoom.addWidget(btn_menos)
+        fila_zoom.addWidget(self._btn_zoom_menos)
         fila_zoom.addWidget(self.lbl_zoom, 1)
-        fila_zoom.addWidget(btn_mas)
+        fila_zoom.addWidget(self._btn_zoom_mas)
         lay.addLayout(fila_zoom)
 
-        # Botón tema
         texto_tema = "☀  Modo claro" if oscuro else "🌙  Modo oscuro"
         self.btn_tema = QPushButton(texto_tema)
         self.btn_tema.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_tema.setFixedHeight(34)
-        self.btn_tema.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {p('btn_menu_hover', oscuro)};
-                color: {p('text_secondary', oscuro)};
-                border: 1px solid {p('border', oscuro)};
-                border-radius: 7px;
-                font-size: 11px;
-                padding: 0 10px;
-                text-align: left;
-            }}
-            QPushButton:hover {{
-                background-color: {p('accent', oscuro)};
-                color: white;
-                border-color: {p('accent', oscuro)};
-            }}
-        """)
+        self.btn_tema.setStyleSheet(self._estilo_btn_tema(oscuro))
         self.btn_tema.clicked.connect(self._alternar_tema)
         lay.addWidget(self.btn_tema)
 
-        # Usuario
         nombre_usuario = obtener_nombre_usuario(self.usuario_id)
         self.usuario_label = QLabel(f"👤  {nombre_usuario}")
         self.usuario_label.setStyleSheet(f"""
@@ -681,6 +655,24 @@ class VentanaPrincipal(QWidget):
 
         return zona
 
+    def _estilo_btn_tema(self, oscuro: bool) -> str:
+        return f"""
+            QPushButton {{
+                background-color: {p('btn_menu_hover', oscuro)};
+                color: {p('text_secondary', oscuro)};
+                border: 1px solid {p('border', oscuro)};
+                border-radius: 7px;
+                font-size: 11px;
+                padding: 0 10px;
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background-color: {p('accent', oscuro)};
+                color: white;
+                border-color: {p('accent', oscuro)};
+            }}
+        """
+
     # -------------------------------------------------------------------------
     # PANEL DERECHO
     # -------------------------------------------------------------------------
@@ -688,30 +680,26 @@ class VentanaPrincipal(QWidget):
     def _construir_panel_derecho(self, layout_raiz):
         oscuro = self._oscuro
 
-        panel_derecho = QWidget()
-        panel_derecho.setStyleSheet(f"background-color: {p('bg_main', oscuro)};")
-        layout_derecho = QVBoxLayout(panel_derecho)
+        self._panel_derecho = QWidget()
+        self._panel_derecho.setStyleSheet(f"background-color: {p('bg_main', oscuro)};")
+        layout_derecho = QVBoxLayout(self._panel_derecho)
         layout_derecho.setContentsMargins(0, 0, 0, 0)
         layout_derecho.setSpacing(0)
 
-        # Header superior
-        header = self._construir_header()
-        layout_derecho.addWidget(header)
+        self._header = self._construir_header()
+        layout_derecho.addWidget(self._header)
 
-        # Barra de filtros
-        barra_filtros = self._construir_barra_filtros()
-        layout_derecho.addWidget(barra_filtros)
+        self._barra_filtros_widget = self._construir_barra_filtros()
+        layout_derecho.addWidget(self._barra_filtros_widget)
 
-        # Separador
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet(f"QFrame {{ background: {p('border', oscuro)}; max-height: 1px; border: none; margin: 0; }}")
-        layout_derecho.addWidget(sep)
+        self._sep_header = QFrame()
+        self._sep_header.setFrameShape(QFrame.Shape.HLine)
+        self._sep_header.setStyleSheet(f"QFrame {{ background: {p('border', oscuro)}; max-height: 1px; border: none; margin: 0; }}")
+        layout_derecho.addWidget(self._sep_header)
 
-        # Tabla
         self._construir_tabla(layout_derecho)
 
-        layout_raiz.addWidget(panel_derecho, 1)
+        layout_raiz.addWidget(self._panel_derecho, 1)
 
     def _construir_header(self) -> QWidget:
         oscuro = self._oscuro
@@ -727,24 +715,23 @@ class VentanaPrincipal(QWidget):
         lay.setContentsMargins(20, 0, 20, 0)
         lay.setSpacing(12)
 
-        titulo = QLabel("Control de Objetivos")
-        titulo.setStyleSheet(f"""
+        self._lbl_titulo_header = QLabel("Control de Objetivos")
+        self._lbl_titulo_header.setStyleSheet(f"""
             color: {p('text_primary', oscuro)};
             font-size: 17px;
             font-weight: 700;
             letter-spacing: 0.3px;
         """)
-        lay.addWidget(titulo)
+        lay.addWidget(self._lbl_titulo_header)
 
-        subtitulo = QLabel("·  VESP Organizations")
-        subtitulo.setStyleSheet(f"""
+        self._lbl_subtitulo_header = QLabel("·  VESP Organizations")
+        self._lbl_subtitulo_header.setStyleSheet(f"""
             color: {p('text_muted', oscuro)};
             font-size: 12px;
         """)
-        lay.addWidget(subtitulo)
+        lay.addWidget(self._lbl_subtitulo_header)
         lay.addStretch()
 
-        # Indicador de refresco
         self.lbl_estado_sync = QLabel("● En vivo")
         self.lbl_estado_sync.setStyleSheet(f"""
             color: {p('accent', oscuro)};
@@ -778,39 +765,8 @@ class VentanaPrincipal(QWidget):
             }}
         """)
 
-        estilo_input = f"""
-            QComboBox, QLineEdit, QDateEdit {{
-                background-color: {p('bg_tabla', oscuro)};
-                color: {p('text_primary', oscuro)};
-                border: 1px solid {p('border', oscuro)};
-                border-radius: 7px;
-                padding: 4px 8px;
-                font-size: 12px;
-                min-height: 28px;
-                selection-background-color: {p('accent', oscuro)};
-            }}
-            QComboBox:hover, QLineEdit:hover, QDateEdit:hover {{
-                border-color: {p('accent', oscuro)};
-            }}
-            QComboBox:focus, QLineEdit:focus, QDateEdit:focus {{
-                border-color: {p('accent', oscuro)};
-                outline: none;
-            }}
-            QComboBox::drop-down {{
-                border: none;
-                width: 20px;
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: {p('bg_tabla', oscuro)};
-                color: {p('text_primary', oscuro)};
-                border: 1px solid {p('border', oscuro)};
-                selection-background-color: {p('accent', oscuro)};
-                selection-color: white;
-                outline: none;
-            }}
-        """
-
-        estilo_lbl = f"color: {p('text_secondary', oscuro)}; font-size: 11px; font-weight: 500;"
+        estilo_input = self._estilo_input(oscuro)
+        estilo_lbl   = f"color: {p('text_secondary', oscuro)}; font-size: 11px; font-weight: 500;"
 
         estilo_btn_nav = f"""
             QPushButton {{
@@ -844,43 +800,37 @@ class VentanaPrincipal(QWidget):
             QPushButton:hover {{
                 background-color: {p('accent_dark', oscuro)};
             }}
-            QPushButton:pressed {{
-                background-color: {p('accent_dark', oscuro)};
-            }}
         """
 
-        widget_filtros = QWidget()
-        widget_filtros.setStyleSheet(f"background-color: {p('bg_header', oscuro)};")
-        fila = QHBoxLayout(widget_filtros)
+        self._widget_filtros = QWidget()
+        self._widget_filtros.setStyleSheet(f"background-color: {p('bg_header', oscuro)};")
+        fila = QHBoxLayout(self._widget_filtros)
         fila.setContentsMargins(16, 0, 16, 0)
         fila.setSpacing(8)
 
-        # Fecha
         self.selector_fecha = QDateEdit()
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.setCalendarPopup(True)
         self.selector_fecha.setFixedWidth(115)
         self.selector_fecha.setStyleSheet(estilo_input)
 
-        boton_ant = QPushButton("‹")
-        boton_ant.setToolTip("Día anterior (Ctrl+←)")
-        boton_ant.setStyleSheet(estilo_btn_nav)
-        boton_ant.setCursor(Qt.CursorShape.PointingHandCursor)
-        boton_ant.clicked.connect(self._fecha_anterior)
+        self._boton_ant = QPushButton("‹")
+        self._boton_ant.setToolTip("Día anterior (Ctrl+←)")
+        self._boton_ant.setStyleSheet(estilo_btn_nav)
+        self._boton_ant.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._boton_ant.clicked.connect(self._fecha_anterior)
 
-        boton_sig = QPushButton("›")
-        boton_sig.setToolTip("Día siguiente (Ctrl+→)")
-        boton_sig.setStyleSheet(estilo_btn_nav)
-        boton_sig.setCursor(Qt.CursorShape.PointingHandCursor)
-        boton_sig.clicked.connect(self._fecha_siguiente)
+        self._boton_sig = QPushButton("›")
+        self._boton_sig.setToolTip("Día siguiente (Ctrl+→)")
+        self._boton_sig.setStyleSheet(estilo_btn_nav)
+        self._boton_sig.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._boton_sig.clicked.connect(self._fecha_siguiente)
 
-        # Turno
         self.filtro_turno = QComboBox()
         self.filtro_turno.addItems(["Todos los turnos", "diurno", "nocturno"])
         self.filtro_turno.setFixedWidth(140)
         self.filtro_turno.setStyleSheet(estilo_input)
 
-        # Supervisor
         self.filtro_supervisor = QComboBox()
         self.filtro_supervisor.addItem("Todos los supervisores", None)
         self.filtro_supervisor.setFixedWidth(170)
@@ -888,7 +838,6 @@ class VentanaPrincipal(QWidget):
         for s in cargar_supervisores():
             self.filtro_supervisor.addItem(s[1], s[0])
 
-        # Estado
         self.filtro_estado = QComboBox()
         self.filtro_estado.addItems([
             "Todos", "Pasaron los dos", "No pasó nadie",
@@ -897,32 +846,27 @@ class VentanaPrincipal(QWidget):
         self.filtro_estado.setFixedWidth(155)
         self.filtro_estado.setStyleSheet(estilo_input)
 
-        # Buscador
         self.buscador = QLineEdit()
         self.buscador.setPlaceholderText("🔍  Buscar objetivo...")
         self.buscador.setFixedWidth(170)
         self.buscador.setStyleSheet(estilo_input)
         self.buscador.textChanged.connect(self.cargar_tabla)
 
-        btn_filtrar = QPushButton("Aplicar")
-        btn_filtrar.setFixedWidth(75)
-        btn_filtrar.setStyleSheet(estilo_btn_accion)
-        btn_filtrar.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_filtrar.clicked.connect(self.cargar_tabla)
+        self._btn_filtrar = QPushButton("Aplicar")
+        self._btn_filtrar.setFixedWidth(75)
+        self._btn_filtrar.setStyleSheet(estilo_btn_accion)
+        self._btn_filtrar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_filtrar.clicked.connect(self.cargar_tabla)
 
-        lbl_fecha  = QLabel("Fecha")
-        lbl_fecha.setStyleSheet(estilo_lbl)
-        lbl_turno  = QLabel("Turno")
-        lbl_turno.setStyleSheet(estilo_lbl)
-        lbl_sup    = QLabel("Supervisor")
-        lbl_sup.setStyleSheet(estilo_lbl)
-        lbl_estado = QLabel("Estado")
-        lbl_estado.setStyleSheet(estilo_lbl)
+        lbl_fecha  = QLabel("Fecha");     lbl_fecha.setStyleSheet(estilo_lbl)
+        lbl_turno  = QLabel("Turno");     lbl_turno.setStyleSheet(estilo_lbl)
+        lbl_sup    = QLabel("Supervisor"); lbl_sup.setStyleSheet(estilo_lbl)
+        lbl_estado = QLabel("Estado");    lbl_estado.setStyleSheet(estilo_lbl)
 
         fila.addWidget(lbl_fecha)
-        fila.addWidget(boton_ant)
+        fila.addWidget(self._boton_ant)
         fila.addWidget(self.selector_fecha)
-        fila.addWidget(boton_sig)
+        fila.addWidget(self._boton_sig)
         fila.addSpacing(4)
         fila.addWidget(lbl_turno)
         fila.addWidget(self.filtro_turno)
@@ -932,11 +876,44 @@ class VentanaPrincipal(QWidget):
         fila.addWidget(self.filtro_estado)
         fila.addSpacing(4)
         fila.addWidget(self.buscador)
-        fila.addWidget(btn_filtrar)
+        fila.addWidget(self._btn_filtrar)
         fila.addStretch()
 
-        scroll_filtros.setWidget(widget_filtros)
+        scroll_filtros.setWidget(self._widget_filtros)
         return scroll_filtros
+
+    def _estilo_input(self, oscuro: bool) -> str:
+        return f"""
+            QComboBox, QLineEdit, QDateEdit {{
+                background-color: {p('bg_tabla', oscuro)};
+                color: {p('text_primary', oscuro)};
+                border: 1px solid {p('border', oscuro)};
+                border-radius: 7px;
+                padding: 4px 8px;
+                font-size: 12px;
+                min-height: 28px;
+                selection-background-color: {p('accent', oscuro)};
+            }}
+            QComboBox:hover, QLineEdit:hover, QDateEdit:hover {{
+                border-color: {p('accent', oscuro)};
+            }}
+            QComboBox:focus, QLineEdit:focus, QDateEdit:focus {{
+                border-color: {p('accent', oscuro)};
+                outline: none;
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                width: 20px;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {p('bg_tabla', oscuro)};
+                color: {p('text_primary', oscuro)};
+                border: 1px solid {p('border', oscuro)};
+                selection-background-color: {p('accent', oscuro)};
+                selection-color: white;
+                outline: none;
+            }}
+        """
 
     def _construir_tabla(self, layout_derecho):
         oscuro = self._oscuro
@@ -950,7 +927,6 @@ class VentanaPrincipal(QWidget):
             "Estado", "Acción"
         ])
 
-        # Anchos de columna
         self.tabla.setColumnWidth(0, 210)
         self.tabla.setColumnWidth(1, 155)
         self.tabla.setColumnWidth(2, 95)
@@ -967,11 +943,13 @@ class VentanaPrincipal(QWidget):
         self.tabla.verticalHeader().setVisible(False)
         self.tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.tabla.horizontalHeader().setStretchLastSection(True)
-
-        # Alto de filas
         self.tabla.verticalHeader().setDefaultSectionSize(44)
 
-        self.tabla.setStyleSheet(f"""
+        self.tabla.setStyleSheet(self._estilo_tabla(oscuro))
+        layout_derecho.addWidget(self.tabla)
+
+    def _estilo_tabla(self, oscuro: bool) -> str:
+        return f"""
             QTableWidget {{
                 background-color: {p('bg_tabla', oscuro)};
                 gridline-color: transparent;
@@ -1019,12 +997,205 @@ class VentanaPrincipal(QWidget):
                 background: {p('scrollbar_handle', oscuro)};
                 border-radius: 3px;
             }}
-        """)
-
-        layout_derecho.addWidget(self.tabla)
+        """
 
     # =========================================================================
-    # SIDEBAR COLAPSAR / EXPANDIR (con animación)
+    # TEMA — ALTERNAR Y REFRESCAR
+    # =========================================================================
+
+    def _alternar_tema(self):
+        if self.alternar_tema_fn and self.app:
+            self.alternar_tema_fn(self.app, self)
+            self._oscuro = obtener_tema_actual() == "oscuro"
+            self._refrescar_tema()
+
+    def _refrescar_tema(self):
+        """Reaplica todos los estilos con la paleta actual sin reconstruir widgets."""
+        oscuro = self._oscuro
+
+        # Ventana raíz
+        self.setStyleSheet(f"QWidget#VentanaPrincipal {{ background-color: {p('bg_main', oscuro)}; }}")
+
+        # Sidebar
+        self.panel_lateral.setStyleSheet(f"""
+            QFrame#PanelLateral {{
+                background-color: {p('bg_sidebar', oscuro)};
+                border-right: 1px solid {p('border', oscuro)};
+            }}
+        """)
+        self._cabecera_sidebar.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
+        self._contenedor_scroll.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
+        self._zona_inferior.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
+
+        # Títulos sidebar
+        self.titulo_lateral.setStyleSheet(f"""
+            color: {p('accent', oscuro)};
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: 2px;
+        """)
+        self.subtitulo_lateral.setStyleSheet(f"""
+            color: {p('text_muted', oscuro)};
+            font-size: 10px;
+            letter-spacing: 1px;
+        """)
+
+        # Botón colapsar
+        self.btn_colapsar.setStyleSheet(f"""
+            QToolButton {{
+                background: {p('btn_menu_hover', oscuro)};
+                color: {p('text_secondary', oscuro)};
+                border: none;
+                border-radius: 5px;
+                font-size: 14px;
+                font-weight: bold;
+            }}
+            QToolButton:hover {{
+                background: {p('accent', oscuro)};
+                color: white;
+            }}
+        """)
+
+        # Botones del menú
+        for b in self._botones_menu:
+            b._oscuro = oscuro
+            b._aplicar_estilo()
+
+        # Label admin (solo existe si rol == admin)
+        if hasattr(self, '_lbl_admin'):
+            self._lbl_admin.setStyleSheet(f"""
+                color: {p('text_muted', oscuro)};
+                font-size: 9px;
+                letter-spacing: 1.2px;
+                font-weight: 600;
+                padding: 4px 0 2px 4px;
+            """)
+
+        # Zoom
+        estilo_mini_btn = f"""
+            QPushButton {{
+                background-color: {p('btn_menu_hover', oscuro)};
+                color: {p('text_secondary', oscuro)};
+                border: 1px solid {p('border', oscuro)};
+                border-radius: 5px;
+                font-size: 11px;
+                min-width: 30px;
+                max-width: 36px;
+                min-height: 26px;
+            }}
+            QPushButton:hover {{
+                background-color: {p('accent', oscuro)};
+                color: white;
+                border-color: {p('accent', oscuro)};
+            }}
+        """
+        self._btn_zoom_menos.setStyleSheet(estilo_mini_btn)
+        self._btn_zoom_mas.setStyleSheet(estilo_mini_btn)
+        self.lbl_zoom.setStyleSheet(f"color: {p('text_muted', oscuro)}; font-size: 10px;")
+
+        # Botón tema
+        texto_tema = "☀  Modo claro" if oscuro else "🌙  Modo oscuro"
+        self.btn_tema.setText(texto_tema)
+        self.btn_tema.setStyleSheet(self._estilo_btn_tema(oscuro))
+
+        # Usuario label
+        self.usuario_label.setStyleSheet(f"""
+            color: {p('text_muted', oscuro)};
+            font-size: 10px;
+            padding: 3px 4px;
+            border-radius: 5px;
+            background: {p('btn_menu_hover', oscuro)};
+        """)
+
+        # Panel derecho
+        self._panel_derecho.setStyleSheet(f"background-color: {p('bg_main', oscuro)};")
+
+        # Header
+        self._header.setStyleSheet(f"""
+            QFrame {{
+                background-color: {p('bg_header', oscuro)};
+                border-bottom: 1px solid {p('border', oscuro)};
+            }}
+        """)
+        self._lbl_titulo_header.setStyleSheet(f"""
+            color: {p('text_primary', oscuro)};
+            font-size: 17px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        """)
+        self._lbl_subtitulo_header.setStyleSheet(f"color: {p('text_muted', oscuro)}; font-size: 12px;")
+        self.lbl_estado_sync.setStyleSheet(f"color: {p('accent', oscuro)}; font-size: 10px; font-weight: 600;")
+
+        # Barra de filtros
+        self._barra_filtros_widget.setStyleSheet(f"""
+            QScrollArea {{
+                border: none;
+                background: {p('bg_header', oscuro)};
+            }}
+            QScrollBar:horizontal {{
+                height: 3px;
+                background: transparent;
+            }}
+            QScrollBar::handle:horizontal {{
+                background: {p('scrollbar_handle', oscuro)};
+                border-radius: 1px;
+            }}
+        """)
+        self._widget_filtros.setStyleSheet(f"background-color: {p('bg_header', oscuro)};")
+        estilo_input = self._estilo_input(oscuro)
+        self.selector_fecha.setStyleSheet(estilo_input)
+        self.filtro_turno.setStyleSheet(estilo_input)
+        self.filtro_supervisor.setStyleSheet(estilo_input)
+        self.filtro_estado.setStyleSheet(estilo_input)
+        self.buscador.setStyleSheet(estilo_input)
+
+        estilo_btn_nav = f"""
+            QPushButton {{
+                background-color: {p('bg_tabla', oscuro)};
+                color: {p('text_secondary', oscuro)};
+                border: 1px solid {p('border', oscuro)};
+                border-radius: 7px;
+                font-size: 13px;
+                min-width: 28px;
+                max-width: 28px;
+                min-height: 28px;
+            }}
+            QPushButton:hover {{
+                background-color: {p('accent', oscuro)};
+                color: white;
+                border-color: {p('accent', oscuro)};
+            }}
+        """
+        self._boton_ant.setStyleSheet(estilo_btn_nav)
+        self._boton_sig.setStyleSheet(estilo_btn_nav)
+
+        self._btn_filtrar.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {p('accent', oscuro)};
+                color: white;
+                border: none;
+                border-radius: 7px;
+                padding: 4px 14px;
+                font-size: 12px;
+                font-weight: 600;
+                min-height: 28px;
+            }}
+            QPushButton:hover {{
+                background-color: {p('accent_dark', oscuro)};
+            }}
+        """)
+
+        # Separador header
+        self._sep_header.setStyleSheet(
+            f"QFrame {{ background: {p('border', oscuro)}; max-height: 1px; border: none; margin: 0; }}"
+        )
+
+        # Tabla (el stylesheet + recargar regenera badges con la paleta nueva)
+        self.tabla.setStyleSheet(self._estilo_tabla(oscuro))
+        self.cargar_tabla()
+
+    # =========================================================================
+    # SIDEBAR COLAPSAR / EXPANDIR
     # =========================================================================
 
     def _toggle_sidebar(self):
@@ -1070,7 +1241,6 @@ class VentanaPrincipal(QWidget):
         grupo.addAnimation(anim)
         grupo.addAnimation(anim2)
         grupo.start()
-        # Guardar referencia para que no se destruya
         self._anim_sidebar = grupo
 
     # =========================================================================
@@ -1094,14 +1264,6 @@ class VentanaPrincipal(QWidget):
             stylesheet_actual = self.app.styleSheet()
             nuevo = re.sub(r'font-size: \d+px;', f'font-size: {self.zoom_nivel}px;', stylesheet_actual)
             self.app.setStyleSheet(nuevo)
-
-    # =========================================================================
-    # TEMA
-    # =========================================================================
-
-    def _alternar_tema(self):
-        if self.alternar_tema_fn and self.app:
-            self.alternar_tema_fn(self.app, self)
 
     # =========================================================================
     # SINCRONIZACIÓN
@@ -1255,7 +1417,7 @@ class VentanaPrincipal(QWidget):
         cursor.execute(query, params)
         resultados = cursor.fetchall()
         conexion.close()
-        pasadas_dia = {}
+        pasadas_dia   = {}
         pasadas_noche = {}
         for obj_id, turno, count in resultados:
             if turno == "diurno":
@@ -1279,7 +1441,6 @@ class VentanaPrincipal(QWidget):
         return item
 
     def _crear_widget_celda(self, widget: QWidget) -> QWidget:
-        """Envuelve un widget en un contenedor centrado para la celda."""
         contenedor = QWidget()
         lay = QHBoxLayout(contenedor)
         lay.setContentsMargins(8, 4, 8, 4)
@@ -1290,9 +1451,9 @@ class VentanaPrincipal(QWidget):
         return contenedor
 
     def cargar_tabla(self):
-        fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
-        turno = self.filtro_turno.currentText()
-        turno = None if turno == "Todos los turnos" else turno
+        fecha          = self.selector_fecha.date().toString("yyyy-MM-dd")
+        turno          = self.filtro_turno.currentText()
+        turno          = None if turno == "Todos los turnos" else turno
         supervisor_id  = self.filtro_supervisor.currentData()
         filtro_estado  = self.filtro_estado.currentText()
         texto_busqueda = self.buscador.text().strip().lower()
@@ -1327,13 +1488,12 @@ class VentanaPrincipal(QWidget):
             pasadas_dia_filtradas   = pasadas_dia_totales
             pasadas_noche_filtradas = pasadas_noche_totales
 
-        # Armar filas
         filas = []
         for o in self.objetivos_actuales:
             if texto_busqueda and texto_busqueda not in o[1].lower():
                 continue
-            pd  = pasadas_dia_filtradas.get(o[0], 0)
-            pn  = pasadas_noche_filtradas.get(o[0], 0)
+            pd = pasadas_dia_filtradas.get(o[0], 0)
+            pn = pasadas_noche_filtradas.get(o[0], 0)
             estado, _ = self._obtener_estado_detallado(
                 pasadas_dia_totales.get(o[0], 0),
                 pasadas_noche_totales.get(o[0], 0)
@@ -1343,52 +1503,43 @@ class VentanaPrincipal(QWidget):
             filas.append((o, pd, pn, estado))
 
         self.tabla.setRowCount(len(filas))
-        oscuro = self._oscuro
-
-        # Color de fila alternada
-        bg_fila  = p("bg_tabla",     oscuro)
-        bg_alt   = p("bg_tabla_alt", oscuro)
+        oscuro  = self._oscuro
+        bg_fila = p("bg_tabla",     oscuro)
+        bg_alt  = p("bg_tabla_alt", oscuro)
 
         for i, (o, pd, pn, estado) in enumerate(filas):
             bg = bg_fila if i % 2 == 0 else bg_alt
 
-            # Col 0: Objetivo
             item_obj = self._crear_item(o[1])
             item_obj.setForeground(QColor(p("text_primary", oscuro)))
             item_obj.setBackground(QColor(bg))
             self.tabla.setItem(i, 0, item_obj)
 
-            # Col 1: Equipo diurno
             item_ed = self._crear_item(equipo_dia)
             item_ed.setForeground(QColor(p("text_secondary", oscuro)))
             item_ed.setBackground(QColor(bg))
             self.tabla.setItem(i, 1, item_ed)
 
-            # Col 2: Pasadas día (badge)
             badge_pd = BadgeNumero(pd, oscuro)
             cont_pd = self._crear_widget_celda(badge_pd)
             cont_pd.setStyleSheet(f"background-color: {bg};")
             self.tabla.setCellWidget(i, 2, cont_pd)
 
-            # Col 3: Equipo nocturno
             item_en = self._crear_item(equipo_noche)
             item_en.setForeground(QColor(p("text_secondary", oscuro)))
             item_en.setBackground(QColor(bg))
             self.tabla.setItem(i, 3, item_en)
 
-            # Col 4: Pasadas noche (badge)
             badge_pn = BadgeNumero(pn, oscuro)
             cont_pn = self._crear_widget_celda(badge_pn)
             cont_pn.setStyleSheet(f"background-color: {bg};")
             self.tabla.setCellWidget(i, 4, cont_pn)
 
-            # Col 5: Estado (badge pill)
             badge_estado = BadgeEstado(estado, oscuro)
             cont_est = self._crear_widget_celda(badge_estado)
             cont_est.setStyleSheet(f"background-color: {bg};")
             self.tabla.setCellWidget(i, 5, cont_est)
 
-            # Col 6: Botón dar de baja
             boton_baja = QPushButton("Dar de baja")
             boton_baja.setCursor(Qt.CursorShape.PointingHandCursor)
             boton_baja.setStyleSheet(f"""
@@ -1404,9 +1555,6 @@ class VentanaPrincipal(QWidget):
                 QPushButton:hover {{
                     background-color: {p('accent_red', oscuro)};
                     color: white;
-                }}
-                QPushButton:pressed {{
-                    opacity: 0.8;
                 }}
             """)
             boton_baja.clicked.connect(lambda checked, obj_id=o[0]: self.dar_de_baja(obj_id))
@@ -1435,7 +1583,6 @@ class VentanaPrincipal(QWidget):
     # =========================================================================
 
     def _abrir_ventana(self, attr: str, cls, *args, **kwargs):
-        """Helper genérico: abre una ventana si no está visible, o la trae al frente."""
         ventana = getattr(self, attr, None)
         if ventana is None or not ventana.isVisible():
             ventana = cls(*args, **kwargs)
