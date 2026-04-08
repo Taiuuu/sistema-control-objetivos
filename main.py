@@ -23,8 +23,8 @@ from services.api_rest import iniciar_api_rest
 # =============================================================================
 
 def aplicar_tema_oscuro(app: QApplication) -> None:
-    """Aplica el tema oscuro corporativo a toda la aplicación."""
     app.setStyle("Fusion")
+    app.setPalette(app.style().standardPalette())
 
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window,          QColor(30, 30, 30))
@@ -122,8 +122,8 @@ def aplicar_tema_oscuro(app: QApplication) -> None:
 
 
 def aplicar_tema_claro(app: QApplication) -> None:
-    """Aplica el tema claro a toda la aplicación."""
     app.setStyle("Fusion")
+    app.setPalette(app.style().standardPalette())
 
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window,          QColor(245, 245, 245))
@@ -135,8 +135,16 @@ def aplicar_tema_claro(app: QApplication) -> None:
     palette.setColor(QPalette.ColorRole.ButtonText,      QColor(30, 30, 30))
     palette.setColor(QPalette.ColorRole.Highlight,       QColor(42, 130, 218))
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
+    palette.setColor(QPalette.ColorRole.ToolTipBase,     QColor(255, 255, 220))
+    palette.setColor(QPalette.ColorRole.ToolTipText,     QColor(30, 30, 30))
+    palette.setColor(QPalette.ColorRole.BrightText,      QColor(255, 0, 0))
     app.setPalette(palette)
 
+    app.setStyleSheet("""...""")
+
+    for widget in app.allWidgets():
+        widget.update()
+        widget.repaint()
     app.setStyleSheet("""
         QWidget {
             font-family: Segoe UI;
