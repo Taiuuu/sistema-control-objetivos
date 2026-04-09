@@ -5,11 +5,13 @@
 
 import os
 import base64
+import hashlib
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
+from dotenv import load_dotenv
 import secrets
 
 # =============================================================================
@@ -17,7 +19,18 @@ import secrets
 # =============================================================================
 
 # Clave maestra para derivar claves (debe estar en variable de entorno en producción)
-MASTER_KEY = os.environ.get('VESP_ENCRYPTION_KEY', 'vesp-master-key-2024-change-in-production')
+load_dotenv()
+
+_clave_raw = os.environ.get('VESP_ENCRYPTION_KEY')
+
+if not _clave_raw:
+    raise RuntimeError(
+        "Falta el archivo .env con VESP_ENCRYPTION_KEY.\n"
+        "Copiá .env.example como .env y completá la clave."
+    )
+
+_clave_bytes = hashlib.sha256(_clave_raw.encode()).digest()
+MASTER_KEY = base64.urlsafe_b64encode(_clave_bytes)
 
 # Algoritmo y parámetros
 KEY_LENGTH = 32  # 256 bits para AES-256
