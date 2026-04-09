@@ -41,24 +41,15 @@ IV_LENGTH = 16
 # FUNCIONES DE DERIVACIÓN DE CLAVES
 # =============================================================================
 
-def _derive_key(password: str, salt: bytes) -> bytes:
-    """
-    Deriva una clave de encriptación desde una contraseña usando PBKDF2.
-    Args:
-        password: Contraseña base
-        salt: Salt aleatorio
-    Returns:
-        Clave derivada de 32 bytes
-    """
+def _derive_key(password, salt):
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
-        length=KEY_LENGTH,
+        length=32,
         salt=salt,
-        iterations=100000,  # Número alto de iteraciones para seguridad
-        backend=default_backend()
+        iterations=100000,
     )
-    return kdf.derive(password.encode())
-
+    password_bytes = password if isinstance(password, bytes) else password.encode()
+    return kdf.derive(password_bytes)
 
 def _generate_salt() -> bytes:
     """Genera un salt aleatorio."""
