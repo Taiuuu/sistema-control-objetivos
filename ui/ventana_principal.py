@@ -24,6 +24,7 @@ from ui.form_de_turno import FormTurno
 from ui.lista_objetivos import ListaObjetivos
 from ui.lista_supervisores import ListaSupervisores
 from ui.reporte_mensual import ReporteMensual
+from ui.reporte_objetivo import ReporteObjetivo
 from ui.lista_pasadas import ListaPasadas
 from ui.notas_diarias import NotasDiarias
 from ui.vista_logs import VistaLogs
@@ -550,6 +551,7 @@ class VentanaPrincipal(QWidget):
         add_btn("🔍", "Ver pasadas",         self.abrir_lista_pasadas)
         add_btn("📝", "Notas del día",       self.abrir_notas,              "(Ctrl+N)")
         add_btn("📅", "Reporte mensual",     self.abrir_reporte_mensual,    "(Ctrl+R)")
+        add_btn("📅", "Reporte objetivo",    self.abrir_reporte_mensual_objetivo, "(Ctrl+Ñ)")
         add_btn("💾", "Transferir datos",    self.abrir_transferir_datos)
         add_btn("📥", "Importar Excel",      self.abrir_importar_excel)
         add_btn("❓", "Ayuda",               self.abrir_ayuda,              "(Ctrl+H)")
@@ -1647,6 +1649,9 @@ class VentanaPrincipal(QWidget):
 
     def abrir_reporte_mensual(self):
         self._abrir_ventana('reporte_mensual', ReporteMensual)
+
+    def abrir_reporte_mensual_objetivo(self):
+        self._abrir_ventana('reporte_mensual_objetivo', ReporteObjetivo)
 
     def abrir_gestionar_usuarios(self):
         self._abrir_ventana('gestionar_usuarios', GestionarUsuarios)
