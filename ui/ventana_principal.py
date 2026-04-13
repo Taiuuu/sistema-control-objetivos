@@ -86,16 +86,19 @@ def obtener_equipo(fecha: str, turno: str) -> str:
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     cursor.execute("""
-        SELECT s1.nombre, s2.nombre
+        SELECT s1.nombre, s2.nombre,
+               CASE WHEN e.supervisor3_id IS NOT NULL THEN s3.nombre ELSE NULL END
         FROM equipos e
         JOIN supervisores s1 ON e.supervisor1_id = s1.id
         JOIN supervisores s2 ON e.supervisor2_id = s2.id
+        LEFT JOIN supervisores s3 ON e.supervisor3_id = s3.id
         WHERE e.fecha = ? AND e.turno = ?
     """, (fecha, turno))
     resultado = cursor.fetchone()
     conexion.close()
     if resultado:
-        return f"{resultado[0]} y {resultado[1]}"
+        nombres = [n for n in resultado if n is not None]
+        return ", ".join(nombres)
     return "—"
 
 

@@ -7,11 +7,11 @@ import sys
 import os
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QPalette, QColor
-from PyQt6.QtCore import QTimer, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import QTimer
 
 from ui.login import LoginWindow
 from ui.ventana_principal import VentanaPrincipal
-from database.db import crear_base_datos
+from database.db import crear_base_datos, migrar_supervisor3
 from services.backup import hacer_backup
 from services.actualizador import verificar_actualizacion
 from services.tema import obtener_tema_actual, establecer_tema_actual
@@ -140,8 +140,6 @@ def aplicar_tema_claro(app: QApplication) -> None:
     palette.setColor(QPalette.ColorRole.BrightText,      QColor(255, 0, 0))
     app.setPalette(palette)
 
-    app.setStyleSheet("""...""")
-
     for widget in app.allWidgets():
         widget.update()
         widget.repaint()
@@ -235,7 +233,6 @@ def aplicar_tema_claro(app: QApplication) -> None:
 # =============================================================================
 
 def alternar_tema(app: QApplication, ventana) -> None:
-    """Alterna entre tema oscuro y claro."""
     if obtener_tema_actual() == "oscuro":
         aplicar_tema_claro(app)
         establecer_tema_actual("claro")
@@ -251,8 +248,8 @@ def alternar_tema(app: QApplication, ventana) -> None:
 # =============================================================================
 
 def iniciar_app() -> None:
-    """Punto de entrada principal."""
     crear_base_datos()
+    migrar_supervisor3()   # ← migración segura, no rompe nada si ya existe
     hacer_backup()
     iniciar_api_rest()
 

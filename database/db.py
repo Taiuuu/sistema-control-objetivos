@@ -12,7 +12,6 @@ import bcrypt
 # CONEXIÓN
 # =============================================================================
 
-# Base de datos guardada en la carpeta del usuario para evitar problemas de permisos
 DB_PATH = os.path.join(os.path.expanduser("~"), "VESP Control", "seguridad.db")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
@@ -27,10 +26,6 @@ def conectar() -> sqlite3.Connection:
 # =============================================================================
 
 def crear_base_datos() -> None:
-    """
-    Crea todas las tablas del sistema si no existen.
-    También inserta el usuario admin por defecto en el primer uso.
-    """
     conexion = conectar()
     cursor = conexion.cursor()
 
@@ -71,8 +66,10 @@ def crear_base_datos() -> None:
             turno           TEXT,
             supervisor1_id  INTEGER,
             supervisor2_id  INTEGER,
+            supervisor3_id  INTEGER,
             FOREIGN KEY (supervisor1_id) REFERENCES supervisores(id),
-            FOREIGN KEY (supervisor2_id) REFERENCES supervisores(id)
+            FOREIGN KEY (supervisor2_id) REFERENCES supervisores(id),
+            FOREIGN KEY (supervisor3_id) REFERENCES supervisores(id)
         )
     """)
 
@@ -123,89 +120,23 @@ def crear_base_datos() -> None:
         )
     """)
 
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON auditoria(fecha DESC)
-    """)
-
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_auditoria_usuario ON auditoria(usuario_id)
-    """)
-
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_auditoria_tabla ON auditoria(tabla, registro_id)
-    """)
-
-    # =========================================================================
-    # ÍNDICES OPTIMIZADOS PARA PERFORMANCE
-    # =========================================================================
-    # Pasadas - acceso frecuente por fecha
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_pasadas_fecha ON pasadas(fecha DESC)
-    """)
-    
-    # Pasadas - acceso frecuente por objetivo
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_pasadas_objetivo_id ON pasadas(objetivo_id)
-    """)
-    
-    # Pasadas - compound index para control diario (fecha + objetivo)
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_pasadas_fecha_objetivo ON pasadas(fecha, objetivo_id)
-    """)
-    
-    # Pasadas - búsqueda por supervisor
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_pasadas_supervisor_id ON pasadas(supervisor_id)
-    """)
-    
-    # Pasadas - filtrado por turno
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_pasadas_turno ON pasadas(turno)
-    """)
-    
-    # Equipos - acceso para obtener equipo del día
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_equipos_fecha ON equipos(fecha)
-    """)
-    
-    # Equipos - compound index para búsqueda (fecha + turno)
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_equipos_fecha_turno ON equipos(fecha, turno)
-    """)
-    
-    # Equipos - búsqueda por supervisor
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_equipos_supervisor1_id ON equipos(supervisor1_id)
-    """)
-    
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_equipos_supervisor2_id ON equipos(supervisor2_id)
-    """)
-    
-    # Auditoria - compound index para auditoría filtrada
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_usuario ON auditoria(fecha DESC, usuario_id)
-    """)
-    
-    # Objetivos - filtrado de objetivos activos
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_objetivos_fecha_fin ON objetivos(fecha_fin)
-    """)
-    
-    # Supervisores - búsqueda por nombre
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_supervisores_nombre ON supervisores(nombre)
-    """)
-    
-    # Logs - búsqueda por usuario
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_logs_usuario_id ON logs(usuario_id)
-    """)
-    
-    # Logs - búsqueda por fecha
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_logs_fecha ON logs(fecha DESC)
-    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON auditoria(fecha DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_usuario ON auditoria(usuario_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_tabla ON auditoria(tabla, registro_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pasadas_fecha ON pasadas(fecha DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pasadas_objetivo_id ON pasadas(objetivo_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pasadas_fecha_objetivo ON pasadas(fecha, objetivo_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pasadas_supervisor_id ON pasadas(supervisor_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pasadas_turno ON pasadas(turno)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_equipos_fecha ON equipos(fecha)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_equipos_fecha_turno ON equipos(fecha, turno)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_equipos_supervisor1_id ON equipos(supervisor1_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_equipos_supervisor2_id ON equipos(supervisor2_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_usuario ON auditoria(fecha DESC, usuario_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_objetivos_fecha_fin ON objetivos(fecha_fin)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_supervisores_nombre ON supervisores(nombre)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_usuario_id ON logs(usuario_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_fecha ON logs(fecha DESC)")
 
     _crear_admin_si_no_existe(cursor)
 
@@ -215,14 +146,29 @@ def crear_base_datos() -> None:
 
 
 # =============================================================================
+# MIGRACIÓN — supervisor3_id
+# =============================================================================
+
+def migrar_supervisor3() -> None:
+    """Agrega supervisor3_id a equipos si no existe (migración segura)."""
+    conexion = conectar()
+    cursor = conexion.cursor()
+    try:
+        cursor.execute(
+            "ALTER TABLE equipos ADD COLUMN supervisor3_id INTEGER REFERENCES supervisores(id)"
+        )
+        conexion.commit()
+        print("Migración: supervisor3_id agregado a equipos.")
+    except sqlite3.OperationalError:
+        pass  # La columna ya existe, no hacer nada
+    conexion.close()
+
+
+# =============================================================================
 # USUARIO ADMIN POR DEFECTO
 # =============================================================================
 
 def _crear_admin_si_no_existe(cursor: sqlite3.Cursor) -> None:
-    """
-    Crea el usuario admin con contraseña 0000 si no hay ningún usuario registrado.
-    El admin no necesita cambiar la contraseña al primer inicio.
-    """
     cursor.execute("SELECT COUNT(*) FROM usuarios")
     if cursor.fetchone()[0] == 0:
         password_hash = bcrypt.hashpw(b"0000", bcrypt.gensalt()).decode()

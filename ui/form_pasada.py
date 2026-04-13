@@ -22,32 +22,33 @@ def _cargar_objetivos() -> list:
 
 
 def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
-    """
-    Retorna los supervisores del equipo asignado al turno de esa fecha.
-    Si no hay equipo registrado retorna todos los supervisores (usa caché).
-    """
     try:
         conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
+
         cursor.execute("""
-            SELECT s1.id, s1.nombre, s2.id, s2.nombre
-            FROM equipos e
-            JOIN supervisores s1 ON e.supervisor1_id = s1.id
-            JOIN supervisores s2 ON e.supervisor2_id = s2.id
-            WHERE e.fecha = ? AND e.turno = ?
-        """, (fecha, turno))
-        equipo = cursor.fetchone()
+            SELECT s.id, s.nombre
+            FROM supervisores s
+            WHERE s.id IN (
+                SELECT supervisor1_id FROM equipos WHERE fecha = ? AND turno = ?
+                UNION
+                SELECT supervisor2_id FROM equipos WHERE fecha = ? AND turno = ?
+                UNION
+                SELECT supervisor3_id FROM equipos WHERE fecha = ? AND turno = ?
+            )
+        """, (fecha, turno, fecha, turno, fecha, turno))
+
+        supervisores = cursor.fetchall()
         conexion.close()
 
-        if equipo:
-            return [(equipo[0], equipo[1]), (equipo[2], equipo[3])]
-    except:
-        pass
+        if supervisores:
+            return supervisores
 
-    # Usar caché para supervisores
-    supervisores = obtener_supervisores_cache(generar_si_falta=True)
-    return supervisores
+    except Exception as e:
+        print("Error cargando supervisores del turno:", e)
 
+    # fallback
+    return obtener_supervisores_cache(generar_si_falta=True)
 
 # Turno recordado entre registros
 _ultimo_turno = "diurno"
