@@ -8,22 +8,13 @@ import os
 import bcrypt
 
 
-# =============================================================================
-# CONEXIÓN
-# =============================================================================
-
 DB_PATH = os.path.join(os.path.expanduser("~"), "VESP Control", "seguridad.db")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 
 def conectar() -> sqlite3.Connection:
-    """Retorna una conexión activa a la base de datos."""
     return sqlite3.connect(DB_PATH)
 
-
-# =============================================================================
-# CREACIÓN DE TABLAS
-# =============================================================================
 
 def crear_base_datos() -> None:
     conexion = conectar()
@@ -41,8 +32,10 @@ def crear_base_datos() -> None:
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS supervisores (
-            id     INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre       TEXT NOT NULL,
+            fecha_alta   TEXT,
+            fecha_baja   TEXT
         )
     """)
 
@@ -146,11 +139,11 @@ def crear_base_datos() -> None:
 
 
 # =============================================================================
-# MIGRACIÓN — supervisor3_id
+# MIGRACIONES
 # =============================================================================
 
 def migrar_supervisor3() -> None:
-    """Agrega supervisor3_id a equipos si no existe (migración segura)."""
+    """Agrega supervisor3_id a equipos si no existe."""
     conexion = conectar()
     cursor = conexion.cursor()
     try:
@@ -158,9 +151,21 @@ def migrar_supervisor3() -> None:
             "ALTER TABLE equipos ADD COLUMN supervisor3_id INTEGER REFERENCES supervisores(id)"
         )
         conexion.commit()
-        print("Migración: supervisor3_id agregado a equipos.")
     except sqlite3.OperationalError:
-        pass  # La columna ya existe, no hacer nada
+        pass
+    conexion.close()
+
+
+def migrar_supervisores_alta_baja() -> None:
+    """Agrega fecha_alta y fecha_baja a supervisores si no existen."""
+    conexion = conectar()
+    cursor = conexion.cursor()
+    for columna in ("fecha_alta TEXT", "fecha_baja TEXT"):
+        try:
+            cursor.execute(f"ALTER TABLE supervisores ADD COLUMN {columna}")
+            conexion.commit()
+        except sqlite3.OperationalError:
+            pass
     conexion.close()
 
 
