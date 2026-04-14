@@ -96,11 +96,12 @@ def obtener_equipo(fecha: str, turno: str) -> str:
     """, (fecha, turno))
     resultado = cursor.fetchone()
     conexion.close()
-    if resultado:
-        nombres = [n for n in resultado if n is not None]
-        return ", ".join(nombres)
-    return "—"
-
+    if not resultado:
+        return "—"
+    nombres = [n for n in resultado if n is not None]
+    if len(nombres) == 1:
+        return nombres[0]
+    return ", ".join(nombres[:-1]) + " y " + nombres[-1]
 
 def cargar_supervisores() -> list:
     conexion = sqlite3.connect(DB_PATH)
