@@ -177,15 +177,24 @@ def generar_reporte_mensual(anio: int, mes: int) -> dict:
 
         if dias_esperados > 0:
             porcentaje = (dias_esperados - dias_sin_control) / dias_esperados * 100
-            reporte['objetivos'].append({
-                'id': obj_id,
-                'nombre': nombre,
-                'dias_esperados': dias_esperados,
-                'dias_con_dia': dias_con_dia,
-                'dias_con_noche': dias_con_noche,
-                'dias_sin_control': dias_sin_control,
-                'cumplimiento': round(porcentaje, 1)
-            })
+        else:
+            porcentaje = 0.0
+
+        reporte['objetivos'].append({
+            'id': obj_id,
+            'nombre': nombre,
+            'dias_esperados': dias_esperados,
+            'dias_con_dia': dias_con_dia,
+            'dias_con_noche': dias_con_noche,
+            'dias_sin_control': dias_sin_control,
+            'cumplimiento': round(porcentaje, 1)
+        'dias_con_noche': dias_con_noche,
+            'dias_sin_control': dias_sin_control,
+            'cumplimiento': round(porcentaje, 1)
+        'dias_con_noche': dias_con_noche,
+            'dias_sin_control': dias_sin_control,
+            'cumplimiento': round(porcentaje, 1)
+        })
 
     conexion.close()
     return reporte

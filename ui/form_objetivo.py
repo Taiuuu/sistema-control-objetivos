@@ -44,7 +44,21 @@ class FormObjetivo(QWidget):
         self.input_inicio = QDateEdit()
         self.input_inicio.setDate(QDate.currentDate())
         self.input_inicio.setCalendarPopup(True)
+        self.input_inicio.setDisplayFormat("dd/MM/yyyy")
         layout.addWidget(self.input_inicio)
+
+        # Checkbox para fecha fin
+        self.checkbox_fin = QCheckBox("Definir fecha fin")
+        layout.addWidget(self.checkbox_fin)
+
+        # Fecha de fin de cobertura
+        self.input_fin = QDateEdit()
+        self.input_fin.setDate(QDate.currentDate())
+        self.input_fin.setCalendarPopup(True)
+        self.input_fin.setDisplayFormat("dd/MM/yyyy")
+        self.input_fin.setEnabled(False)
+        self.checkbox_fin.stateChanged.connect(lambda: self.input_fin.setEnabled(self.checkbox_fin.isChecked()))
+        layout.addWidget(self.input_fin)
 
         # Días de cobertura semanal
         layout.addWidget(QLabel("Días de cobertura:"))
