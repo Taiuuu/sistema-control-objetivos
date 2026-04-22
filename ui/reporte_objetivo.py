@@ -67,16 +67,29 @@ def calcular_reporte_objetivo(anio: int, mes: int, objetivo_id: int) -> dict:
         nombre_dia = NOMBRES_DIA[fecha_dt.weekday()]
 
         cursor.execute("""
-            SELECT COUNT(*) FROM pasadas
-            WHERE fecha = ? AND objetivo_id = ? AND turno = 'diurno'
+            SELECT s.nombre FROM pasadas p
+            JOIN supervisores s ON p.supervisor_id = s.id
+            WHERE p.fecha = ? AND p.objetivo_id = ? AND p.turno = 'diurno'
         """, (fecha, objetivo_id))
-        tuvo_dia = cursor.fetchone()[0] > 0
+        supervisores_dia = cursor.fetchall()
+        supervisores_dia_nombres = [s[0] for s in supervisores_dia]
+        diurno_texto = "✔" if supervisores_dia_nombres else "✘"
+        if supervisores_dia_nombres:
+            diurno_texto = ", ".join(supervisores_dia_nombres)
 
         cursor.execute("""
-            SELECT COUNT(*) FROM pasadas
-            WHERE fecha = ? AND objetivo_id = ? AND turno = 'nocturno'
+            SELECT s.nombre FROM pasadas p
+            JOIN supervisores s ON p.supervisor_id = s.id
+            WHERE p.fecha = ? AND p.objetivo_id = ? AND p.turno = 'nocturno'
         """, (fecha, objetivo_id))
-        tuvo_noche = cursor.fetchone()[0] > 0
+        supervisores_noche = cursor.fetchall()
+        supervisores_noche_nombres = [s[0] for s in supervisores_noche]
+        nocturno_texto = "✔" if supervisores_noche_nombres else "✘"
+        if supervisores_noche_nombres:
+            nocturno_texto = ", ".join(supervisores_noche_nombres)
+
+        tuvo_dia = len(supervisores_dia_nombres) > 0
+        tuvo_noche = len(supervisores_noche_nombres) > 0
 
         if tuvo_dia:
             dias_con_dia += 1
@@ -97,8 +110,8 @@ def calcular_reporte_objetivo(anio: int, mes: int, objetivo_id: int) -> dict:
         dias.append({
             "fecha": f"{dia:02d}/{mes:02d}/{anio}",
             "dia_semana": nombre_dia,
-            "diurno": "✔" if tuvo_dia else "✘",
-            "nocturno": "✔" if tuvo_noche else "✘",
+            "diurno": diurno_texto,
+            "nocturno": nocturno_texto,
             "estado": estado,
         })
 
@@ -205,11 +218,11 @@ def _exportar_excel_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str) -
     ws.cell(row=fila_res + 4, column=1, value="Cumplimiento:").font     = Font(bold=True)
     ws.cell(row=fila_res + 4, column=2, value=f"{r['porcentaje']:.1f}%")
 
-    # Ancho columnas
+    # Ancho columnas - ajustar para nombres de supervisores
     ws.column_dimensions["A"].width = 14
     ws.column_dimensions["B"].width = 8
-    ws.column_dimensions["C"].width = 10
-    ws.column_dimensions["D"].width = 12
+    ws.column_dimensions["C"].width = 25  # Más ancho para nombres
+    ws.column_dimensions["D"].width = 25  # Más ancho para nombres
     ws.column_dimensions["E"].width = 16
 
     wb.save(ruta)
@@ -243,7 +256,7 @@ def _exportar_pdf_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str) -> 
     for d in datos["dias"]:
         filas.append([d["fecha"], d["dia_semana"], d["diurno"], d["nocturno"], d["estado"]])
 
-    tabla = Table(filas, colWidths=[80, 40, 55, 65, 90])
+    tabla = Table(filas, colWidths=[80, 40, 80, 80, 90])  # Ajustar anchos para nombres
 
     COLOR_HEADER   = colors.HexColor("#2B4F8C")
     COLOR_COMPLETO = colors.HexColor("#90EE90")
@@ -357,8 +370,8 @@ class ReporteObjetivo(QWidget):
         )
         self.tabla.setColumnWidth(0, 110)
         self.tabla.setColumnWidth(1, 60)
-        self.tabla.setColumnWidth(2, 80)
-        self.tabla.setColumnWidth(3, 90)
+        self.tabla.setColumnWidth(2, 150)  # Más ancho para nombres de supervisores
+        self.tabla.setColumnWidth(3, 150)  # Más ancho para nombres de supervisores
         self.tabla.setColumnWidth(4, 120)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.tabla)

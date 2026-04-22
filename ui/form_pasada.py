@@ -111,7 +111,7 @@ class FormPasada(QWidget):
         self.input_turno = QComboBox()
         self.input_turno.addItems(["diurno", "nocturno"])
         self.input_turno.setCurrentText(_ultimo_turno)
-        self.input_turno.currentTextChanged.connect(self._actualizar_supervisores)
+        self.input_turno.currentTextChanged.connect(self._actualizar_listas)
         layout.addWidget(self.input_turno)
 
         # Objetivo
