@@ -93,6 +93,33 @@ def validar_objetivo_existe(objetivo_id: int) -> None:
         raise ErrorValidacion(f"Error validando objetivo: {e}")
 
 
+def validar_objetivo_activo_en_fecha(objetivo_id: int, fecha: str) -> None:
+    """Valida que un objetivo esté activo en la fecha especificada."""
+    try:
+        conn = conectar()
+        cursor = conn.cursor()
+        cursor.execute("SELECT fecha_inicio, fecha_fin FROM objetivos WHERE id = ?", (objetivo_id,))
+        resultado = cursor.fetchone()
+        conn.close()
+        
+        if not resultado:
+            raise ErrorValidacion(f"Objetivo con ID {objetivo_id} no existe")
+        
+        fecha_inicio, fecha_fin = resultado
+        
+        # Verificar que la fecha esté dentro del rango del objetivo
+        if fecha < fecha_inicio:
+            raise ErrorValidacion(f"El objetivo no estaba activo en la fecha {fecha} (inicia el {fecha_inicio})")
+        
+        if fecha_fin and fecha > fecha_fin:
+            raise ErrorValidacion(f"El objetivo ya finalizó en la fecha {fecha_fin} (no puede registrar pasadas después de esa fecha)")
+            
+    except ErrorValidacion:
+        raise
+    except Exception as e:
+        raise ErrorValidacion(f"Error validando actividad del objetivo: {e}")
+
+
 def validar_supervisor_existe(supervisor_id: int) -> None:
     """Valida que un supervisor exista en la BD."""
     try:
@@ -300,6 +327,7 @@ def validar_pasada(
         raise ErrorValidacion(f"Turno inválido: '{turno}'. Debe ser 'diurno' o 'nocturno'")
     
     validar_objetivo_existe(objetivo_id)
+    validar_objetivo_activo_en_fecha(objetivo_id, fecha)
     
     if supervisor_id:
         validar_supervisor_existe(supervisor_id)

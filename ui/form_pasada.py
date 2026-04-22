@@ -16,9 +16,32 @@ from services.validaciones import validar_pasada, ErrorValidacion
 from services.cache import obtener_objetivos_cache, obtener_supervisores_cache
 
 
-def _cargar_objetivos() -> list:
-    """Retorna todos los objetivos registrados (usa caché)."""
-    return obtener_objetivos_cache(generar_si_falta=True)
+def _cargar_objetivos(fecha: str = None) -> list:
+    """Retorna todos los objetivos registrados (usa caché), filtrados por fecha si se proporciona."""
+    objetivos = obtener_objetivos_cache(generar_si_falta=True)
+    
+    if fecha:
+        # Filtrar objetivos activos en la fecha
+        objetivos_filtrados = []
+        try:
+            from database.db import conectar
+            conn = conectar()
+            cursor = conn.cursor()
+            for obj in objetivos:
+                obj_id = obj[0]
+                cursor.execute("SELECT fecha_inicio, fecha_fin FROM objetivos WHERE id = ?", (obj_id,))
+                resultado = cursor.fetchone()
+                if resultado:
+                    fecha_inicio, fecha_fin = resultado
+                    if fecha >= fecha_inicio and (fecha_fin is None or fecha <= fecha_fin):
+                        objetivos_filtrados.append(obj)
+            conn.close()
+        except Exception as e:
+            print("Error filtrando objetivos:", e)
+            return objetivos  # fallback a todos si hay error
+        return objetivos_filtrados
+    
+    return objetivos
 
 
 def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
@@ -94,7 +117,8 @@ class FormPasada(QWidget):
         # Objetivo
         layout.addWidget(QLabel("Objetivo:"))
         self.input_objetivo = QComboBox()
-        for o in _cargar_objetivos():
+        fecha_actual = self.input_fecha.date().toString("yyyy-MM-dd")
+        for o in _cargar_objetivos(fecha_actual):
             self.input_objetivo.addItem(o[1], o[0])
         layout.addWidget(self.input_objetivo)
 
@@ -109,13 +133,22 @@ class FormPasada(QWidget):
 
         self.setLayout(layout)
         animar_entrada(self)
-        self._actualizar_supervisores()
-        self.input_fecha.dateChanged.connect(lambda: self._actualizar_supervisores())
+        self._actualizar_listas()
+        self.input_fecha.dateChanged.connect(lambda: self._actualizar_listas())
+        self.input_turno.currentTextChanged.connect(self._actualizar_listas)
 
-    def _actualizar_supervisores(self) -> None:
-        """Actualiza la lista de supervisores según el turno y fecha seleccionados."""
+    def _actualizar_listas(self) -> None:
+        """Actualiza las listas de objetivos y supervisores según la fecha y turno seleccionados."""
         fecha = self.input_fecha.date().toString("yyyy-MM-dd")
         turno = self.input_turno.currentText()
+        
+        # Actualizar objetivos
+        objetivos = _cargar_objetivos(fecha)
+        self.input_objetivo.clear()
+        for o in objetivos:
+            self.input_objetivo.addItem(o[1], o[0])
+        
+        # Actualizar supervisores
         supervisores = _cargar_supervisores_del_turno(fecha, turno)
         self.input_supervisor.clear()
         for s in supervisores:
