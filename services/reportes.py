@@ -116,88 +116,102 @@ def generar_reporte_mensual(anio: int, mes: int) -> dict:
     import calendar
     from collections import defaultdict
 
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
+    # Validar parámetros
+    if not isinstance(anio, int) or not isinstance(mes, int):
+        raise ValueError("Año y mes deben ser números enteros")
+    if not (1 <= mes <= 12):
+        raise ValueError("Mes debe estar entre 1 y 12")
+    if not (2000 <= anio <= 2100):
+        raise ValueError("Año debe estar entre 2000 y 2100")
 
-    cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
-    objetivos = cursor.fetchall()
+    try:
+        conexion = sqlite3.connect(DB_PATH)
+        cursor = conexion.cursor()
 
-    total_dias = calendar.monthrange(anio, mes)[1]
-    fecha_inicio_mes = f"{anio}-{mes:02d}-01"
-    fecha_fin_mes = f"{anio}-{mes:02d}-{total_dias:02d}"
+        cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
+        objetivos = cursor.fetchall()
 
-    cursor.execute("""
-        SELECT fecha, objetivo_id, turno, COUNT(*)
-        FROM pasadas
-        WHERE fecha BETWEEN ? AND ?
-        GROUP BY fecha, objetivo_id, turno
-    """, (fecha_inicio_mes, fecha_fin_mes))
-    pasadas_raw = cursor.fetchall()
+        total_dias = calendar.monthrange(anio, mes)[1]
+        fecha_inicio_mes = f"{anio}-{mes:02d}-01"
+        fecha_fin_mes = f"{anio}-{mes:02d}-{total_dias:02d}"
 
-    pasadas_por_objetivo = defaultdict(lambda: defaultdict(lambda: {'diurno': 0, 'nocturno': 0}))
-    for fecha, objetivo_id, turno, cantidad in pasadas_raw:
-        pasadas_por_objetivo[objetivo_id][fecha][turno] = cantidad
+        cursor.execute("""
+            SELECT fecha, objetivo_id, turno, COUNT(*)
+            FROM pasadas
+            WHERE fecha BETWEEN ? AND ?
+            GROUP BY fecha, objetivo_id, turno
+        """, (fecha_inicio_mes, fecha_fin_mes))
+        pasadas_raw = cursor.fetchall()
 
-    reporte = {
-        'anio': anio,
-        'mes': mes,
-        'objetivos': []
-    }
+        pasadas_por_objetivo = defaultdict(lambda: defaultdict(lambda: {'diurno': 0, 'nocturno': 0}))
+        for fecha, objetivo_id, turno, cantidad in pasadas_raw:
+            pasadas_por_objetivo[objetivo_id][fecha][turno] = cantidad
 
-    for o in objetivos:
-        obj_id, nombre, inicio, fin, dias_str = o
-        dias_semana = [int(d.strip()) for d in dias_str.split(",") if d.strip()]
-        dias_esperados = 0
-        dias_con_dia = 0
-        dias_con_noche = 0
-        dias_sin_control = 0
+        reporte = {
+            'anio': anio,
+            'mes': mes,
+            'objetivos': []
+        }
 
-        for dia in range(1, total_dias + 1):
-            fecha = f"{anio}-{mes:02d}-{dia:02d}"
-            fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
+        for o in objetivos:
+            obj_id, nombre, inicio, fin, dias_str = o
+            dias_semana = [int(d.strip()) for d in dias_str.split(",") if d.strip()]
+            dias_esperados = 0
+            dias_con_dia = 0
+            dias_con_noche = 0
+            dias_sin_control = 0
 
-            if inicio and fecha < inicio:
-                continue
-            if fin and fecha > fin:
-                continue
-            if fecha_dt.isoweekday() not in dias_semana:
-                continue
+            for dia in range(1, total_dias + 1):
+                fecha = f"{anio}-{mes:02d}-{dia:02d}"
+                fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
 
-            dias_esperados += 1
-            turno_data = pasadas_por_objetivo[obj_id][fecha]
-            tuvo_dia = turno_data['diurno'] > 0
-            tuvo_noche = turno_data['nocturno'] > 0
+                if inicio and fecha < inicio:
+                    continue
+                if fin and fecha > fin:
+                    continue
+                if fecha_dt.isoweekday() not in dias_semana:
+                    continue
 
-            if tuvo_dia:
-                dias_con_dia += 1
-            if tuvo_noche:
-                dias_con_noche += 1
-            if not tuvo_dia and not tuvo_noche:
-                dias_sin_control += 1
+                dias_esperados += 1
+                turno_data = pasadas_por_objetivo[obj_id][fecha]
+                tuvo_dia = turno_data['diurno'] > 0
+                tuvo_noche = turno_data['nocturno'] > 0
 
-        if dias_esperados > 0:
-            porcentaje = (dias_esperados - dias_sin_control) / dias_esperados * 100
-        else:
-            porcentaje = 0.0
+                if tuvo_dia:
+                    dias_con_dia += 1
+                if tuvo_noche:
+                    dias_con_noche += 1
+                if not tuvo_dia and not tuvo_noche:
+                    dias_sin_control += 1
 
-        reporte['objetivos'].append({
-            'id': obj_id,
-            'nombre': nombre,
-            'dias_esperados': dias_esperados,
-            'dias_con_dia': dias_con_dia,
-            'dias_con_noche': dias_con_noche,
-            'dias_sin_control': dias_sin_control,
-            'cumplimiento': round(porcentaje, 1)
-        'dias_con_noche': dias_con_noche,
-            'dias_sin_control': dias_sin_control,
-            'cumplimiento': round(porcentaje, 1)
-        'dias_con_noche': dias_con_noche,
-            'dias_sin_control': dias_sin_control,
-            'cumplimiento': round(porcentaje, 1)
-        })
+            if dias_esperados > 0:
+                porcentaje = (dias_esperados - dias_sin_control) / dias_esperados * 100
+            else:
+                porcentaje = 0.0
 
-    conexion.close()
-    return reporte
+            reporte['objetivos'].append({
+                'id': obj_id,
+                'nombre': nombre,
+                'dias_esperados': dias_esperados,
+                'dias_con_dia': dias_con_dia,
+                'dias_con_noche': dias_con_noche,
+                'dias_sin_control': dias_sin_control,
+                'cumplimiento': round(porcentaje, 1)
+            })
+
+        conexion.close()
+        return reporte
+
+    except sqlite3.Error as e:
+        from services.logger import registrar_accion
+        from services.sesion import get_usuario_id
+        registrar_accion(get_usuario_id(), f"Error generando reporte mensual {mes}/{anio}: {str(e)}")
+        raise RuntimeError(f"Error de base de datos al generar reporte: {str(e)}")
+    except Exception as e:
+        from services.logger import registrar_accion
+        from services.sesion import get_usuario_id
+        registrar_accion(get_usuario_id(), f"Error inesperado generando reporte mensual {mes}/{anio}: {str(e)}")
+        raise RuntimeError(f"Error inesperado al generar reporte: {str(e)}")
 
 
 def generar_reporte_diario(fecha: str) -> dict:
