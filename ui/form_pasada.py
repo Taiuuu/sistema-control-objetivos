@@ -33,7 +33,7 @@ def _cargar_objetivos(fecha: str = None) -> list:
                 resultado = cursor.fetchone()
                 if resultado:
                     fecha_inicio, fecha_fin = resultado
-                    if fecha >= fecha_inicio and (fecha_fin is None or fecha <= fecha_fin):
+                    if (not fecha_inicio or fecha >= fecha_inicio) and (fecha_fin is None or fecha <= fecha_fin):
                         objetivos_filtrados.append(obj)
             conn.close()
         except Exception as e:

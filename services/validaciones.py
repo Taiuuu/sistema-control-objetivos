@@ -108,7 +108,7 @@ def validar_objetivo_activo_en_fecha(objetivo_id: int, fecha: str) -> None:
         fecha_inicio, fecha_fin = resultado
         
         # Verificar que la fecha esté dentro del rango del objetivo
-        if fecha < fecha_inicio:
+        if fecha_inicio and fecha < fecha_inicio:
             raise ErrorValidacion(f"El objetivo no estaba activo en la fecha {fecha} (inicia el {fecha_inicio})")
         
         if fecha_fin and fecha > fecha_fin:
