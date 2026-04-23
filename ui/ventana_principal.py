@@ -40,6 +40,7 @@ from ui.vista_indexacion import VistaIndexacion
 from ui.vista_sincronizacion import VistaSincronizacion
 from models.objetivos import dar_de_baja_objetivo
 from services.tema import obtener_tema_actual
+from services.permisos import tiene_permiso
 from services.backup import hacer_backup
 from services.logger import registrar_accion
 from services.assets import ruta_asset
@@ -560,7 +561,7 @@ class VentanaPrincipal(QWidget):
         add_btn("📥", "Importar Excel",      self.abrir_importar_excel)
         add_btn("❓", "Ayuda",               self.abrir_ayuda,              "(Ctrl+H)")
 
-        if self.rol == "admin":
+        if tiene_permiso('usuarios.ver'):
             add_sep()
             self._lbl_admin = QLabel("  ADMINISTRACIÓN")
             self._lbl_admin.setStyleSheet(f"""
@@ -659,6 +660,14 @@ class VentanaPrincipal(QWidget):
         self.usuario_label.setWordWrap(True)
         lay.addWidget(self.usuario_label)
 
+        # Botón de cerrar sesión
+        self.btn_logout = QPushButton("🚪 Cerrar sesión")
+        self.btn_logout.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_logout.setFixedHeight(34)
+        self.btn_logout.setStyleSheet(self._estilo_btn_logout(oscuro))
+        self.btn_logout.clicked.connect(self._cerrar_sesion)
+        lay.addWidget(self.btn_logout)
+
         return zona
 
     def _estilo_btn_tema(self, oscuro: bool) -> str:
@@ -676,6 +685,23 @@ class VentanaPrincipal(QWidget):
                 background-color: {p('accent', oscuro)};
                 color: white;
                 border-color: {p('accent', oscuro)};
+            }}
+        """
+
+    def _estilo_btn_logout(self, oscuro: bool) -> str:
+        return f"""
+            QPushButton {{
+                background-color: {p('accent_red', oscuro)};
+                color: white;
+                border: 1px solid {p('accent_red', oscuro)};
+                border-radius: 7px;
+                font-size: 11px;
+                padding: 0 10px;
+                text-align: center;
+            }}
+            QPushButton:hover {{
+                background-color: #ff5252;
+                border-color: #ff5252;
             }}
         """
 
@@ -1015,6 +1041,26 @@ class VentanaPrincipal(QWidget):
             self._oscuro = obtener_tema_actual() == "oscuro"
             self._refrescar_tema()
 
+    def _cerrar_sesion(self):
+        """Cierra la sesión actual y regresa a la ventana de login."""
+        from services.sesion import cerrar_sesion
+        from services.auditoria import registrar_evento
+
+        # Registrar el logout en auditoría
+        registrar_evento(self.usuario_id, "LOGOUT", "Usuario cerró sesión manualmente")
+
+        # Cerrar sesión
+        cerrar_sesion()
+
+        # Cerrar esta ventana
+        self.close()
+
+        # Mostrar ventana de login nuevamente
+        if self.on_login_exitoso:
+            from ui.login import LoginWindow
+            self.login = LoginWindow(self.on_login_exitoso)
+            self.login.show()
+
     def _refrescar_tema(self):
         """Reaplica todos los estilos con la paleta actual sin reconstruir widgets."""
         oscuro = self._oscuro
@@ -1103,6 +1149,9 @@ class VentanaPrincipal(QWidget):
         texto_tema = "☀  Modo claro" if oscuro else "🌙  Modo oscuro"
         self.btn_tema.setText(texto_tema)
         self.btn_tema.setStyleSheet(self._estilo_btn_tema(oscuro))
+
+        # Botón logout
+        self.btn_logout.setStyleSheet(self._estilo_btn_logout(oscuro))
 
         # Usuario label
         self.usuario_label.setStyleSheet(f"""

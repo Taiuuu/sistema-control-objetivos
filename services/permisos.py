@@ -13,39 +13,71 @@ from services.sesion import get_rol
 ROLES_DISPONIBLES = {
     'admin': 'Administrador completo del sistema',
     'supervisor': 'Supervisor de operaciones diarias',
+    'auditor': 'Auditor con acceso de solo lectura',
+    'gerente': 'Gerente con vista ejecutiva',
     'operador': 'Operador básico del sistema'
 }
 
 PERMISOS_POR_ROL: Dict[str, Set[str]] = {
     'admin': {
-        # Gestión de usuarios
+        # Gestión completa de usuarios
         'usuarios.crear', 'usuarios.editar', 'usuarios.eliminar', 'usuarios.ver',
-        # Gestión de objetivos
+        'usuarios.cambiar_rol',
+        # Gestión completa de objetivos
         'objetivos.crear', 'objetivos.editar', 'objetivos.eliminar', 'objetivos.ver',
-        # Gestión de supervisores
+        # Gestión completa de supervisores
         'supervisores.crear', 'supervisores.editar', 'supervisores.eliminar', 'supervisores.ver',
-        # Operaciones diarias
-        'pasadas.crear', 'pasadas.editar', 'pasadas.eliminar', 'pasadas.ver',
-        'equipos.crear', 'equipos.editar', 'equipos.eliminar', 'equipos.ver',
-        # Reportes y análisis
-        'reportes.ver', 'reportes.exportar',
-        # Configuración del sistema
-        'config.backup', 'config.restore', 'config.logs',
-        # Auditoría
-        'auditoria.ver'
-    },
-    'supervisor': {
-        # Gestión limitada de objetivos
-        'objetivos.ver', 'objetivos.editar',
-        # Gestión de supervisores
-        'supervisores.ver',
         # Operaciones diarias completas
         'pasadas.crear', 'pasadas.editar', 'pasadas.eliminar', 'pasadas.ver',
         'equipos.crear', 'equipos.editar', 'equipos.eliminar', 'equipos.ver',
-        # Reportes limitados
-        'reportes.ver',
+        # Reportes y análisis completos
+        'reportes.ver', 'reportes.exportar',
+        # Configuración completa del sistema
+        'config.backup', 'config.restore', 'config.logs', 'config.sincronizacion',
+        # Auditoría completa
+        'auditoria.ver',
+        # Notas completas
+        'notas.crear', 'notas.editar', 'notas.ver',
+        # Dashboard y estadísticas
+        'dashboard.ver', 'estadisticas.ver'
+    },
+    'supervisor': {
+        # Gestión limitada de objetivos
+        'objetivos.ver', 'objetivos.editar', 'objetivos.crear',
+        # Gestión de supervisores
+        'supervisores.ver', 'supervisores.editar',
+        # Operaciones diarias completas
+        'pasadas.crear', 'pasadas.editar', 'pasadas.eliminar', 'pasadas.ver',
+        'equipos.crear', 'equipos.editar', 'equipos.eliminar', 'equipos.ver',
+        # Reportes de su área
+        'reportes.ver', 'reportes.exportar',
         # Notas
-        'notas.crear', 'notas.editar', 'notas.ver'
+        'notas.crear', 'notas.editar', 'notas.ver',
+        # Dashboard básico
+        'dashboard.ver'
+    },
+    'auditor': {
+        # Solo lectura de todo
+        'usuarios.ver',
+        'objetivos.ver',
+        'supervisores.ver',
+        'pasadas.ver',
+        'equipos.ver',
+        'reportes.ver', 'reportes.exportar',
+        'auditoria.ver',
+        'notas.ver',
+        'dashboard.ver', 'estadisticas.ver',
+        'config.logs'
+    },
+    'gerente': {
+        # Vista ejecutiva
+        'objetivos.ver',
+        'supervisores.ver',
+        'pasadas.ver',
+        'equipos.ver',
+        'reportes.ver', 'reportes.exportar',
+        'dashboard.ver', 'estadisticas.ver',
+        'notas.ver'
     },
     'operador': {
         # Solo operaciones básicas
