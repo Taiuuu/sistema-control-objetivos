@@ -15,6 +15,22 @@ from services.sincronizacion import notificar_cambio
 # GESTIÓN DE USUARIOS
 # =============================================================================
 
+def get_username_by_id(usuario_id: int) -> str:
+    """
+    Obtiene el nombre de usuario por su ID.
+    Args:
+        usuario_id: ID del usuario
+    Returns:
+        Nombre de usuario o None si no existe
+    """
+    conexion = sqlite3.connect(DB_PATH)
+    cursor = conexion.cursor()
+    cursor.execute('SELECT username FROM usuarios WHERE id = ?', (usuario_id,))
+    resultado = cursor.fetchone()
+    conexion.close()
+    return resultado[0] if resultado else None
+
+
 def crear_usuario(username: str, password: str, rol: str = 'operador', debe_cambiar_password: bool = True) -> int:
     """
     Crea un nuevo usuario en el sistema.

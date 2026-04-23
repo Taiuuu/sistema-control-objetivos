@@ -45,7 +45,12 @@ from services.backup import hacer_backup
 from services.logger import registrar_accion
 from services.assets import ruta_asset
 from services.sincronizacion import obtener_sincronizador
+from services.usuarios import get_username_by_id
 from database.db import DB_PATH
+
+# Componentes visuales extraídos a ui/widgets/
+from ui.widgets.badges import BadgeEstado, BadgeNumero
+
 import sqlite3
 
 
@@ -114,12 +119,8 @@ def cargar_supervisores() -> list:
 
 
 def obtener_nombre_usuario(usuario_id: int) -> str:
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute('SELECT username FROM usuarios WHERE id = ?', (usuario_id,))
-    resultado = cursor.fetchone()
-    conexion.close()
-    return resultado[0] if resultado else "Usuario"
+    """Obtiene el nombre de usuario por ID."""
+    return get_username_by_id(usuario_id) or "Usuario"
 
 
 # =============================================================================

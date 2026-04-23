@@ -46,6 +46,14 @@ class Pasada:
 
 class DataProvider(ABC):
     """Interfaz abstracta para proveedores de datos."""
+    
+    # Métodos base con implementación por defecto para crear_pasada
+    def crear_pasada(self, pasada: Pasada) -> bool:
+        """
+        Método base que delegará a la implementación concreta.
+        Por defecto retorna False - debe ser sobrescrito.
+        """
+        raise NotImplementedError("Debe implementarse en subclase")
 
     @abstractmethod
     def get_usuarios(self) -> List[Usuario]:
@@ -64,13 +72,22 @@ class DataProvider(ABC):
         pass
 
     @abstractmethod
-    def crear_pasada(self, pasada: Pasada) -> bool:
-        pass
-
-    @abstractmethod
     def sincronizar_datos(self) -> Dict[str, Any]:
         """Sincronizar con servidor remoto (para futuro)."""
         pass
+    
+    # Métodos de utilidad comunes
+    def contar_pasadas(self, fecha: str, objetivo_id: int, turno: str = None) -> int:
+        """Cuenta pasadas para un objetivo en una fecha."""
+        return 0  # Default - sobrescribir en implementación
+    
+    def obtener_estado_cobertura(self, fecha: str, objetivo_id: int) -> Dict[str, Any]:
+        """Retorna el estado de cobertura para un objetivo."""
+        return {
+            'pasadas_dia': 0,
+            'pasadas_noche': 0,
+            'estado': 'sin_datos'
+        }
 
 
 class SQLiteDataProvider(DataProvider):
@@ -151,6 +168,113 @@ class SQLiteDataProvider(DataProvider):
             "estado": "local",
             "mensaje": "Datos locales, no hay servidor para sincronizar",
             "timestamp": None
+        }
+    
+    # =========================================================================
+    # Métodos de utilidad adicionales
+    # =========================================================================
+    
+    def contar_pasadas(self, fecha: str, objetivo_id: int, turno: str = None) -> int:
+        """Cuenta pasadas para un objetivo en una fecha y opcionalmente turno."""
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        query = 'SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?'
+        params = [fecha, objetivo_id]
+        if turno:
+            query += ' AND turno = ?'
+            params.append(turno)
+        cursor.execute(query, params)
+        resultado = cursor.fetchone()[0]
+        conn.close()
+        return resultado
+    
+    def obtener_estado_cobertura(self, fecha: str, objetivo_id: int) -> Dict[str, Any]:
+        """Retorna el estado de cobertura para un objetivo."""
+        pasadas_dia = self.contar_pasadas(fecha, objetivo_id, turno="diurno")
+        pasadas_noche = self.contar_pasadas(fecha, objetivo_id, turno="nocturno")
+        
+        if pasadas_dia > 0 and pasadas_noche > 0:
+            estado = "completo"
+        elif pasadas_dia > 0 or pasadas_noche > 0:
+            estado = "parcial"
+        else:
+            estado = "sin_cobertura"
+            
+        return {
+            'pasadas_dia': pasadas_dia,
+            'pasadas_noche': pasadas_noche,
+            'estado': estado,
+            'objetivo_id': objetivo_id,
+            'fecha': fecha
+        }
+    
+    def get_pasadas_por_objetivo(self, objetivo_id: int, fecha: str = None) -> List[Pasada]:
+        """Obtiene todas las pasadas de un objetivo específico."""
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT p.id, p.fecha, p.hora, p.turno, p.supervisor_id, p.objetivo_id, p.notas,
+                   p.fecha_operativa
+            FROM pasadas p
+            WHERE p.objetivo_id = ?
+        """
+        params = [objetivo_id]
+        
+        if fecha:
+            query += " AND p.fecha = ?"
+            params.append(fecha)
+        
+        query += " ORDER BY p.fecha DESC, p.hora DESC"
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [Pasada(id=r[0], fecha=r[1], hora=r[2], turno=r[3],
+                      supervisor_id=r[4], objetivo_id=r[5], notas=r[6],
+                      fecha_operativa=r[7]) for r in rows]
+    
+    def get_estadisticas_dia(self, fecha: str) -> Dict[str, Any]:
+        """Obtiene estadísticas agregadas del día."""
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Total pasadas
+        cursor.execute("SELECT COUNT(*) FROM pasadas WHERE fecha = ?", (fecha,))
+        total_pasadas = cursor.fetchone()[0]
+        
+        # Pasadas por turno
+        cursor.execute("""
+            SELECT turno, COUNT(*) 
+            FROM pasadas 
+            WHERE fecha = ? 
+            GROUP BY turno
+        """, (fecha,))
+        por_turno = dict(cursor.fetchall())
+        
+        # Objetivos cubiertos (tienen al menos una pasada)
+        cursor.execute("""
+            SELECT COUNT(DISTINCT objetivo_id) 
+            FROM pasadas 
+            WHERE fecha = ?
+        """, (fecha,))
+        objetivos_cubiertos = cursor.fetchone()[0]
+        
+        # Total objetivos activos
+        cursor.execute("SELECT COUNT(*) FROM objetivos WHERE activo = 1")
+        total_objetivos = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        return {
+            'fecha': fecha,
+            'total_pasadas': total_pasadas,
+            'pasadas_diurno': por_turno.get('diurno', 0),
+            'pasadas_nocturno': por_turno.get('nocturno', 0),
+            'objetivos_cubiertos': objetivos_cubiertos,
+            'total_objetivos': total_objetivos,
+            'porcentaje_cobertura': round((objetivos_cubiertos / total_objetivos) * 100, 1) if total_objetivos > 0 else 0
         }
 
 
