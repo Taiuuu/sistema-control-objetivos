@@ -1,70 +1,130 @@
-# Sistema de Control de Objetivos
-### V.E.S.P Organizations – Seguridad Privada
+# 🏢 VESP Control de Objetivos
+### Sistema de gestión de seguridad privada - V.E.S.P Organizations
 
-![Logo](assets/vesp.png)
-
----
-
-## ¿De qué trata el sistema?
-
-Sistema de escritorio desarrollado para reemplazar el control manual en Excel de objetivos de seguridad privada.
-
-Permite registrar y visualizar en tiempo real qué objetivos fueron controlados durante el día, qué supervisores estaban de turno, cuántas pasadas se realizaron por turno y generar reportes mensuales de cumplimiento.
-
-**Versión actual: 1.0.0** - Con API REST avanzada y sincronización en tiempo real.
+![VESP Logo](assets/vesp.png)
 
 ---
 
-## 🚀 Novedades en v2.0
+## 📌 ¿Qué es VESP?
 
-- ✅ **API REST completa** con autenticación JWT y documentación OpenAPI
-- ✅ **Sincronización en tiempo real** entre módulos con notificaciones SSE
-- ✅ **Sistema de auditoría avanzado** con logs detallados y respaldo automático
-- ✅ **Validaciones exhaustivas** de datos con reglas de negocio
-- ✅ **Caché inteligente** para optimización de rendimiento
-- ✅ **Indexación óptima** de base de datos para consultas rápidas
-- ✅ **Interfaz mejorada** con actualizaciones automáticas en tiempo real
+**VESP** es un sistema profesional diseñado para mejorar la gestión de **objetivos de seguridad privada**.
 
-## 🔮 **Preparado para v3.0 - Multi-usuario**
+Permite registrar, monitorear y reportar el cumplimiento de supervisiones en tiempo real desde múltiples dispositivos (PC, tablets, móviles), con sincronización automática y reportes detallados.
 
-- 🏗️ **Arquitectura modular** con proveedores de datos intercambiables
-- 🔄 **Sistema de sincronización** preparado para trabajo offline/online
-- 📱 **App móvil** para supervisores con Kivy (Android/iOS)
-- 📊 **Importación universal** desde Excel, tablets y JSON
-- ☁️ **Base de datos centralizada** lista para PostgreSQL/MySQL
-- 🌐 **Cliente web** preparado para acceso remoto
-- 📡 **API preparada** para comunicación servidor-cliente
+### Caso de Uso Principal
+```
+Oficina: PC con PyQt6
+Supervisores en campo: Tablets Android (Kivy)
+Jefes: Acceso web para reportes
+Integración: APIs REST para sistemas externos
+```
+
+**Versión actual: 1.0.0** - Sistema de escritorio completo con API REST
 
 ---
 
-## 📦 Instalación
+## ✨ Características Principales
+
+### ✅ Versión Actual (v1.0) - Funcionando
+
+**Aplicación de Escritorio**
+- 📊 Dashboard con estado de cobertura en tiempo real
+- 📝 Registro de pasadas por turno (diurno/nocturno)
+- 👥 Gestión de supervisores y objetivos
+- 📈 Reportes mensuales detallados
+- 📊 Gráficos de cumplimiento
+- 🔐 Sistema de usuarios con roles (admin/operador/supervisor/auditor/gerente)
+
+**Base de Datos**
+- 🗄️ SQLite local con backup automático
+- 🔒 Auditoría completa de acciones
+- 📋 Validaciones exhaustivas de datos
+- 🔐 Encriptación de datos sensibles
+
+**Seguridad**
+- 🔐 Contraseñas encriptadas con bcrypt
+- 👤 Sistema de roles y permisos
+- 📋 Log de auditoría completo
+- 🔒 Cierre de sesión por inactividad
+
+**API REST**
+- ✅ Autenticación JWT
+- ✅ Endpoints documentados
+- ✅ Sincronización en tiempo real con SSE
+- ✅ Importación/exportación de datos
+
+### 🚀 Próximas Versiones
+
+**v2.0 - Q2-Q3 2026** 🟡
+- 📱 App móvil Android para supervisores
+- 🔄 Sincronización automática offline/online
+- 🖥️ Múltiples PCs trabajando simultáneamente
+- 📊 Importación universal (Excel/JSON/Tablets)
+
+**v3.0 - Q4 2026** 🔵
+- ☁️ Backend centralizado en servidor
+- 🌐 Cliente web para acceso remoto
+- 📱 App iOS nativa (Flutter)
+- 📡 WebSocket para sync en tiempo real
+- 📈 Análisis avanzado y predicciones
+
+---
+
+## � Instalación Rápida
 
 ### Opción 1: Instalador (Recomendado)
-
-1. Descargá el instalador desde la sección **Releases** del repositorio
-2. Ejecutá `VESP_Control_Instalador.exe`
-3. Seguí los pasos de instalación
-4. Se creará un acceso directo en el escritorio
+```bash
+1. Descargar desde: GitHub Releases
+2. Ejecutar: VESP_Control_Instalador.exe
+3. Seguir asistente de instalación
+4. Se crea acceso directo en escritorio
+```
 
 ### Opción 2: Desde código fuente
 
+**Requisitos previos:**
+- Python 3.8+
+- pip (gestor de paquetes Python)
+
+**Instalación:**
 ```bash
 # Clonar repositorio
 git clone https://github.com/Taiuuu/sistema-control-objetivos.git
 cd sistema-control-objetivos
 
+# Crear entorno virtual
+python -m venv venv
+.\venv\Scripts\activate  # Windows
+# o en Linux/Mac: source venv/bin/activate
+
 # Instalar dependencias
 pip install -r requirements.txt
 
-# Ejecutar aplicación
+# Ejecutar
 python main.py
 ```
 
-### Credenciales por defecto
-```
-Usuario: admin
-Contraseña: 0000
-```
+**Primera vez:**
+- Usuario: `admin`
+- Contraseña: `0000`
+- ⚠️ Se te pedirá cambiar la contraseña
+- Se creará base de datos automáticamente
+
+---
+
+## 📱 Instalación de App Móvil (Android)
+
+### Requisitos:
+- Tablet Android 5.0+
+- 50 MB de espacio libre
+- Conexión WiFi (para sincronización)
+
+### Instalación:
+1. **Descargar APK** desde GitHub Releases
+2. En la tablet: Settings → Security → Enable "Unknown sources"
+3. Transferir APK a tablet (por USB o email)
+4. Tocar archivo → Install
+5. Abrir app → Login con mismo usuario que en PC
 
 ---
 

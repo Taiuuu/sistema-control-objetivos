@@ -1,10 +1,14 @@
 # =============================================================================
-# VESP Organizations - App Móvil Offline-First
-# Aplicación móvil para supervisores (Android/iOS)
+# VESP Organizations - App Móvil Android (Kivy)
+# Supervisores en campo registran pasadas desde tablets Android
+#
+# Para compilar APK:
+#   pip install kivy buildozer cython
+#   buildozer android debug
+#
+# Versión Android: Kivy
+# Versión iOS: Flutter (ver mobile/ios/README.md)
 # =============================================================================
-
-# Archivo: mobile_app.py
-# Para ejecutar: python mobile_app.py
 
 import kivy
 kivy.require('2.1.0')
