@@ -25,6 +25,16 @@ Permite registrar y visualizar en tiempo real qué objetivos fueron controlados 
 - ✅ **Indexación óptima** de base de datos para consultas rápidas
 - ✅ **Interfaz mejorada** con actualizaciones automáticas en tiempo real
 
+## 🔮 **Preparado para v3.0 - Multi-usuario**
+
+- 🏗️ **Arquitectura modular** con proveedores de datos intercambiables
+- 🔄 **Sistema de sincronización** preparado para trabajo offline/online
+- 📱 **App móvil** para supervisores con Kivy (Android/iOS)
+- 📊 **Importación universal** desde Excel, tablets y JSON
+- ☁️ **Base de datos centralizada** lista para PostgreSQL/MySQL
+- 🌐 **Cliente web** preparado para acceso remoto
+- 📡 **API preparada** para comunicación servidor-cliente
+
 ---
 
 ## 📦 Instalación
@@ -127,7 +137,42 @@ Contraseña: 0000
 
 ---
 
-## 🔌 API REST Avanzada
+## � Funcionalidades Preparadas para Multi-usuario
+
+### Arquitectura Modular
+- **Proveedores de datos intercambiables**: Fácil cambio entre SQLite local y bases de datos remotas
+- **Sistema de sincronización**: Trabajo offline/online con cola de cambios pendientes
+- **API preparada**: Estructura lista para comunicación cliente-servidor
+
+### App Móvil para Supervisores
+```bash
+# Ejecutar app móvil (requiere Kivy)
+python mobile_app.py
+```
+
+**Características:**
+- ✅ **Offline-first**: Funciona sin conexión a internet
+- ✅ **Sincronización automática**: Envía datos cuando hay conexión
+- ✅ **Interfaz intuitiva**: Diseño optimizado para móviles
+- ✅ **GPS opcional**: Registro de ubicación (preparado)
+- ✅ **Fotos adjuntas**: Para evidencia visual (preparado)
+
+### Importación Universal
+- ✅ **Excel**: Archivos `.xlsx` con formato estandarizado
+- ✅ **Tablets**: Archivos JSON desde dispositivos móviles
+- ✅ **API**: Recepción de datos desde sistemas externos
+- ✅ **Validación automática**: Detección de duplicados y errores
+
+### Base de Datos Centralizada
+**Preparado para migración a PostgreSQL/MySQL:**
+- ✅ Esquema compatible con PostgreSQL
+- ✅ Consultas optimizadas para concurrencia
+- ✅ Sistema de backups preparado para la nube
+- ✅ Pool de conexiones para múltiples usuarios
+
+---
+
+## �🔌 API REST Avanzada
 
 El sistema incluye una API REST completa para integración con otros sistemas:
 
