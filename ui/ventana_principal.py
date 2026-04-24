@@ -16,6 +16,10 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence, QFont, QPalette
 from services.reportes import obtener_objetivos_del_dia
+from services.queries_tabla import (
+    contar_pasadas, obtener_equipo, cargar_supervisores, 
+    obtener_todas_pasadas_por_turno
+)
 from ui.animaciones import animar_entrada
 from ui.form_objetivo import FormObjetivo
 from ui.form_supervisor import FormSupervisor
@@ -48,214 +52,30 @@ from services.sincronizacion import obtener_sincronizador
 from services.usuarios import get_username_by_id
 from database.db import DB_PATH
 
-# Componentes visuales extraídos a ui/widgets/
+# Componentes visuales y estilos centralizados
 from ui.widgets.badges import BadgeEstado, BadgeNumero
-
-import sqlite3
+from ui.widgets.estilos import (
+    obtener_color, estilo_input, estilo_tabla, estilo_boton_menu,
+    estilo_separador, estilo_btn_tema, estilo_btn_logout, estilo_btn_zoom,
+    estilo_scrollarea_filtros, estilo_header
+)
 
 
 # =============================================================================
-# FUNCIONES DE CONSULTA
+# UTILIDADES
 # =============================================================================
-
-def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_id: int = None) -> int:
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    query = 'SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?'
-    params = [fecha, objetivo_id]
-    if turno:
-        query += ' AND turno = ?'
-        params.append(turno)
-    if supervisor_id:
-        query += ' AND supervisor_id = ?'
-        params.append(supervisor_id)
-    cursor.execute(query, params)
-    resultado = cursor.fetchone()[0]
-    conexion.close()
-    return resultado
-
-
-def obtener_estado_detallado(fecha: str, objetivo_id: int) -> tuple:
-    pasadas_dia   = contar_pasadas(fecha, objetivo_id, turno="diurno")
-    pasadas_noche = contar_pasadas(fecha, objetivo_id, turno="nocturno")
-    if pasadas_dia > 0 and pasadas_noche > 0:
-        return "Pasaron los dos", "#90EE90"
-    elif pasadas_dia > 0 and pasadas_noche == 0:
-        return "No pasó noche", "#FFD700"
-    elif pasadas_dia == 0 and pasadas_noche > 0:
-        return "No pasó día", "#FFD700"
-    else:
-        return "No pasó nadie", "#FF6B6B"
-
-
-def obtener_equipo(fecha: str, turno: str) -> str:
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute("""
-        SELECT s1.nombre, s2.nombre,
-               CASE WHEN e.supervisor3_id IS NOT NULL THEN s3.nombre ELSE NULL END
-        FROM equipos e
-        JOIN supervisores s1 ON e.supervisor1_id = s1.id
-        JOIN supervisores s2 ON e.supervisor2_id = s2.id
-        LEFT JOIN supervisores s3 ON e.supervisor3_id = s3.id
-        WHERE e.fecha = ? AND e.turno = ?
-    """, (fecha, turno))
-    resultado = cursor.fetchone()
-    conexion.close()
-    if not resultado:
-        return "—"
-    nombres = [n for n in resultado if n is not None]
-    if len(nombres) == 1:
-        return nombres[0]
-    return ", ".join(nombres[:-1]) + " y " + nombres[-1]
-
-def cargar_supervisores() -> list:
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute('SELECT id, nombre FROM supervisores')
-    resultado = cursor.fetchall()
-    conexion.close()
-    return resultado
-
 
 def obtener_nombre_usuario(usuario_id: int) -> str:
     """Obtiene el nombre de usuario por ID."""
     return get_username_by_id(usuario_id) or "Usuario"
 
 
-# =============================================================================
-# PALETAS DE COLOR
-# =============================================================================
-
-PALETA_OSCURA = {
-    "bg_sidebar":        "#111318",
-    "bg_sidebar_hover":  "#1e2128",
-    "bg_main":           "#16181e",
-    "bg_header":         "#1a1d24",
-    "bg_tabla":          "#1e2128",
-    "bg_tabla_alt":      "#1a1d24",
-    "accent":            "#4ade80",
-    "accent_dark":       "#22c55e",
-    "accent_red":        "#f87171",
-    "accent_yellow":     "#fbbf24",
-    "text_primary":      "#f1f5f9",
-    "text_secondary":    "#94a3b8",
-    "text_muted":        "#475569",
-    "border":            "#2a2d36",
-    "border_light":      "#1e2128",
-    "btn_menu_text":     "#cbd5e1",
-    "btn_menu_hover":    "#2a2d36",
-    "scrollbar":         "#2a2d36",
-    "scrollbar_handle":  "#3f4556",
-    "badge_bg":          "#1e2128",
-    "estado_verde_bg":   "#14532d",
-    "estado_verde_fg":   "#4ade80",
-    "estado_rojo_bg":    "#7f1d1d",
-    "estado_rojo_fg":    "#fca5a5",
-    "estado_amarillo_bg": "#78350f",
-    "estado_amarillo_fg": "#fcd34d",
-}
-
-PALETA_CLARA = {
-    "bg_sidebar":        "#f8fafc",
-    "bg_sidebar_hover":  "#f1f5f9",
-    "bg_main":           "#ffffff",
-    "bg_header":         "#f8fafc",
-    "bg_tabla":          "#ffffff",
-    "bg_tabla_alt":      "#f8fafc",
-    "accent":            "#16a34a",
-    "accent_dark":       "#15803d",
-    "accent_red":        "#dc2626",
-    "accent_yellow":     "#d97706",
-    "text_primary":      "#0f172a",
-    "text_secondary":    "#475569",
-    "text_muted":        "#94a3b8",
-    "border":            "#e2e8f0",
-    "border_light":      "#f1f5f9",
-    "btn_menu_text":     "#334155",
-    "btn_menu_hover":    "#e2e8f0",
-    "scrollbar":         "#e2e8f0",
-    "scrollbar_handle":  "#94a3b8",
-    "badge_bg":          "#f1f5f9",
-    "estado_verde_bg":   "#dcfce7",
-    "estado_verde_fg":   "#15803d",
-    "estado_rojo_bg":    "#fee2e2",
-    "estado_rojo_fg":    "#dc2626",
-    "estado_amarillo_bg": "#fef9c3",
-    "estado_amarillo_fg": "#b45309",
-}
-
-
-def p(key: str, oscuro: bool) -> str:
-    """Acceso rápido a paleta."""
-    return (PALETA_OSCURA if oscuro else PALETA_CLARA)[key]
-
-
-# =============================================================================
-# WIDGET BADGE ESTADO (pill coloreado)
-# =============================================================================
-
-class BadgeEstado(QLabel):
-    """Label con forma de pill para mostrar el estado de cobertura."""
-
-    _MAPA = {
-        "Pasaron los dos": ("estado_verde_bg",    "estado_verde_fg",    "✔  Pasaron los dos"),
-        "No pasó noche":   ("estado_amarillo_bg",  "estado_amarillo_fg", "🌙  No pasó noche"),
-        "No pasó día":     ("estado_amarillo_bg",  "estado_amarillo_fg", "☀  No pasó día"),
-        "No pasó nadie":   ("estado_rojo_bg",      "estado_rojo_fg",     "✖  No pasó nadie"),
-    }
-
-    def __init__(self, estado: str, oscuro: bool, parent=None):
-        super().__init__(parent)
-        bg_key, fg_key, texto = self._MAPA.get(
-            estado,
-            ("badge_bg", "text_secondary", estado)
-        )
-        bg = p(bg_key, oscuro)
-        fg = p(fg_key, oscuro)
-        self.setText(texto)
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet(f"""
-            QLabel {{
-                background-color: {bg};
-                color: {fg};
-                border-radius: 10px;
-                padding: 3px 10px;
-                font-size: 11px;
-                font-weight: 600;
-                letter-spacing: 0.3px;
-            }}
-        """)
-
-
-# =============================================================================
-# WIDGET BADGE NUMÉRICO (conteo de pasadas)
-# =============================================================================
-
-class BadgeNumero(QLabel):
-    def __init__(self, numero: int, oscuro: bool, parent=None):
-        super().__init__(parent)
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        if numero == 0:
-            bg = p("estado_rojo_bg", oscuro)
-            fg = p("estado_rojo_fg", oscuro)
-        elif numero == 1:
-            bg = p("estado_amarillo_bg", oscuro)
-            fg = p("estado_amarillo_fg", oscuro)
-        else:
-            bg = p("estado_verde_bg", oscuro)
-            fg = p("estado_verde_fg", oscuro)
-        self.setText(str(numero))
-        self.setStyleSheet(f"""
-            QLabel {{
-                background-color: {bg};
-                color: {fg};
-                border-radius: 12px;
-                padding: 2px 10px;
-                font-size: 12px;
-                font-weight: 700;
-            }}
-        """)
+def crear_separador(oscuro: bool) -> QFrame:
+    """Crea un separador visual horizontal."""
+    sep = QFrame()
+    sep.setFrameShape(QFrame.Shape.HLine)
+    sep.setStyleSheet(estilo_separador(oscuro))
+    return sep
 
 
 # =============================================================================
@@ -281,10 +101,10 @@ class BotonMenu(QPushButton):
         self._aplicar_estilo()
 
     def _aplicar_estilo(self):
-        bg_activo   = p("accent", self._oscuro)
+        bg_activo   = obtener_color("accent", self._oscuro)
         text_activo = "#ffffff"
-        bg_hover    = p("btn_menu_hover", self._oscuro)
-        text_normal = p("btn_menu_text", self._oscuro)
+        bg_hover    = obtener_color("btn_menu_hover", self._oscuro)
+        text_normal = obtener_color("btn_menu_text", self._oscuro)
 
         if self._activo:
             self.setStyleSheet(f"""
@@ -312,7 +132,7 @@ class BotonMenu(QPushButton):
                 }}
                 QPushButton:hover {{
                     background-color: {bg_hover};
-                    color: {p("text_primary", self._oscuro)};
+                    color: {obtener_color("text_primary", self._oscuro)};
                 }}
                 QPushButton:pressed {{
                     background-color: {bg_activo};
@@ -333,17 +153,6 @@ class BotonMenu(QPushButton):
         self._expandido = True
         self.setText(self._texto_completo)
 
-
-# =============================================================================
-# SEPARADOR ELEGANTE
-# =============================================================================
-
-def crear_separador(oscuro: bool) -> QFrame:
-    s = QFrame()
-    s.setFrameShape(QFrame.Shape.HLine)
-    color = p("border", oscuro)
-    s.setStyleSheet(f"QFrame {{ color: {color}; background-color: {color}; border: none; max-height: 1px; margin: 4px 6px; }}")
-    return s
 
 
 # =============================================================================
@@ -394,7 +203,7 @@ class VentanaPrincipal(QWidget):
         self._construir_sidebar(layout_raiz)
         self._construir_panel_derecho(layout_raiz)
 
-        self.setStyleSheet(f"QWidget#VentanaPrincipal {{ background-color: {p('bg_main', self._oscuro)}; }}")
+        self.setStyleSheet(f"QWidget#VentanaPrincipal {{ background-color: {obtener_color('bg_main', self._oscuro)}; }}")
         self.setObjectName("VentanaPrincipal")
 
     # -------------------------------------------------------------------------
@@ -409,8 +218,8 @@ class VentanaPrincipal(QWidget):
         self.panel_lateral.setFixedWidth(self.SIDEBAR_EXPANDIDO)
         self.panel_lateral.setStyleSheet(f"""
             QFrame#PanelLateral {{
-                background-color: {p('bg_sidebar', oscuro)};
-                border-right: 1px solid {p('border', oscuro)};
+                background-color: {obtener_color('bg_sidebar', oscuro)};
+                border-right: 1px solid {obtener_color('border', oscuro)};
             }}
         """)
 
@@ -434,7 +243,7 @@ class VentanaPrincipal(QWidget):
                 border-radius: 2px;
             }}
             QScrollBar::handle:vertical {{
-                background: {p('scrollbar_handle', oscuro)};
+                background: {obtener_color('scrollbar_handle', oscuro)};
                 border-radius: 2px;
                 min-height: 24px;
             }}
@@ -443,7 +252,7 @@ class VentanaPrincipal(QWidget):
         """)
 
         self._contenedor_scroll = QWidget()
-        self._contenedor_scroll.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
+        self._contenedor_scroll.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
         self.layout_scroll = QVBoxLayout(self._contenedor_scroll)
         self.layout_scroll.setSpacing(2)
         self.layout_scroll.setContentsMargins(8, 8, 8, 8)
@@ -464,7 +273,7 @@ class VentanaPrincipal(QWidget):
         oscuro = self._oscuro
         self._cabecera_sidebar = QWidget()
         self._cabecera_sidebar.setFixedHeight(100)
-        self._cabecera_sidebar.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
+        self._cabecera_sidebar.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
 
         lay = QVBoxLayout(self._cabecera_sidebar)
         lay.setContentsMargins(10, 10, 10, 6)
@@ -477,15 +286,15 @@ class VentanaPrincipal(QWidget):
         self.btn_colapsar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_colapsar.setStyleSheet(f"""
             QToolButton {{
-                background: {p('btn_menu_hover', oscuro)};
-                color: {p('text_secondary', oscuro)};
+                background: {obtener_color('btn_menu_hover', oscuro)};
+                color: {obtener_color('text_secondary', oscuro)};
                 border: none;
                 border-radius: 5px;
                 font-size: 14px;
                 font-weight: bold;
             }}
             QToolButton:hover {{
-                background: {p('accent', oscuro)};
+                background: {obtener_color('accent', oscuro)};
                 color: white;
             }}
         """)
@@ -507,7 +316,7 @@ class VentanaPrincipal(QWidget):
 
         self.titulo_lateral = QLabel("V.E.S.P")
         self.titulo_lateral.setStyleSheet(f"""
-            color: {p('accent', oscuro)};
+            color: {obtener_color('accent', oscuro)};
             font-size: 16px;
             font-weight: 800;
             letter-spacing: 2px;
@@ -516,7 +325,7 @@ class VentanaPrincipal(QWidget):
 
         self.subtitulo_lateral = QLabel("Organizations")
         self.subtitulo_lateral.setStyleSheet(f"""
-            color: {p('text_muted', oscuro)};
+            color: {obtener_color('text_muted', oscuro)};
             font-size: 10px;
             letter-spacing: 1px;
         """)
@@ -566,7 +375,7 @@ class VentanaPrincipal(QWidget):
             add_sep()
             self._lbl_admin = QLabel("  ADMINISTRACIÓN")
             self._lbl_admin.setStyleSheet(f"""
-                color: {p('text_muted', oscuro)};
+                color: {obtener_color('text_muted', oscuro)};
                 font-size: 9px;
                 letter-spacing: 1.2px;
                 font-weight: 600;
@@ -591,7 +400,7 @@ class VentanaPrincipal(QWidget):
     def _construir_zona_inferior(self) -> QWidget:
         oscuro = self._oscuro
         zona = QWidget()
-        zona.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
+        zona.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
         lay = QVBoxLayout(zona)
         lay.setContentsMargins(8, 4, 8, 10)
         lay.setSpacing(4)
@@ -603,9 +412,9 @@ class VentanaPrincipal(QWidget):
 
         estilo_mini_btn = f"""
             QPushButton {{
-                background-color: {p('btn_menu_hover', oscuro)};
-                color: {p('text_secondary', oscuro)};
-                border: 1px solid {p('border', oscuro)};
+                background-color: {obtener_color('btn_menu_hover', oscuro)};
+                color: {obtener_color('text_secondary', oscuro)};
+                border: 1px solid {obtener_color('border', oscuro)};
                 border-radius: 5px;
                 font-size: 11px;
                 min-width: 30px;
@@ -613,9 +422,9 @@ class VentanaPrincipal(QWidget):
                 min-height: 26px;
             }}
             QPushButton:hover {{
-                background-color: {p('accent', oscuro)};
+                background-color: {obtener_color('accent', oscuro)};
                 color: white;
-                border-color: {p('accent', oscuro)};
+                border-color: {obtener_color('accent', oscuro)};
             }}
         """
 
@@ -632,7 +441,7 @@ class VentanaPrincipal(QWidget):
         self._btn_zoom_mas.clicked.connect(self._zoom_mas)
 
         self.lbl_zoom = QLabel(f"{self.zoom_nivel}px")
-        self.lbl_zoom.setStyleSheet(f"color: {p('text_muted', oscuro)}; font-size: 10px;")
+        self.lbl_zoom.setStyleSheet(f"color: {obtener_color('text_muted', oscuro)}; font-size: 10px;")
         self.lbl_zoom.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         fila_zoom.addWidget(self._btn_zoom_menos)
@@ -651,11 +460,11 @@ class VentanaPrincipal(QWidget):
         nombre_usuario = obtener_nombre_usuario(self.usuario_id)
         self.usuario_label = QLabel(f"👤  {nombre_usuario}")
         self.usuario_label.setStyleSheet(f"""
-            color: {p('text_muted', oscuro)};
+            color: {obtener_color('text_muted', oscuro)};
             font-size: 10px;
             padding: 3px 4px;
             border-radius: 5px;
-            background: {p('btn_menu_hover', oscuro)};
+            background: {obtener_color('btn_menu_hover', oscuro)};
         """)
         self.usuario_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.usuario_label.setWordWrap(True)
@@ -674,27 +483,27 @@ class VentanaPrincipal(QWidget):
     def _estilo_btn_tema(self, oscuro: bool) -> str:
         return f"""
             QPushButton {{
-                background-color: {p('btn_menu_hover', oscuro)};
-                color: {p('text_secondary', oscuro)};
-                border: 1px solid {p('border', oscuro)};
+                background-color: {obtener_color('btn_menu_hover', oscuro)};
+                color: {obtener_color('text_secondary', oscuro)};
+                border: 1px solid {obtener_color('border', oscuro)};
                 border-radius: 7px;
                 font-size: 11px;
                 padding: 0 10px;
                 text-align: left;
             }}
             QPushButton:hover {{
-                background-color: {p('accent', oscuro)};
+                background-color: {obtener_color('accent', oscuro)};
                 color: white;
-                border-color: {p('accent', oscuro)};
+                border-color: {obtener_color('accent', oscuro)};
             }}
         """
 
     def _estilo_btn_logout(self, oscuro: bool) -> str:
         return f"""
             QPushButton {{
-                background-color: {p('accent_red', oscuro)};
+                background-color: {obtener_color('accent_red', oscuro)};
                 color: white;
-                border: 1px solid {p('accent_red', oscuro)};
+                border: 1px solid {obtener_color('accent_red', oscuro)};
                 border-radius: 7px;
                 font-size: 11px;
                 padding: 0 10px;
@@ -714,7 +523,7 @@ class VentanaPrincipal(QWidget):
         oscuro = self._oscuro
 
         self._panel_derecho = QWidget()
-        self._panel_derecho.setStyleSheet(f"background-color: {p('bg_main', oscuro)};")
+        self._panel_derecho.setStyleSheet(f"background-color: {obtener_color('bg_main', oscuro)};")
         layout_derecho = QVBoxLayout(self._panel_derecho)
         layout_derecho.setContentsMargins(0, 0, 0, 0)
         layout_derecho.setSpacing(0)
@@ -727,7 +536,7 @@ class VentanaPrincipal(QWidget):
 
         self._sep_header = QFrame()
         self._sep_header.setFrameShape(QFrame.Shape.HLine)
-        self._sep_header.setStyleSheet(f"QFrame {{ background: {p('border', oscuro)}; max-height: 1px; border: none; margin: 0; }}")
+        self._sep_header.setStyleSheet(f"QFrame {{ background: {obtener_color('border', oscuro)}; max-height: 1px; border: none; margin: 0; }}")
         layout_derecho.addWidget(self._sep_header)
 
         self._construir_tabla(layout_derecho)
@@ -740,8 +549,8 @@ class VentanaPrincipal(QWidget):
         header.setFixedHeight(56)
         header.setStyleSheet(f"""
             QFrame {{
-                background-color: {p('bg_header', oscuro)};
-                border-bottom: 1px solid {p('border', oscuro)};
+                background-color: {obtener_color('bg_header', oscuro)};
+                border-bottom: 1px solid {obtener_color('border', oscuro)};
             }}
         """)
         lay = QHBoxLayout(header)
@@ -750,7 +559,7 @@ class VentanaPrincipal(QWidget):
 
         self._lbl_titulo_header = QLabel("Control de Objetivos")
         self._lbl_titulo_header.setStyleSheet(f"""
-            color: {p('text_primary', oscuro)};
+            color: {obtener_color('text_primary', oscuro)};
             font-size: 17px;
             font-weight: 700;
             letter-spacing: 0.3px;
@@ -759,7 +568,7 @@ class VentanaPrincipal(QWidget):
 
         self._lbl_subtitulo_header = QLabel("·  VESP Organizations")
         self._lbl_subtitulo_header.setStyleSheet(f"""
-            color: {p('text_muted', oscuro)};
+            color: {obtener_color('text_muted', oscuro)};
             font-size: 12px;
         """)
         lay.addWidget(self._lbl_subtitulo_header)
@@ -767,7 +576,7 @@ class VentanaPrincipal(QWidget):
 
         self.lbl_estado_sync = QLabel("● En vivo")
         self.lbl_estado_sync.setStyleSheet(f"""
-            color: {p('accent', oscuro)};
+            color: {obtener_color('accent', oscuro)};
             font-size: 10px;
             font-weight: 600;
         """)
@@ -786,26 +595,26 @@ class VentanaPrincipal(QWidget):
         scroll_filtros.setStyleSheet(f"""
             QScrollArea {{
                 border: none;
-                background: {p('bg_header', oscuro)};
+                background: {obtener_color('bg_header', oscuro)};
             }}
             QScrollBar:horizontal {{
                 height: 3px;
                 background: transparent;
             }}
             QScrollBar::handle:horizontal {{
-                background: {p('scrollbar_handle', oscuro)};
+                background: {obtener_color('scrollbar_handle', oscuro)};
                 border-radius: 1px;
             }}
         """)
 
         estilo_input = self._estilo_input(oscuro)
-        estilo_lbl   = f"color: {p('text_secondary', oscuro)}; font-size: 11px; font-weight: 500;"
+        estilo_lbl   = f"color: {obtener_color('text_secondary', oscuro)}; font-size: 11px; font-weight: 500;"
 
         estilo_btn_nav = f"""
             QPushButton {{
-                background-color: {p('bg_tabla', oscuro)};
-                color: {p('text_secondary', oscuro)};
-                border: 1px solid {p('border', oscuro)};
+                background-color: {obtener_color('bg_tabla', oscuro)};
+                color: {obtener_color('text_secondary', oscuro)};
+                border: 1px solid {obtener_color('border', oscuro)};
                 border-radius: 7px;
                 font-size: 13px;
                 min-width: 28px;
@@ -813,15 +622,15 @@ class VentanaPrincipal(QWidget):
                 min-height: 28px;
             }}
             QPushButton:hover {{
-                background-color: {p('accent', oscuro)};
+                background-color: {obtener_color('accent', oscuro)};
                 color: white;
-                border-color: {p('accent', oscuro)};
+                border-color: {obtener_color('accent', oscuro)};
             }}
         """
 
         estilo_btn_accion = f"""
             QPushButton {{
-                background-color: {p('accent', oscuro)};
+                background-color: {obtener_color('accent', oscuro)};
                 color: white;
                 border: none;
                 border-radius: 7px;
@@ -831,12 +640,12 @@ class VentanaPrincipal(QWidget):
                 min-height: 28px;
             }}
             QPushButton:hover {{
-                background-color: {p('accent_dark', oscuro)};
+                background-color: {obtener_color('accent_dark', oscuro)};
             }}
         """
 
         self._widget_filtros = QWidget()
-        self._widget_filtros.setStyleSheet(f"background-color: {p('bg_header', oscuro)};")
+        self._widget_filtros.setStyleSheet(f"background-color: {obtener_color('bg_header', oscuro)};")
         fila = QHBoxLayout(self._widget_filtros)
         fila.setContentsMargins(16, 0, 16, 0)
         fila.setSpacing(8)
@@ -918,20 +727,20 @@ class VentanaPrincipal(QWidget):
     def _estilo_input(self, oscuro: bool) -> str:
         return f"""
             QComboBox, QLineEdit, QDateEdit {{
-                background-color: {p('bg_tabla', oscuro)};
-                color: {p('text_primary', oscuro)};
-                border: 1px solid {p('border', oscuro)};
+                background-color: {obtener_color('bg_tabla', oscuro)};
+                color: {obtener_color('text_primary', oscuro)};
+                border: 1px solid {obtener_color('border', oscuro)};
                 border-radius: 7px;
                 padding: 4px 8px;
                 font-size: 12px;
                 min-height: 28px;
-                selection-background-color: {p('accent', oscuro)};
+                selection-background-color: {obtener_color('accent', oscuro)};
             }}
             QComboBox:hover, QLineEdit:hover, QDateEdit:hover {{
-                border-color: {p('accent', oscuro)};
+                border-color: {obtener_color('accent', oscuro)};
             }}
             QComboBox:focus, QLineEdit:focus, QDateEdit:focus {{
-                border-color: {p('accent', oscuro)};
+                border-color: {obtener_color('accent', oscuro)};
                 outline: none;
             }}
             QComboBox::drop-down {{
@@ -939,10 +748,10 @@ class VentanaPrincipal(QWidget):
                 width: 20px;
             }}
             QComboBox QAbstractItemView {{
-                background-color: {p('bg_tabla', oscuro)};
-                color: {p('text_primary', oscuro)};
-                border: 1px solid {p('border', oscuro)};
-                selection-background-color: {p('accent', oscuro)};
+                background-color: {obtener_color('bg_tabla', oscuro)};
+                color: {obtener_color('text_primary', oscuro)};
+                border: 1px solid {obtener_color('border', oscuro)};
+                selection-background-color: {obtener_color('accent', oscuro)};
                 selection-color: white;
                 outline: none;
             }}
@@ -984,28 +793,28 @@ class VentanaPrincipal(QWidget):
     def _estilo_tabla(self, oscuro: bool) -> str:
         return f"""
             QTableWidget {{
-                background-color: {p('bg_tabla', oscuro)};
+                background-color: {obtener_color('bg_tabla', oscuro)};
                 gridline-color: transparent;
                 border: none;
                 outline: none;
                 font-size: 12px;
-                color: {p('text_primary', oscuro)};
+                color: {obtener_color('text_primary', oscuro)};
                 selection-background-color: transparent;
             }}
             QTableWidget::item {{
                 padding: 6px 10px;
-                border-bottom: 1px solid {p('border_light', oscuro)};
-                color: {p('text_primary', oscuro)};
+                border-bottom: 1px solid {obtener_color('border_light', oscuro)};
+                color: {obtener_color('text_primary', oscuro)};
             }}
             QTableWidget::item:selected {{
-                background-color: {p('btn_menu_hover', oscuro)};
-                color: {p('text_primary', oscuro)};
+                background-color: {obtener_color('btn_menu_hover', oscuro)};
+                color: {obtener_color('text_primary', oscuro)};
             }}
             QHeaderView::section {{
-                background-color: {p('bg_header', oscuro)};
-                color: {p('text_secondary', oscuro)};
+                background-color: {obtener_color('bg_header', oscuro)};
+                color: {obtener_color('text_secondary', oscuro)};
                 border: none;
-                border-bottom: 2px solid {p('accent', oscuro)};
+                border-bottom: 2px solid {obtener_color('accent', oscuro)};
                 padding: 8px 10px;
                 font-size: 11px;
                 font-weight: 600;
@@ -1016,7 +825,7 @@ class VentanaPrincipal(QWidget):
                 background: transparent;
             }}
             QScrollBar::handle:vertical {{
-                background: {p('scrollbar_handle', oscuro)};
+                background: {obtener_color('scrollbar_handle', oscuro)};
                 border-radius: 3px;
                 min-height: 24px;
             }}
@@ -1027,7 +836,7 @@ class VentanaPrincipal(QWidget):
                 background: transparent;
             }}
             QScrollBar::handle:horizontal {{
-                background: {p('scrollbar_handle', oscuro)};
+                background: {obtener_color('scrollbar_handle', oscuro)};
                 border-radius: 3px;
             }}
         """
@@ -1067,28 +876,28 @@ class VentanaPrincipal(QWidget):
         oscuro = self._oscuro
 
         # Ventana raíz
-        self.setStyleSheet(f"QWidget#VentanaPrincipal {{ background-color: {p('bg_main', oscuro)}; }}")
+        self.setStyleSheet(f"QWidget#VentanaPrincipal {{ background-color: {obtener_color('bg_main', oscuro)}; }}")
 
         # Sidebar
         self.panel_lateral.setStyleSheet(f"""
             QFrame#PanelLateral {{
-                background-color: {p('bg_sidebar', oscuro)};
-                border-right: 1px solid {p('border', oscuro)};
+                background-color: {obtener_color('bg_sidebar', oscuro)};
+                border-right: 1px solid {obtener_color('border', oscuro)};
             }}
         """)
-        self._cabecera_sidebar.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
-        self._contenedor_scroll.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
-        self._zona_inferior.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
+        self._cabecera_sidebar.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
+        self._contenedor_scroll.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
+        self._zona_inferior.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
 
         # Títulos sidebar
         self.titulo_lateral.setStyleSheet(f"""
-            color: {p('accent', oscuro)};
+            color: {obtener_color('accent', oscuro)};
             font-size: 16px;
             font-weight: 800;
             letter-spacing: 2px;
         """)
         self.subtitulo_lateral.setStyleSheet(f"""
-            color: {p('text_muted', oscuro)};
+            color: {obtener_color('text_muted', oscuro)};
             font-size: 10px;
             letter-spacing: 1px;
         """)
@@ -1096,15 +905,15 @@ class VentanaPrincipal(QWidget):
         # Botón colapsar
         self.btn_colapsar.setStyleSheet(f"""
             QToolButton {{
-                background: {p('btn_menu_hover', oscuro)};
-                color: {p('text_secondary', oscuro)};
+                background: {obtener_color('btn_menu_hover', oscuro)};
+                color: {obtener_color('text_secondary', oscuro)};
                 border: none;
                 border-radius: 5px;
                 font-size: 14px;
                 font-weight: bold;
             }}
             QToolButton:hover {{
-                background: {p('accent', oscuro)};
+                background: {obtener_color('accent', oscuro)};
                 color: white;
             }}
         """)
@@ -1117,7 +926,7 @@ class VentanaPrincipal(QWidget):
         # Label admin (solo existe si rol == admin)
         if hasattr(self, '_lbl_admin'):
             self._lbl_admin.setStyleSheet(f"""
-                color: {p('text_muted', oscuro)};
+                color: {obtener_color('text_muted', oscuro)};
                 font-size: 9px;
                 letter-spacing: 1.2px;
                 font-weight: 600;
@@ -1127,9 +936,9 @@ class VentanaPrincipal(QWidget):
         # Zoom
         estilo_mini_btn = f"""
             QPushButton {{
-                background-color: {p('btn_menu_hover', oscuro)};
-                color: {p('text_secondary', oscuro)};
-                border: 1px solid {p('border', oscuro)};
+                background-color: {obtener_color('btn_menu_hover', oscuro)};
+                color: {obtener_color('text_secondary', oscuro)};
+                border: 1px solid {obtener_color('border', oscuro)};
                 border-radius: 5px;
                 font-size: 11px;
                 min-width: 30px;
@@ -1137,14 +946,14 @@ class VentanaPrincipal(QWidget):
                 min-height: 26px;
             }}
             QPushButton:hover {{
-                background-color: {p('accent', oscuro)};
+                background-color: {obtener_color('accent', oscuro)};
                 color: white;
-                border-color: {p('accent', oscuro)};
+                border-color: {obtener_color('accent', oscuro)};
             }}
         """
         self._btn_zoom_menos.setStyleSheet(estilo_mini_btn)
         self._btn_zoom_mas.setStyleSheet(estilo_mini_btn)
-        self.lbl_zoom.setStyleSheet(f"color: {p('text_muted', oscuro)}; font-size: 10px;")
+        self.lbl_zoom.setStyleSheet(f"color: {obtener_color('text_muted', oscuro)}; font-size: 10px;")
 
         # Botón tema
         texto_tema = "☀  Modo claro" if oscuro else "🌙  Modo oscuro"
@@ -1156,48 +965,48 @@ class VentanaPrincipal(QWidget):
 
         # Usuario label
         self.usuario_label.setStyleSheet(f"""
-            color: {p('text_muted', oscuro)};
+            color: {obtener_color('text_muted', oscuro)};
             font-size: 10px;
             padding: 3px 4px;
             border-radius: 5px;
-            background: {p('btn_menu_hover', oscuro)};
+            background: {obtener_color('btn_menu_hover', oscuro)};
         """)
 
         # Panel derecho
-        self._panel_derecho.setStyleSheet(f"background-color: {p('bg_main', oscuro)};")
+        self._panel_derecho.setStyleSheet(f"background-color: {obtener_color('bg_main', oscuro)};")
 
         # Header
         self._header.setStyleSheet(f"""
             QFrame {{
-                background-color: {p('bg_header', oscuro)};
-                border-bottom: 1px solid {p('border', oscuro)};
+                background-color: {obtener_color('bg_header', oscuro)};
+                border-bottom: 1px solid {obtener_color('border', oscuro)};
             }}
         """)
         self._lbl_titulo_header.setStyleSheet(f"""
-            color: {p('text_primary', oscuro)};
+            color: {obtener_color('text_primary', oscuro)};
             font-size: 17px;
             font-weight: 700;
             letter-spacing: 0.3px;
         """)
-        self._lbl_subtitulo_header.setStyleSheet(f"color: {p('text_muted', oscuro)}; font-size: 12px;")
-        self.lbl_estado_sync.setStyleSheet(f"color: {p('accent', oscuro)}; font-size: 10px; font-weight: 600;")
+        self._lbl_subtitulo_header.setStyleSheet(f"color: {obtener_color('text_muted', oscuro)}; font-size: 12px;")
+        self.lbl_estado_sync.setStyleSheet(f"color: {obtener_color('accent', oscuro)}; font-size: 10px; font-weight: 600;")
 
         # Barra de filtros
         self._barra_filtros_widget.setStyleSheet(f"""
             QScrollArea {{
                 border: none;
-                background: {p('bg_header', oscuro)};
+                background: {obtener_color('bg_header', oscuro)};
             }}
             QScrollBar:horizontal {{
                 height: 3px;
                 background: transparent;
             }}
             QScrollBar::handle:horizontal {{
-                background: {p('scrollbar_handle', oscuro)};
+                background: {obtener_color('scrollbar_handle', oscuro)};
                 border-radius: 1px;
             }}
         """)
-        self._widget_filtros.setStyleSheet(f"background-color: {p('bg_header', oscuro)};")
+        self._widget_filtros.setStyleSheet(f"background-color: {obtener_color('bg_header', oscuro)};")
         estilo_input = self._estilo_input(oscuro)
         self.selector_fecha.setStyleSheet(estilo_input)
         self.filtro_turno.setStyleSheet(estilo_input)
@@ -1207,9 +1016,9 @@ class VentanaPrincipal(QWidget):
 
         estilo_btn_nav = f"""
             QPushButton {{
-                background-color: {p('bg_tabla', oscuro)};
-                color: {p('text_secondary', oscuro)};
-                border: 1px solid {p('border', oscuro)};
+                background-color: {obtener_color('bg_tabla', oscuro)};
+                color: {obtener_color('text_secondary', oscuro)};
+                border: 1px solid {obtener_color('border', oscuro)};
                 border-radius: 7px;
                 font-size: 13px;
                 min-width: 28px;
@@ -1217,9 +1026,9 @@ class VentanaPrincipal(QWidget):
                 min-height: 28px;
             }}
             QPushButton:hover {{
-                background-color: {p('accent', oscuro)};
+                background-color: {obtener_color('accent', oscuro)};
                 color: white;
-                border-color: {p('accent', oscuro)};
+                border-color: {obtener_color('accent', oscuro)};
             }}
         """
         self._boton_ant.setStyleSheet(estilo_btn_nav)
@@ -1227,7 +1036,7 @@ class VentanaPrincipal(QWidget):
 
         self._btn_filtrar.setStyleSheet(f"""
             QPushButton {{
-                background-color: {p('accent', oscuro)};
+                background-color: {obtener_color('accent', oscuro)};
                 color: white;
                 border: none;
                 border-radius: 7px;
@@ -1237,13 +1046,13 @@ class VentanaPrincipal(QWidget):
                 min-height: 28px;
             }}
             QPushButton:hover {{
-                background-color: {p('accent_dark', oscuro)};
+                background-color: {obtener_color('accent_dark', oscuro)};
             }}
         """)
 
         # Separador header
         self._sep_header.setStyleSheet(
-            f"QFrame {{ background: {p('border', oscuro)}; max-height: 1px; border: none; margin: 0; }}"
+            f"QFrame {{ background: {obtener_color('border', oscuro)}; max-height: 1px; border: none; margin: 0; }}"
         )
 
         # Tabla (el stylesheet + recargar regenera badges con la paleta nueva)
@@ -1560,19 +1369,19 @@ class VentanaPrincipal(QWidget):
 
         self.tabla.setRowCount(len(filas))
         oscuro  = self._oscuro
-        bg_fila = p("bg_tabla",     oscuro)
-        bg_alt  = p("bg_tabla_alt", oscuro)
+        bg_fila = obtener_color("bg_tabla",     oscuro)
+        bg_alt  = obtener_color("bg_tabla_alt", oscuro)
 
         for i, (o, pd, pn, estado) in enumerate(filas):
             bg = bg_fila if i % 2 == 0 else bg_alt
 
             item_obj = self._crear_item(o[1])
-            item_obj.setForeground(QColor(p("text_primary", oscuro)))
+            item_obj.setForeground(QColor(obtener_color("text_primary", oscuro)))
             item_obj.setBackground(QColor(bg))
             self.tabla.setItem(i, 0, item_obj)
 
             item_ed = self._crear_item(equipo_dia)
-            item_ed.setForeground(QColor(p("text_secondary", oscuro)))
+            item_ed.setForeground(QColor(obtener_color("text_secondary", oscuro)))
             item_ed.setBackground(QColor(bg))
             self.tabla.setItem(i, 1, item_ed)
 
@@ -1582,7 +1391,7 @@ class VentanaPrincipal(QWidget):
             self.tabla.setCellWidget(i, 2, cont_pd)
 
             item_en = self._crear_item(equipo_noche)
-            item_en.setForeground(QColor(p("text_secondary", oscuro)))
+            item_en.setForeground(QColor(obtener_color("text_secondary", oscuro)))
             item_en.setBackground(QColor(bg))
             self.tabla.setItem(i, 3, item_en)
 
@@ -1601,15 +1410,15 @@ class VentanaPrincipal(QWidget):
             boton_baja.setStyleSheet(f"""
                 QPushButton {{
                     background-color: transparent;
-                    color: {p('accent_red', oscuro)};
-                    border: 1px solid {p('accent_red', oscuro)};
+                    color: {obtener_color('accent_red', oscuro)};
+                    border: 1px solid {obtener_color('accent_red', oscuro)};
                     border-radius: 6px;
                     padding: 4px 10px;
                     font-size: 11px;
                     font-weight: 600;
                 }}
                 QPushButton:hover {{
-                    background-color: {p('accent_red', oscuro)};
+                    background-color: {obtener_color('accent_red', oscuro)};
                     color: white;
                 }}
             """)

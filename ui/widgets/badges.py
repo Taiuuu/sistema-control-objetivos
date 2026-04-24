@@ -5,38 +5,7 @@
 
 from PyQt6.QtWidgets import QLabel
 from PyQt6.QtCore import Qt
-
-
-# =============================================================================
-# PALETAS DE COLOR (compartidas)
-# =============================================================================
-
-PALETA_OSCURA = {
-    "estado_verde_bg":   "#14532d",
-    "estado_verde_fg":   "#4ade80",
-    "estado_rojo_bg":    "#7f1d1d",
-    "estado_rojo_fg":    "#fca5a5",
-    "estado_amarillo_bg": "#78350f",
-    "estado_amarillo_fg": "#fcd34d",
-    "badge_bg":          "#1e2128",
-    "text_secondary":    "#94a3b8",
-}
-
-PALETA_CLARA = {
-    "estado_verde_bg":   "#dcfce7",
-    "estado_verde_fg":   "#15803d",
-    "estado_rojo_bg":    "#fee2e2",
-    "estado_rojo_fg":    "#dc2626",
-    "estado_amarillo_bg": "#fef9c3",
-    "estado_amarillo_fg": "#b45309",
-    "badge_bg":          "#f1f5f9",
-    "text_secondary":    "#475569",
-}
-
-
-def p(key: str, oscuro: bool) -> str:
-    """Acceso rápido a paleta."""
-    return (PALETA_OSCURA if oscuro else PALETA_CLARA)[key]
+from ui.widgets.estilos import obtener_color
 
 
 # =============================================================================
@@ -59,8 +28,8 @@ class BadgeEstado(QLabel):
             estado,
             ("badge_bg", "text_secondary", estado)
         )
-        bg = p(bg_key, oscuro)
-        fg = p(fg_key, oscuro)
+        bg = obtener_color(bg_key, oscuro)
+        fg = obtener_color(fg_key, oscuro)
         self.setText(texto)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setStyleSheet(f"""
@@ -85,14 +54,14 @@ class BadgeNumero(QLabel):
         super().__init__(parent)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if numero == 0:
-            bg = p("estado_rojo_bg", oscuro)
-            fg = p("estado_rojo_fg", oscuro)
+            bg = obtener_color("estado_rojo_bg", oscuro)
+            fg = obtener_color("estado_rojo_fg", oscuro)
         elif numero == 1:
-            bg = p("estado_amarillo_bg", oscuro)
-            fg = p("estado_amarillo_fg", oscuro)
+            bg = obtener_color("estado_amarillo_bg", oscuro)
+            fg = obtener_color("estado_amarillo_fg", oscuro)
         else:
-            bg = p("estado_verde_bg", oscuro)
-            fg = p("estado_verde_fg", oscuro)
+            bg = obtener_color("estado_verde_bg", oscuro)
+            fg = obtener_color("estado_verde_fg", oscuro)
         self.setText(str(numero))
         self.setStyleSheet(f"""
             QLabel {{
