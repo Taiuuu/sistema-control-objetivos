@@ -1,39 +1,46 @@
 # =============================================================================
 # VESP Organizations - Sistema de Control de Objetivos
-# Módulo de reportes y lógica de control diario
+# Módulo de reportes y lógica de control diario OPTIMIZADO
 # =============================================================================
 
-import sqlite3
 import datetime
-from database.db import DB_PATH
+import calendar
+from collections import defaultdict
+from database.gestor_db import gestor_db
+from services.cache import cache_global
 
 
 def obtener_objetivos_del_dia(fecha: str) -> list:
     """
     Retorna los objetivos que corresponden ser controlados en una fecha dada.
-    - Solo muestra objetivos cuya fecha_inicio <= fecha
-    - Si tiene fecha_fin, solo muestra si fecha <= fecha_fin
-    - Si no tiene fecha_fin, se muestra indefinidamente
+    OPTIMIZADO: Usa gestor_db y cache.
     """
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-
-    cursor.execute("""
+    # Intentar obtener del cache
+    cache_key = f"objetivos_dia:{fecha}"
+    resultado_cache = cache_global.get(cache_key)
+    if resultado_cache is not None:
+        return resultado_cache
+    
+    # Query optimizada
+    query = """
         SELECT id, nombre, dias_semana, fecha_inicio, fecha_fin
         FROM objetivos
         WHERE (fecha_inicio IS NULL OR fecha_inicio <= ?)
           AND (fecha_fin IS NULL OR fecha_fin >= ?)
-    """, (fecha, fecha))
-
-    objetivos = cursor.fetchall()
-    conexion.close()
+    """
+    
+    objetivos = gestor_db.ejecutar(query, (fecha, fecha))
 
     fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
     dia_semana = fecha_dt.isoweekday()
 
     resultado = []
     for o in objetivos:
-        obj_id, nombre, dias_semana_str, fecha_inicio, fecha_fin = o
+        obj_id = o['id']
+        nombre = o['nombre']
+        dias_semana_str = o['dias_semana']
+        fecha_inicio = o['fecha_inicio']
+        fecha_fin = o['fecha_fin']
 
         if fecha_inicio and fecha < fecha_inicio:
             continue
@@ -47,6 +54,8 @@ def obtener_objetivos_del_dia(fecha: str) -> list:
 
         resultado.append((obj_id, nombre, dias_semana_str))
 
+    # Cachear por 5 minutos
+    cache_global.set(cache_key, resultado, 300)
     return resultado
 
 
@@ -62,23 +71,42 @@ def objetivo_corresponde(fecha: str, dias: str) -> bool:
 
 
 def reporte_mensual(anio: int, mes: int) -> None:
-    """Imprime en consola el reporte de cumplimiento mensual por objetivo."""
-    import calendar
+    """
+    Imprime en consola el reporte de cumplimiento mensual por objetivo.
+    OPTIMIZADO: Usa bulk queries.
+    """
+    total_dias = calendar.monthrange(anio, mes)[1]
+    fecha_inicio_mes = f"{anio}-{mes:02d}-01"
+    fecha_fin_mes = f"{anio}-{mes:02d}-{total_dias:02d}"
 
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
+    # Obtener todos los objetivos en una sola query
+    objetivos = gestor_db.ejecutar("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
 
-    cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
-    objetivos = cursor.fetchall()
+    # Obtener todas las pasadas del mes en una sola query
+    query_pasadas = """
+        SELECT fecha, objetivo_id, turno, COUNT(*) as total
+        FROM pasadas
+        WHERE fecha BETWEEN ? AND ?
+        GROUP BY fecha, objetivo_id, turno
+    """
+    pasadas_raw = gestor_db.ejecutar(query_pasadas, (fecha_inicio_mes, fecha_fin_mes))
+
+    # Indexar pasadas por objetivo y fecha
+    pasadas_por_objetivo = defaultdict(lambda: defaultdict(lambda: {'diurno': 0, 'nocturno': 0}))
+    for p in pasadas_raw:
+        pasadas_por_objetivo[p['objetivo_id']][p['fecha']][p['turno']] = p['total']
 
     print(f"\n=== REPORTE MENSUAL {mes}/{anio} ===\n")
     print(f"{'Objetivo':<20} {'Días esperados':<16} {'Días cumplidos':<16} {'Cumplimiento'}")
     print("-" * 70)
 
-    total_dias = calendar.monthrange(anio, mes)[1]
-
     for o in objetivos:
-        obj_id, nombre, inicio, fin, dias_str = o
+        obj_id = o['id']
+        nombre = o['nombre']
+        inicio = o['fecha_inicio']
+        fin = o['fecha_fin']
+        dias_str = o['dias_semana']
+        
         dias_semana = [int(d) for d in dias_str.split(",")]
         dias_esperados = 0
         dias_cumplidos = 0
@@ -95,27 +123,23 @@ def reporte_mensual(anio: int, mes: int) -> None:
                 continue
 
             dias_esperados += 1
-
-            cursor.execute("""
-                SELECT COUNT(*) FROM pasadas
-                WHERE fecha = ? AND objetivo_id = ?
-            """, (fecha, obj_id))
-
-            if cursor.fetchone()[0] > 0:
+            
+            # Usar índice precalculado en lugar de query
+            turno_data = pasadas_por_objetivo[obj_id][fecha]
+            if turno_data['diurno'] > 0 or turno_data['nocturno'] > 0:
                 dias_cumplidos += 1
 
         if dias_esperados > 0:
             porcentaje = (dias_cumplidos / dias_esperados) * 100
             print(f"{nombre:<20} {dias_esperados:<16} {dias_cumplidos:<16} {porcentaje:.1f}%")
 
-    conexion.close()
 
-
+@cache_global.auto_cache(ttl=600)
 def generar_reporte_mensual(anio: int, mes: int) -> dict:
-    """Genera y retorna el reporte de cumplimiento mensual por objetivo."""
-    import calendar
-    from collections import defaultdict
-
+    """
+    Genera y retorna el reporte de cumplimiento mensual por objetivo.
+    OPTIMIZADO: Bulk queries + cache (10 min).
+    """
     # Validar parámetros
     if not isinstance(anio, int) or not isinstance(mes, int):
         raise ValueError("Año y mes deben ser números enteros")
@@ -125,27 +149,28 @@ def generar_reporte_mensual(anio: int, mes: int) -> dict:
         raise ValueError("Año debe estar entre 2000 y 2100")
 
     try:
-        conexion = sqlite3.connect(DB_PATH)
-        cursor = conexion.cursor()
-
-        cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
-        objetivos = cursor.fetchall()
-
         total_dias = calendar.monthrange(anio, mes)[1]
         fecha_inicio_mes = f"{anio}-{mes:02d}-01"
         fecha_fin_mes = f"{anio}-{mes:02d}-{total_dias:02d}"
 
-        cursor.execute("""
-            SELECT fecha, objetivo_id, turno, COUNT(*)
+        # Obtener objetivos en una sola query
+        objetivos = gestor_db.ejecutar(
+            "SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos"
+        )
+
+        # Obtener todas las pasadas del mes en una sola query
+        query_pasadas = """
+            SELECT fecha, objetivo_id, turno, COUNT(*) as total
             FROM pasadas
             WHERE fecha BETWEEN ? AND ?
             GROUP BY fecha, objetivo_id, turno
-        """, (fecha_inicio_mes, fecha_fin_mes))
-        pasadas_raw = cursor.fetchall()
+        """
+        pasadas_raw = gestor_db.ejecutar(query_pasadas, (fecha_inicio_mes, fecha_fin_mes))
 
+        # Indexar pasadas por objetivo y fecha
         pasadas_por_objetivo = defaultdict(lambda: defaultdict(lambda: {'diurno': 0, 'nocturno': 0}))
-        for fecha, objetivo_id, turno, cantidad in pasadas_raw:
-            pasadas_por_objetivo[objetivo_id][fecha][turno] = cantidad
+        for p in pasadas_raw:
+            pasadas_por_objetivo[p['objetivo_id']][p['fecha']][p['turno']] = p['total']
 
         reporte = {
             'anio': anio,
@@ -154,7 +179,12 @@ def generar_reporte_mensual(anio: int, mes: int) -> dict:
         }
 
         for o in objetivos:
-            obj_id, nombre, inicio, fin, dias_str = o
+            obj_id = o['id']
+            nombre = o['nombre']
+            inicio = o['fecha_inicio']
+            fin = o['fecha_fin']
+            dias_str = o['dias_semana']
+            
             dias_semana = [int(d.strip()) for d in dias_str.split(",") if d.strip()]
             dias_esperados = 0
             dias_con_dia = 0
@@ -173,6 +203,8 @@ def generar_reporte_mensual(anio: int, mes: int) -> dict:
                     continue
 
                 dias_esperados += 1
+                
+                # Usar índice precalculado
                 turno_data = pasadas_por_objetivo[obj_id][fecha]
                 tuvo_dia = turno_data['diurno'] > 0
                 tuvo_noche = turno_data['nocturno'] > 0
@@ -199,46 +231,42 @@ def generar_reporte_mensual(anio: int, mes: int) -> dict:
                 'cumplimiento': round(porcentaje, 1)
             })
 
-        conexion.close()
         return reporte
 
-    except sqlite3.Error as e:
-        from services.logger import registrar_accion
-        from services.sesion import get_usuario_id
-        registrar_accion(get_usuario_id(), f"Error generando reporte mensual {mes}/{anio}: {str(e)}")
-        raise RuntimeError(f"Error de base de datos al generar reporte: {str(e)}")
     except Exception as e:
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id
-        registrar_accion(get_usuario_id(), f"Error inesperado generando reporte mensual {mes}/{anio}: {str(e)}")
-        raise RuntimeError(f"Error inesperado al generar reporte: {str(e)}")
+        try:
+            registrar_accion(get_usuario_id(), f"Error generando reporte mensual {mes}/{anio}: {str(e)}")
+        except Exception:
+            pass
+        raise RuntimeError(f"Error al generar reporte: {str(e)}")
 
 
 def generar_reporte_diario(fecha: str) -> dict:
-    """Genera y retorna el reporte diario de pasadas."""
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-
-    cursor.execute("""
+    """
+    Genera y retorna el reporte diario de pasadas.
+    OPTIMIZADO: Usa gestor_db.
+    """
+    query = """
         SELECT p.id, p.hora, p.turno, o.nombre, s.nombre
         FROM pasadas p
         JOIN objetivos o ON p.objetivo_id = o.id
         JOIN supervisores s ON p.supervisor_id = s.id
         WHERE p.fecha = ?
         ORDER BY p.hora
-    """, (fecha,))
+    """
 
-    pasadas = cursor.fetchall()
-    conexion.close()
+    pasadas = gestor_db.ejecutar(query, (fecha,))
 
     return {
         'fecha': fecha,
         'pasadas': [{
-            'id': p[0],
-            'hora': p[1],
-            'turno': p[2],
-            'objetivo': p[3],
-            'supervisor': p[4]
+            'id': p['id'],
+            'hora': p['hora'],
+            'turno': p['turno'],
+            'objetivo': p['o.nombre'],
+            'supervisor': p['s.nombre']
         } for p in pasadas],
         'total': len(pasadas)
     }

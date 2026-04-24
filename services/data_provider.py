@@ -1,13 +1,13 @@
 # =============================================================================
-# VESP Organizations - Capa de Abstracción de Datos
+# VESP Organizations - Capa de Abstracción de Datos OPTIMIZADA
 # Prepara el proyecto para multi-usuario y sincronización
 # =============================================================================
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
-import sqlite3
-from database.db import DB_PATH
+from database.gestor_db import gestor_db
+from services.cache import cache_global
 
 
 @dataclass
@@ -91,40 +91,48 @@ class DataProvider(ABC):
 
 
 class SQLiteDataProvider(DataProvider):
-    """Proveedor de datos local con SQLite."""
+    """
+    Proveedor de datos local con SQLite OPTIMIZADO.
+    Usa gestor_db y caché para mejor rendimiento.
+    """
 
+    @cache_global.auto_cache(ttl=120)
     def get_usuarios(self) -> List[Usuario]:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, username, rol, debe_cambiar_password FROM usuarios")
-        rows = cursor.fetchall()
-        conn.close()
-        return [Usuario(id=r[0], username=r[1], rol=r[2], debe_cambiar_password=bool(r[3])) for r in rows]
+        """Obtiene usuarios con cache de 2 minutos."""
+        rows = gestor_db.ejecutar("SELECT id, username, rol, debe_cambiar_password FROM usuarios")
+        return [Usuario(id=r['id'], username=r['username'], rol=r['rol'], 
+                       debe_cambiar_password=bool(r['debe_cambiar_password'])) for r in rows]
 
+    @cache_global.auto_cache(ttl=120)
     def get_objetivos(self) -> List[Objetivo]:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("""
+        """Obtiene objetivos con cache de 2 minutos."""
+        rows = gestor_db.ejecutar("""
             SELECT id, nombre, descripcion, fecha_inicio, fecha_fin, activo
             FROM objetivos WHERE activo = 1
         """)
-        rows = cursor.fetchall()
-        conn.close()
-        return [Objetivo(id=r[0], nombre=r[1], descripcion=r[2], fecha_inicio=r[3],
-                        fecha_fin=r[4], activo=bool(r[5])) for r in rows]
+        return [Objetivo(id=r['id'], nombre=r['nombre'], descripcion=r['descripcion'], 
+                        fecha_inicio=r['fecha_inicio'], fecha_fin=r['fecha_fin'], 
+                        activo=bool(r['activo'])) for r in rows]
 
+    @cache_global.auto_cache(ttl=120)
     def get_supervisores(self) -> List[Supervisor]:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, nombre, activo FROM supervisores WHERE activo = 1")
-        rows = cursor.fetchall()
-        conn.close()
-        return [Supervisor(id=r[0], nombre=r[1], activo=bool(r[2])) for r in rows]
+        """Obtiene supervisores con cache de 2 minutos."""
+        rows = gestor_db.ejecutar("SELECT id, nombre, activo FROM supervisores WHERE activo = 1")
+        return [Supervisor(id=r['id'], nombre=r['nombre'], activo=bool(r['activo'])) for r in rows]
 
     def get_pasadas(self, fecha: str = None) -> List[Pasada]:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-
+        """
+        Obtiene pasadas con lazy loading.
+        Si no se especifica fecha, carga solo las últimas 100.
+        """
+        cache_key = f"pasadas:{fecha}:limit_100"
+        
+        # Intentar cache para fechas específicas
+        if fecha:
+            resultado = cache_global.get(cache_key)
+            if resultado is not None:
+                return resultado
+        
         query = """
             SELECT p.id, p.fecha, p.hora, p.turno, p.supervisor_id, p.objetivo_id, p.notas,
                    p.fecha_operativa
@@ -136,27 +144,30 @@ class SQLiteDataProvider(DataProvider):
             query += " WHERE p.fecha = ?"
             params.append(fecha)
 
-        query += " ORDER BY p.fecha DESC, p.hora DESC"
+        query += " ORDER BY p.fecha DESC, p.hora DESC LIMIT 100"
 
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        conn.close()
+        rows = gestor_db.ejecutar(query, tuple(params) if params else ())
 
-        return [Pasada(id=r[0], fecha=r[1], hora=r[2], turno=r[3],
-                      supervisor_id=r[4], objetivo_id=r[5], notas=r[6],
-                      fecha_operativa=r[7]) for r in rows]
+        pasadas = [Pasada(id=r['id'], fecha=r['fecha'], hora=r['hora'], turno=r['turno'],
+                      supervisor_id=r['supervisor_id'], objetivo_id=r['objetivo_id'], 
+                      notas=r['notas'], fecha_operativa=r['fecha_operativa']) for r in rows]
+        
+        # Cachear solo si hay fecha específica
+        if fecha:
+            cache_global.set(cache_key, pasadas, 60)
+        
+        return pasadas
 
     def crear_pasada(self, pasada: Pasada) -> bool:
+        """Crea una nueva pasada."""
         try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO pasadas (fecha, hora, turno, supervisor_id, objetivo_id, notas, fecha_operativa)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (pasada.fecha, pasada.hora, pasada.turno, pasada.supervisor_id,
-                  pasada.objetivo_id, pasada.notas, pasada.fecha_operativa))
-            conn.commit()
-            conn.close()
+            with gestor_db.transaction() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO pasadas (fecha, hora, turno, supervisor_id, objetivo_id, notas, fecha_operativa)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (pasada.fecha, pasada.hora, pasada.turno, pasada.supervisor_id,
+                      pasada.objetivo_id, pasada.notas, pasada.fecha_operativa))
             return True
         except Exception as e:
             print(f"Error creando pasada: {e}")
@@ -171,55 +182,182 @@ class SQLiteDataProvider(DataProvider):
         }
     
     # =========================================================================
-    # Métodos de utilidad adicionales
+    # Métodos de utilidad adicionales OPTIMIZADOS
     # =========================================================================
     
     def contar_pasadas(self, fecha: str, objetivo_id: int, turno: str = None) -> int:
         """Cuenta pasadas para un objetivo en una fecha y opcionalmente turno."""
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
         query = 'SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?'
         params = [fecha, objetivo_id]
         if turno:
             query += ' AND turno = ?'
             params.append(turno)
-        cursor.execute(query, params)
-        resultado = cursor.fetchone()[0]
-        conn.close()
-        return resultado
+        return gestor_db.ejecutar_scalar(query, tuple(params))
     
     def obtener_estado_cobertura(self, fecha: str, objetivo_id: int) -> Dict[str, Any]:
         """Retorna el estado de cobertura para un objetivo."""
-        pasadas_dia = self.contar_pasadas(fecha, objetivo_id, turno="diurno")
-        pasadas_noche = self.contar_pasadas(fecha, objetivo_id, turno="nocturno")
+        # Usar una sola query en lugar de dos
+        query = """
+            SELECT 
+                SUM(CASE WHEN turno = 'diurno' THEN 1 ELSE 0 END) as dia,
+                SUM(CASE WHEN turno = 'nocturno' THEN 1 ELSE 0 END) as noche
+            FROM pasadas 
+            WHERE fecha = ? AND objetivo_id = ?
+        """
+        resultado = gestor_db.ejecutar(query, (fecha, objetivo_id))
+        
+        if resultado and resultado[0]:
+            pasadas_dia = resultado[0]['dia'] or 0
+            pasadas_noche = resultado[0]['noche'] or 0
+        else:
+            pasadas_dia = 0
+            pasadas_noche = 0
         
         if pasadas_dia > 0 and pasadas_noche > 0:
             estado = "completo"
         elif pasadas_dia > 0 or pasadas_noche > 0:
             estado = "parcial"
         else:
-            estado = "sin_cobertura"
-            
+            estado = "sin_datos"
+        
         return {
             'pasadas_dia': pasadas_dia,
             'pasadas_noche': pasadas_noche,
-            'estado': estado,
-            'objetivo_id': objetivo_id,
-            'fecha': fecha
+            'estado': estado
         }
-    
-    def get_pasadas_por_objetivo(self, objetivo_id: int, fecha: str = None) -> List[Pasada]:
-        """Obtiene todas las pasadas de un objetivo específico."""
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        
-        query = """
-            SELECT p.id, p.fecha, p.hora, p.turno, p.supervisor_id, p.objetivo_id, p.notas,
-                   p.fecha_operativa
-            FROM pasadas p
-            WHERE p.objetivo_id = ?
+
+
+# =============================================================================
+# MÉTODOS DE PAGINACIÓN
+# =============================================================================
+
+    def get_objetivos_paginados(self, pagina: int = 1, por_pagina: int = 50) -> Dict[str, Any]:
         """
-        params = [objetivo_id]
+        Obtiene objetivos con paginación.
+        Retorna: {items: [], total: int, pagina: int, total_paginas: int}
+        """
+        offset = (pagina - 1) * por_pagina
+        
+        # Obtener total
+        total = gestor_db.ejecutar_scalar("SELECT COUNT(*) FROM objetivos")
+        
+        # Obtener página
+        rows = gestor_db.ejecutar(
+            "SELECT id, nombre, descripcion, fecha_inicio, fecha_fin, activo FROM objetivos ORDER BY nombre LIMIT ? OFFSET ?",
+            (por_pagina, offset)
+        )
+        
+        objetivos = [Objetivo(id=r['id'], nombre=r['nombre'], descripcion=r['descripcion'],
+                            fecha_inicio=r['fecha_inicio'], fecha_fin=r['fecha_fin'],
+                            activo=bool(r['activo'])) for r in rows]
+        
+        return {
+            'items': objetivos,
+            'total': total or 0,
+            'pagina': pagina,
+            'por_pagina': por_pagina,
+            'total_paginas': (total or 0) // por_pagina + ((total or 0) % por_pagina > 0)
+        }
+
+    def get_supervisores_paginados(self, pagina: int = 1, por_pagina: int = 50) -> Dict[str, Any]:
+        """Obtiene supervisores con paginación."""
+        offset = (pagina - 1) * por_pagina
+        
+        total = gestor_db.ejecutar_scalar("SELECT COUNT(*) FROM supervisores")
+        
+        rows = gestor_db.ejecutar(
+            "SELECT id, nombre, fecha_alta, fecha_baja FROM supervisores ORDER BY nombre LIMIT ? OFFSET ?",
+            (por_pagina, offset)
+        )
+        
+        supervisores = [Supervisor(id=r['id'], nombre=r['nombre'], activo=not r['fecha_baja']) for r in rows]
+        
+        return {
+            'items': supervisores,
+            'total': total or 0,
+            'pagina': pagina,
+            'por_pagina': por_pagina,
+            'total_paginas': (total or 0) // por_pagina + ((total or 0) % por_pagina > 0)
+        }
+
+    def get_pasadas_paginadas(self, pagina: int = 1, por_pagina: int = 100, fecha: str = None) -> Dict[str, Any]:
+        """Obtiene pasadas con paginación."""
+        offset = (pagina - 1) * por_pagina
+        
+        # Query base
+        if fecha:
+            count_query = "SELECT COUNT(*) FROM pasadas WHERE fecha = ?"
+            data_query = "SELECT id, fecha, hora, turno, supervisor_id, objetivo_id, notas, fecha_operativa FROM pasadas WHERE fecha = ? ORDER BY fecha DESC, hora DESC LIMIT ? OFFSET ?"
+            count_params = (fecha,)
+            data_params = (fecha, por_pagina, offset)
+        else:
+            count_query = "SELECT COUNT(*) FROM pasadas"
+            data_query = "SELECT id, fecha, hora, turno, supervisor_id, objetivo_id, notas, fecha_operativa FROM pasadas ORDER BY fecha DESC, hora DESC LIMIT ? OFFSET ?"
+            count_params = ()
+            data_params = (por_pagina, offset)
+        
+        total = gestor_db.ejecutar_scalar(count_query, count_params)
+        rows = gestor_db.ejecutar(data_query, data_params)
+        
+        pasadas = [Pasada(id=r['id'], fecha=r['fecha'], hora=r['hora'], turno=r['turno'],
+                         supervisor_id=r['supervisor_id'], objetivo_id=r['objetivo_id'],
+                         notas=r['notas'], fecha_operativa=r['fecha_operativa']) for r in rows]
+        
+        return {
+            'items': pasadas,
+            'total': total or 0,
+            'pagina': pagina,
+            'por_pagina': por_pagina,
+            'total_paginas': (total or 0) // por_pagina + ((total or 0) % por_pagina > 0)
+        }
+
+
+# =============================================================================
+# MÉTODOS DE BÚSQUEDA
+# =============================================================================
+
+    def buscar_objetivos(self, texto: str) -> List[Objetivo]:
+        """Busca objetivos por nombre."""
+        rows = gestor_db.ejecutar(
+            "SELECT id, nombre, descripcion, fecha_inicio, fecha_fin, activo FROM objetivos WHERE nombre LIKE ? LIMIT 20",
+            (f"%{texto}%",)
+        )
+        return [Objetivo(id=r['id'], nombre=r['nombre'], descripcion=r['descripcion'],
+                        fecha_inicio=r['fecha_inicio'], fecha_fin=r['fecha_fin'],
+                        activo=bool(r['activo'])) for r in rows]
+
+    def buscar_supervisores(self, texto: str) -> List[Supervisor]:
+        """Busca supervisores por nombre."""
+        rows = gestor_db.ejecutar(
+            "SELECT id, nombre, activo FROM supervisores WHERE nombre LIKE ? LIMIT 20",
+            (f"%{texto}%",)
+        )
+        return [Supervisor(id=r['id'], nombre=r['nombre'], activo=bool(r['activo'])) for r in rows]
+
+
+# =============================================================================
+# MÉTODOS DE ESTADÍSTICAS RÁPIDAS
+# =============================================================================
+
+    def get_resumen_rapido(self) -> Dict[str, Any]:
+        """Obtiene un resumen rápido de la app en una sola query."""
+        query = """
+            SELECT 
+                (SELECT COUNT(*) FROM objetivos) as total_objetivos,
+                (SELECT COUNT(*) FROM supervisores WHERE fecha_baja IS NULL) as total_supervisores,
+                (SELECT COUNT(*) FROM pasadas WHERE fecha = date('now')) as pasadas_hoy,
+                (SELECT COUNT(*) FROM pasadas WHERE fecha >= date('now', '-7 days')) as pasadas_semana
+        """
+        resultado = gestor_db.ejecutar_dict(query, ())
+        
+        if resultado:
+            return {
+                'total_objetivos': resultado['total_objetivos'] or 0,
+                'total_supervisores': resultado['total_supervisores'] or 0,
+                'pasadas_hoy': resultado['pasadas_hoy'] or 0,
+                'pasadas_semana': resultado['pasadas_semana'] or 0
+            }
+        return {'total_objetivos': 0, 'total_supervisores': 0, 'pasadas_hoy': 0, 'pasadas_semana': 0}
         
         if fecha:
             query += " AND p.fecha = ?"

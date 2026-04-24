@@ -184,6 +184,30 @@ class CacheInteligente:
     def establecer_ttl_por_defecto(self, ttl_segundos: int) -> None:
         """Cambia el TTL por defecto para futuras entradas."""
         self._ttl_por_defecto = ttl_segundos
+    
+    def auto_cache(self, ttl: int = None):
+        """
+        Decorador para cachear automáticamente resultados de funciones.
+        Uso:
+            @cache_global.auto_cache(ttl=60)
+            def mi_funcion():
+                ...
+        """
+        def decorador(func):
+            from functools import wraps
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                # Generar clave basada en nombre de función y argumentos
+                clave = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+                resultado = self.get(clave)
+                if resultado is not None:
+                    return resultado
+                resultado = func(*args, **kwargs)
+                if resultado is not None:
+                    self.set(clave, resultado, ttl or self._ttl_por_defecto)
+                return resultado
+            return wrapper
+        return decorador
 
 
 # =============================================================================
@@ -196,6 +220,39 @@ _cache_global = CacheInteligente(ttl_por_defecto=300)  # 5 minutos por defecto
 def obtener_cache() -> CacheInteligente:
     """Retorna la instancia global de caché."""
     return _cache_global
+
+
+# Alias para compatibilidad
+cache_global = _cache_global
+
+
+# =============================================================================
+# FUNCIONES DE INVALIDACIÓN ESPECÍFICAS
+# =============================================================================
+
+def invalidar_objetivos() -> None:
+    """Invalida todas las entradas relacionadas con objetivos."""
+    _cache_global.invalidar_patron("objetivo")
+    _cache_global.invalidar_patron("contar_pasadas")
+    _cache_global.invalidar_patron("pasadas_turno")
+
+
+def invalidar_supervisores() -> None:
+    """Invalida todas las entradas relacionadas con supervisores."""
+    _cache_global.invalidar_patron("supervisor")
+    _cache_global.invalidar_patron("cargar_supervisores")
+
+
+def invalidar_pasadas() -> None:
+    """Invalida todas las entradas relacionadas con pasadas."""
+    _cache_global.invalidar_patron("pasada")
+    _cache_global.invalidar_patron("contar_pasadas")
+    _cache_global.invalidar_patron("pasadas_turno")
+
+
+def invalidar_todo() -> None:
+    """Invalida todo el caché."""
+    _cache_global.limpiar()
 
 
 # =============================================================================
