@@ -1,19 +1,15 @@
 # =============================================================================
 # VESP Organizations - Queries para Tabla Principal OPTIMIZADAS
-# Consultas a BD con pool de conexiones, caching y batching
 # =============================================================================
 
 from database.gestor_db import gestor_db, con_cache
-from database.db import DB_PATH
-import sqlite3
 
+
+# =============================================================================
+# CONTADORES
+# =============================================================================
 
 def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_id: int = None) -> int:
-    """
-    Cuenta pasadas registradas para un objetivo en una fecha.
-    OPTIMIZADO: Usa gestor_db con cacheo de resultados frecuentes.
-    """
-    # Construir query dinámicamente
     query = 'SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?'
     params = [fecha, objetivo_id]
     
@@ -24,18 +20,19 @@ def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_i
         query += ' AND supervisor_id = ?'
         params.append(supervisor_id)
     
-    # Usar cache para consultas frecuentes (30 segundos para counts)
     return gestor_db.ejecutar_scalar(query, tuple(params))
 
 
+# =============================================================================
+# EQUIPO
+# =============================================================================
+
 def obtener_equipo(fecha: str, turno: str) -> str:
-    """
-    Obtiene los supervisores asignados a un turno en una fecha.
-    OPTIMIZADO: Query optimizada con JOINs eficientes.
-    """
     query = """
-        SELECT s1.nombre, s2.nombre,
-               CASE WHEN e.supervisor3_id IS NOT NULL THEN s3.nombre ELSE NULL END
+        SELECT 
+            s1.nombre AS supervisor1,
+            s2.nombre AS supervisor2,
+            s3.nombre AS supervisor3
         FROM equipos e
         JOIN supervisores s1 ON e.supervisor1_id = s1.id
         JOIN supervisores s2 ON e.supervisor2_id = s2.id
@@ -48,34 +45,41 @@ def obtener_equipo(fecha: str, turno: str) -> str:
     if not resultado:
         return "—"
     
-    # Extraer valores del dict
     fila = resultado[0]
-    nombres = [n for n in [fila['s1.nombre'], fila['s2.nombre'], fila.get('CASE WHEN e.supervisor3_id IS NOT NULL THEN s3.nombre ELSE NULL END')] if n is not None]
-    
-    if len(nombres) == 0:
+
+    nombres = [
+        n for n in [
+            fila.get('supervisor1'),
+            fila.get('supervisor2'),
+            fila.get('supervisor3')
+        ]
+        if n is not None
+    ]
+
+    if not nombres:
         return "—"
     if len(nombres) == 1:
         return nombres[0]
+
     return ", ".join(nombres[:-1]) + " y " + nombres[-1]
 
 
+# =============================================================================
+# SUPERVISORES
+# =============================================================================
+
 @con_cache(ttl=60)
 def cargar_supervisores() -> list:
-    """
-    Carga lista de (id, nombre) de supervisores.
-    OPTIMIZADO: Cacheado por 60 segundos.
-    """
     query = 'SELECT id, nombre FROM supervisores WHERE fecha_baja IS NULL ORDER BY nombre'
     resultados = gestor_db.ejecutar(query)
     return [(r['id'], r['nombre']) for r in resultados]
 
 
+# =============================================================================
+# PASADAS POR TURNO
+# =============================================================================
+
 def obtener_todas_pasadas_por_turno(fecha: str, supervisor_id: int = None) -> tuple:
-    """
-    Obtiene conteo de pasadas por objetivo y turno.
-    OPTIMIZADO: Una sola query en lugar de múltiples.
-    Retorna (pasadas_dia, pasadas_noche) donde cada una es un dict {objetivo_id: count}.
-    """
     query = """
         SELECT objetivo_id, turno, COUNT(*) as total
         FROM pasadas 
@@ -108,17 +112,15 @@ def obtener_todas_pasadas_por_turno(fecha: str, supervisor_id: int = None) -> tu
 
 
 # =============================================================================
-# NUEVAS FUNCIONES OPTIMIZADAS
+# CONSULTAS AVANZADAS
 # =============================================================================
 
 def obtener_pasadas_fecha_rango(fecha_inicio: str, fecha_fin: str, objetivo_id: int = None) -> list:
-    """
-    Obtiene todas las pasadas en un rango de fechas.
-    OPTIMIZADO: Bulk query con filtros opcionales.
-    """
     query = """
-        SELECT p.id, p.fecha, p.hora, p.turno, p.objetivo_id, p.supervisor_id,
-               o.nombre as objetivo_nombre, s.nombre as supervisor_nombre
+        SELECT 
+            p.id, p.fecha, p.hora, p.turno, p.objetivo_id, p.supervisor_id,
+            o.nombre as objetivo_nombre, 
+            s.nombre as supervisor_nombre
         FROM pasadas p
         JOIN objetivos o ON p.objetivo_id = o.id
         JOIN supervisores s ON p.supervisor_id = s.id
@@ -136,10 +138,6 @@ def obtener_pasadas_fecha_rango(fecha_inicio: str, fecha_fin: str, objetivo_id: 
 
 
 def obtener_estado_cobertura_dia(fecha: str) -> dict:
-    """
-    Obtiene el estado de cobertura para todos los objetivos de un día.
-    OPTIMIZADO: Una sola query con subconsultas.
-    """
     query = """
         SELECT 
             o.id,
@@ -173,10 +171,6 @@ def obtener_estado_cobertura_dia(fecha: str) -> dict:
 
 
 def batch_contar_pasadas(fecha: str, objetivo_ids: list[int]) -> dict:
-    """
-    Cuenta pasadas para múltiples objetivos en una sola query.
-    OPTIMIZADO: Bulk operation en lugar de N queries.
-    """
     if not objetivo_ids:
         return {}
     
@@ -195,31 +189,28 @@ def batch_contar_pasadas(fecha: str, objetivo_ids: list[int]) -> dict:
 
 
 def obtener_resumen_diario(fecha: str) -> dict:
-    """
-    Obtiene un resumen completo del día en una sola query.
-    OPTIMIZADO: Agregación en DB en lugar de Python.
-    """
     query = """
         SELECT 
             COUNT(*) as total_pasadas,
             COUNT(DISTINCT objetivo_id) as objetivos_controlados,
             COUNT(DISTINCT supervisor_id) as supervisores_activos,
-            COUNT(DISTINCT CASE WHEN turno = 'diurno' THEN 1 END) as pasadas_diurno,
-            COUNT(DISTINCT CASE WHEN turno = 'nocturno' THEN 1 END) as pasadas_nocturno
+            COUNT(CASE WHEN turno = 'diurno' THEN 1 END) as pasadas_diurno,
+            COUNT(CASE WHEN turno = 'nocturno' THEN 1 END) as pasadas_nocturno
         FROM pasadas
         WHERE fecha = ?
     """
     
-    resultado = gestor_db.ejecutar_dict(query, (fecha,))
+    resultados = gestor_db.ejecutar(query, (fecha,))
     
-    if resultado:
+    if resultados:
+        r = resultados[0]
         return {
             'fecha': fecha,
-            'total_pasadas': resultado['total_pasadas'],
-            'objetivos_controlados': resultado['objetivos_controlados'],
-            'supervisores_activos': resultado['supervisores_activos'],
-            'pasadas_diurno': resultado['pasadas_diurno'] or 0,
-            'pasadas_nocturno': resultado['pasadas_nocturno'] or 0
+            'total_pasadas': r['total_pasadas'],
+            'objetivos_controlados': r['objetivos_controlados'],
+            'supervisores_activos': r['supervisores_activos'],
+            'pasadas_diurno': r['pasadas_diurno'] or 0,
+            'pasadas_nocturno': r['pasadas_nocturno'] or 0
         }
     
     return {

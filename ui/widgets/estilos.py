@@ -32,6 +32,18 @@ PALETA_OSCURA = {
 
     "scrollbar": "#2a2d36",
     "scrollbar_handle": "#4ade80",
+
+    # ✅ ARREGLO CLAVE (BADGES EN MODO OSCURO)
+    "badge_bg": "#2a2d36",
+
+    "estado_verde_bg": "#064e3b",
+    "estado_verde_fg": "#6ee7b7",
+
+    "estado_rojo_bg": "#7f1d1d",
+    "estado_rojo_fg": "#fca5a5",
+
+    "estado_amarillo_bg": "#78350f",
+    "estado_amarillo_fg": "#fcd34d",
 }
 
 
@@ -63,16 +75,19 @@ PALETA_CLARA = {
 
     # badges
     "badge_bg": "#f1f5f9",
+
     "estado_verde_bg": "#dcfce7",
     "estado_verde_fg": "#15803d",
+
     "estado_rojo_bg": "#fee2e2",
     "estado_rojo_fg": "#dc2626",
+
     "estado_amarillo_bg": "#fef9c3",
     "estado_amarillo_fg": "#b45309",
 }
 
 
-# compatibilidad con código viejo
+# compatibilidad
 PALETA_EMPRESA = PALETA_OSCURA
 
 
@@ -114,9 +129,7 @@ def estilo_tabla(oscuro: bool) -> str:
     header = obtener_color("bg_header", oscuro)
     fg = obtener_color("text_primary", oscuro)
     fg2 = obtener_color("text_secondary", oscuro)
-    border = obtener_color("border_light", oscuro)
     accent = obtener_color("accent", oscuro)
-    scroll = obtener_color("scrollbar_handle", oscuro)
 
     return f"""
     QTableWidget {{
@@ -128,9 +141,6 @@ def estilo_tabla(oscuro: bool) -> str:
         background-color: {header};
         color: {fg2};
         border-bottom: 2px solid {accent};
-    }}
-    QScrollBar::handle:vertical {{
-        background: {scroll};
     }}
     """
 

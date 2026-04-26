@@ -2,6 +2,7 @@
 # VESP Organizations - Sistema de Control de Objetivos
 # Ventana principal del sistema — UI/UX mejorada
 # =============================================================================
+import sqlite3
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
@@ -51,6 +52,7 @@ from services.assets import ruta_asset
 from services.sincronizacion import obtener_sincronizador
 from services.usuarios import get_username_by_id
 from database.db import DB_PATH
+
 
 # Componentes visuales y estilos centralizados
 from ui.widgets.badges import BadgeEstado, BadgeNumero
