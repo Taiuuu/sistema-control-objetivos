@@ -4,7 +4,6 @@
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from services.sesion import get_usuario_id
 import sqlite3
 import bcrypt
 from database.db import DB_PATH

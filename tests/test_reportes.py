@@ -2,7 +2,6 @@
 # VESP Testing - Services: Reportes
 # =============================================================================
 
-import pytest
 import sqlite3
 import datetime
 from services.reportes import generar_reporte_mensual, obtener_objetivos_del_dia

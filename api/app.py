@@ -10,7 +10,6 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_sse import sse
 from api.routes import register_routes
-from database.db import DB_PATH
 import os
 
 app = Flask(__name__)

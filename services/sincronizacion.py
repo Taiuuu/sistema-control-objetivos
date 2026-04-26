@@ -3,7 +3,7 @@
 # =============================================================================
 
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
-from typing import Dict, List, Callable, Any
+from typing import Dict, List, Callable
 from datetime import datetime
 import threading
 import requests  # Para enviar a SSE si la API está corriendo

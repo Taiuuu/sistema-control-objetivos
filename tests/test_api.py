@@ -3,10 +3,7 @@
 # =============================================================================
 
 import pytest
-import sqlite3
 import datetime
-import json
-from flask.testing import FlaskClient
 
 
 @pytest.fixture

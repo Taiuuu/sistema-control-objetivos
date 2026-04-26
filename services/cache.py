@@ -5,7 +5,6 @@
 import time
 import threading
 from typing import Any, Optional, List, Dict, Callable
-from datetime import datetime, timedelta
 from database.db import conectar
 
 

@@ -7,7 +7,7 @@ import sqlite3
 import bcrypt
 from database.db import DB_PATH
 from services.encriptacion import validar_contrasena_fuerte, generar_contrasena_segura
-from services.permisos import ROLES_DISPONIBLES, obtener_permisos_rol
+from services.permisos import ROLES_DISPONIBLES
 from services.sincronizacion import notificar_cambio
 
 

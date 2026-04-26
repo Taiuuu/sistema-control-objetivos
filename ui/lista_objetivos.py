@@ -5,11 +5,11 @@
 
 import sqlite3
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
+    QWidget, QVBoxLayout, QTableWidget,
     QTableWidgetItem, QPushButton, QMessageBox, QDialog,
     QLabel, QLineEdit, QDateEdit, QCheckBox, QDialogButtonBox
 )
-from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtCore import QDate
 from database.db import DB_PATH
 from models.objetivos import dar_de_baja_objetivo
 from services.sincronizacion import obtener_sincronizador

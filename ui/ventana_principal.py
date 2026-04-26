@@ -9,17 +9,15 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QLabel,
     QPushButton, QDateEdit, QComboBox, QMessageBox,
     QFrame, QLineEdit, QHeaderView, QScrollArea,
-    QToolButton, QSizePolicy, QSpacerItem, QGraphicsDropShadowEffect
+    QToolButton, QSizePolicy
 )
 from PyQt6.QtCore import (
-    QDate, QTimer, QEvent, Qt, QSize,
-    QPropertyAnimation, QEasingCurve, QPoint, pyqtSignal, QParallelAnimationGroup
+    QDate, QTimer, QEvent, Qt, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
 )
-from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence, QFont, QPalette
+from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
 from services.reportes import obtener_objetivos_del_dia
 from services.queries_tabla import (
-    contar_pasadas, obtener_equipo, cargar_supervisores, 
-    obtener_todas_pasadas_por_turno
+    obtener_equipo, cargar_supervisores
 )
 from ui.animaciones import animar_entrada
 from ui.form_objetivo import FormObjetivo
@@ -57,11 +55,8 @@ from database.db import DB_PATH
 # Componentes visuales y estilos centralizados
 from ui.widgets.badges import BadgeEstado, BadgeNumero
 from ui.widgets.estilos import (
-    obtener_color, estilo_input, estilo_tabla, estilo_boton_menu,
-    estilo_separador, estilo_btn_tema, estilo_btn_logout, estilo_btn_zoom,
-    estilo_scrollarea_filtros, estilo_header
+    obtener_color, estilo_separador
 )
-from ui.widgets.estilos import PALETA_EMPRESA
 
 # =============================================================================
 # UTILIDADES
