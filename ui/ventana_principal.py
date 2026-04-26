@@ -59,7 +59,7 @@ from ui.widgets.estilos import (
     estilo_separador, estilo_btn_tema, estilo_btn_logout, estilo_btn_zoom,
     estilo_scrollarea_filtros, estilo_header
 )
-
+from ui.widgets.estilos import PALETA_EMPRESA
 
 # =============================================================================
 # UTILIDADES

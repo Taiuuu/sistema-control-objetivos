@@ -277,31 +277,27 @@ class Dashboard(QWidget):
     def actualizar_datos(self):
         """Actualiza todas las métricas del dashboard."""
         from PyQt6.QtCore import QDate
+        from services.data_provider import SQLiteDataProvider
+        from services.queries_tabla import obtener_estado_cobertura_dia
+        
         fecha = QDate.currentDate().toString("yyyy-MM-dd")
 
         try:
-            # Obtener datos básicos
-            objetivos = obtener_objetivos_del_dia(fecha)
-
-            # Calcular métricas
+            # Usar data provider optimizado
+            provider = SQLiteDataProvider()
+            
+            # Obtener resumen rápido en UNA sola query
+            resumen = provider.get_resumen_rapido()
+            
+            # Obtener estado de cobertura del día (una sola query para todos los objetivos)
+            estado_cobertura = obtener_estado_cobertura_dia(fecha)
+            
+            # Calcular métricas desde el estado de cobertura
+            objetivos = estado_cobertura.get('objetivos', [])
             total_objetivos = len(objetivos)
-            cumplidos = 0
-            criticos = 0
-
-            for obj in objetivos:
-                obj_id = obj[0]
-
-                # Contar pasadas totales (diurno + nocturno)
-                pasadas_dia = self._contar_pasadas(fecha, obj_id, "diurno")
-                pasadas_noche = self._contar_pasadas(fecha, obj_id, "nocturno")
-
-                if pasadas_dia > 0 or pasadas_noche > 0:
-                    cumplidos += 1
-
-                # Considerar crítico si no tiene ninguna pasada
-                if pasadas_dia == 0 and pasadas_noche == 0:
-                    criticos += 1
-
+            
+            cumplidos = sum(1 for obj in objetivos if obj.get('completo', False))
+            criticos = sum(1 for obj in objetivos if obj.get('pasadas_diurno', 0) == 0 and obj.get('pasadas_nocturno', 0) == 0)
             pendientes = total_objetivos - cumplidos
 
             # Actualizar tarjetas
@@ -310,11 +306,9 @@ class Dashboard(QWidget):
             self.tarjeta_pendientes.setText(str(pendientes))
             self.tarjeta_criticos.setText(str(criticos))
 
-            # Actualizar barras de progreso por turno
-            cumplidos_dia = sum(1 for obj in objetivos
-                              if self._contar_pasadas(fecha, obj[0], "diurno") > 0)
-            cumplidos_noche = sum(1 for obj in objetivos
-                                if self._contar_pasadas(fecha, obj[0], "nocturno") > 0)
+            # Calcular cumplidos por turno
+            cumplidos_dia = sum(1 for obj in objetivos if obj.get('pasadas_diurno', 0) > 0)
+            cumplidos_noche = sum(1 for obj in objetivos if obj.get('pasadas_nocturno', 0) > 0)
 
             # Actualizar barras
             self._actualizar_barra_turno(self.barra_dia, cumplidos_dia, total_objetivos)
@@ -330,20 +324,8 @@ class Dashboard(QWidget):
 
     def _contar_pasadas(self, fecha: str, obj_id: int, turno: str = None) -> int:
         """Cuenta las pasadas para un objetivo y turno específicos."""
-        conexion = sqlite3.connect(DB_PATH)
-        cursor = conexion.cursor()
-
-        query = "SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?"
-        params = [fecha, obj_id]
-
-        if turno:
-            query += " AND turno = ?"
-            params.append(turno)
-
-        cursor.execute(query, params)
-        resultado = cursor.fetchone()[0]
-        conexion.close()
-        return resultado
+        from services.queries_tabla import contar_pasadas
+        return contar_pasadas(fecha, obj_id, turno)
 
     def _actualizar_barra_turno(self, barra_widget, cumplidos: int, total: int):
         """Actualiza una barra de progreso de turno."""
