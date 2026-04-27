@@ -2,10 +2,14 @@
 # VESP Organizations - Sistema de Caché Inteligente
 # =============================================================================
 
+import logging
 import time
 import threading
 from typing import Any, Optional, List, Dict, Callable
 from database.db import conectar
+
+# Configurar logger
+logger = logging.getLogger(__name__)
 
 
 class EntradaCache:
