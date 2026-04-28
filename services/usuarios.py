@@ -2,21 +2,6 @@
 # VESP Organizations - Sistema de Control de Objetivos
 # Módulo de gestión de usuarios y contraseñas - VERSIÓN PROFESIONAL
 # =============================================================================
-"""
-Módulo para la gestión completa de usuarios y autenticación del sistema.
-
-Proporciona funciones para:
-- Crear y eliminar usuarios
-- Autenticar usuarios (login)
-- Cambiar contraseñas
-- Gestionar roles y permisos
-- Validación de contraseña fuerte
-- Auditoría de cambios
-
-Autor: VESP Control de Objetivos
-Versión: 2.0.0
-"""
-
 import logging
 from typing import Dict, List, Optional
 
