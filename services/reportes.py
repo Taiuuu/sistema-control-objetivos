@@ -1,272 +1,446 @@
 # =============================================================================
 # VESP Organizations - Sistema de Control de Objetivos
-# Módulo de reportes y lógica de control diario OPTIMIZADO
+# Módulo de reportes - VERSIÓN PROFESIONAL
 # =============================================================================
+"""
+Módulo para la generación de reportes del sistema.
 
+Proporciona funciones para:
+- Obtener objetivos del día según schedule
+- Generar reportes diarios de cumplimiento
+- Generar reportes mensuales detallados
+- Consultas de cobertura y estadísticas
+- Análisis de cumplimiento de objetivos
+
+Autor: VESP Control de Objetivos
+Versión: 2.0.0
+"""
+
+import logging
 import datetime
 import calendar
 from collections import defaultdict
+from typing import List, Dict, Optional, Tuple, Any
+
 from database.gestor_db import gestor_db
 from services.cache import cache_global
+from .exceptions import (
+    ReporteError, FechaInvalidaReporte, DatosInsuficientesReporte
+)
+
+# Configurar logger
+logger = logging.getLogger(__name__)
 
 
-def obtener_objetivos_del_dia(fecha: str) -> list:
-    """
-    Retorna los objetivos que corresponden ser controlados en una fecha dada.
-    OPTIMIZADO: Usa gestor_db y cache.
-    """
-    # Intentar obtener del cache
-    cache_key = f"objetivos_dia:{fecha}"
-    resultado_cache = cache_global.get(cache_key)
-    if resultado_cache is not None:
-        return resultado_cache
-    
-    # Query optimizada
-    query = """
-        SELECT id, nombre, dias_semana, fecha_inicio, fecha_fin
-        FROM objetivos
-        WHERE (fecha_inicio IS NULL OR fecha_inicio <= ?)
-          AND (fecha_fin IS NULL OR fecha_fin >= ?)
-    """
-    
-    objetivos = gestor_db.ejecutar(query, (fecha, fecha))
+# =============================================================================
+# CONSTANTES
+# =============================================================================
 
+TURNOS_VALIDOS = ["Mañana", "Tarde", "Noche", "Completo"]
+AÑO_MINIMO = 2000
+AÑO_MAXIMO = 2100
+
+
+# =============================================================================
+# FUNCIONES DE UTILIDAD
+# =============================================================================
+
+def _validar_fecha(fecha: str) -> None:
+    """Valida que la fecha tenga formato correcto YYYY-MM-DD."""
+    try:
+        datetime.datetime.strptime(fecha, "%Y-%m-%d")
+    except ValueError:
+        raise FechaInvalidaReporte(fecha)
+
+
+def _validar_ano_mes(anio: int, mes: int) -> None:
+    """Valida año y mes para reportes."""
+    if not isinstance(anio, int) or not isinstance(mes, int):
+        raise ReporteError("Año y mes deben ser números enteros")
+    if not (AÑO_MINIMO <= anio <= AÑO_MAXIMO):
+        raise ReporteError(f"Año debe estar entre {AÑO_MINIMO} y {AÑO_MAXIMO}")
+    if not (1 <= mes <= 12):
+        raise ReporteError("Mes debe estar entre 1 y 12")
+
+
+def _obtener_dia_semana(fecha: str) -> int:
+    """Obtiene el día de la semana (1=Lunes, 7=Domingo)."""
     fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
-    dia_semana = fecha_dt.isoweekday()
-
-    resultado = []
-    for o in objetivos:
-        obj_id = o['id']
-        nombre = o['nombre']
-        dias_semana_str = o['dias_semana']
-        fecha_inicio = o['fecha_inicio']
-        fecha_fin = o['fecha_fin']
-
-        if fecha_inicio and fecha < fecha_inicio:
-            continue
-
-        if fecha_fin and fecha > fecha_fin:
-            continue
-
-        dias = [int(d) for d in dias_semana_str.split(",")]
-        if dia_semana not in dias:
-            continue
-
-        resultado.append((obj_id, nombre, dias_semana_str))
-
-    # Cachear por 5 minutos
-    cache_global.set(cache_key, resultado, 300)
-    return resultado
+    return fecha_dt.isoweekday()
 
 
-def objetivo_corresponde(fecha: str, dias: str) -> bool:
-    """
-    Verifica si un objetivo debe controlarse en una fecha dada,
-    según sus días de cobertura configurados.
-    """
-    fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
-    dia = fecha_dt.isoweekday()
-    dias_lista = [int(d) for d in dias.split(",")]
-    return dia in dias_lista
+def _parsear_dias_semana(dias_str: str) -> List[int]:
+    """Parsea string de días en lista de enteros."""
+    try:
+        return [int(d.strip()) for d in dias_str.split(",") if d.strip()]
+    except ValueError:
+        return []
 
 
-def reporte_mensual(anio: int, mes: int) -> None:
-    """
-    Imprime en consola el reporte de cumplimiento mensual por objetivo.
-    OPTIMIZADO: Usa bulk queries.
-    """
-    total_dias = calendar.monthrange(anio, mes)[1]
-    fecha_inicio_mes = f"{anio}-{mes:02d}-01"
-    fecha_fin_mes = f"{anio}-{mes:02d}-{total_dias:02d}"
+# =============================================================================
+# REPORTES DIARIOS
+# =============================================================================
 
-    # Obtener todos los objetivos en una sola query
-    objetivos = gestor_db.ejecutar("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
-
-    # Obtener todas las pasadas del mes en una sola query
-    query_pasadas = """
-        SELECT fecha, objetivo_id, turno, COUNT(*) as total
-        FROM pasadas
-        WHERE fecha BETWEEN ? AND ?
-        GROUP BY fecha, objetivo_id, turno
-    """
-    pasadas_raw = gestor_db.ejecutar(query_pasadas, (fecha_inicio_mes, fecha_fin_mes))
-
-    # Indexar pasadas por objetivo y fecha
-    pasadas_por_objetivo = defaultdict(lambda: defaultdict(lambda: {'diurno': 0, 'nocturno': 0}))
-    for p in pasadas_raw:
-        pasadas_por_objetivo[p['objetivo_id']][p['fecha']][p['turno']] = p['total']
-
-    print(f"\n=== REPORTE MENSUAL {mes}/{anio} ===\n")
-    print(f"{'Objetivo':<20} {'Días esperados':<16} {'Días cumplidos':<16} {'Cumplimiento'}")
-    print("-" * 70)
-
-    for o in objetivos:
-        obj_id = o['id']
-        nombre = o['nombre']
-        inicio = o['fecha_inicio']
-        fin = o['fecha_fin']
-        dias_str = o['dias_semana']
+@cache_global.auto_cache(ttl=300)
+def obtener_objetivos_del_dia(fecha: str) -> List[Tuple[int, str, str]]:
+    """Obtiene los objetivos que deben controlarse en una fecha específica.
+    
+    Args:
+        fecha: Fecha en formato YYYY-MM-DD.
+    
+    Returns:
+        Lista de tuplas (id_objetivo, nombre, dias_semana).
         
-        dias_semana = [int(d) for d in dias_str.split(",")]
-        dias_esperados = 0
-        dias_cumplidos = 0
-
-        for dia in range(1, total_dias + 1):
-            fecha = f"{anio}-{mes:02d}-{dia:02d}"
-            fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
-
-            if inicio and fecha < inicio:
-                continue
-            if fin and fecha > fin:
-                continue
-            if fecha_dt.isoweekday() not in dias_semana:
-                continue
-
-            dias_esperados += 1
+    Raises:
+        FechaInvalidaReporte: Si la fecha no es válida.
+        DatabaseError: Si hay error en la consulta.
+    
+    Note:
+        Resultado cacheado por 5 minutos.
+    
+    Example:
+        >>> objetivos = obtener_objetivos_del_dia("2026-04-27")
+        >>> print(len(objetivos))
+        3
+    """
+    try:
+        _validar_fecha(fecha)
+        
+        # Query optimizada
+        query = """
+            SELECT id, nombre, dias_semana, fecha_inicio, fecha_fin
+            FROM objetivos
+            WHERE (fecha_inicio IS NULL OR fecha_inicio <= ?)
+              AND (fecha_fin IS NULL OR fecha_fin >= ?)
+        """
+        
+        objetivos_db = gestor_db.ejecutar(query, (fecha, fecha))
+        
+        if not objetivos_db:
+            logger.debug(f"No hay objetivos para {fecha}")
+            return []
+        
+        dia_semana = _obtener_dia_semana(fecha)
+        resultado = []
+        
+        for obj in objetivos_db:
+            obj_id = obj['id']
+            nombre = obj['nombre']
+            dias_semana_str = obj['dias_semana']
+            fecha_inicio = obj['fecha_inicio']
+            fecha_fin = obj['fecha_fin']
             
-            # Usar índice precalculado en lugar de query
-            turno_data = pasadas_por_objetivo[obj_id][fecha]
-            if turno_data['diurno'] > 0 or turno_data['nocturno'] > 0:
-                dias_cumplidos += 1
+            # Validar fechas de inicio/fin
+            if fecha_inicio and fecha < fecha_inicio:
+                continue
+            if fecha_fin and fecha > fecha_fin:
+                continue
+            
+            # Verificar que sea un día válido para este objetivo
+            dias = _parsear_dias_semana(dias_semana_str)
+            if dia_semana not in dias:
+                continue
+            
+            resultado.append((obj_id, nombre, dias_semana_str))
+        
+        logger.info(f"Objetivos del día {fecha}: {len(resultado)} encontrados")
+        return resultado
+        
+    except FechaInvalidaReporte:
+        raise
+    except Exception as e:
+        logger.error(f"Error obteniendo objetivos del día {fecha}: {e}")
+        raise ReporteError(f"Error obteniendo objetivos: {str(e)}")
 
-        if dias_esperados > 0:
-            porcentaje = (dias_cumplidos / dias_esperados) * 100
-            print(f"{nombre:<20} {dias_esperados:<16} {dias_cumplidos:<16} {porcentaje:.1f}%")
+
+def objetivo_corresponde(fecha: str, dias_semana_str: str) -> bool:
+    """Verifica si un objetivo debe controlarse en una fecha.
+    
+    Args:
+        fecha: Fecha en formato YYYY-MM-DD.
+        dias_semana_str: String con días (ej: "1,2,3").
+    
+    Returns:
+        True si el objetivo corresponde controlar en esa fecha.
+    """
+    try:
+        _validar_fecha(fecha)
+        
+        dia = _obtener_dia_semana(fecha)
+        dias = _parsear_dias_semana(dias_semana_str)
+        
+        return dia in dias
+        
+    except Exception as e:
+        logger.error(f"Error verificando correspondencia: {e}")
+        return False
 
 
 @cache_global.auto_cache(ttl=600)
-def generar_reporte_mensual(anio: int, mes: int) -> dict:
+def generar_reporte_diario(fecha: str) -> Dict[str, Any]:
+    """Genera reporte detallado de pasadas de un día.
+    
+    Args:
+        fecha: Fecha en formato YYYY-MM-DD.
+    
+    Returns:
+        Diccionario con estructura:
+        {
+            'fecha': str,
+            'pasadas': [
+                {
+                    'id': int,
+                    'hora': str,
+                    'turno': str,
+                    'objetivo': str,
+                    'supervisor': str
+                }
+            ],
+            'total': int,
+            'cumplimiento_porcentaje': float
+        }
+    
+    Raises:
+        FechaInvalidaReporte: Si la fecha no es válida.
+        DatabaseError: Si hay error en la consulta.
+        
+    Note:
+        Resultado cacheado por 10 minutos.
     """
-    Genera y retorna el reporte de cumplimiento mensual por objetivo.
-    OPTIMIZADO: Bulk queries + cache (10 min).
-    """
-    # Validar parámetros
-    if not isinstance(anio, int) or not isinstance(mes, int):
-        raise ValueError("Año y mes deben ser números enteros")
-    if not (1 <= mes <= 12):
-        raise ValueError("Mes debe estar entre 1 y 12")
-    if not (2000 <= anio <= 2100):
-        raise ValueError("Año debe estar entre 2000 y 2100")
-
     try:
+        _validar_fecha(fecha)
+        
+        query = """
+            SELECT p.id, p.hora, p.turno, o.nombre as objetivo, s.nombre as supervisor
+            FROM pasadas p
+            JOIN objetivos o ON p.objetivo_id = o.id
+            JOIN supervisores s ON p.supervisor_id = s.id
+            WHERE p.fecha = ?
+            ORDER BY p.hora, p.turno
+        """
+        
+        pasadas = gestor_db.ejecutar(query, (fecha,))
+        
+        pasadas_list = [
+            {
+                'id': p['id'],
+                'hora': p['hora'],
+                'turno': p['turno'],
+                'objetivo': p['objetivo'],
+                'supervisor': p['supervisor']
+            }
+            for p in pasadas
+        ]
+        
+        total_pasadas = len(pasadas_list)
+        
+        # Calcular cumplimiento (simplista: % de objetivos con pasada)
+        objetivos_dia = obtener_objetivos_del_dia(fecha)
+        cumplimiento = 0.0
+        if objetivos_dia:
+            objetivos_con_pasada = set()
+            for pasada in pasadas_list:
+                for obj in objetivos_dia:
+                    if obj[1] == pasada['objetivo']:
+                        objetivos_con_pasada.add(obj[0])
+            cumplimiento = (len(objetivos_con_pasada) / len(objetivos_dia)) * 100
+        
+        reporte = {
+            'fecha': fecha,
+            'pasadas': pasadas_list,
+            'total': total_pasadas,
+            'cumplimiento_porcentaje': round(cumplimiento, 1)
+        }
+        
+        logger.info(f"Reporte diario generado para {fecha}: {total_pasadas} pasadas")
+        return reporte
+        
+    except FechaInvalidaReporte:
+        raise
+    except Exception as e:
+        logger.error(f"Error generando reporte diario {fecha}: {e}")
+        raise ReporteError(f"Error generando reporte: {str(e)}")
+
+
+# =============================================================================
+# REPORTES MENSUALES
+# =============================================================================
+
+@cache_global.auto_cache(ttl=1800)
+def generar_reporte_mensual(anio: int, mes: int) -> Dict[str, Any]:
+    """Genera reporte mensual detallado de cumplimiento.
+    
+    Args:
+        anio: Año (ej: 2026).
+        mes: Mes (1-12).
+    
+    Returns:
+        Diccionario con estructura:
+        {
+            'anio': int,
+            'mes': int,
+            'periodo': str,
+            'total_dias': int,
+            'objetivos': [
+                {
+                    'id': int,
+                    'nombre': str,
+                    'dias_esperados': int,
+                    'dias_con_pasada': int,
+                    'dias_sin_pasada': int,
+                    'cumplimiento_porcentaje': float
+                }
+            ],
+            'cumplimiento_total': float
+        }
+    
+    Raises:
+        ReporteError: Si hay error validando parámetros.
+        DatabaseError: Si hay error en consultas.
+        
+    Note:
+        Resultado cacheado por 30 minutos.
+    """
+    try:
+        _validar_ano_mes(anio, mes)
+        
         total_dias = calendar.monthrange(anio, mes)[1]
-        fecha_inicio_mes = f"{anio}-{mes:02d}-01"
-        fecha_fin_mes = f"{anio}-{mes:02d}-{total_dias:02d}"
-
-        # Obtener objetivos en una sola query
+        fecha_inicio = f"{anio}-{mes:02d}-01"
+        fecha_fin = f"{anio}-{mes:02d}-{total_dias:02d}"
+        
+        # Obtener todos los objetivos
         objetivos = gestor_db.ejecutar(
-            "SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos"
+            """SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana 
+               FROM objetivos ORDER BY nombre"""
         )
-
-        # Obtener todas las pasadas del mes en una sola query
+        
+        if not objetivos:
+            logger.warning(f"No hay objetivos para reporte {mes}/{anio}")
+            raise DatosInsuficientesReporte("No hay objetivos en el sistema")
+        
+        # Obtener todas las pasadas del mes en una sola query (optimización)
         query_pasadas = """
-            SELECT fecha, objetivo_id, turno, COUNT(*) as total
+            SELECT fecha, objetivo_id, COUNT(*) as total
             FROM pasadas
             WHERE fecha BETWEEN ? AND ?
-            GROUP BY fecha, objetivo_id, turno
+            GROUP BY fecha, objetivo_id
         """
-        pasadas_raw = gestor_db.ejecutar(query_pasadas, (fecha_inicio_mes, fecha_fin_mes))
-
+        pasadas_raw = gestor_db.ejecutar(query_pasadas, (fecha_inicio, fecha_fin))
+        
         # Indexar pasadas por objetivo y fecha
-        pasadas_por_objetivo = defaultdict(lambda: defaultdict(lambda: {'diurno': 0, 'nocturno': 0}))
+        pasadas_por_objetivo = defaultdict(set)
         for p in pasadas_raw:
-            pasadas_por_objetivo[p['objetivo_id']][p['fecha']][p['turno']] = p['total']
-
+            pasadas_por_objetivo[p['objetivo_id']].add(p['fecha'])
+        
         reporte = {
             'anio': anio,
             'mes': mes,
-            'objetivos': []
+            'periodo': f"{mes:02d}/{anio}",
+            'total_dias': total_dias,
+            'objetivos': [],
+            'cumplimiento_total': 0.0
         }
-
-        for o in objetivos:
-            obj_id = o['id']
-            nombre = o['nombre']
-            inicio = o['fecha_inicio']
-            fin = o['fecha_fin']
-            dias_str = o['dias_semana']
+        
+        total_cumplimiento_ponderado = 0.0
+        total_objetivos_esperados = 0
+        
+        for obj in objetivos:
+            obj_id = obj['id']
+            nombre = obj['nombre']
+            inicio = obj['fecha_inicio']
+            fin = obj['fecha_fin']
+            dias_str = obj['dias_semana']
             
-            dias_semana = [int(d.strip()) for d in dias_str.split(",") if d.strip()]
+            dias_semana = _parsear_dias_semana(dias_str)
             dias_esperados = 0
-            dias_con_dia = 0
-            dias_con_noche = 0
-            dias_sin_control = 0
-
+            dias_con_pasada = 0
+            
+            # Contar días esperados y con pasada
             for dia in range(1, total_dias + 1):
                 fecha = f"{anio}-{mes:02d}-{dia:02d}"
                 fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
-
+                
+                # Validar fechas de inicio/fin
                 if inicio and fecha < inicio:
                     continue
                 if fin and fecha > fin:
                     continue
+                
+                # Verificar que sea un día válido
                 if fecha_dt.isoweekday() not in dias_semana:
                     continue
-
+                
                 dias_esperados += 1
                 
-                # Usar índice precalculado
-                turno_data = pasadas_por_objetivo[obj_id][fecha]
-                tuvo_dia = turno_data['diurno'] > 0
-                tuvo_noche = turno_data['nocturno'] > 0
-
-                if tuvo_dia:
-                    dias_con_dia += 1
-                if tuvo_noche:
-                    dias_con_noche += 1
-                if not tuvo_dia and not tuvo_noche:
-                    dias_sin_control += 1
-
+                # Verificar si hay pasada para este día
+                if fecha in pasadas_por_objetivo[obj_id]:
+                    dias_con_pasada += 1
+            
+            # Calcular cumplimiento
+            cumplimiento = 0.0
             if dias_esperados > 0:
-                porcentaje = (dias_esperados - dias_sin_control) / dias_esperados * 100
-            else:
-                porcentaje = 0.0
-
+                cumplimiento = (dias_con_pasada / dias_esperados) * 100
+                total_cumplimiento_ponderado += cumplimiento
+                total_objetivos_esperados += 1
+            
             reporte['objetivos'].append({
                 'id': obj_id,
                 'nombre': nombre,
                 'dias_esperados': dias_esperados,
-                'dias_con_dia': dias_con_dia,
-                'dias_con_noche': dias_con_noche,
-                'dias_sin_control': dias_sin_control,
-                'cumplimiento': round(porcentaje, 1)
+                'dias_con_pasada': dias_con_pasada,
+                'dias_sin_pasada': dias_esperados - dias_con_pasada,
+                'cumplimiento_porcentaje': round(cumplimiento, 1)
             })
-
+        
+        # Cumplimiento total
+        if total_objetivos_esperados > 0:
+            reporte['cumplimiento_total'] = round(
+                total_cumplimiento_ponderado / total_objetivos_esperados,
+                1
+            )
+        
+        logger.info(f"Reporte mensual generado {mes}/{anio}: "
+                   f"{len(reporte['objetivos'])} objetivos, "
+                   f"Cumplimiento: {reporte['cumplimiento_total']}%")
+        
         return reporte
-
+        
+    except (ReporteError, DatosInsuficientesReporte):
+        raise
     except Exception as e:
-        from services.logger import registrar_accion
-        from services.sesion import get_usuario_id
-        try:
-            registrar_accion(get_usuario_id(), f"Error generando reporte mensual {mes}/{anio}: {str(e)}")
-        except Exception:
-            pass
-        raise RuntimeError(f"Error al generar reporte: {str(e)}")
+        logger.error(f"Error generando reporte mensual {mes}/{anio}: {e}")
+        raise ReporteError(f"Error generando reporte: {str(e)}")
 
 
-def generar_reporte_diario(fecha: str) -> dict:
+def imprimir_reporte_mensual(anio: int, mes: int) -> None:
+    """Imprime el reporte mensual en formato tabla en consola.
+    
+    Args:
+        anio: Año.
+        mes: Mes.
     """
-    Genera y retorna el reporte diario de pasadas.
-    OPTIMIZADO: Usa gestor_db.
-    """
-    query = """
-        SELECT p.id, p.hora, p.turno, o.nombre, s.nombre
-        FROM pasadas p
-        JOIN objetivos o ON p.objetivo_id = o.id
-        JOIN supervisores s ON p.supervisor_id = s.id
-        WHERE p.fecha = ?
-        ORDER BY p.hora
-    """
-
-    pasadas = gestor_db.ejecutar(query, (fecha,))
-
-    return {
-        'fecha': fecha,
-        'pasadas': [{
-            'id': p['id'],
-            'hora': p['hora'],
-            'turno': p['turno'],
-            'objetivo': p['o.nombre'],
-            'supervisor': p['s.nombre']
-        } for p in pasadas],
-        'total': len(pasadas)
-    }
+    try:
+        reporte = generar_reporte_mensual(anio, mes)
+        
+        print(f"\n{'='*80}")
+        print(f"REPORTE MENSUAL {reporte['periodo']}")
+        print(f"{'='*80}\n")
+        
+        print(f"{'Objetivo':<30} {'Esperados':<12} {'Cumplidos':<12} {'Cumplimiento':<12}")
+        print("-" * 80)
+        
+        for obj in reporte['objetivos']:
+            print(
+                f"{obj['nombre']:<30} "
+                f"{obj['dias_esperados']:<12} "
+                f"{obj['dias_con_pasada']:<12} "
+                f"{obj['cumplimiento_porcentaje']:<12.1f}%"
+            )
+        
+        print("-" * 80)
+        print(f"{'CUMPLIMIENTO TOTAL':<54} {reporte['cumplimiento_total']:.1f}%")
+        print(f"{'='*80}\n")
+        
+    except Exception as e:
+        logger.error(f"Error imprimiendo reporte: {e}")
+        print(f"Error al generar reporte: {e}")
