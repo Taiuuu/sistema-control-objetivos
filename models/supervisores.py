@@ -26,7 +26,7 @@ from services.sincronizacion import notificar_cambio
 
 from .exceptions import (
     SupervisorError, SupervisorNoEncontrado, SupervisorYaExiste,
-    SupervisorInactivo, DatabaseError
+    SupervisorInactivo, DatabaseError, ValidationError
 )
 from .types import Supervisor, EstadoSupervisor
 from .validators import validar_nombre, validar_fecha, validar_id
