@@ -25,16 +25,38 @@ ENV/
 # ARCHIVOS DE PYTHON
 # ============================================================
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 *.pyo
 *.pyd
 *.pyw~
+.python-version
 
 # ============================================================
-# PYINSTALLER Y DISTRIBUCIÓN
+# CACHE / HERRAMIENTAS PYTHON
+# ============================================================
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.tox/
+.nox/
+pip-wheel-metadata/
+
+# ============================================================
+# TESTING Y COBERTURA
+# ============================================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+
+# ============================================================
+# PYINSTALLER / BUILD / DISTRIBUCIÓN
 # ============================================================
 build/
 dist/
+site/
 *.spec
 instalador/
 *.exe
@@ -42,28 +64,32 @@ instalador/
 *.zip
 
 # ============================================================
-# ARCHIVOS TEMPORALES Y LOGS
+# LOGS / TEMPORALES
 # ============================================================
 *.log
 *.tmp
 *.temp
 logs/
+temp/
+tmp/
 
 # ============================================================
-# BACKUPS — son datos reales, no van al repo
+# BACKUPS — datos reales
 # ============================================================
 backups/
 
 # ============================================================
-# CONFIGURACIÓN DE EDITORES
+# EDITORES / IDE
 # ============================================================
 .vscode/
 .idea/
 *.suo
 *.user
+*.swp
+*.swo
 
 # ============================================================
-# ARCHIVOS DEL SISTEMA OPERATIVO
+# SISTEMA OPERATIVO
 # ============================================================
 .DS_Store
 Thumbs.db
@@ -71,8 +97,13 @@ desktop.ini
 ehthumbs.db
 
 # ============================================================
-# ARCHIVOS DE TESTING Y COBERTURA
+# JUPYTER / NOTEBOOKS
 # ============================================================
-.pytest_cache/
-.coverage
-htmlcov/
+.ipynb_checkpoints/
+
+# ============================================================
+# ARCHIVOS LOCALES DEL PROYECTO
+# ============================================================
+*.bak
+*.old
+*.orig
