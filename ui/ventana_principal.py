@@ -868,14 +868,20 @@ class VentanaPrincipal(QWidget):
             self.login = LoginWindow(self.on_login_exitoso)
             self.login.show()
 
-    def _refrescar_tema(self):
-        """Reaplica todos los estilos con la paleta actual sin reconstruir widgets."""
+    def _refrescar_tema(self) -> None:
         oscuro = self._oscuro
+        self._refrescar_tema_sidebar(oscuro)
+        self._refrescar_tema_panel_derecho(oscuro)
+        self.tabla.setStyleSheet(self._estilo_tabla(oscuro))
+        self.cargar_tabla()
 
-        # Ventana raíz
+    def _refrescar_tema_sidebar(self, oscuro: bool) -> None:
+        """Reaplica estilos del sidebar y sus subcomponentes.
+        
+        Args:
+            oscuro: Si usar tema oscuro.
+        """
         self.setStyleSheet(f"QWidget#VentanaPrincipal {{ background-color: {obtener_color('bg_main', oscuro)}; }}")
-
-        # Sidebar
         self.panel_lateral.setStyleSheet(f"""
             QFrame#PanelLateral {{
                 background-color: {obtener_color('bg_sidebar', oscuro)};
@@ -885,94 +891,66 @@ class VentanaPrincipal(QWidget):
         self._cabecera_sidebar.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
         self._contenedor_scroll.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
         self._zona_inferior.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
-
-        # Títulos sidebar
         self.titulo_lateral.setStyleSheet(f"""
             color: {obtener_color('accent', oscuro)};
-            font-size: 16px;
-            font-weight: 800;
-            letter-spacing: 2px;
+            font-size: 16px; font-weight: 800; letter-spacing: 2px;
         """)
         self.subtitulo_lateral.setStyleSheet(f"""
             color: {obtener_color('text_muted', oscuro)};
-            font-size: 10px;
-            letter-spacing: 1px;
+            font-size: 10px; letter-spacing: 1px;
         """)
-
-        # Botón colapsar
         self.btn_colapsar.setStyleSheet(f"""
             QToolButton {{
                 background: {obtener_color('btn_menu_hover', oscuro)};
                 color: {obtener_color('text_secondary', oscuro)};
-                border: none;
-                border-radius: 5px;
-                font-size: 14px;
-                font-weight: bold;
+                border: none; border-radius: 5px;
+                font-size: 14px; font-weight: bold;
             }}
             QToolButton:hover {{
-                background: {obtener_color('accent', oscuro)};
-                color: white;
+                background: {obtener_color('accent', oscuro)}; color: white;
             }}
         """)
-
-        # Botones del menú
         for b in self._botones_menu:
-            b._oscuro = oscuro
-            b._aplicar_estilo()
-
-        # Label admin (solo existe si rol == admin)
+            b.actualizar_tema(oscuro)
         if hasattr(self, '_lbl_admin'):
             self._lbl_admin.setStyleSheet(f"""
                 color: {obtener_color('text_muted', oscuro)};
-                font-size: 9px;
-                letter-spacing: 1.2px;
-                font-weight: 600;
-                padding: 4px 0 2px 4px;
+                font-size: 9px; letter-spacing: 1.2px;
+                font-weight: 600; padding: 4px 0 2px 4px;
             """)
-
-        # Zoom
         estilo_mini_btn = f"""
             QPushButton {{
                 background-color: {obtener_color('btn_menu_hover', oscuro)};
                 color: {obtener_color('text_secondary', oscuro)};
                 border: 1px solid {obtener_color('border', oscuro)};
-                border-radius: 5px;
-                font-size: 11px;
-                min-width: 30px;
-                max-width: 36px;
-                min-height: 26px;
+                border-radius: 5px; font-size: 11px;
+                min-width: 30px; max-width: 36px; min-height: 26px;
             }}
             QPushButton:hover {{
                 background-color: {obtener_color('accent', oscuro)};
-                color: white;
-                border-color: {obtener_color('accent', oscuro)};
+                color: white; border-color: {obtener_color('accent', oscuro)};
             }}
         """
         self._btn_zoom_menos.setStyleSheet(estilo_mini_btn)
         self._btn_zoom_mas.setStyleSheet(estilo_mini_btn)
         self.lbl_zoom.setStyleSheet(f"color: {obtener_color('text_muted', oscuro)}; font-size: 10px;")
-
-        # Botón tema
         texto_tema = "☀  Modo claro" if oscuro else "🌙  Modo oscuro"
         self.btn_tema.setText(texto_tema)
         self.btn_tema.setStyleSheet(self._estilo_btn_tema(oscuro))
-
-        # Botón logout
         self.btn_logout.setStyleSheet(self._estilo_btn_logout(oscuro))
-
-        # Usuario label
         self.usuario_label.setStyleSheet(f"""
             color: {obtener_color('text_muted', oscuro)};
-            font-size: 10px;
-            padding: 3px 4px;
-            border-radius: 5px;
+            font-size: 10px; padding: 3px 4px; border-radius: 5px;
             background: {obtener_color('btn_menu_hover', oscuro)};
         """)
 
-        # Panel derecho
+    def _refrescar_tema_panel_derecho(self, oscuro: bool) -> None:
+        """Reaplica estilos del panel derecho (header, filtros, tabla).
+        
+        Args:
+            oscuro: Si usar tema oscuro.
+        """
         self._panel_derecho.setStyleSheet(f"background-color: {obtener_color('bg_main', oscuro)};")
-
-        # Header
         self._header.setStyleSheet(f"""
             QFrame {{
                 background-color: {obtener_color('bg_header', oscuro)};
@@ -981,73 +959,49 @@ class VentanaPrincipal(QWidget):
         """)
         self._lbl_titulo_header.setStyleSheet(f"""
             color: {obtener_color('text_primary', oscuro)};
-            font-size: 17px;
-            font-weight: 700;
-            letter-spacing: 0.3px;
+            font-size: 17px; font-weight: 700; letter-spacing: 0.3px;
         """)
-        self._lbl_subtitulo_header.setStyleSheet(f"color: {obtener_color('text_muted', oscuro)}; font-size: 12px;")
-        self.lbl_estado_sync.setStyleSheet(f"color: {obtener_color('accent', oscuro)}; font-size: 10px; font-weight: 600;")
-
-        # Barra de filtros
+        self._lbl_subtitulo_header.setStyleSheet(
+            f"color: {obtener_color('text_muted', oscuro)}; font-size: 12px;"
+        )
+        self.lbl_estado_sync.setStyleSheet(
+            f"color: {obtener_color('accent', oscuro)}; font-size: 10px; font-weight: 600;"
+        )
         self._barra_filtros_widget.setStyleSheet(f"""
-            QScrollArea {{
-                border: none;
-                background: {obtener_color('bg_header', oscuro)};
-            }}
-            QScrollBar:horizontal {{
-                height: 3px;
-                background: transparent;
-            }}
+            QScrollArea {{ border: none; background: {obtener_color('bg_header', oscuro)}; }}
+            QScrollBar:horizontal {{ height: 3px; background: transparent; }}
             QScrollBar::handle:horizontal {{
-                background: {obtener_color('scrollbar_handle', oscuro)};
-                border-radius: 1px;
+                background: {obtener_color('scrollbar_handle', oscuro)}; border-radius: 1px;
             }}
         """)
         self._widget_filtros.setStyleSheet(f"background-color: {obtener_color('bg_header', oscuro)};")
         estilo_input = self._estilo_input(oscuro)
-        self.selector_fecha.setStyleSheet(estilo_input)
-        self.filtro_turno.setStyleSheet(estilo_input)
-        self.filtro_supervisor.setStyleSheet(estilo_input)
-        self.filtro_estado.setStyleSheet(estilo_input)
-        self.buscador.setStyleSheet(estilo_input)
-
+        for w in (self.selector_fecha, self.filtro_turno,
+                self.filtro_supervisor, self.filtro_estado, self.buscador):
+            w.setStyleSheet(estilo_input)
         estilo_btn_nav = f"""
             QPushButton {{
                 background-color: {obtener_color('bg_tabla', oscuro)};
                 color: {obtener_color('text_secondary', oscuro)};
                 border: 1px solid {obtener_color('border', oscuro)};
-                border-radius: 7px;
-                font-size: 13px;
-                min-width: 28px;
-                max-width: 28px;
-                min-height: 28px;
+                border-radius: 7px; font-size: 13px;
+                min-width: 28px; max-width: 28px; min-height: 28px;
             }}
             QPushButton:hover {{
                 background-color: {obtener_color('accent', oscuro)};
-                color: white;
-                border-color: {obtener_color('accent', oscuro)};
+                color: white; border-color: {obtener_color('accent', oscuro)};
             }}
         """
         self._boton_ant.setStyleSheet(estilo_btn_nav)
         self._boton_sig.setStyleSheet(estilo_btn_nav)
-
         self._btn_filtrar.setStyleSheet(f"""
             QPushButton {{
                 background-color: {obtener_color('accent', oscuro)};
-                color: white;
-                border: none;
-                border-radius: 7px;
-                padding: 4px 14px;
-                font-size: 12px;
-                font-weight: 600;
-                min-height: 28px;
+                color: white; border: none; border-radius: 7px;
+                padding: 4px 14px; font-size: 12px; font-weight: 600; min-height: 28px;
             }}
-            QPushButton:hover {{
-                background-color: {obtener_color('accent_dark', oscuro)};
-            }}
+            QPushButton:hover {{ background-color: {obtener_color('accent_dark', oscuro)}; }}
         """)
-
-        # Separador header
         self._sep_header.setStyleSheet(
             f"QFrame {{ background: {obtener_color('border', oscuro)}; max-height: 1px; border: none; margin: 0; }}"
         )
@@ -1312,121 +1266,169 @@ class VentanaPrincipal(QWidget):
         lay.addStretch()
         return contenedor
 
-    def cargar_tabla(self):
-        fecha          = self.selector_fecha.date().toString("yyyy-MM-dd")
-        turno          = self.filtro_turno.currentText()
-        turno          = None if turno == "Todos los turnos" else turno
-        supervisor_id  = self.filtro_supervisor.currentData()
-        filtro_estado  = self.filtro_estado.currentText()
-        texto_busqueda = self.buscador.text().strip().lower()
+    def cargar_tabla(self) -> None:
+        fecha         = self.selector_fecha.date().toString("yyyy-MM-dd")
+        turno         = self.filtro_turno.currentText()
+        turno         = None if turno == "Todos los turnos" else turno
+        supervisor_id = self.filtro_supervisor.currentData()
+        filtro_estado = self.filtro_estado.currentText()
+        texto_busq    = self.buscador.text().strip().lower()
 
-        self.objetivos_actuales = sorted(
-            obtener_objetivos_del_dia(fecha),
-            key=lambda o: o[1].lower()
-        )
+        objetivos = sorted(obtener_objetivos_del_dia(fecha), key=lambda o: o[1].lower())
         equipo_dia   = obtener_equipo(fecha, "diurno")
         equipo_noche = obtener_equipo(fecha, "nocturno")
+
+        pasadas_dia_tot, pasadas_noche_tot = self._obtener_todas_pasadas_por_turno(fecha)
+        pasadas_dia_fil, pasadas_noche_fil = self._aplicar_filtro_pasadas(
+            fecha, turno, supervisor_id, pasadas_dia_tot, pasadas_noche_tot
+        )
+
+        filas = self._filtrar_filas(
+            objetivos, texto_busq, filtro_estado,
+            pasadas_dia_fil, pasadas_noche_fil,
+            pasadas_dia_tot, pasadas_noche_tot
+        )
 
         sorting_enabled = self.tabla.isSortingEnabled()
         self.tabla.setSortingEnabled(False)
         self.tabla.setUpdatesEnabled(False)
         self._limpiar_tabla()
-
-        pasadas_dia_totales, pasadas_noche_totales = self._obtener_todas_pasadas_por_turno(fecha)
-
-        if turno == "diurno":
-            pasadas_dia_filtradas = (
-                self._obtener_todas_pasadas_por_turno(fecha, supervisor_id)[0]
-                if supervisor_id else pasadas_dia_totales
-            )
-            pasadas_noche_filtradas = pasadas_noche_totales
-        elif turno == "nocturno":
-            pasadas_noche_filtradas = (
-                self._obtener_todas_pasadas_por_turno(fecha, supervisor_id)[1]
-                if supervisor_id else pasadas_noche_totales
-            )
-            pasadas_dia_filtradas = pasadas_dia_totales
-        else:
-            pasadas_dia_filtradas   = pasadas_dia_totales
-            pasadas_noche_filtradas = pasadas_noche_totales
-
-        filas = []
-        for o in self.objetivos_actuales:
-            if texto_busqueda and texto_busqueda not in o[1].lower():
-                continue
-            pd = pasadas_dia_filtradas.get(o[0], 0)
-            pn = pasadas_noche_filtradas.get(o[0], 0)
-            estado, _ = self._obtener_estado_detallado(
-                pasadas_dia_totales.get(o[0], 0),
-                pasadas_noche_totales.get(o[0], 0)
-            )
-            if filtro_estado != "Todos" and estado != filtro_estado:
-                continue
-            filas.append((o, pd, pn, estado))
-
         self.tabla.setRowCount(len(filas))
-        oscuro  = self._oscuro
-        bg_fila = obtener_color("bg_tabla",     oscuro)
-        bg_alt  = obtener_color("bg_tabla_alt", oscuro)
-
-        for i, (o, pd, pn, estado) in enumerate(filas):
-            bg = bg_fila if i % 2 == 0 else bg_alt
-
-            item_obj = self._crear_item(o[1])
-            item_obj.setForeground(QColor(obtener_color("text_primary", oscuro)))
-            item_obj.setBackground(QColor(bg))
-            self.tabla.setItem(i, 0, item_obj)
-
-            item_ed = self._crear_item(equipo_dia)
-            item_ed.setForeground(QColor(obtener_color("text_secondary", oscuro)))
-            item_ed.setBackground(QColor(bg))
-            self.tabla.setItem(i, 1, item_ed)
-
-            badge_pd = BadgeNumero(pd, oscuro)
-            cont_pd = self._crear_widget_celda(badge_pd)
-            cont_pd.setStyleSheet(f"background-color: {bg};")
-            self.tabla.setCellWidget(i, 2, cont_pd)
-
-            item_en = self._crear_item(equipo_noche)
-            item_en.setForeground(QColor(obtener_color("text_secondary", oscuro)))
-            item_en.setBackground(QColor(bg))
-            self.tabla.setItem(i, 3, item_en)
-
-            badge_pn = BadgeNumero(pn, oscuro)
-            cont_pn = self._crear_widget_celda(badge_pn)
-            cont_pn.setStyleSheet(f"background-color: {bg};")
-            self.tabla.setCellWidget(i, 4, cont_pn)
-
-            badge_estado = BadgeEstado(estado, oscuro)
-            cont_est = self._crear_widget_celda(badge_estado)
-            cont_est.setStyleSheet(f"background-color: {bg};")
-            self.tabla.setCellWidget(i, 5, cont_est)
-
-            boton_baja = QPushButton("Dar de baja")
-            boton_baja.setCursor(Qt.CursorShape.PointingHandCursor)
-            boton_baja.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: transparent;
-                    color: {obtener_color('accent_red', oscuro)};
-                    border: 1px solid {obtener_color('accent_red', oscuro)};
-                    border-radius: 6px;
-                    padding: 4px 10px;
-                    font-size: 11px;
-                    font-weight: 600;
-                }}
-                QPushButton:hover {{
-                    background-color: {obtener_color('accent_red', oscuro)};
-                    color: white;
-                }}
-            """)
-            boton_baja.clicked.connect(lambda checked, obj_id=o[0]: self.dar_de_baja(obj_id))
-            cont_baja = self._crear_widget_celda(boton_baja)
-            cont_baja.setStyleSheet(f"background-color: {bg};")
-            self.tabla.setCellWidget(i, 6, cont_baja)
+        
+        for i, fila in enumerate(filas):
+            self._poblar_fila(i, fila, equipo_dia, equipo_noche)
 
         self.tabla.setUpdatesEnabled(True)
         self.tabla.setSortingEnabled(sorting_enabled)
         self.tabla.update()
+        
+    def _aplicar_filtro_pasadas(
+        self,
+        fecha: str,
+        turno: Optional[str],
+        supervisor_id: Optional[int],
+        pasadas_dia_tot: dict,
+        pasadas_noche_tot: dict
+    ) -> tuple:
+        """Calcula pasadas filtradas por turno y supervisor.
+        
+        Args:
+            fecha: Fecha en formato yyyy-MM-dd.
+            turno: 'diurno', 'nocturno' o None para todos.
+            supervisor_id: ID del supervisor o None para todos.
+            pasadas_dia_tot: Totales de pasadas diurnas sin filtrar.
+            pasadas_noche_tot: Totales de pasadas nocturnas sin filtrar.
+        
+        Returns:
+            Tupla (pasadas_dia_filtradas, pasadas_noche_filtradas).
+        """
+        if turno == "diurno":
+            dia = (
+                self._obtener_todas_pasadas_por_turno(fecha, supervisor_id)[0]
+                if supervisor_id else pasadas_dia_tot
+            )
+            return dia, pasadas_noche_tot
+        if turno == "nocturno":
+            noche = (
+                self._obtener_todas_pasadas_por_turno(fecha, supervisor_id)[1]
+                if supervisor_id else pasadas_noche_tot
+            )
+            return pasadas_dia_tot, noche
+        return pasadas_dia_tot, pasadas_noche_tot
+
+    def _filtrar_filas(
+        self,
+        objetivos: list,
+        texto_busq: str,
+        filtro_estado: str,
+        pasadas_dia_fil: dict,
+        pasadas_noche_fil: dict,
+        pasadas_dia_tot: dict,
+        pasadas_noche_tot: dict
+    ) -> list:
+        """Aplica filtros de texto y estado a la lista de objetivos.
+        
+        Args:
+            objetivos: Lista de tuplas (id, nombre, ...) de objetivos.
+            texto_busq: Texto de búsqueda en minúsculas.
+            filtro_estado: Estado a filtrar o 'Todos'.
+            pasadas_dia_fil: Pasadas diurnas filtradas por supervisor.
+            pasadas_noche_fil: Pasadas nocturnas filtradas por supervisor.
+            pasadas_dia_tot: Totales diurnos (para calcular estado real).
+            pasadas_noche_tot: Totales nocturnos (para calcular estado real).
+        
+        Returns:
+            Lista de tuplas (objetivo, pd, pn, estado) listas para renderizar.
+        """
+        filas = []
+        for o in objetivos:
+            if texto_busq and texto_busq not in o[1].lower():
+                continue
+            pd = pasadas_dia_fil.get(o[0], 0)
+            pn = pasadas_noche_fil.get(o[0], 0)
+            estado, _ = self._obtener_estado_detallado(
+                pasadas_dia_tot.get(o[0], 0),
+                pasadas_noche_tot.get(o[0], 0)
+            )
+            if filtro_estado != "Todos" and estado != filtro_estado:
+                continue
+            filas.append((o, pd, pn, estado))
+        return filas
+
+    def _poblar_fila(
+        self,
+        i: int,
+        fila: tuple,
+        equipo_dia: str,
+        equipo_noche: str
+    ) -> None:
+        """Rellena una fila de la tabla con datos de un objetivo.
+        
+        Args:
+            i: Índice de la fila (0-based).
+            fila: Tupla (objetivo, pasadas_dia, pasadas_noche, estado).
+            equipo_dia: Nombre del equipo diurno.
+            equipo_noche: Nombre del equipo nocturno.
+        """
+        o, pd, pn, estado = fila
+        oscuro = self._oscuro
+        bg = obtener_color("bg_tabla", oscuro) if i % 2 == 0 else obtener_color("bg_tabla_alt", oscuro)
+
+        def item(txt: str, color_key: str = "text_primary") -> QTableWidgetItem:
+            it = self._crear_item(txt)
+            it.setForeground(QColor(obtener_color(color_key, oscuro)))
+            it.setBackground(QColor(bg))
+            return it
+
+        def celda(widget: QWidget) -> QWidget:
+            c = self._crear_widget_celda(widget)
+            c.setStyleSheet(f"background-color: {bg};")
+            return c
+
+        self.tabla.setItem(i, 0, item(o[1]))
+        self.tabla.setItem(i, 1, item(equipo_dia, "text_secondary"))
+        self.tabla.setCellWidget(i, 2, celda(BadgeNumero(pd, oscuro)))
+        self.tabla.setItem(i, 3, item(equipo_noche, "text_secondary"))
+        self.tabla.setCellWidget(i, 4, celda(BadgeNumero(pn, oscuro)))
+        self.tabla.setCellWidget(i, 5, celda(BadgeEstado(estado, oscuro)))
+
+        boton_baja = QPushButton("Dar de baja")
+        boton_baja.setCursor(Qt.CursorShape.PointingHandCursor)
+        boton_baja.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {obtener_color('accent_red', oscuro)};
+                border: 1px solid {obtener_color('accent_red', oscuro)};
+                border-radius: 6px; padding: 4px 10px;
+                font-size: 11px; font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background-color: {obtener_color('accent_red', oscuro)};
+                color: white;
+            }}
+        """)
+        boton_baja.clicked.connect(lambda checked, obj_id=o[0]: self.dar_de_baja(obj_id))
+        self.tabla.setCellWidget(i, 6, celda(boton_baja))
 
     def dar_de_baja(self, objetivo_id: int):
         confirmar = QMessageBox.question(
@@ -1444,129 +1446,176 @@ class VentanaPrincipal(QWidget):
     # ABRIR VENTANAS
     # =========================================================================
 
-    def _abrir_ventana(self, attr: str, cls, *args, **kwargs):
+    def _abrir_ventana(
+        self,
+        attr: str,
+        cls,
+        *args,
+        on_close: Optional[Callable] = None,
+        **kwargs
+    ) -> QWidget:
+        """
+        Abre o trae al frente una ventana secundaria.
+
+        Si la ventana ya existe y está visible, la trae al frente.
+        Si no existe o fue cerrada, la crea nuevamente.
+
+        Args:
+            attr: Nombre del atributo donde se guarda la instancia.
+            cls: Clase de la ventana a abrir.
+            *args: Argumentos posicionales del constructor.
+            on_close: Función opcional al cerrar.
+            **kwargs: Argumentos nombrados del constructor.
+
+        Returns:
+            Instancia de la ventana abierta.
+        """
         ventana = getattr(self, attr, None)
+
         if ventana is None or not ventana.isVisible():
             ventana = cls(*args, **kwargs)
             setattr(self, attr, ventana)
+
+            if on_close:
+                ventana.destroyed.connect(on_close)
+
             ventana.show()
         else:
             ventana.raise_()
             ventana.activateWindow()
 
-    def abrir_form_objetivo(self):
-        v = getattr(self, 'form_objetivo', None)
-        if v is None or not v.isVisible():
-            self.form_objetivo = FormObjetivo()
-            self.form_objetivo.destroyed.connect(self.cargar_tabla)
-            self.form_objetivo.show()
-        else:
-            v.raise_(); v.activateWindow()
+        return ventana
 
-    def abrir_form_supervisor(self):
+
+    def abrir_form_objetivo(self) -> None:
+        self._abrir_ventana(
+            'form_objetivo',
+            FormObjetivo,
+            on_close=self.cargar_tabla
+        )
+
+
+    def abrir_form_supervisor(self) -> None:
         self._abrir_ventana('form_supervisor', FormSupervisor)
 
-    def abrir_form_pasada(self):
-        v = getattr(self, 'form_pasada', None)
-        if v is None or not v.isVisible():
-            self.form_pasada = FormPasada(
-                fecha_inicial=self.selector_fecha.date().toString("yyyy-MM-dd")
-            )
-            self.form_pasada.pasada_registrada.connect(self.cargar_tabla)
-            self.form_pasada.show()
-        else:
-            v.raise_(); v.activateWindow()
 
-    def abrir_form_turno(self):
-        v = getattr(self, 'form_turno', None)
-        if v is None or not v.isVisible():
-            self.form_turno = FormTurno()
-            self.form_turno.destroyed.connect(self.cargar_tabla)
-            self.form_turno.show()
-        else:
-            v.raise_(); v.activateWindow()
+    def abrir_form_pasada(self) -> None:
+        self._abrir_ventana(
+            'form_pasada',
+            FormPasada,
+            fecha_inicial=self.selector_fecha.date().toString("yyyy-MM-dd"),
+            on_close=self.cargar_tabla
+        )
 
-    def abrir_lista_objetivos(self):
+
+    def abrir_form_turno(self) -> None:
+        self._abrir_ventana(
+            'form_turno',
+            FormTurno,
+            on_close=self.cargar_tabla
+        )
+
+
+    def abrir_lista_objetivos(self) -> None:
         self._abrir_ventana('lista_objetivos', ListaObjetivos)
 
-    def abrir_lista_supervisores(self):
+
+    def abrir_lista_supervisores(self) -> None:
         self._abrir_ventana('lista_supervisores', ListaSupervisores)
 
-    def abrir_lista_pasadas(self):
-        v = getattr(self, 'lista_pasadas', None)
-        if v is None or not v.isVisible():
-            self.lista_pasadas = ListaPasadas()
-            self.lista_pasadas.destroyed.connect(self.cargar_tabla)
-            self.lista_pasadas.show()
-        else:
-            v.raise_(); v.activateWindow()
 
-    def abrir_notas(self):
+    def abrir_lista_pasadas(self) -> None:
+        self._abrir_ventana(
+            'lista_pasadas',
+            ListaPasadas,
+            on_close=self.cargar_tabla
+        )
+
+
+    def abrir_notas(self) -> None:
         self._abrir_ventana('notas', NotasDiarias)
 
-    def abrir_dashboard(self):
+
+    def abrir_dashboard(self) -> None:
         self._abrir_ventana('dashboard', Dashboard)
 
-    def abrir_reporte_mensual(self):
+
+    def abrir_reporte_mensual(self) -> None:
         self._abrir_ventana('reporte_mensual', ReporteMensual)
 
-    def abrir_reporte_mensual_objetivo(self):
-        self._abrir_ventana('reporte_mensual_objetivo', ReporteObjetivo)
 
-    def abrir_gestionar_usuarios(self):
-        self._abrir_ventana('gestionar_usuarios', GestionarUsuarios)
+    def abrir_reporte_mensual_objetivo(self) -> None:
+        self._abrir_ventana(
+            'reporte_mensual_objetivo',
+            ReporteObjetivo
+        )
 
-    def abrir_logs(self):
+
+    def abrir_gestionar_usuarios(self) -> None:
+        self._abrir_ventana(
+            'gestionar_usuarios',
+            GestionarUsuarios
+        )
+
+
+    def abrir_logs(self) -> None:
         self._abrir_ventana('logs', VistaLogs)
 
-    def abrir_cache(self):
-        v = getattr(self, 'cache_monitor', None)
-        if v is None or not v.isVisible():
-            self.cache_monitor = VistaCache(self.usuario_id)
-            self.cache_monitor.setWindowTitle("Monitor de Caché Inteligente")
-            self.cache_monitor.setGeometry(100, 100, 1000, 600)
-            self.cache_monitor.show()
-        else:
-            v.raise_(); v.activateWindow()
 
-    def abrir_indexacion(self):
-        v = getattr(self, 'indexacion', None)
-        if v is None or not v.isVisible():
-            self.indexacion = VistaIndexacion(self.usuario_id)
-            self.indexacion.setWindowTitle("Optimización de Índices y Rendimiento")
-            self.indexacion.setGeometry(100, 100, 1200, 700)
-            self.indexacion.show()
-        else:
-            v.raise_(); v.activateWindow()
+    def abrir_cache(self) -> None:
+        ventana = self._abrir_ventana(
+            'cache_monitor',
+            VistaCache,
+            self.usuario_id
+        )
+        ventana.setWindowTitle("Monitor de Caché Inteligente")
+        ventana.setGeometry(100, 100, 1000, 600)
 
-    def abrir_validaciones(self):
-        v = getattr(self, 'validaciones', None)
-        if v is None or not v.isVisible():
-            self.validaciones = VistaValidaciones(self.usuario_id)
-            self.validaciones.setWindowTitle("Validaciones e Integridad de BD")
-            self.validaciones.setGeometry(100, 100, 1000, 600)
-            self.validaciones.show()
-        else:
-            v.raise_(); v.activateWindow()
 
-    def abrir_ayuda(self):
+    def abrir_indexacion(self) -> None:
+        ventana = self._abrir_ventana(
+            'indexacion',
+            VistaIndexacion,
+            self.usuario_id
+        )
+        ventana.setWindowTitle("Optimización de Índices y Rendimiento")
+        ventana.setGeometry(100, 100, 1200, 700)
+
+
+    def abrir_validaciones(self) -> None:
+        ventana = self._abrir_ventana(
+            'validaciones',
+            VistaValidaciones,
+            self.usuario_id
+        )
+        ventana.setWindowTitle("Validaciones e Integridad de BD")
+        ventana.setGeometry(100, 100, 1000, 600)
+
+
+    def abrir_ayuda(self) -> None:
         self._abrir_ventana('ayuda', Ayuda)
 
-    def abrir_transferir_datos(self):
-        self._abrir_ventana('transferir_datos', TransferirDatos)
 
-    def abrir_sincronizacion(self):
-        v = getattr(self, 'sincronizacion', None)
-        if v is None or not v.isVisible():
-            self.sincronizacion = VistaSincronizacion(self.usuario_id)
-            self.sincronizacion.setWindowTitle("Monitoreo de Sincronización de Datos")
-            self.sincronizacion.setGeometry(100, 100, 1200, 700)
-            self.sincronizacion.show()
-        else:
-            v.raise_(); v.activateWindow()
+    def abrir_transferir_datos(self) -> None:
+        self._abrir_ventana(
+            'transferir_datos',
+            TransferirDatos
+        )
 
-    def abrir_importar_excel(self):
+
+    def abrir_sincronizacion(self) -> None:
+        ventana = self._abrir_ventana(
+            'sincronizacion',
+            VistaSincronizacion,
+            self.usuario_id
+        )
+        ventana.setWindowTitle("Monitoreo de Sincronización de Datos")
+        ventana.setGeometry(100, 100, 1200, 700)
+
+
+    def abrir_importar_excel(self) -> None:
         self._abrir_ventana('importar_excel', ImportarExcel)
 
-    def abrir_auditoria(self):
+
+    def abrir_auditoria(self) -> None:
         self._abrir_ventana('auditoria', VistaAuditoria)

@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 class EntradaCache:
     """Representa una entrada en el caché con TTL."""
+    """Representa una entrada en el caché con TTL."""
     
     def __init__(self, valor: Any, ttl_segundos: int = 300):
         self.valor = valor
@@ -24,6 +25,7 @@ class EntradaCache:
     def esta_expirada(self) -> bool:
         """Verifica si la entrada ha expirado."""
         tiempo_transcurrido = time.time() - self.timestamp_creacion
+        return tiempo_transcurrido > self.ttl_segundos
         return tiempo_transcurrido > self.ttl_segundos
     
     def obtener(self) -> Any:
@@ -39,6 +41,7 @@ class EntradaCache:
         """Retorna info de la entrada para debugging."""
         return {
             "ttl_segundos": self.ttl_segundos,
+            "antiguedad_segundos": self.antiguedad_segundos(),
             "antiguedad_segundos": self.antiguedad_segundos(),
             "hits": self.hits,
             "expirada": self.esta_expirada()
@@ -67,6 +70,7 @@ class CacheInteligente:
     
     def set(self, clave: str, valor: Any, ttl_segundos: Optional[int] = None) -> None:
         """Almacena un valor en el caché."""
+        """Almacena un valor en el caché."""
         ttl = ttl_segundos or self._ttl_por_defecto
         with self._lock:
             self._cache[clave] = EntradaCache(valor, ttl)
@@ -79,8 +83,11 @@ class CacheInteligente:
         Args:
             clave: Clave del caché
             generador: Callable que genera el valor si no está en caché
+            clave: Clave del caché
+            generador: Callable que genera el valor si no está en caché
         
         Returns:
+            Valor del caché o None si no existe y no hay generador
             Valor del caché o None si no existe y no hay generador
         """
         with self._lock:
@@ -106,6 +113,7 @@ class CacheInteligente:
     
     def existe(self, clave: str) -> bool:
         """Verifica si existe una clave válida en caché."""
+        """Verifica si existe una clave válida en caché."""
         with self._lock:
             if clave not in self._cache:
                 return False
@@ -116,6 +124,7 @@ class CacheInteligente:
     
     def eliminar(self, clave: str) -> bool:
         """Elimina una clave del caché."""
+        """Elimina una clave del caché."""
         with self._lock:
             if clave in self._cache:
                 del self._cache[clave]
@@ -125,12 +134,14 @@ class CacheInteligente:
     
     def limpiar(self) -> None:
         """Limpia todas las entradas del caché."""
+        """Limpia todas las entradas del caché."""
         with self._lock:
             cantidad = len(self._cache)
             self._cache.clear()
             self._stats["invalidaciones"] += cantidad
     
     def limpiar_expiradas(self) -> int:
+        """Elimina todas las entradas expiradas."""
         """Elimina todas las entradas expiradas."""
         with self._lock:
             claves_a_eliminar = [
@@ -159,6 +170,7 @@ class CacheInteligente:
     
     def obtener_stats(self) -> dict:
         """Retorna estadísticas de uso del caché."""
+        """Retorna estadísticas de uso del caché."""
         with self._lock:
             total_accesos = self._stats["hits"] + self._stats["misses"]
             tasa_acierto = (
@@ -166,6 +178,8 @@ class CacheInteligente:
                 if total_accesos > 0 else 0
             )
             
+            return {
+                "enumerador": len(self._cache),
             return {
                 "enumerador": len(self._cache),
                 "hits": self._stats["hits"],
@@ -178,6 +192,7 @@ class CacheInteligente:
     
     def obtener_detalles(self) -> dict:
         """Retorna detalles de todas las entradas en caché."""
+        """Retorna detalles de todas las entradas en caché."""
         with self._lock:
             detalles = {}
             for clave, entrada in self._cache.items():
@@ -186,21 +201,27 @@ class CacheInteligente:
     
     def establecer_ttl_por_defecto(self, ttl_segundos: int) -> None:
         """Cambia el TTL por defecto para futuras entradas."""
+        """Cambia el TTL por defecto para futuras entradas."""
         self._ttl_por_defecto = ttl_segundos
     
     def auto_cache(self, ttl: int = None):
         """
         Decorador para cachear automáticamente resultados de funciones.
         Uso:
+        Uso:
             @cache_global.auto_cache(ttl=60)
+            def mi_funcion():
+                ...
             def mi_funcion():
                 ...
         """
         def decorador(func):
             from functools import wraps
+            from functools import wraps
             @wraps(func)
             def wrapper(*args, **kwargs):
                 # Generar clave basada en nombre de función y argumentos
+                clave = f"{func.__name__}:{str(args)}:{str(kwargs)}"
                 clave = f"{func.__name__}:{str(args)}:{str(kwargs)}"
                 resultado = self.get(clave)
                 if resultado is not None:
@@ -222,6 +243,7 @@ _cache_global = CacheInteligente(ttl_por_defecto=300)  # 5 minutos por defecto
 
 def obtener_cache() -> CacheInteligente:
     """Retorna la instancia global de caché."""
+    """Retorna la instancia global de caché."""
     return _cache_global
 
 
@@ -238,8 +260,17 @@ def invalidar_objetivos() -> None:
     _cache_global.invalidar_patron("objetivo")
     _cache_global.invalidar_patron("contar_pasadas")
     _cache_global.invalidar_patron("pasadas_turno")
+def invalidar_objetivos() -> None:
+    """Invalida todas las entradas relacionadas con objetivos."""
+    _cache_global.invalidar_patron("objetivo")
+    _cache_global.invalidar_patron("contar_pasadas")
+    _cache_global.invalidar_patron("pasadas_turno")
 
 
+def invalidar_supervisores() -> None:
+    """Invalida todas las entradas relacionadas con supervisores."""
+    _cache_global.invalidar_patron("supervisor")
+    _cache_global.invalidar_patron("cargar_supervisores")
 def invalidar_supervisores() -> None:
     """Invalida todas las entradas relacionadas con supervisores."""
     _cache_global.invalidar_patron("supervisor")
@@ -251,8 +282,15 @@ def invalidar_pasadas() -> None:
     _cache_global.invalidar_patron("pasada")
     _cache_global.invalidar_patron("contar_pasadas")
     _cache_global.invalidar_patron("pasadas_turno")
+def invalidar_pasadas() -> None:
+    """Invalida todas las entradas relacionadas con pasadas."""
+    _cache_global.invalidar_patron("pasada")
+    _cache_global.invalidar_patron("contar_pasadas")
+    _cache_global.invalidar_patron("pasadas_turno")
 
 
+def invalidar_todo() -> None:
+    """Invalida todo el caché."""
 def invalidar_todo() -> None:
     """Invalida todo el caché."""
     _cache_global.limpiar()
@@ -262,6 +300,8 @@ def invalidar_todo() -> None:
 # FUNCIONES DE CACHÉ PARA ENTIDADES
 # =============================================================================
 
+def cargar_objetivos_en_cache(ttl: int = 300) -> None:
+    """Carga todos los objetivos en caché."""
 def cargar_objetivos_en_cache(ttl: int = 300) -> None:
     """Carga todos los objetivos en caché."""
     try:
@@ -280,6 +320,7 @@ def cargar_objetivos_en_cache(ttl: int = 300) -> None:
         
     except Exception as e:
         print(f"Error cacheando objetivos: {e}")
+        print(f"Error cacheando objetivos: {e}")
 
 
 def obtener_objetivos_cache(generar_si_falta: bool = True) -> List[tuple]:
@@ -295,6 +336,7 @@ def obtener_objetivos_cache(generar_si_falta: bool = True) -> List[tuple]:
             resultado = cursor.fetchall()
             conn.close()
             return resultado
+        except:
         except:
             return []
     
