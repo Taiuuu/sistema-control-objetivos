@@ -4,6 +4,8 @@
 # =============================================================================
 import sqlite3
 
+from typing import Optional, Callable
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QLabel,
