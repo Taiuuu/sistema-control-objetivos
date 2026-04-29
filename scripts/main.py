@@ -127,27 +127,69 @@ def alternar_tema(app: QApplication, ventana) -> None:
 
 
 def iniciar_app() -> None:
-    crear_base_datos()
-    migrar_supervisor3()
-    migrar_supervisores_alta_baja()
-    hacer_backup()
-    iniciar_api_rest()
+    """Inicializa la aplicación con error handling robusto."""
+    try:
+        # Inicializar base de datos y migraciones
+        try:
+            crear_base_datos()
+            print("✅ Base de datos inicializada")
+        except Exception as e:
+            print(f"⚠️  Error creando BD: {e}")
+            # Continuar porque la BD podría ya existir
+        
+        try:
+            migrar_supervisor3()
+            migrar_supervisores_alta_baja()
+            print("✅ Migraciones completadas")
+        except Exception as e:
+            print(f"⚠️  Error en migraciones: {e}")
+            # Continuar - migraciones pueden ya estar aplicadas
+        
+        # Backup - no debe detener la app
+        try:
+            hacer_backup()
+            print("✅ Backup realizado")
+        except Exception as e:
+            print(f"⚠️  Error en backup: {e}")
+            # Continuar - backup es no-crítico
+        
+        # API REST - no debe detener la app
+        try:
+            iniciar_api_rest()
+            print("✅ API REST iniciada")
+        except Exception as e:
+            print(f"⚠️  Error iniciando API: {e}")
+            # Continuar - API es opcional
+        
+        # Inicializar aplicación Qt
+        app = QApplication(sys.argv)
+        aplicar_tema_oscuro(app)
 
-    app = QApplication(sys.argv)
-    aplicar_tema_oscuro(app)
+        ventana_principal = None
 
-    ventana_principal = None
+        def on_login_exitoso(usuario_id: int, rol: str) -> None:
+            """Callback al login exitoso."""
+            from services.sesion import iniciar_sesion
+            try:
+                iniciar_sesion(usuario_id, rol)
+                nonlocal ventana_principal
+                ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso, app, alternar_tema)
+                ventana_principal.show()
+                QTimer.singleShot(1000, lambda: verificar_actualizacion(ventana_principal))
+            except Exception as e:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.critical(None, "Error", f"Error al abrir ventana principal: {e}")
+                print(f"❌ Error en on_login_exitoso: {e}")
 
-    def on_login_exitoso(usuario_id: int, rol: str) -> None:
-        from services.sesion import iniciar_sesion
-        iniciar_sesion(usuario_id, rol)
-        nonlocal ventana_principal
-        ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso, app, alternar_tema)
-        ventana_principal.show()
-        QTimer.singleShot(1000, lambda: verificar_actualizacion(ventana_principal))
-
-    login = LoginWindow(on_login_exitoso)
-    login.show()
+        login = LoginWindow(on_login_exitoso)
+        login.show()
+        sys.exit(app.exec())
+        
+    except Exception as e:
+        print(f"❌ Error crítico en iniciar_app: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
     sys.exit(app.exec())
 
 

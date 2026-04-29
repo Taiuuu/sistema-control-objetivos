@@ -25,27 +25,58 @@ def verificar_login(username: str, password: str) -> tuple | None:
     """
     Verifica las credenciales del usuario contra la base de datos.
     Retorna (id, rol, debe_cambiar_password) si son correctas, None si no.
+    
+    Args:
+        username: Nombre de usuario
+        password: Contraseña sin encriptar
+        
+    Returns:
+        Tupla (usuario_id, rol, debe_cambiar_password) o None si fallan credenciales
+        
+    Raises:
+        Logs de error para intentos fallidos de seguridad
     """
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute("""
-        SELECT id, rol, debe_cambiar_password, password
-        FROM usuarios WHERE username = ?
-    """, (username,))
-    resultado = cursor.fetchone()
-    conexion.close()
-
-    if not resultado:
-        return None
-
     try:
-        if bcrypt.checkpw(password.encode(), resultado[3].encode()):
-            # Retornar solo lo que esté configurado en la BD, sin forzar cambios por fortaleza
-            return (resultado[0], resultado[1], resultado[2])
-    except Exception:
-        pass
+        conexion = sqlite3.connect(DB_PATH)
+        cursor = conexion.cursor()
+        cursor.execute("""
+            SELECT id, rol, debe_cambiar_password, password
+            FROM usuarios WHERE username = ?
+        """, (username,))
+        resultado = cursor.fetchone()
+        conexion.close()
 
-    return None
+        if not resultado:
+            from services.logger import registrar_accion
+            registrar_accion(None, f"Intento de login fallido: usuario no existe '{username}'")
+            return None
+
+        try:
+            # Validar contraseña con bcrypt
+            if bcrypt.checkpw(password.encode(), resultado[3].encode()):
+                return (resultado[0], resultado[1], resultado[2])
+            else:
+                # Contraseña incorrecta
+                from services.logger import registrar_accion
+                registrar_accion(resultado[0], f"Intento de login fallido: contraseña incorrecta")
+                return None
+        except ValueError as e:
+            # Error en validación de hash bcrypt - posible corrupción de datos
+            from services.logger import registrar_accion
+            registrar_accion(resultado[0], f"⚠️ Error bcrypt en login: {e}")
+            print(f"❌ Error bcrypt para usuario {username}: {e}")
+            return None
+            
+    except sqlite3.Error as e:
+        print(f"❌ Error BD en verificar_login: {e}")
+        from services.logger import registrar_accion
+        registrar_accion(None, f"Error BD en login: {e}")
+        return None
+    except Exception as e:
+        print(f"❌ Error inesperado en verificar_login: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 
 # =============================================================================
@@ -204,11 +235,38 @@ class LoginWindow(QWidget):
         self.cambiar_pw.show()
 
     def _login_post_cambio(self, usuario_id: int) -> None:
-        """Completa el login después de que el usuario cambió su contraseña."""
-        conexion = sqlite3.connect(DB_PATH)
-        cursor = conexion.cursor()
-        cursor.execute("SELECT rol FROM usuarios WHERE id = ?", (usuario_id,))
-        rol = cursor.fetchone()[0]
-        conexion.close()
-        self.on_login_exitoso(usuario_id, rol)
-        self.close()
+        """
+        Completa el login después de que el usuario cambió su contraseña.
+        
+        Args:
+            usuario_id: ID del usuario que cambió la contraseña
+            
+        Raises:
+            Maneja casos donde el usuario fue eliminado entre cambio de password y login
+        """
+        try:
+            conexion = sqlite3.connect(DB_PATH)
+            cursor = conexion.cursor()
+            cursor.execute("SELECT rol FROM usuarios WHERE id = ?", (usuario_id,))
+            resultado = cursor.fetchone()
+            conexion.close()
+            
+            if resultado is None:
+                # Usuario fue eliminado - caso raro pero posible en entorno multi-usuario
+                QMessageBox.warning(
+                    self, 
+                    "Error", 
+                    "El usuario fue eliminado. Por favor, contacte al administrador."
+                )
+                print(f"⚠️ Usuario {usuario_id} no encontrado post-cambio password")
+                return
+            
+            rol = resultado[0]
+            self.on_login_exitoso(usuario_id, rol)
+            self.close()
+        except sqlite3.Error as e:
+            QMessageBox.critical(self, "Error", f"Error al recuperar datos del usuario: {e}")
+            print(f"❌ Error BD en _login_post_cambio: {e}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error inesperado: {e}")
+            print(f"❌ Error inesperado en _login_post_cambio: {e}")

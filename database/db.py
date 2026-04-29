@@ -143,7 +143,12 @@ def crear_base_datos() -> None:
 # =============================================================================
 
 def migrar_supervisor3() -> None:
-    """Agrega supervisor3_id a equipos si no existe."""
+    """
+    Agrega supervisor3_id a equipos si no existe.
+    
+    Note:
+        Maneja gracefully si la columna ya existe
+    """
     conexion = conectar()
     cursor = conexion.cursor()
     try:
@@ -151,21 +156,51 @@ def migrar_supervisor3() -> None:
             "ALTER TABLE equipos ADD COLUMN supervisor3_id INTEGER REFERENCES supervisores(id)"
         )
         conexion.commit()
-    except sqlite3.OperationalError:
-        pass
-    conexion.close()
+        print("✅ Migración supervisor3 completada")
+    except sqlite3.OperationalError as e:
+        # Columna ya existe - esto es normal
+        if "duplicate column" in str(e).lower():
+            print("ℹ️ Columna supervisor3_id ya existe")
+        else:
+            print(f"⚠️ Error en migración supervisor3: {e}")
+            conexion.rollback()
+    except Exception as e:
+        print(f"❌ Error inesperado en migrar_supervisor3: {e}")
+        conexion.rollback()
+    finally:
+        conexion.close()
 
 
 def migrar_supervisores_alta_baja() -> None:
-    """Agrega fecha_alta y fecha_baja a supervisores si no existen."""
+    """
+    Agrega fecha_alta y fecha_baja a supervisores si no existen.
+    
+    Note:
+        Maneja gracefully si las columnas ya existen
+    """
     conexion = conectar()
     cursor = conexion.cursor()
-    for columna in ("fecha_alta TEXT", "fecha_baja TEXT"):
+    migraciones_completadas = []
+    
+    for columna_def in ("fecha_alta TEXT", "fecha_baja TEXT"):
         try:
-            cursor.execute(f"ALTER TABLE supervisores ADD COLUMN {columna}")
+            cursor.execute(f"ALTER TABLE supervisores ADD COLUMN {columna_def}")
             conexion.commit()
-        except sqlite3.OperationalError:
-            pass
+            migraciones_completadas.append(columna_def.split()[0])
+        except sqlite3.OperationalError as e:
+            # Columna ya existe - esto es normal
+            if "duplicate column" in str(e).lower():
+                print(f"ℹ️ Columna {columna_def.split()[0]} ya existe")
+            else:
+                print(f"⚠️ Error en migración {columna_def}: {e}")
+                conexion.rollback()
+        except Exception as e:
+            print(f"❌ Error inesperado en migración: {e}")
+            conexion.rollback()
+    
+    if migraciones_completadas:
+        print(f"✅ Migraciones completadas: {', '.join(migraciones_completadas)}")
+    
     conexion.close()
 
 

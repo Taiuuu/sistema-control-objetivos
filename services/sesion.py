@@ -103,10 +103,38 @@ def verificar_token_sesion(token: str) -> bool:
 
 
 def get_usuario_id() -> int | None:
-    """Retorna el ID del usuario actualmente logueado."""
+    """
+    Retorna el ID del usuario actualmente logueado.
+    
+    Returns:
+        ID del usuario si sesión es válida, None si no hay sesión o expiró
+        
+    Note:
+        Verifica que la sesión sea válida antes de retornar
+    """
     if not validar_sesion_activa():
         return None
     return _usuario_id_activo
+
+
+def obtener_sesion_valida() -> tuple | None:
+    """
+    Obtiene información de sesión validada de forma centralizada.
+    
+    Returns:
+        Tupla (usuario_id, rol) si sesión es válida, None si no
+        
+    Example:
+        sesion = obtener_sesion_valida()
+        if sesion:
+            usuario_id, rol = sesion
+            # Continuar
+        else:
+            # Mostrar error de sesión expirada
+    """
+    if not validar_sesion_activa():
+        return None
+    return (_usuario_id_activo, _rol_activo)
 
 
 def get_rol() -> str | None:
