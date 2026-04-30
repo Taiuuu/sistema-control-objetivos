@@ -54,9 +54,7 @@ def registrar_turno(
         hora = validar_hora(hora)            # HH:mm
 
         if _pasada_ya_existe(fecha, objetivo_id, supervisor_id, turno):
-            raise TurnoYaRegistrado(
-                f"Ya existe pasada para fecha={fecha}, objetivo={objetivo_id}, supervisor={supervisor_id}"
-            )
+            raise TurnoYaRegistrado(fecha, objetivo_id, supervisor_id)
 
         with gestor_db.transaction() as conn:
             cursor = conn.cursor()
