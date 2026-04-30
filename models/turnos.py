@@ -51,9 +51,7 @@ def registrar_turno(
         turno = validar_turno(turno)
         objetivo_id = validar_id(objetivo_id, "objetivo_id")
         supervisor_id = validar_id(supervisor_id, "supervisor_id")
-
-        # Hora obligatoria
-        hora = validar_hora(hora, requerida=True)
+        hora = validar_hora(hora)  # ⚠️ NO obligatoria (compatibilidad legacy)
 
         if _pasada_ya_existe(fecha, objetivo_id, supervisor_id, turno, hora):
             raise TurnoYaRegistrado(fecha, objetivo_id, supervisor_id)
@@ -301,14 +299,20 @@ def _pasada_ya_existe(
     objetivo_id: int,
     supervisor_id: int,
     turno: str,
-    hora: str
+    hora: Optional[str]
 ) -> bool:
     """
-    Verifica si existe una pasada dentro de ±5 minutos.
-    Solo compara HH:mm (sin segundos).
+    Verifica duplicado:
+
+    - Si hay hora → valida ventana de ±5 minutos (HH:mm)
+    - Si NO hay hora → no bloquea (compatibilidad con datos legacy)
     """
 
     try:
+        # 👉 Datos legacy: no validar
+        if not hora:
+            return False
+
         query = """
             SELECT 1
             FROM pasadas
