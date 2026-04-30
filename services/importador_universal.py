@@ -287,5 +287,4 @@ importador = ImportadorUniversal()
 
 def get_importador() -> ImportadorUniversal:
     """Obtiene el importador universal."""
-    return importador</content>
-<parameter name="filePath">c:\Vesp taiu\sistema-control-objetivos\services\importador_universal.py
+    return importador

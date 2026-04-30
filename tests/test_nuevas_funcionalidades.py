@@ -194,5 +194,4 @@ def main():
 
 if __name__ == "__main__":
     import json
-    main()</content>
-<parameter name="filePath">c:\Vesp taiu\sistema-control-objetivos\test_nuevas_funcionalidades.py
+    main()

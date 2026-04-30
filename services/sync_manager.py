@@ -208,5 +208,4 @@ sync_manager = SyncManager()
 
 def get_sync_manager() -> SyncManager:
     """Obtiene el manager de sincronización."""
-    return sync_manager</content>
-<parameter name="filePath">c:\Vesp taiu\sistema-control-objetivos\services\sync_manager.py
+    return sync_manager
