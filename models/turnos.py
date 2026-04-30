@@ -1,12 +1,10 @@
 # =============================================================================
 # VESP Organizations - Sistema de Control de Objetivos
 # Módulo de gestión de pasadas (turnos)
-# Compatible con estructura real de tu base de datos
 # =============================================================================
 
 import logging
-from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from database.gestor_db import gestor_db
 from services.cache import cache_global, invalidar_pasadas
@@ -30,6 +28,8 @@ from .validators import (
 
 logger = logging.getLogger(__name__)
 
+VENTANA_DUPLICADO_MINUTOS = 5
+
 
 # =============================================================================
 # ALTAS
@@ -48,12 +48,14 @@ def registrar_turno(
 
     try:
         fecha = validar_fecha(fecha, "fecha", requerida=True)
-        turno = validar_turno(turno)          # diurno / nocturno
+        turno = validar_turno(turno)
         objetivo_id = validar_id(objetivo_id, "objetivo_id")
         supervisor_id = validar_id(supervisor_id, "supervisor_id")
-        hora = validar_hora(hora)            # HH:mm
 
-        if _pasada_ya_existe(fecha, objetivo_id, supervisor_id, turno):
+        # Hora obligatoria
+        hora = validar_hora(hora, requerida=True)
+
+        if _pasada_ya_existe(fecha, objetivo_id, supervisor_id, turno, hora):
             raise TurnoYaRegistrado(fecha, objetivo_id, supervisor_id)
 
         with gestor_db.transaction() as conn:
@@ -298,28 +300,44 @@ def _pasada_ya_existe(
     fecha: str,
     objetivo_id: int,
     supervisor_id: int,
-    turno: str
+    turno: str,
+    hora: str
 ) -> bool:
     """
-    Verifica duplicado.
+    Verifica si existe una pasada dentro de ±5 minutos.
+    Solo compara HH:mm (sin segundos).
     """
 
     try:
-        resultado = gestor_db.ejecutar("""
-            SELECT id
+        query = """
+            SELECT 1
             FROM pasadas
             WHERE fecha = ?
-            AND objetivo_id = ?
-            AND supervisor_id = ?
-            AND turno = ?
-        """, (
+              AND objetivo_id = ?
+              AND supervisor_id = ?
+              AND turno = ?
+              AND hora IS NOT NULL
+              AND ABS(
+                  (CAST(substr(hora, 1, 2) AS INTEGER) * 60 + CAST(substr(hora, 4, 2) AS INTEGER)) -
+                  (CAST(substr(?, 1, 2) AS INTEGER) * 60 + CAST(substr(?, 4, 2) AS INTEGER))
+              ) <= ?
+            LIMIT 1
+        """
+
+        params = (
             fecha,
             objetivo_id,
             supervisor_id,
-            turno
-        ))
+            turno,
+            hora,
+            hora,
+            VENTANA_DUPLICADO_MINUTOS
+        )
+
+        resultado = gestor_db.ejecutar(query, params)
 
         return bool(resultado)
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error verificando duplicado: {e}")
         return False
