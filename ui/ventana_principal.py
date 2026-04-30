@@ -844,11 +844,58 @@ class VentanaPrincipal(QWidget):
     # TEMA — ALTERNAR Y REFRESCAR
     # =========================================================================
 
-    def _alternar_tema(self):
-        if self.alternar_tema_fn and self.app:
+    def _alternar_tema(self) -> None:
+        """
+        Alterna entre tema claro y oscuro globalmente.
+        
+        Actualiza:
+        - Tema general de la aplicación
+        - Todos los componentes de la ventana
+        - Estilos de botones, tabla, y paneles
+        - Persistencia del tema elegido
+        
+        Raises:
+            Loguea errores pero no los propaga para evitar crashes
+        """
+        try:
+            # ✅ Validar que hay callback de tema
+            if not self.alternar_tema_fn or not self.app:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.warning(self, "Error", "Error al cambiar tema. Intenta nuevamente.")
+                print("⚠️ Error: No hay callback de alternar_tema o app no disponible")
+                return
+            
+            # ✅ Llamar al callback global de tema
             self.alternar_tema_fn(self.app, self)
-            self._oscuro = obtener_tema_actual() == "oscuro"
+            
+            # ✅ Actualizar estado local
+            tema_actual = obtener_tema_actual()
+            self._oscuro = tema_actual == "oscuro"
+            
+            # ✅ Refrescar todos los componentes de la UI
             self._refrescar_tema()
+            
+            # ✅ Persistir tema en BD
+            from services.tema import establecer_tema_actual
+            establecer_tema_actual("oscuro" if self._oscuro else "claro")
+            
+            # ✅ Loguear cambio
+            try:
+                from services.logger import registrar_accion
+                registrar_accion(
+                    self.usuario_id,
+                    f"Cambió tema a {'oscuro' if self._oscuro else 'claro'}"
+                )
+            except Exception:
+                pass  # No interrumpir si logging falla
+            
+            print(f"✅ Tema cambiado a: {'oscuro' if self._oscuro else 'claro'}")
+            
+        except Exception as e:
+            print(f"❌ Error al alternar tema: {e}")
+            import traceback
+            traceback.print_exc()
+            # No lanzar excepción para que la app siga funcionando
 
     def _cerrar_sesion(self):
         """Cierra la sesión actual y regresa a la ventana de login."""
@@ -871,11 +918,16 @@ class VentanaPrincipal(QWidget):
             self.login.show()
 
     def _refrescar_tema(self) -> None:
-        oscuro = self._oscuro
-        self._refrescar_tema_sidebar(oscuro)
-        self._refrescar_tema_panel_derecho(oscuro)
-        self.tabla.setStyleSheet(self._estilo_tabla(oscuro))
-        self.cargar_tabla()
+        """Refresca todos los estilos de tema en la ventana."""
+        try:
+            oscuro = self._oscuro
+            self._refrescar_tema_sidebar(oscuro)
+            self._refrescar_tema_panel_derecho(oscuro)
+            self.tabla.setStyleSheet(self._estilo_tabla(oscuro))
+            self.cargar_tabla()
+        except Exception as e:
+            print(f"⚠️ Error refrescando tema: {e}")
+            # No lanzar para que la app siga funcionando
 
     def _refrescar_tema_sidebar(self, oscuro: bool) -> None:
         """Reaplica estilos del sidebar y sus subcomponentes.
