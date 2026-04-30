@@ -24,9 +24,7 @@ from .validators import (
     validar_hora,
     validar_id
 )
-
-# 🔥 NUEVO: lógica central de turnos
-from services.turnos_logic import calcular_turno_y_fecha_operativa
+from services.logica_turnos import calcular_turno_y_fecha_operativa
 
 logger = logging.getLogger(__name__)
 
