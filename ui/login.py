@@ -201,13 +201,62 @@ class LoginWindow(QWidget):
         self.setLayout(layout)
         animar_entrada(self)
 
+    def _validar_entrada_login(self, username: str, password: str) -> bool:
+        """
+        Valida la entrada del usuario según políticas de seguridad.
+        
+        Args:
+            username: Nombre de usuario ingresado
+            password: Contraseña ingresada
+            
+        Returns:
+            True si la entrada es válida, False si hay error (muestra mensaje)
+        """
+        # ✅ Validación de vacío
+        if not username or not password:
+            QMessageBox.warning(self, "Error", "Completá usuario y contraseña.")
+            return False
+        
+        # ✅ Validación de largo mínimo/máximo
+        if len(username) < 3:
+            QMessageBox.warning(self, "Error", "Usuario debe tener mínimo 3 caracteres.")
+            return False
+        
+        if len(username) > 50:
+            QMessageBox.warning(self, "Error", "Usuario no puede exceder 50 caracteres.")
+            return False
+        
+        if len(password) < 4:
+            QMessageBox.warning(self, "Error", "Contraseña debe tener mínimo 4 caracteres.")
+            return False
+        
+        if len(password) > 100:
+            QMessageBox.warning(self, "Error", "Contraseña no puede exceder 100 caracteres.")
+            return False
+        
+        # ✅ Validación de caracteres (username solo alfanuméricos + underscore)
+        if not all(c.isalnum() or c == '_' for c in username):
+            QMessageBox.warning(
+                self, 
+                "Error", 
+                "Usuario solo puede contener letras, números y guiones bajos (_)."
+            )
+            return False
+        
+        # ✅ No permitir espacios en username
+        if ' ' in username:
+            QMessageBox.warning(self, "Error", "Usuario no puede contener espacios.")
+            return False
+        
+        return True
+
     def intentar_login(self) -> None:
         """Valida las credenciales y redirige según el estado del usuario."""
         username = self.input_usuario.text().strip()
         password = self.input_password.text()
 
-        if not username or not password:
-            QMessageBox.warning(self, "Error", "Completá usuario y contraseña.")
+        # ✅ Validar entrada antes de intentar login
+        if not self._validar_entrada_login(username, password):
             return
 
         resultado = verificar_login(username, password)
