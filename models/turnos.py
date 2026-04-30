@@ -22,9 +22,11 @@ from .types import Pasada
 from .validators import (
     validar_fecha,
     validar_hora,
-    validar_turno,
     validar_id
 )
+
+# 🔥 NUEVO: lógica central de turnos
+from services.turnos_logic import calcular_turno_y_fecha_operativa
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,7 @@ VENTANA_DUPLICADO_MINUTOS = 5
 
 def registrar_turno(
     fecha: str,
-    turno: str,
+    turno: str,  # (se mantiene por compatibilidad, pero ya no se confía)
     objetivo_id: int,
     supervisor_id: int,
     hora: Optional[str] = None
@@ -48,12 +50,17 @@ def registrar_turno(
 
     try:
         fecha = validar_fecha(fecha, "fecha", requerida=True)
-        turno = validar_turno(turno)
         objetivo_id = validar_id(objetivo_id, "objetivo_id")
         supervisor_id = validar_id(supervisor_id, "supervisor_id")
-        hora = validar_hora(hora)  # ⚠️ NO obligatoria (compatibilidad legacy)
+        hora = validar_hora(hora)  # obligatorio para lógica correcta
 
-        if _pasada_ya_existe(fecha, objetivo_id, supervisor_id, turno, hora):
+        # =========================================================
+        # 🔥 LÓGICA REAL DEL SISTEMA (REGLA DE NEGOCIO)
+        # =========================================================
+        turno_calculado, fecha_operativa = calcular_turno_y_fecha_operativa(fecha, hora)
+
+        # Verificación de duplicado usando turno real calculado
+        if _pasada_ya_existe(fecha_operativa.strftime("%Y-%m-%d"), objetivo_id, supervisor_id, turno_calculado, hora):
             raise TurnoYaRegistrado(fecha, objetivo_id, supervisor_id)
 
         with gestor_db.transaction() as conn:
@@ -64,9 +71,9 @@ def registrar_turno(
                 (fecha, hora, turno, objetivo_id, supervisor_id)
                 VALUES (?, ?, ?, ?, ?)
             """, (
-                fecha,
+                fecha_operativa.strftime("%Y-%m-%d"),
                 hora,
-                turno,
+                turno_calculado,
                 objetivo_id,
                 supervisor_id
             ))
@@ -75,9 +82,9 @@ def registrar_turno(
 
         pasada = Pasada(
             id=pasada_id,
-            fecha=fecha,
+            fecha=fecha_operativa.strftime("%Y-%m-%d"),
             hora=hora,
-            turno=turno,
+            turno=turno_calculado,
             objetivo_id=objetivo_id,
             supervisor_id=supervisor_id
         )
@@ -90,7 +97,7 @@ def registrar_turno(
 
         logger.info(
             f"Pasada registrada ID={pasada_id} "
-            f"{fecha} {hora} {turno}"
+            f"{fecha_operativa} {hora} {turno_calculado}"
         )
 
         return pasada
@@ -110,7 +117,7 @@ def registrar_turno(
 @cache_global.auto_cache(ttl=30)
 def listar_turnos_del_dia(fecha: str) -> List[Pasada]:
     """
-    Lista pasadas del día.
+    Lista pasadas del día (fecha operativa).
     """
 
     try:
@@ -250,25 +257,31 @@ def actualizar_pasada(
     turno: Optional[str] = None
 ) -> Pasada:
     """
-    Actualiza hora y/o turno.
+    Actualiza hora y recalcula turno correctamente.
     """
 
     try:
         pasada = obtener_pasada(pasada_id)
 
         nueva_hora = validar_hora(hora) if hora else pasada.hora
-        nuevo_turno = validar_turno(turno) if turno else pasada.turno
+
+        # 🔥 REGLA CONSISTENTE
+        turno_calculado, fecha_operativa = calcular_turno_y_fecha_operativa(
+            pasada.fecha,
+            nueva_hora
+        )
 
         with gestor_db.transaction() as conn:
             cursor = conn.cursor()
 
             cursor.execute("""
                 UPDATE pasadas
-                SET hora = ?, turno = ?
+                SET hora = ?, turno = ?, fecha = ?
                 WHERE id = ?
             """, (
                 nueva_hora,
-                nuevo_turno,
+                turno_calculado,
+                fecha_operativa.strftime("%Y-%m-%d"),
                 pasada_id
             ))
 
@@ -279,7 +292,8 @@ def actualizar_pasada(
         })
 
         pasada.hora = nueva_hora
-        pasada.turno = nuevo_turno
+        pasada.turno = turno_calculado
+        pasada.fecha = fecha_operativa.strftime("%Y-%m-%d")
 
         logger.info(f"Pasada actualizada ID={pasada_id}")
 
@@ -302,14 +316,10 @@ def _pasada_ya_existe(
     hora: Optional[str]
 ) -> bool:
     """
-    Verifica duplicado:
-
-    - Si hay hora → valida ventana de ±5 minutos (HH:mm)
-    - Si NO hay hora → no bloquea (compatibilidad con datos legacy)
+    Verifica duplicado dentro de ventana de minutos.
     """
 
     try:
-        # 👉 Datos legacy: no validar
         if not hora:
             return False
 
