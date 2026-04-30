@@ -1,5 +1,20 @@
 from datetime import datetime, timedelta, time
 
+
+def _parsear_hora(hora: str) -> time:
+    """
+    Acepta formatos:
+    - HH:MM
+    - HH:MM:SS
+    """
+    for formato in ("%H:%M:%S", "%H:%M"):
+        try:
+            return datetime.strptime(hora, formato).time()
+        except ValueError:
+            continue
+    raise ValueError(f"Formato de hora inválido: {hora}")
+
+
 def calcular_turno_y_fecha_operativa(fecha: str, hora: str):
     """
     Devuelve:
@@ -8,7 +23,7 @@ def calcular_turno_y_fecha_operativa(fecha: str, hora: str):
     """
 
     fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
-    hora_obj = datetime.strptime(hora, "%H:%M:%S").time()
+    hora_obj = _parsear_hora(hora)
 
     # Diurno: 07:00 - 18:59
     if time(7, 0) <= hora_obj < time(19, 0):

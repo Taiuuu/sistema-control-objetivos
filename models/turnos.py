@@ -50,11 +50,8 @@ def registrar_turno(
         fecha = validar_fecha(fecha, "fecha", requerida=True)
         objetivo_id = validar_id(objetivo_id, "objetivo_id")
         supervisor_id = validar_id(supervisor_id, "supervisor_id")
-        hora = validar_hora(hora)  # obligatorio para lógica correcta
+        hora = validar_hora(hora)
 
-        # =========================================================
-        # 🔥 LÓGICA REAL DEL SISTEMA (REGLA DE NEGOCIO)
-        # =========================================================
         turno_calculado, fecha_operativa = calcular_turno_y_fecha_operativa(fecha, hora)
 
         # Verificación de duplicado usando turno real calculado
@@ -263,7 +260,6 @@ def actualizar_pasada(
 
         nueva_hora = validar_hora(hora) if hora else pasada.hora
 
-        # 🔥 REGLA CONSISTENTE
         turno_calculado, fecha_operativa = calcular_turno_y_fecha_operativa(
             pasada.fecha,
             nueva_hora
