@@ -278,9 +278,29 @@ def sanitizar_texto(texto: str, max_longitud: int = 1000) -> str:
         texto = texto[:max_longitud]
 
     return texto
-    
-    return hora
 
+def validar_hora(hora: Optional[str], campo: str = "hora") -> Optional[str]:
+    """Valida que la hora tenga formato HH:MM.
+
+    Args:
+        hora: Hora a validar.
+        campo: Nombre del campo (para mensajes de error).
+
+    Returns:
+        La hora validada o None si no se proporcionó.
+
+    Raises:
+        ValidationError: Si la hora no es válida.
+    """
+    if not hora:
+        return None
+
+    hora = hora.strip()
+
+    if not re.match(REGEX_HORA, hora):
+        raise ValidationError(campo, MENSAJE_HORA_INVALIDA)
+
+    return hora
 
 def validar_turno(turno: Optional[str], campo: str = "turno") -> str:
     """Valida que el turno sea uno de los tipos válidos.
