@@ -4,7 +4,7 @@
 
 import pytest
 import sqlite3
-from services.usuarios import crear_usuario, cambiar_contrasena, obtener_usuarios, obtener_usuario_por_id
+from services.usuarios import crear_usuario, cambiar_contrasena_usuario, listar_usuarios, obtener_usuario_por_id
 
 
 class TestCrearUsuario:

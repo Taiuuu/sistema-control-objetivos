@@ -6,12 +6,14 @@
 
 import sys
 import os
+import json
+import datetime
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from services.data_provider import get_data_provider, cambiar_a_modo_local
+from services.data_provider import get_data_provider
 from services.sync_manager import get_sync_manager
 from services.importador_universal import get_importador
-from services.gestor_turnos import calcular_fecha_operativa
+from services.gestor_turnos import GestorTurnos
 
 
 def test_arquitectura_modular():
@@ -21,10 +23,6 @@ def test_arquitectura_modular():
     # Obtener proveedor actual
     provider = get_data_provider()
     print(f"Proveedor actual: {type(provider).__name__}")
-
-    # Cambiar a modo local (por si acaso)
-    cambiar_a_modo_local()
-    print("Modo local activado")
 
     # Intentar obtener datos
     try:
@@ -87,13 +85,18 @@ def test_gestor_turnos():
         ("2026-04-22", "06:59", "nocturno", "2026-04-21"),  # Fin de turno nocturno
     ]
 
-    for fecha, hora, turno, esperado in casos_prueba:
+    for fecha_str, hora_str, turno, esperado in casos_prueba:
         try:
-            resultado = calcular_fecha_operativa(fecha, hora, turno)
-            status = "✅" if resultado == esperado else "❌"
-            print(f"{status} {fecha} {hora} ({turno}) → {resultado} (esperado: {esperado})")
+            # Parsear strings a objetos datetime
+            fecha = datetime.datetime.strptime(fecha_str, "%Y-%m-%d").date()
+            hora = datetime.datetime.strptime(hora_str, "%H:%M").time()
+            
+            resultado = GestorTurnos.calcular_fecha_operativa(fecha, hora, turno)
+            resultado_str = resultado.strftime("%Y-%m-%d")
+            status = "✅" if resultado_str == esperado else "❌"
+            print(f"{status} {fecha_str} {hora_str} ({turno}) → {resultado_str} (esperado: {esperado})")
         except Exception as e:
-            print(f"❌ Error en {fecha} {hora} ({turno}): {e}")
+            print(f"❌ Error en {fecha_str} {hora_str} ({turno}): {e}")
 
     print()
 

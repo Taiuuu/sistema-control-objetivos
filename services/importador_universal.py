@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, date, time
 import os
 from services.sync_manager import get_sync_manager
-from services.gestor_turnos import calcular_fecha_operativa
+from services.gestor_turnos import GestorTurnos
 
 
 @dataclass
@@ -203,7 +203,13 @@ class ImportadorUniversal:
                     continue
 
                 # Calcular fecha operativa
-                fecha_operativa = calcular_fecha_operativa(registro.fecha, registro.hora, registro.turno)
+                try:
+                    fecha = datetime.strptime(registro.fecha, "%Y-%m-%d").date()
+                    hora = datetime.strptime(registro.hora, "%H:%M").time()
+                    fecha_operativa = GestorTurnos.calcular_fecha_operativa(fecha, hora, registro.turno)
+                except ValueError as e:
+                    errores.append(f"Error en formato de fecha/hora ({registro.fecha} {registro.hora}): {e}")
+                    continue
 
                 # Verificar duplicado
                 if self._es_duplicado(supervisor_id, objetivo_id, fecha_operativa, registro.hora, registro.turno):
