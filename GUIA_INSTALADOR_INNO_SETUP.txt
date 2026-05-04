@@ -1,0 +1,208 @@
+# Guía de Instalador Inno Setup - VESP Control de Objetivos
+# =============================================================================
+# Fecha: 2026-05-04
+# Versión: 1.1.0
+# =============================================================================
+
+## 📋 INTRODUCCIÓN
+
+Esta guía explica cómo crear y mantener el instalador para VESP Control usando Inno Setup.
+El proyecto ya incluye un script base `scripts/instalador.iss` que puedes usar como punto de partida.
+
+## 🔧 REQUISITOS PREVIOS
+
+### Software Necesario:
+1. **Inno Setup Compiler** (gratuito)
+   - Descargar desde: https://jrsoftware.org/isinfo.php
+   - Versión recomendada: 6.2.0 o superior
+
+2. **Python y dependencias del proyecto**
+   - Asegurarse que `pip install -r requirements.txt` funciona
+   - El proyecto debe compilar correctamente con PyInstaller
+
+3. **PyInstaller** para crear el ejecutable
+   - `pip install pyinstaller`
+   - El proyecto ya tiene configuración en `build/VESP Control/`
+
+## 📝 PASO A PASO: CREAR INSTALADOR POR PRIMERA VEZ
+
+### Paso 1: Preparar el Ejecutable
+```bash
+# 1. Asegurarse que todas las dependencias están instaladas
+cd "c:\Vesp taiu\sistema-control-objetivos"
+pip install -r requirements.txt
+
+# 2. Crear el ejecutable con PyInstaller (si no existe)
+# El proyecto ya incluye build/VESP Control/ pero si necesitas recrearlo:
+pyinstaller --onefile --windowed --name "VESP Control" scripts/main.py
+
+# 3. Verificar que el ejecutable funciona
+# Ejecutar dist/VESP Control/VESP Control.exe
+```
+
+### Paso 2: Configurar el Script Inno Setup
+```iss
+; scripts/instalador.iss
+#define MyAppName "VESP Control"
+#define MyAppVersion "1.1.0"          ; ← CAMBIAR AQUÍ LA VERSIÓN
+#define MyAppPublisher "V.E.S.P Organizations"
+#define MyAppExeName "VESP Control.exe"
+
+[Setup]
+AppId={{VESP-CONTROL-2024}}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+DefaultDirName={autopf}\{#MyAppName}
+DefaultGroupName={#MyAppName}
+OutputBaseFilename=VESP_Control_Instalador_v{#MyAppVersion}  ; ← NOMBRE CON VERSIÓN
+OutputDir=instalador
+Compression=lzma
+SolidCompression=yes
+WizardStyle=modern
+SetupIconFile=assets\vesp.ico           ; ← AJUSTAR RUTA SI ES NECESARIO
+UninstallDisplayIcon={app}\{#MyAppExeName}
+
+[Languages]
+Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "Crear acceso directo en el escritorio"; GroupDescription: "Opciones adicionales:"
+
+[Files]
+; Copiar todos los archivos del directorio dist
+Source: "dist\VESP Control\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Icons]
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\Desinstalar {#MyAppName}"; Filename: "{uninstallexe}"
+Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+[Run]
+Filename: "{app}\{#MyAppExeName}"; Description: "Ejecutar {#MyAppName}"; Flags: nowait postinstall skipifsilent
+```
+
+### Paso 3: Compilar el Instalador
+```bash
+# 1. Abrir Inno Setup Compiler
+# 2. File → Open → seleccionar scripts/instalador.iss
+# 3. Build → Compile
+# 4. El instalador se creará en instalador/VESP_Control_Instalador_v1.1.0.exe
+```
+
+### Paso 4: Probar el Instalador
+```bash
+# 1. Ejecutar el instalador generado
+# 2. Instalar en una máquina virtual o diferente
+# 3. Verificar que la aplicación funciona correctamente
+# 4. Probar desinstalación desde Panel de Control
+```
+
+## 🔄 ACTUALIZACIÓN PARA NUEVAS VERSIONES
+
+### Checklist Pre-Actualización:
+- [ ] **Cambiar versión en código**: Actualizar `docs/version.txt`
+- [ ] **Actualizar requirements.txt**: Si hay nuevas dependencias
+- [ ] **Probar la aplicación**: Asegurarse que funciona correctamente
+- [ ] **Crear nuevo ejecutable**: `pyinstaller --onefile --windowed --name "VESP Control" scripts/main.py`
+- [ ] **Actualizar changelog**: Documentar cambios en `docs/`
+
+### Pasos para Nueva Versión:
+
+#### 1. Actualizar el Script ISS
+```iss
+; Cambiar SOLO estas líneas:
+#define MyAppVersion "1.1.1"          ; ← NUEVA VERSIÓN
+OutputBaseFilename=VESP_Control_Instalador_v{#MyAppVersion}  ; ← AUTO-ACTUALIZA
+```
+
+#### 2. Si hay cambios en archivos incluidos:
+```iss
+[Files]
+; Si agregaste nuevos directorios, actualizar:
+Source: "dist\VESP Control\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "docs\*"; DestDir: "{app}\docs"; Flags: ignoreversion recursesubdirs createallsubdirs  ; ← EJEMPLO
+```
+
+#### 3. Compilar y Probar
+```bash
+# 1. Abrir Inno Setup Compiler
+# 2. Cargar scripts/instalador.iss
+# 3. Build → Compile
+# 4. Probar instalación
+# 5. Verificar que la nueva versión funciona
+```
+
+#### 4. Distribuir
+```bash
+# 1. Subir instalador a servidor de descargas
+# 2. Actualizar sitio web con nueva versión
+# 3. Notificar a usuarios sobre actualización
+# 4. Mantener versiones anteriores disponibles por 3 meses
+```
+
+## 🛠️ CONFIGURACIONES AVANZADAS
+
+### Agregar Verificación de Versión
+```iss
+[Code]
+function InitializeSetup(): Boolean;
+begin
+  // Verificar si ya está instalada una versión
+  if RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1', 'DisplayVersion', ExpandConstant('{app}')) then
+  begin
+    if MsgBox('VESP Control ya está instalado. ¿Desea continuar con la instalación?', mbConfirmation, MB_YESNO) = IDNO then
+    begin
+      Result := False;
+      Exit;
+    end;
+  end;
+  Result := True;
+end;
+```
+
+### Crear Instalador Silencioso
+```bash
+# Para instalación desatendida:
+VESP_Control_Instalador_v1.1.0.exe /SILENT /NORESTART
+```
+
+### Personalizar Idioma
+```iss
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
+Name: "portuguese"; MessagesFile: "compiler:Languages\Portuguese.isl"
+```
+
+## 🚨 SOLUCIÓN DE PROBLEMAS
+
+### Error: "File not found" al compilar
+**Causa**: Ruta incorrecta en [Files]
+**Solución**: Verificar que `dist\VESP Control\` existe y contiene archivos
+
+### Error: "Application cannot start" después de instalar
+**Causa**: Faltan dependencias de runtime
+**Solución**: 
+- Usar `--onedir` en PyInstaller en lugar de `--onefile`
+- Agregar DLLs faltantes en [Files]
+
+### Instalador muy grande
+**Solución**: 
+- Usar compresión LZMA
+- Excluir archivos innecesarios con `Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: *.pdb,*.log`
+
+### Usuario no puede instalar
+**Causa**: Permisos insuficientes
+**Solución**: Ejecutar como administrador o cambiar `PrivilegesRequired=lowest`
+
+## 📞 SOPORTE
+
+Para problemas específicos con Inno Setup:
+- Documentación oficial: https://jrsoftware.org/ishelp/
+- Foro de usuarios: https://jrsoftware.org/isforum.php
+
+Para problemas con el proyecto VESP:
+- Revisar `docs/TROUBLESHOOTING.md`
+- Contactar al equipo de desarrollo</content>
+<parameter name="filePath">c:\Vesp taiu\sistema-control-objetivos\GUIA_INSTALADOR_INNO_SETUP.txt

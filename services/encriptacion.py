@@ -6,6 +6,7 @@
 import os
 import base64
 import hashlib
+import bcrypt
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -187,3 +188,75 @@ def generar_contrasena_segura(longitud: int = 12) -> str:
     secrets.SystemRandom().shuffle(contrasena)
 
     return ''.join(contrasena)
+
+
+# =============================================================================
+# FUNCIONES DE HASHING DE CONTRASEÑAS CON BCRYPT
+# =============================================================================
+
+def hashear_contrasena(contrasena: str) -> str:
+    """
+    Hashea una contraseña usando bcrypt para almacenamiento seguro.
+    Args:
+        contrasena: Contraseña en texto plano
+    Returns:
+        Hash bcrypt de la contraseña
+    """
+    if not contrasena:
+        raise ValueError("La contraseña no puede estar vacía")
+
+    # Convertir a bytes si es necesario
+    if isinstance(contrasena, str):
+        contrasena = contrasena.encode('utf-8')
+
+    # Generar salt y hashear
+    salt = bcrypt.gensalt(rounds=12)  # 12 rounds = ~2^12 iteraciones
+    hash_bytes = bcrypt.hashpw(contrasena, salt)
+
+    # Retornar como string para almacenamiento en BD
+    return hash_bytes.decode('utf-8')
+
+
+def verificar_contrasena(contrasena: str, hash_almacenado: str) -> bool:
+    """
+    Verifica una contraseña contra su hash almacenado.
+    Args:
+        contrasena: Contraseña en texto plano
+        hash_almacenado: Hash bcrypt almacenado
+    Returns:
+        True si la contraseña es correcta
+    """
+    if not contrasena or not hash_almacenado:
+        return False
+
+    try:
+        # Convertir a bytes
+        contrasena_bytes = contrasena.encode('utf-8')
+        hash_bytes = hash_almacenado.encode('utf-8')
+
+        # Verificar con bcrypt
+        return bcrypt.checkpw(contrasena_bytes, hash_bytes)
+    except (ValueError, TypeError):
+        # Hash corrupto o formato inválido
+        return False
+
+
+def necesita_rehash(hash_almacenado: str, rounds_actuales: int = 12) -> bool:
+    """
+    Verifica si un hash necesita ser actualizado (nueva política de seguridad).
+    Args:
+        hash_almacenado: Hash bcrypt actual
+        rounds_actuales: Número de rounds que debería tener
+    Returns:
+        True si necesita rehash
+    """
+    try:
+        # bcrypt incluye el número de rounds en el hash
+        # Formato: $2b$rounds$salt$hash
+        partes = hash_almacenado.split('$')
+        if len(partes) >= 4:
+            rounds_hash = int(partes[2])
+            return rounds_hash < rounds_actuales
+        return True  # Formato desconocido, mejor rehash
+    except (ValueError, IndexError):
+        return True  # Error al parsear, mejor rehash
