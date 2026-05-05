@@ -80,7 +80,8 @@ def crear_base_datos() -> None:
             username              TEXT    NOT NULL UNIQUE,
             password              TEXT    NOT NULL,
             rol                   TEXT    NOT NULL DEFAULT 'operador',
-            debe_cambiar_password INTEGER DEFAULT 1
+            debe_cambiar_password INTEGER DEFAULT 1,
+            activo                INTEGER DEFAULT 1
         )
     """)
 
@@ -145,7 +146,7 @@ def crear_base_datos() -> None:
 def migrar_supervisor3() -> None:
     """
     Agrega supervisor3_id a equipos si no existe.
-    
+
     Note:
         Maneja gracefully si la columna ya existe
     """
@@ -158,7 +159,6 @@ def migrar_supervisor3() -> None:
         conexion.commit()
         print("✅ Migración supervisor3 completada")
     except sqlite3.OperationalError as e:
-        # Columna ya existe - esto es normal
         if "duplicate column" in str(e).lower():
             print("ℹ️ Columna supervisor3_id ya existe")
         else:
@@ -174,21 +174,20 @@ def migrar_supervisor3() -> None:
 def migrar_supervisores_alta_baja() -> None:
     """
     Agrega fecha_alta y fecha_baja a supervisores si no existen.
-    
+
     Note:
         Maneja gracefully si las columnas ya existen
     """
     conexion = conectar()
     cursor = conexion.cursor()
     migraciones_completadas = []
-    
+
     for columna_def in ("fecha_alta TEXT", "fecha_baja TEXT"):
         try:
             cursor.execute(f"ALTER TABLE supervisores ADD COLUMN {columna_def}")
             conexion.commit()
             migraciones_completadas.append(columna_def.split()[0])
         except sqlite3.OperationalError as e:
-            # Columna ya existe - esto es normal
             if "duplicate column" in str(e).lower():
                 print(f"ℹ️ Columna {columna_def.split()[0]} ya existe")
             else:
@@ -197,11 +196,44 @@ def migrar_supervisores_alta_baja() -> None:
         except Exception as e:
             print(f"❌ Error inesperado en migración: {e}")
             conexion.rollback()
-    
+
     if migraciones_completadas:
         print(f"✅ Migraciones completadas: {', '.join(migraciones_completadas)}")
-    
+
     conexion.close()
+
+
+def migrar_usuarios_activo() -> None:
+    """
+    Agrega la columna activo a usuarios si no existe.
+
+    Bases de datos nuevas ya la tienen por el CREATE TABLE.
+    Bases de datos existentes (creadas antes de esta migración)
+    necesitan este ALTER TABLE para poder hacer login.
+
+    Note:
+        Maneja gracefully si la columna ya existe
+    """
+    conexion = conectar()
+    cursor = conexion.cursor()
+    try:
+        cursor.execute("ALTER TABLE usuarios ADD COLUMN activo INTEGER DEFAULT 1")
+        conexion.commit()
+        # Marcar todos los usuarios existentes como activos
+        cursor.execute("UPDATE usuarios SET activo = 1 WHERE activo IS NULL")
+        conexion.commit()
+        print("✅ Migración usuarios_activo completada")
+    except sqlite3.OperationalError as e:
+        if "duplicate column" in str(e).lower():
+            print("ℹ️ Columna activo ya existe")
+        else:
+            print(f"⚠️ Error en migración usuarios_activo: {e}")
+            conexion.rollback()
+    except Exception as e:
+        print(f"❌ Error inesperado en migrar_usuarios_activo: {e}")
+        conexion.rollback()
+    finally:
+        conexion.close()
 
 
 # =============================================================================
