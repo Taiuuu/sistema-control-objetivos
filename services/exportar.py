@@ -27,24 +27,23 @@ def _obtener_datos_reporte(anio: int, mes: int) -> list:
     return [
         (
             objetivo['nombre'],
-            objetivo['dias_con_dia'],
-            objetivo['dias_con_noche'],
-            objetivo['dias_sin_control'],
-            objetivo['cumplimiento']
+            objetivo['dias_con_pasada'],
+            objetivo['dias_sin_pasada'],
+            objetivo['cumplimiento_porcentaje']
         )
         for objetivo in reporte['objetivos']
     ]
 
 
 def exportar_excel(anio: int, mes: int, ruta: str) -> None:
-    """Genera Excel con reporte mensual incluyendo diurno/nocturno separados."""
+    """Genera Excel con reporte mensual."""
+    # r = (nombre, dias_con_pasada, dias_sin_pasada, cumplimiento_porcentaje)
     resultados = _obtener_datos_reporte(anio, mes)
 
     wb = Workbook()
     ws = wb.active
     ws.title = f"Reporte {MESES[mes-1]} {anio}"
 
-    # Logo
     try:
         from services.assets import ruta_asset
         img = XLImage(ruta_asset("assets/vesp.png"))
@@ -54,49 +53,42 @@ def exportar_excel(anio: int, mes: int, ruta: str) -> None:
     except Exception:
         pass
 
-    # Encabezado
-    ws.merge_cells("B1:G2")
+    ws.merge_cells("B1:F2")
     ws["B1"] = "V.E.S.P Organizations - Seguridad Privada"
     ws["B1"].font = Font(bold=True, size=14, color="2E7D32")
     ws["B1"].alignment = Alignment(horizontal="center", vertical="center")
 
-    ws.merge_cells("A3:G3")
+    ws.merge_cells("A3:F3")
     ws["A3"] = f"Reporte mensual - {MESES[mes-1]} {anio}"
     ws["A3"].font = Font(bold=True, size=12)
     ws["A3"].alignment = Alignment(horizontal="center")
 
-    ws.merge_cells("A4:G4")
+    ws.merge_cells("A4:F4")
     ws["A4"] = f"Generado el {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}"
     ws["A4"].font = Font(size=9, color="888888")
     ws["A4"].alignment = Alignment(horizontal="center")
 
-    # Encabezados columnas
-    encabezados = [
-        "Objetivo", "Días c/ diurno", "Días c/ nocturno",
-        "Días sin control", "Porcentaje", "Estado"
-    ]
+    encabezados = ["Objetivo", "Días con pasada", "Días sin pasada", "Cumplimiento", "Estado"]
     for col, enc in enumerate(encabezados, 1):
         celda = ws.cell(row=6, column=col, value=enc)
         celda.font = Font(bold=True, color="FFFFFF")
         celda.fill = PatternFill(fill_type="solid", fgColor="1B5E20")
         celda.alignment = Alignment(horizontal="center")
 
-    # Datos
     for fila, r in enumerate(resultados, 7):
-        estado = "CUMPLE" if r[4] >= 80 else "NO CUMPLE"
-        valores = [r[0], r[1], r[2], r[3], f"{r[4]:.1f}%", estado]
+        estado = "CUMPLE" if r[3] >= 80 else "NO CUMPLE"
+        valores = [r[0], r[1], r[2], f"{r[3]:.1f}%", estado]
         for col, val in enumerate(valores, 1):
             celda = ws.cell(row=fila, column=col, value=val)
-            color = "C8E6C9" if r[4] >= 80 else "FFCDD2"
+            color = "C8E6C9" if r[3] >= 80 else "FFCDD2"
             celda.fill = PatternFill(fill_type="solid", fgColor=color)
             celda.alignment = Alignment(horizontal="center")
 
     ws.column_dimensions["A"].width = 30
-    ws.column_dimensions["B"].width = 16
+    ws.column_dimensions["B"].width = 18
     ws.column_dimensions["C"].width = 18
-    ws.column_dimensions["D"].width = 16
+    ws.column_dimensions["D"].width = 14
     ws.column_dimensions["E"].width = 12
-    ws.column_dimensions["F"].width = 12
     ws.row_dimensions[1].height = 60
     ws.row_dimensions[2].height = 60
 
@@ -104,7 +96,8 @@ def exportar_excel(anio: int, mes: int, ruta: str) -> None:
 
 
 def exportar_pdf(anio: int, mes: int, ruta: str) -> None:
-    """Genera PDF con reporte mensual incluyendo diurno/nocturno separados."""
+    """Genera PDF con reporte mensual."""
+    # r = (nombre, dias_con_pasada, dias_sin_pasada, cumplimiento_porcentaje)
     resultados = _obtener_datos_reporte(anio, mes)
 
     doc = SimpleDocTemplate(
@@ -148,12 +141,12 @@ def exportar_pdf(anio: int, mes: int, ruta: str) -> None:
     ))
     elementos.append(Spacer(1, 0.5*cm))
 
-    datos = [["Objetivo", "Días c/\ndiurno", "Días c/\nnocturno", "Sin\ncontrol", "%", "Estado"]]
+    datos = [["Objetivo", "Días con pasada", "Días sin pasada", "Cumplimiento", "Estado"]]
     for r in resultados:
-        estado = "CUMPLE" if r[4] >= 80 else "NO CUMPLE"
-        datos.append([r[0], str(r[1]), str(r[2]), str(r[3]), f"{r[4]:.1f}%", estado])
+        estado = "CUMPLE" if r[3] >= 80 else "NO CUMPLE"
+        datos.append([r[0], str(r[1]), str(r[2]), f"{r[3]:.1f}%", estado])
 
-    tabla = Table(datos, colWidths=[5.5*cm, 2.5*cm, 2.5*cm, 2*cm, 1.8*cm, 2.7*cm])
+    tabla = Table(datos, colWidths=[5.5*cm, 3*cm, 3*cm, 2.5*cm, 3*cm])
     tabla.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1B5E20")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -165,14 +158,14 @@ def exportar_pdf(anio: int, mes: int, ruta: str) -> None:
     ]))
 
     for i, r in enumerate(resultados, 1):
-        color = colors.HexColor("#C8E6C9") if r[4] >= 80 else colors.HexColor("#FFCDD2")
+        color = colors.HexColor("#C8E6C9") if r[3] >= 80 else colors.HexColor("#FFCDD2")
         tabla.setStyle(TableStyle([("BACKGROUND", (0, i), (-1, i), color)]))
 
     elementos.append(tabla)
     elementos.append(Spacer(1, 0.5*cm))
 
     total = len(resultados)
-    cumplen = sum(1 for r in resultados if r[4] >= 80)
+    cumplen = sum(1 for r in resultados if r[3] >= 80)
     elementos.append(Paragraph(
         f"<b>Resumen:</b> {cumplen} de {total} objetivos cumplen el 80% o más de cobertura.",
         estilos["Normal"]

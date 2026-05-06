@@ -18,72 +18,6 @@ from database.db import DB_PATH
 
 
 # =============================================================================
-# CÁLCULO DEL REPORTE
-# =============================================================================
-
-def calcular_reporte(anio: int, mes: int) -> list:
-    """
-    Calcula el cumplimiento mensual por objetivo con pasadas diurnas y nocturnas separadas.
-    Retorna lista de (nombre, dias_controlados_dia, dias_controlados_noche, dias_sin_control, porcentaje).
-    """
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
-    objetivos = cursor.fetchall()
-
-    resultados = []
-    total_dias = calendar.monthrange(anio, mes)[1]
-
-    for o in objetivos:
-        obj_id, nombre, inicio, fin, dias_str = o
-        dias_semana = [int(d) for d in dias_str.split(",")]
-        dias_esperados = 0
-        dias_con_dia = 0
-        dias_con_noche = 0
-        dias_sin_control = 0
-
-        for dia in range(1, total_dias + 1):
-            fecha = f"{anio}-{mes:02d}-{dia:02d}"
-            fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
-
-            if inicio and fecha < inicio:
-                continue
-            if fin and fecha > fin:
-                continue
-            if fecha_dt.isoweekday() not in dias_semana:
-                continue
-
-            dias_esperados += 1
-
-            cursor.execute("""
-                SELECT COUNT(*) FROM pasadas
-                WHERE fecha = ? AND objetivo_id = ? AND turno = 'diurno'
-            """, (fecha, obj_id))
-            tuvo_dia = cursor.fetchone()[0] > 0
-
-            cursor.execute("""
-                SELECT COUNT(*) FROM pasadas
-                WHERE fecha = ? AND objetivo_id = ? AND turno = 'nocturno'
-            """, (fecha, obj_id))
-            tuvo_noche = cursor.fetchone()[0] > 0
-
-            if tuvo_dia:
-                dias_con_dia += 1
-            if tuvo_noche:
-                dias_con_noche += 1
-            if not tuvo_dia and not tuvo_noche:
-                dias_sin_control += 1
-
-        if dias_esperados > 0:
-            dias_controlados = dias_esperados - dias_sin_control
-            porcentaje = (dias_controlados / dias_esperados) * 100
-            resultados.append((nombre, dias_con_dia, dias_con_noche, dias_sin_control, porcentaje))
-
-    conexion.close()
-    return resultados
-
-
-# =============================================================================
 # PANTALLA DE REPORTE MENSUAL
 # =============================================================================
 
@@ -137,14 +71,14 @@ class ReporteMensual(QWidget):
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(6)
         self.tabla.setHorizontalHeaderLabels([
-            "Objetivo", "Días c/ diurno", "Días c/ nocturno",
-            "Días sin control", "Porcentaje", "Estado"
+            "Objetivo", "Días esperados", "Días con pasada",
+            "Días sin pasada", "Cumplimiento", "Estado"
         ])
         self.tabla.setColumnWidth(0, 220)
         self.tabla.setColumnWidth(1, 110)
         self.tabla.setColumnWidth(2, 120)
         self.tabla.setColumnWidth(3, 120)
-        self.tabla.setColumnWidth(4, 90)
+        self.tabla.setColumnWidth(4, 100)
         self.tabla.setColumnWidth(5, 100)
         layout.addWidget(self.tabla)
 
@@ -173,22 +107,27 @@ class ReporteMensual(QWidget):
         self.tabla.setUpdatesEnabled(False)
         self.tabla.clearContents()
         self.tabla.setRowCount(len(resultados['objetivos']))
+
         for i, r in enumerate(resultados['objetivos']):
-            estado = "CUMPLE" if r['cumplimiento'] >= 80 else "NO CUMPLE"
+            cumplimiento = r['cumplimiento_porcentaje']
+            estado = "CUMPLE" if cumplimiento >= 80 else "NO CUMPLE"
+
             self.tabla.setItem(i, 0, QTableWidgetItem(r['nombre']))
-            self.tabla.setItem(i, 1, QTableWidgetItem(str(r['dias_con_dia'])))
-            self.tabla.setItem(i, 2, QTableWidgetItem(str(r['dias_con_noche'])))
-            self.tabla.setItem(i, 3, QTableWidgetItem(str(r['dias_sin_control'])))
-            self.tabla.setItem(i, 4, QTableWidgetItem(f"{r['cumplimiento']:.1f}%"))
+            self.tabla.setItem(i, 1, QTableWidgetItem(str(r['dias_esperados'])))
+            self.tabla.setItem(i, 2, QTableWidgetItem(str(r['dias_con_pasada'])))
+            self.tabla.setItem(i, 3, QTableWidgetItem(str(r['dias_sin_pasada'])))
+            self.tabla.setItem(i, 4, QTableWidgetItem(f"{cumplimiento:.1f}%"))
             self.tabla.setItem(i, 5, QTableWidgetItem(estado))
 
-            color = QColor("#90EE90") if r['cumplimiento'] >= 80 else QColor("#FF6B6B")
+            color = QColor("#90EE90") if cumplimiento >= 80 else QColor("#FF6B6B")
             for col in range(6):
                 self.tabla.item(i, col).setBackground(color)
                 self.tabla.item(i, col).setForeground(QColor("#000000"))
 
         self.tabla.setUpdatesEnabled(True)
-        self.estado_label.setText("Reporte generado")
+        self.estado_label.setText(
+            f"Reporte generado — Cumplimiento total: {resultados['cumplimiento_total']:.1f}%"
+        )
         self._set_controls_enabled(True)
 
     def _on_error(self, mensaje: str) -> None:
