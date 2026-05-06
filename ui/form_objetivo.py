@@ -86,14 +86,18 @@ class FormObjetivo(QWidget):
             return
 
         dias_str = ",".join(dias_seleccionados)
-        
+
+        # Obtener fecha_fin solo si el checkbox está activo
+        fecha_fin = self.input_fin.date().toString("yyyy-MM-dd") if self.checkbox_fin.isChecked() else None
+
         try:
             validar_objetivo(nombre, dias_str)
         except ErrorValidacion as e:
             QMessageBox.warning(self, "Error de Validación", str(e))
             return
-        
-        agregar_objetivo(nombre, inicio, None, dias_str)
+
+        # CORRECCIÓN: el orden correcto es (nombre, fecha_inicio, dias_semana, fecha_fin)
+        agregar_objetivo(nombre, inicio, dias_str, fecha_fin)
 
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id
