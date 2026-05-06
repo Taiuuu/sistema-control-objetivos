@@ -25,7 +25,7 @@ from services.cache import cache_global, invalidar_objetivos
 from services.sincronizacion import notificar_cambio
 
 from .exceptions import (
-    ObjetivoError, ObjetivoNoEncontrado, ObjetivoYaExiste, DatabaseError
+    ValidationError, ObjetivoError, ObjetivoNoEncontrado, ObjetivoYaExiste, DatabaseError  # ← CORRECCIÓN: se agregó ValidationError
 )
 from .types import Objetivo
 from .validators import (
