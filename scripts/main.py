@@ -190,7 +190,6 @@ def alternar_tema(app: QApplication, ventana) -> None:
         establecer_tema_actual("oscuro")
         ventana.btn_tema.setText("☀ Modo claro")
 
-
 def iniciar_app() -> None:
     """
     Inicializa la aplicación con error handling robusto.
