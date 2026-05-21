@@ -80,23 +80,27 @@ def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
         cursor = conexion.cursor()
 
         cursor.execute("""
-            SELECT s.id, s.nombre
-            FROM supervisores s
-            WHERE s.id IN (
-                SELECT supervisor1_id FROM equipos
+            SELECT s.id, s.nombre, eq.posicion
+            FROM (
+                SELECT supervisor1_id AS supervisor_id, 1 AS posicion
+                FROM equipos
                 WHERE fecha = ? AND turno = ?
 
-                UNION
+                UNION ALL
 
-                SELECT supervisor2_id FROM equipos
+                SELECT supervisor2_id AS supervisor_id, 2 AS posicion
+                FROM equipos
                 WHERE fecha = ? AND turno = ?
 
-                UNION
+                UNION ALL
 
-                SELECT supervisor3_id FROM equipos
+                SELECT supervisor3_id AS supervisor_id, 3 AS posicion
+                FROM equipos
                 WHERE fecha = ? AND turno = ?
-            )
-            ORDER BY s.nombre
+            ) AS eq
+            JOIN supervisores s ON s.id = eq.supervisor_id
+            GROUP BY s.id, s.nombre, eq.posicion
+            ORDER BY eq.posicion
         """, (
             fecha, turno,
             fecha, turno,
@@ -238,7 +242,8 @@ class FormPasada(QWidget):
         supervisores = _cargar_supervisores_del_turno(fecha, turno)
 
         for sup in supervisores:
-            self.input_supervisor.addItem(sup[1], sup[0])
+            label = f"Sup {sup[2]} - {sup[1]}"
+            self.input_supervisor.addItem(label, sup[0])
 
     # =========================================================================
     # GUARDAR
