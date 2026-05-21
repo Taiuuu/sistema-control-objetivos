@@ -5,12 +5,13 @@
 
 import sqlite3
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel,
-    QLineEdit, QPushButton, QCheckBox, QDateEdit, QMessageBox
+    QWidget, QVBoxLayout, QFormLayout, QLabel,
+    QLineEdit, QPushButton, QCheckBox, QDateEdit, QMessageBox, QFrame
 )
-from PyQt6.QtCore import QDate
+from PyQt6.QtCore import QDate, Qt
 from ui.animaciones import animar_entrada
 from models.objetivos import agregar_objetivo
+from services.tema import obtener_tema
 from services.validaciones import validar_objetivo, ErrorValidacion
 
 
@@ -29,49 +30,128 @@ class FormObjetivo(QWidget):
 
     def __init__(self):
         super().__init__()
+        self._tema = obtener_tema()
         self.setWindowTitle("Agregar objetivo")
-        self.setGeometry(300, 300, 400, 420)
+        self.setMinimumSize(440, 520)
+        self.setStyleSheet(self._generar_estilos())
 
-        layout = QVBoxLayout()
+        self._titulo = QLabel("Agregar objetivo")
+        self._titulo.setObjectName("TituloPrincipal")
 
-        # Nombre del objetivo
-        layout.addWidget(QLabel("Nombre del objetivo:"))
+        self._subtitulo = QLabel("Define los datos básicos del objetivo y su cobertura semanal.")
+        self._subtitulo.setObjectName("Subtitulo")
+        self._subtitulo.setWordWrap(True)
+
         self.input_nombre = QLineEdit()
-        layout.addWidget(self.input_nombre)
+        self.input_nombre.setFixedHeight(34)
 
-        # Fecha de inicio de cobertura
-        layout.addWidget(QLabel("Fecha inicio:"))
         self.input_inicio = QDateEdit()
         self.input_inicio.setDate(QDate.currentDate())
         self.input_inicio.setCalendarPopup(True)
         self.input_inicio.setDisplayFormat("dd/MM/yyyy")
-        layout.addWidget(self.input_inicio)
+        self.input_inicio.setFixedHeight(34)
 
-        # Checkbox para fecha fin
         self.checkbox_fin = QCheckBox("Definir fecha fin")
-        layout.addWidget(self.checkbox_fin)
+        self.checkbox_fin.setFixedHeight(30)
 
-        # Fecha de fin de cobertura
         self.input_fin = QDateEdit()
         self.input_fin.setDate(QDate.currentDate())
         self.input_fin.setCalendarPopup(True)
         self.input_fin.setDisplayFormat("dd/MM/yyyy")
         self.input_fin.setEnabled(False)
+        self.input_fin.setFixedHeight(34)
         self.checkbox_fin.stateChanged.connect(lambda: self.input_fin.setEnabled(self.checkbox_fin.isChecked()))
-        layout.addWidget(self.input_fin)
 
-        # Días de cobertura semanal
-        layout.addWidget(QLabel("Días de cobertura:"))
         self.dias = {dia: QCheckBox(dia) for dia in DIAS_MAP}
         for checkbox in self.dias.values():
-            layout.addWidget(checkbox)
+            checkbox.setFixedHeight(28)
 
-        boton_guardar = QPushButton("Guardar objetivo")
-        boton_guardar.clicked.connect(self._guardar)
-        layout.addWidget(boton_guardar)
+        self.boton_guardar = QPushButton("Guardar objetivo")
+        self.boton_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.boton_guardar.setFixedHeight(42)
+        self.boton_guardar.clicked.connect(self._guardar)
 
-        self.setLayout(layout)
+        form_layout = QFormLayout()
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setSpacing(14)
+        form_layout.setContentsMargins(0, 0, 0, 0)
+        form_layout.addRow(QLabel("Nombre del objetivo"), self.input_nombre)
+        form_layout.addRow(QLabel("Fecha inicio"), self.input_inicio)
+        form_layout.addRow(self.checkbox_fin, self.input_fin)
+
+        dias_widget = QFrame()
+        dias_layout = QVBoxLayout(dias_widget)
+        dias_layout.setContentsMargins(0, 0, 0, 0)
+        dias_layout.setSpacing(6)
+        for checkbox in self.dias.values():
+            dias_layout.addWidget(checkbox)
+
+        form_layout.addRow(QLabel("Días de cobertura"), dias_widget)
+
+        card = QFrame()
+        card.setObjectName("CardContenedor")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(18, 18, 18, 18)
+        card_layout.setSpacing(16)
+        card_layout.addLayout(form_layout)
+        card_layout.addWidget(self.boton_guardar)
+
+        layout_principal = QVBoxLayout(self)
+        layout_principal.setContentsMargins(18, 18, 18, 18)
+        layout_principal.setSpacing(14)
+        layout_principal.addWidget(self._titulo)
+        layout_principal.addWidget(self._subtitulo)
+        layout_principal.addWidget(card)
+
+        self.setLayout(layout_principal)
         animar_entrada(self)
+
+    def _generar_estilos(self) -> str:
+        tema = self._tema
+        return f"""
+            QWidget {{
+                background-color: {tema['background']};
+                color: {tema['texto']};
+                font-family: Segoe UI, Arial, sans-serif;
+                font-size: 13px;
+            }}
+            QLabel#TituloPrincipal {{
+                color: {tema['texto']};
+                font-size: 18px;
+                font-weight: 700;
+            }}
+            QLabel#Subtitulo {{
+                color: {tema['texto_secundario']};
+                font-size: 12px;
+            }}
+            QFrame#CardContenedor {{
+                background-color: {tema['background_secundario']};
+                border: 1px solid {tema['border']};
+                border-radius: 14px;
+            }}
+            QLineEdit, QDateEdit {{
+                background-color: {tema['input_background']};
+                color: {tema['texto']};
+                border: 1px solid {tema['border']};
+                border-radius: 8px;
+                padding: 6px 10px;
+            }}
+            QCheckBox {{
+                color: {tema['texto']};
+            }}
+            QPushButton {{
+                background-color: {tema['primario']};
+                color: #ffffff;
+                border: none;
+                border-radius: 10px;
+                font-weight: 700;
+                padding: 10px 18px;
+            }}
+            QPushButton:hover {{
+                background-color: {tema['primario_hover']};
+            }}
+        """
 
     def _guardar(self) -> None:
         """Valida los datos y registra el nuevo objetivo en la base de datos."""

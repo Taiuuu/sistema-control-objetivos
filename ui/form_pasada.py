@@ -7,18 +7,23 @@ import sqlite3
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,
+    QFormLayout,
     QLabel,
     QPushButton,
     QComboBox,
     QDateEdit,
     QTimeEdit,
-    QMessageBox
+    QFrame,
+    QMessageBox,
+    QSizePolicy
 )
-from PyQt6.QtCore import QDate, QTime, pyqtSignal
+from PyQt6.QtCore import QDate, QTime, pyqtSignal, Qt
 
 from models.turnos import registrar_turno
 from ui.animaciones import animar_entrada
 from database.db import DB_PATH
+from services.tema import obtener_tema
 from services.validaciones import validar_pasada, ErrorValidacion
 from services.cache import (
     obtener_objetivos_cache,
@@ -118,7 +123,6 @@ def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
 
     return obtener_supervisores_cache(generar_si_falta=True)
 
-
 # =============================================================================
 # MEMORIA DEL ÚLTIMO TURNO
 # =============================================================================
@@ -139,75 +143,79 @@ class FormPasada(QWidget):
 
         global _ultimo_turno
 
+        self._tema = obtener_tema()
         self.setWindowTitle("Registrar pasada")
-        self.setGeometry(300, 300, 360, 320)
+        self.setMinimumSize(420, 420)
+        self.setWindowFlag(Qt.WindowType.Window)
+        self.setStyleSheet(self._generar_estilos())
 
-        layout = QVBoxLayout()
-
-        # ---------------------------------------------------------------------
-        # FECHA
-        # ---------------------------------------------------------------------
-        layout.addWidget(QLabel("Fecha:"))
+        if fecha_inicial:
+            fecha = QDate.fromString(fecha_inicial, "yyyy-MM-dd")
+        else:
+            fecha = QDate.currentDate()
 
         self.input_fecha = QDateEdit()
         self.input_fecha.setCalendarPopup(True)
-
-        if fecha_inicial:
-            self.input_fecha.setDate(
-                QDate.fromString(fecha_inicial, "yyyy-MM-dd")
-            )
-        else:
-            self.input_fecha.setDate(QDate.currentDate())
-
-        layout.addWidget(self.input_fecha)
-
-        # ---------------------------------------------------------------------
-        # HORA
-        # ---------------------------------------------------------------------
-        layout.addWidget(QLabel("Hora:"))
+        self.input_fecha.setDate(fecha)
+        self.input_fecha.setFixedHeight(34)
 
         self.input_hora = QTimeEdit()
         self.input_hora.setDisplayFormat("HH:mm")
         self.input_hora.setTime(QTime.currentTime())
-
-        layout.addWidget(self.input_hora)
-
-        # ---------------------------------------------------------------------
-        # TURNO
-        # ---------------------------------------------------------------------
-        layout.addWidget(QLabel("Turno:"))
+        self.input_hora.setFixedHeight(34)
 
         self.input_turno = QComboBox()
         self.input_turno.addItems(["diurno", "nocturno"])
         self.input_turno.setCurrentText(_ultimo_turno)
-
-        layout.addWidget(self.input_turno)
-
-        # ---------------------------------------------------------------------
-        # OBJETIVO
-        # ---------------------------------------------------------------------
-        layout.addWidget(QLabel("Objetivo:"))
+        self.input_turno.setFixedHeight(34)
 
         self.input_objetivo = QComboBox()
-        layout.addWidget(self.input_objetivo)
-
-        # ---------------------------------------------------------------------
-        # SUPERVISOR
-        # ---------------------------------------------------------------------
-        layout.addWidget(QLabel("Supervisor:"))
+        self.input_objetivo.setFixedHeight(34)
 
         self.input_supervisor = QComboBox()
-        layout.addWidget(self.input_supervisor)
+        self.input_supervisor.setFixedHeight(34)
 
-        # ---------------------------------------------------------------------
-        # BOTÓN
-        # ---------------------------------------------------------------------
         self.boton_guardar = QPushButton("Registrar pasada")
+        self.boton_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.boton_guardar.setFixedHeight(40)
         self.boton_guardar.clicked.connect(self._guardar)
 
-        layout.addWidget(self.boton_guardar)
+        self._titulo = QLabel("Registrar pasada")
+        self._titulo.setObjectName("TituloPrincipal")
 
-        self.setLayout(layout)
+        self._subtitulo = QLabel("Completa los datos de la pasada y presiona registrar.")
+        self._subtitulo.setObjectName("Subtitulo")
+        self._subtitulo.setWordWrap(True)
+
+        form_layout = QFormLayout()
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setSpacing(14)
+        form_layout.setContentsMargins(0, 0, 0, 0)
+
+        form_layout.addRow(QLabel("Fecha"), self.input_fecha)
+        form_layout.addRow(QLabel("Hora"), self.input_hora)
+        form_layout.addRow(QLabel("Turno"), self.input_turno)
+        form_layout.addRow(QLabel("Objetivo"), self.input_objetivo)
+        form_layout.addRow(QLabel("Supervisor"), self.input_supervisor)
+
+        card = QFrame()
+        card.setObjectName("CardContenedor")
+        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(18, 18, 18, 18)
+        card_layout.setSpacing(20)
+        card_layout.addLayout(form_layout)
+        card_layout.addWidget(self.boton_guardar)
+
+        layout_principal = QVBoxLayout(self)
+        layout_principal.setContentsMargins(18, 18, 18, 18)
+        layout_principal.setSpacing(16)
+        layout_principal.addWidget(self._titulo)
+        layout_principal.addWidget(self._subtitulo)
+        layout_principal.addWidget(card)
+
+        self.setLayout(layout_principal)
 
         # ---------------------------------------------------------------------
         # EVENTOS
@@ -220,6 +228,58 @@ class FormPasada(QWidget):
         # ---------------------------------------------------------------------
         self._actualizar_listas()
         animar_entrada(self)
+
+    def _generar_estilos(self) -> str:
+        tema = self._tema
+        return f"""
+            QWidget {{
+                background-color: {tema['background']};
+                color: {tema['texto']};
+                font-family: Segoe UI, Arial, sans-serif;
+                font-size: 13px;
+            }}
+            QLabel#TituloPrincipal {{
+                color: {tema['texto']};
+                font-size: 18px;
+                font-weight: 700;
+            }}
+            QLabel#Subtitulo {{
+                color: {tema['texto_secundario']};
+                font-size: 12px;
+            }}
+            QFrame#CardContenedor {{
+                background-color: {tema['background_secundario']};
+                border: 1px solid {tema['border']};
+                border-radius: 14px;
+            }}
+            QComboBox, QDateEdit, QTimeEdit {{
+                background-color: {tema['input_background']};
+                color: {tema['texto']};
+                border: 1px solid {tema['border']};
+                border-radius: 8px;
+                padding: 6px 10px;
+            }}
+            QComboBox::drop-down {{
+                border: none;
+            }}
+            QPushButton {{
+                background-color: {tema['primario']};
+                color: #ffffff;
+                border: none;
+                border-radius: 10px;
+                font-weight: 700;
+                padding: 8px 18px;
+            }}
+            QPushButton:hover {{
+                background-color: {tema['primario_hover']};
+            }}
+            QPushButton:pressed {{
+                background-color: {tema['primario']};
+            }}
+            QLabel {{
+                color: {tema['texto']};
+            }}
+        """
 
     # =========================================================================
     # ACTUALIZAR COMBOS
@@ -242,7 +302,10 @@ class FormPasada(QWidget):
         supervisores = _cargar_supervisores_del_turno(fecha, turno)
 
         for sup in supervisores:
-            label = f"Sup {sup[2]} - {sup[1]}"
+            if len(sup) >= 3:
+                label = f"Sup {sup[2]} - {sup[1]}"
+            else:
+                label = sup[1]
             self.input_supervisor.addItem(label, sup[0])
 
     # =========================================================================

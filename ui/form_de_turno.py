@@ -4,9 +4,10 @@
 # =============================================================================
 
 from services.cache import obtener_supervisores_cache
+from services.tema import obtener_tema
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QComboBox, QDateEdit, QMessageBox, QFrame
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
+    QPushButton, QComboBox, QDateEdit, QMessageBox, QFrame, QSizePolicy
 )
 from PyQt6.QtCore import QDate, Qt
 from ui.animaciones import animar_entrada
@@ -21,109 +22,152 @@ class FormTurno(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Registrar turno")
-        self.setGeometry(300, 300, 370, 320)
+        self._tema = obtener_tema()
         self._supervisores = _cargar_supervisores()
         self._tiene_tercero = False
 
-        self._layout = QVBoxLayout()
-        self._layout.setSpacing(6)
-        self._layout.setContentsMargins(16, 16, 16, 16)
+        self.setWindowTitle("Registrar turno")
+        self.setMinimumSize(420, 420)
+        self.setStyleSheet(self._generar_estilos())
 
-        # Fecha
-        self._layout.addWidget(QLabel("Fecha:"))
+        self._titulo = QLabel("Registrar equipo de turno")
+        self._titulo.setObjectName("TituloPrincipal")
+
+        self._subtitulo = QLabel("Seleccioná los supervisores que estarán de turno hoy.")
+        self._subtitulo.setObjectName("Subtitulo")
+        self._subtitulo.setWordWrap(True)
+
         self.input_fecha = QDateEdit()
-        self.input_fecha.setDate(QDate.currentDate())
         self.input_fecha.setCalendarPopup(True)
-        self._layout.addWidget(self.input_fecha)
+        self.input_fecha.setDate(QDate.currentDate())
+        self.input_fecha.setFixedHeight(34)
 
-        # Turno
-        self._layout.addWidget(QLabel("Turno:"))
         self.input_turno = QComboBox()
         self.input_turno.addItems(["diurno", "nocturno"])
-        self._layout.addWidget(self.input_turno)
+        self.input_turno.setFixedHeight(34)
 
-        # Supervisor 1
-        self._layout.addWidget(QLabel("Supervisor 1:"))
         self.input_sup1 = QComboBox()
+        self.input_sup1.setFixedHeight(34)
         self._poblar_combo(self.input_sup1)
-        self._layout.addWidget(self.input_sup1)
 
-        # Supervisor 2
-        self._layout.addWidget(QLabel("Supervisor 2:"))
         self.input_sup2 = QComboBox()
+        self.input_sup2.setFixedHeight(34)
         self._poblar_combo(self.input_sup2)
-        self._layout.addWidget(self.input_sup2)
 
-        # Separador
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        self._layout.addWidget(sep)
+        self.input_sup3 = QComboBox()
+        self.input_sup3.setFixedHeight(34)
+        self._poblar_combo(self.input_sup3)
 
-        # Botón agregar supervisor 3
         self.btn_agregar_sup3 = QPushButton("＋  Agregar supervisor")
         self.btn_agregar_sup3.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_agregar_sup3.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #4ade80;
-                border: 1px dashed #4ade80;
-                border-radius: 6px;
-                padding: 5px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #14532d;
-            }
-        """)
+        self.btn_agregar_sup3.setFixedHeight(34)
         self.btn_agregar_sup3.clicked.connect(self._mostrar_sup3)
-        self._layout.addWidget(self.btn_agregar_sup3)
 
-        # Bloque supervisor 3 (oculto por defecto)
+        self.btn_quitar_sup3 = QPushButton("✕ Quitar")
+        self.btn_quitar_sup3.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_quitar_sup3.setFixedWidth(86)
+        self.btn_quitar_sup3.setFixedHeight(30)
+        self.btn_quitar_sup3.clicked.connect(self._ocultar_sup3)
+
         self._fila_sup3 = QWidget()
         fila_layout = QVBoxLayout(self._fila_sup3)
         fila_layout.setContentsMargins(0, 0, 0, 0)
-        fila_layout.setSpacing(4)
+        fila_layout.setSpacing(10)
 
         cabecera_sup3 = QHBoxLayout()
-        lbl_sup3 = QLabel("Supervisor 3:")
-        self.btn_quitar_sup3 = QPushButton("✕ Quitar")
-        self.btn_quitar_sup3.setFixedWidth(70)
-        self.btn_quitar_sup3.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_quitar_sup3.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #f87171;
-                border: none;
-                font-size: 11px;
-            }
-            QPushButton:hover { color: #dc2626; }
-        """)
-        self.btn_quitar_sup3.clicked.connect(self._ocultar_sup3)
-        cabecera_sup3.addWidget(lbl_sup3)
+        cabecera_sup3.addWidget(QLabel("Supervisor 3:"))
         cabecera_sup3.addStretch()
         cabecera_sup3.addWidget(self.btn_quitar_sup3)
         fila_layout.addLayout(cabecera_sup3)
-
-        self.input_sup3 = QComboBox()
-        self._poblar_combo(self.input_sup3)
         fila_layout.addWidget(self.input_sup3)
-
         self._fila_sup3.setVisible(False)
-        self._layout.addWidget(self._fila_sup3)
 
-        # Guardar
         self.boton_guardar = QPushButton("Guardar turno")
         self.boton_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.boton_guardar.setFixedHeight(42)
         self.boton_guardar.clicked.connect(self._guardar)
-        self._layout.addWidget(self.boton_guardar)
 
-        self.setLayout(self._layout)
+        form_layout = QFormLayout()
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setSpacing(12)
+        form_layout.setContentsMargins(0, 0, 0, 0)
+        form_layout.addRow(QLabel("Fecha"), self.input_fecha)
+        form_layout.addRow(QLabel("Turno"), self.input_turno)
+        form_layout.addRow(QLabel("Supervisor 1"), self.input_sup1)
+        form_layout.addRow(QLabel("Supervisor 2"), self.input_sup2)
+
+        card = QFrame()
+        card.setObjectName("CardContenedor")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(18, 18, 18, 18)
+        card_layout.setSpacing(16)
+        card_layout.addLayout(form_layout)
+        card_layout.addWidget(self.btn_agregar_sup3)
+        card_layout.addWidget(self._fila_sup3)
+        card_layout.addWidget(self.boton_guardar)
+
+        layout_principal = QVBoxLayout(self)
+        layout_principal.setContentsMargins(18, 18, 18, 18)
+        layout_principal.setSpacing(14)
+        layout_principal.addWidget(self._titulo)
+        layout_principal.addWidget(self._subtitulo)
+        layout_principal.addWidget(card)
+
+        self.setLayout(layout_principal)
         animar_entrada(self)
 
     def _poblar_combo(self, combo: QComboBox) -> None:
+        combo.clear()
         for s in self._supervisores:
             combo.addItem(s[1], s[0])
+
+    def _generar_estilos(self) -> str:
+        tema = self._tema
+        return f"""
+            QWidget {{
+                background-color: {tema['background']};
+                color: {tema['texto']};
+                font-family: Segoe UI, Arial, sans-serif;
+                font-size: 13px;
+            }}
+            QLabel#TituloPrincipal {{
+                color: {tema['texto']};
+                font-size: 18px;
+                font-weight: 700;
+            }}
+            QLabel#Subtitulo {{
+                color: {tema['texto_secundario']};
+                font-size: 12px;
+            }}
+            QFrame#CardContenedor {{
+                background-color: {tema['background_secundario']};
+                border: 1px solid {tema['border']};
+                border-radius: 14px;
+            }}
+            QComboBox, QDateEdit {{
+                background-color: {tema['input_background']};
+                color: {tema['texto']};
+                border: 1px solid {tema['border']};
+                border-radius: 8px;
+                padding: 6px 10px;
+            }}
+            QPushButton {{
+                background-color: {tema['primario']};
+                color: #ffffff;
+                border: none;
+                border-radius: 10px;
+                font-weight: 700;
+                padding: 10px 18px;
+            }}
+            QPushButton:hover {{
+                background-color: {tema['primario_hover']};
+            }}
+            QPushButton:disabled {{
+                background-color: {tema['button_disabled']};
+                color: #ffffff;
+            }}
+        """
 
     def _mostrar_sup3(self) -> None:
         self._tiene_tercero = True

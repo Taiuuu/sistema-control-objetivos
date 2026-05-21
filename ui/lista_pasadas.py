@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QDateEdit, QTimeEdit, QComboBox, QMessageBox, QDialog
 )
 from PyQt6.QtCore import QDate, QTime
+from PyQt6.QtGui import QColor
 
 from database.db import DB_PATH
 from services.sincronizacion import obtener_sincronizador
@@ -20,11 +21,11 @@ from services.sincronizacion import obtener_sincronizador
 # FUNCIONES DB
 # =============================================================================
 
-def _cargar_pasadas(fecha: str) -> list:
+def _cargar_pasadas(fecha: str, supervisor_id: int | None = None, turno: str | None = None) -> list:
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
 
-    cursor.execute("""
+    query = """
         SELECT
             p.id,
             p.hora,
@@ -37,8 +38,20 @@ def _cargar_pasadas(fecha: str) -> list:
         JOIN objetivos o ON p.objetivo_id = o.id
         JOIN supervisores s ON p.supervisor_id = s.id
         WHERE p.fecha = ?
-        ORDER BY p.hora
-    """, (fecha,))
+    """
+    params = [fecha]
+
+    if supervisor_id:
+        query += " AND p.supervisor_id = ?"
+        params.append(supervisor_id)
+
+    if turno:
+        query += " AND p.turno = ?"
+        params.append(turno)
+
+    query += " ORDER BY p.hora"
+
+    cursor.execute(query, tuple(params))
 
     datos = cursor.fetchall()
     conexion.close()
@@ -298,6 +311,20 @@ class ListaPasadas(QWidget):
 
         fila.addWidget(self.selector_fecha)
 
+        fila.addWidget(QLabel("Supervisor:"))
+        self.selector_supervisor = QComboBox()
+        self.selector_supervisor.addItem("Todos", 0)
+        for sup_id, sup_nombre in _cargar_supervisores():
+            self.selector_supervisor.addItem(sup_nombre, sup_id)
+        self.selector_supervisor.currentIndexChanged.connect(self._cargar_tabla)
+        fila.addWidget(self.selector_supervisor)
+
+        fila.addWidget(QLabel("Turno:"))
+        self.selector_turno = QComboBox()
+        self.selector_turno.addItems(["Todos", "diurno", "nocturno"])
+        self.selector_turno.currentTextChanged.connect(self._cargar_tabla)
+        fila.addWidget(self.selector_turno)
+
         btn_buscar = QPushButton("Buscar")
         btn_buscar.clicked.connect(self._cargar_tabla)
 
@@ -325,6 +352,9 @@ class ListaPasadas(QWidget):
         self.tabla.setColumnWidth(3, 180)
         self.tabla.setColumnWidth(4, 100)
         self.tabla.setColumnWidth(5, 100)
+        self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.tabla.verticalHeader().setVisible(False)
+        self.tabla.setSortingEnabled(True)
 
         layout.addWidget(self.tabla)
 
@@ -340,18 +370,35 @@ class ListaPasadas(QWidget):
     def _cargar_tabla(self):
 
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
-        datos = _cargar_pasadas(fecha)
+        supervisor_id = self.selector_supervisor.currentData() or None
+        turno = self.selector_turno.currentText()
+        if turno == "Todos":
+            turno = None
+
+        datos = _cargar_pasadas(fecha, supervisor_id, turno)
 
         self.tabla.setRowCount(len(datos))
+
+        COLOR_DIURNO = QColor("#fff9db")
+        COLOR_NOCTURNO = QColor("#dbeafe")
+        COLOR_TEXTO = QColor("#111111")
 
         for fila, item in enumerate(datos):
 
             pasada_id = item[0]
+            turno_pasada = item[2]
+            color = COLOR_DIURNO if turno_pasada == "diurno" else COLOR_NOCTURNO
 
-            self.tabla.setItem(fila, 0, QTableWidgetItem(item[1]))
-            self.tabla.setItem(fila, 1, QTableWidgetItem(item[2]))
-            self.tabla.setItem(fila, 2, QTableWidgetItem(item[3]))
-            self.tabla.setItem(fila, 3, QTableWidgetItem(item[4]))
+            def _item(texto):
+                it = QTableWidgetItem(texto)
+                it.setBackground(color)
+                it.setForeground(COLOR_TEXTO)
+                return it
+
+            self.tabla.setItem(fila, 0, _item(item[1]))
+            self.tabla.setItem(fila, 1, _item(item[2].capitalize()))
+            self.tabla.setItem(fila, 2, _item(item[3]))
+            self.tabla.setItem(fila, 3, _item(item[4]))
 
             btn_editar = QPushButton("Editar")
             btn_editar.clicked.connect(

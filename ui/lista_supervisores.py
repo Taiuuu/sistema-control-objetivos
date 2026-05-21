@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
     QTableWidgetItem, QPushButton, QMessageBox,
     QDialog, QLabel, QLineEdit, QDateEdit, QFormLayout,
-    QDialogButtonBox, QHeaderView
+    QDialogButtonBox, QHeaderView, QComboBox
 )
 from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtGui import QColor
@@ -127,6 +127,25 @@ class ListaSupervisores(QWidget):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
 
+        # Filtros
+        filtros = QHBoxLayout()
+        filtros.setSpacing(8)
+
+        filtros.addWidget(QLabel("Buscar:"))
+        self.input_buscar = QLineEdit()
+        self.input_buscar.setPlaceholderText("Buscar por nombre...")
+        self.input_buscar.textChanged.connect(self._cargar_tabla)
+        filtros.addWidget(self.input_buscar)
+
+        filtros.addWidget(QLabel("Estado:"))
+        self.filtro_estado = QComboBox()
+        self.filtro_estado.addItems(["Todos", "Activos", "Dado de baja"])
+        self.filtro_estado.currentTextChanged.connect(self._cargar_tabla)
+        filtros.addWidget(self.filtro_estado)
+
+        filtros.addStretch()
+        layout.addLayout(filtros)
+
         # Leyenda de colores
         leyenda = QHBoxLayout()
         for color, texto in [("#c8f7c5", "Activo"), ("#ffd6d6", "Dado de baja")]:
@@ -149,6 +168,7 @@ class ListaSupervisores(QWidget):
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.verticalHeader().setVisible(False)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.tabla.setSortingEnabled(True)
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
@@ -160,7 +180,17 @@ class ListaSupervisores(QWidget):
     # ------------------------------------------------------------------
 
     def _cargar_tabla(self) -> None:
+        texto_buscar = self.input_buscar.text().strip().lower()
+        estado = self.filtro_estado.currentText()
+
         supervisores = listar_supervisores(solo_activos=False)
+        if texto_buscar:
+            supervisores = [s for s in supervisores if texto_buscar in (s.nombre or "").lower()]
+        if estado == "Activos":
+            supervisores = [s for s in supervisores if s.fecha_baja is None]
+        elif estado == "Dado de baja":
+            supervisores = [s for s in supervisores if s.fecha_baja is not None]
+
         self.tabla.setUpdatesEnabled(False)
         self.tabla.clearContents()
         self.tabla.setRowCount(len(supervisores))
@@ -170,8 +200,11 @@ class ListaSupervisores(QWidget):
         COLOR_TEXTO  = QColor("#111111")
 
         for i, s in enumerate(supervisores):
-            sup_id, nombre, fecha_alta, fecha_baja = s
-            activo = fecha_baja is None
+            sup_id = s.id
+            nombre = s.nombre
+            fecha_alta = s.fecha_alta
+            fecha_baja = s.fecha_baja
+            activo = s.fecha_baja is None
             color  = COLOR_ACTIVO if activo else COLOR_BAJA
 
             def _item(texto):

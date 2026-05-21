@@ -8,6 +8,17 @@ import datetime
 from database.db import DB_PATH
 from services.logger import registrar_accion
 
+
+def _parsear_hora(hora: str) -> datetime.time:
+    """Acepta formatos HH:MM y HH:MM:SS."""
+    for formato in ("%H:%M:%S", "%H:%M"):
+        try:
+            return datetime.datetime.strptime(hora, formato).time()
+        except ValueError:
+            continue
+    raise ValueError(f"Formato de hora inválido: {hora}")
+
+
 def migrar_turnos_nocturnos():
     """
     Migra pasadas nocturnas que ocurrieron entre 00:00-06:59 AM.
@@ -29,13 +40,14 @@ def migrar_turnos_nocturnos():
     cursor = conexion.cursor()
     
     try:
-        # Buscar pasadas nocturnas en horas de madrugada (00:00 - 06:59)
+        # Buscar pasadas nocturnas en horas de madrugada (00:00 - 06:59:59)
         cursor.execute("""
             SELECT id, fecha, hora, turno, objetivo_id, supervisor_id
             FROM pasadas
-            WHERE turno = 'nocturno' 
-            AND hora LIKE '0%' OR hora LIKE '1%' OR hora LIKE '2%' OR hora LIKE '3%' OR hora LIKE '4%' OR hora LIKE '5%' OR hora LIKE '6%'
-            ORDER BY fecha DESC
+            WHERE turno = 'nocturno'
+              AND hora >= '00:00'
+              AND hora <= '06:59:59'
+            ORDER BY fecha DESC, hora DESC
         """)
         
         pasadas_a_corregir = cursor.fetchall()
@@ -55,10 +67,10 @@ def migrar_turnos_nocturnos():
             try:
                 # Parsear fecha y hora
                 fecha_obj = datetime.datetime.strptime(fecha_str, "%Y-%m-%d").date()
-                hora_obj = datetime.datetime.strptime(hora, "%H:%M:%S").time()
+                hora_obj = _parsear_hora(hora)
                 
-                # Validar que está entre 00:00 y 06:59
-                if not (datetime.time(0, 0) <= hora_obj < datetime.time(7, 0)):
+                # Validar que está entre 00:00 y 06:59:59
+                if not (datetime.time(0, 0) <= hora_obj <= datetime.time(6, 59, 59)):
                     continue
                 
                 # Calcular nueva fecha (día anterior)

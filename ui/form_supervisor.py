@@ -4,10 +4,12 @@
 # =============================================================================
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel,
-    QLineEdit, QPushButton, QMessageBox
+    QWidget, QVBoxLayout, QFormLayout, QLabel,
+    QLineEdit, QPushButton, QMessageBox, QFrame
 )
+from PyQt6.QtCore import Qt
 from models.supervisores import agregar_supervisor
+from services.tema import obtener_tema
 from services.validaciones import validar_supervisor, ErrorValidacion
 
 
@@ -19,20 +21,92 @@ class FormSupervisor(QWidget):
 
     def __init__(self):
         super().__init__()
+        self._tema = obtener_tema()
         self.setWindowTitle("Agregar supervisor")
-        self.setGeometry(300, 300, 300, 150)
+        self.setMinimumSize(360, 180)
+        self.setStyleSheet(self._generar_estilos())
 
-        layout = QVBoxLayout()
+        self._titulo = QLabel("Agregar supervisor")
+        self._titulo.setObjectName("TituloPrincipal")
 
-        layout.addWidget(QLabel("Nombre del supervisor:"))
+        self._subtitulo = QLabel("Ingresa el nombre del supervisor y guarda.")
+        self._subtitulo.setObjectName("Subtitulo")
+        self._subtitulo.setWordWrap(True)
+
         self.input_nombre = QLineEdit()
-        layout.addWidget(self.input_nombre)
+        self.input_nombre.setFixedHeight(34)
 
-        boton_guardar = QPushButton("Guardar supervisor")
-        boton_guardar.clicked.connect(self._guardar)
-        layout.addWidget(boton_guardar)
+        self.boton_guardar = QPushButton("Guardar supervisor")
+        self.boton_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.boton_guardar.setFixedHeight(40)
+        self.boton_guardar.clicked.connect(self._guardar)
+
+        form_layout = QFormLayout()
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setContentsMargins(0, 0, 0, 0)
+        form_layout.setSpacing(12)
+        form_layout.addRow(QLabel("Nombre del supervisor"), self.input_nombre)
+
+        card = QFrame()
+        card.setObjectName("CardContenedor")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(18, 18, 18, 18)
+        card_layout.setSpacing(16)
+        card_layout.addLayout(form_layout)
+        card_layout.addWidget(self.boton_guardar)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(14)
+        layout.addWidget(self._titulo)
+        layout.addWidget(self._subtitulo)
+        layout.addWidget(card)
 
         self.setLayout(layout)
+
+    def _generar_estilos(self) -> str:
+        tema = self._tema
+        return f"""
+            QWidget {{
+                background-color: {tema['background']};
+                color: {tema['texto']};
+                font-family: Segoe UI, Arial, sans-serif;
+                font-size: 13px;
+            }}
+            QLabel#TituloPrincipal {{
+                color: {tema['texto']};
+                font-size: 18px;
+                font-weight: 700;
+            }}
+            QLabel#Subtitulo {{
+                color: {tema['texto_secundario']};
+                font-size: 12px;
+            }}
+            QFrame#CardContenedor {{
+                background-color: {tema['background_secundario']};
+                border: 1px solid {tema['border']};
+                border-radius: 14px;
+            }}
+            QLineEdit {{
+                background-color: {tema['input_background']};
+                color: {tema['texto']};
+                border: 1px solid {tema['border']};
+                border-radius: 8px;
+                padding: 6px 10px;
+            }}
+            QPushButton {{
+                background-color: {tema['primario']};
+                color: #ffffff;
+                border: none;
+                border-radius: 10px;
+                font-weight: 700;
+                padding: 10px 18px;
+            }}
+            QPushButton:hover {{
+                background-color: {tema['primario_hover']};
+            }}
+        """
 
     def _guardar(self) -> None:
         """Valida y registra el nuevo supervisor en la base de datos."""
