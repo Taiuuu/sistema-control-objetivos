@@ -51,6 +51,7 @@ from services.logger import registrar_accion
 from services.assets import ruta_asset
 from services.sincronizacion import obtener_sincronizador
 from services.usuarios import get_username_by_id
+from services.sesion import actualizar_actividad_sesion, cerrar_sesion, TIEMPO_INACTIVIDAD_MAXIMA
 from database.db import DB_PATH
 
 
@@ -188,6 +189,7 @@ class VentanaPrincipal(QWidget):
         animar_entrada(self)
         self._configurar_shortcuts()
         self._configurar_timers()
+        self._configurar_event_filter()
         self._configurar_sincronizacion()
 
     # =========================================================================
@@ -1194,7 +1196,7 @@ class VentanaPrincipal(QWidget):
 
     def _configurar_timers(self):
         self.timer_inactividad = QTimer()
-        self.timer_inactividad.setInterval(30 * 60 * 1000)
+        self.timer_inactividad.setInterval(int(TIEMPO_INACTIVIDAD_MAXIMA * 1000))
         self.timer_inactividad.timeout.connect(self.cerrar_por_inactividad)
         self.timer_inactividad.start()
 
@@ -1202,6 +1204,28 @@ class VentanaPrincipal(QWidget):
         self.timer_refresco.setInterval(30 * 1000)
         self.timer_refresco.timeout.connect(self.cargar_tabla)
         self.timer_refresco.start()
+
+    def _configurar_event_filter(self):
+        if self.app:
+            self.app.installEventFilter(self)
+
+    def _registrar_actividad(self):
+        try:
+            if hasattr(self, "timer_inactividad"):
+                self.timer_inactividad.start()
+            actualizar_actividad_sesion()
+        except Exception:
+            pass
+
+    def eventFilter(self, objeto, evento):
+        if evento.type() in (
+            QEvent.Type.MouseMove,
+            QEvent.Type.KeyPress,
+            QEvent.Type.MouseButtonPress,
+            QEvent.Type.Wheel
+        ):
+            self._registrar_actividad()
+        return super().eventFilter(objeto, evento)
 
     # =========================================================================
     # EVENTOS
@@ -1214,7 +1238,7 @@ class VentanaPrincipal(QWidget):
                 QEvent.Type.KeyPress,
                 QEvent.Type.MouseButtonPress
             ):
-                self.timer_inactividad.start()
+                self._registrar_actividad()
             return super().event(evento)
         except Exception as e:
             print(f"Error en event: {e}")
@@ -1222,20 +1246,21 @@ class VentanaPrincipal(QWidget):
 
     def moveEvent(self, evento):
         try:
-            self.timer_inactividad.start()
+            self._registrar_actividad()
         except Exception:
             pass
         super().moveEvent(evento)
 
     def resizeEvent(self, evento):
         try:
-            self.timer_inactividad.start()
+            self._registrar_actividad()
         except Exception:
             pass
         super().resizeEvent(evento)
 
     def cerrar_por_inactividad(self):
         hacer_backup()
+        cerrar_sesion()
         QMessageBox.information(
             self, "Sesión cerrada",
             "La sesión se cerró por inactividad.\nSe realizó un backup automático."
