@@ -25,6 +25,7 @@ from ui.animaciones import animar_entrada
 from database.db import DB_PATH
 from services.tema import obtener_tema
 from services.validaciones import validar_pasada, ErrorValidacion
+from services.validador_horas_limite import validar_hora_turno_nocturno
 from services.cache import (
     obtener_objetivos_cache,
     obtener_supervisores_cache
@@ -348,6 +349,35 @@ class FormPasada(QWidget):
                 str(e)
             )
             return
+
+        # Validar horas límite (07:00-07:59) para turnos nocturnos
+        es_valida, sugerencia = validar_hora_turno_nocturno(fecha, hora, turno)
+        
+        if not es_valida and sugerencia and sugerencia.get('tipo') == 'hora_limite':
+            respuesta = QMessageBox.question(
+                self,
+                "⚠️ Hora límite de turno nocturno",
+                f"{sugerencia['razon']}\n\n"
+                f"Hora actual: {hora}\n"
+                f"Fecha actual: {fecha}\n"
+                f"{sugerencia['pregunta']}",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if respuesta == QMessageBox.StandardButton.Yes:
+                fecha = sugerencia['fecha_sugerida']
+                QMessageBox.information(
+                    self,
+                    "Fecha ajustada",
+                    f"La pasada se registrará con fecha: {fecha}\n"
+                    f"(Correspondiente al turno nocturno anterior)"
+                )
+            else:
+                QMessageBox.information(
+                    self,
+                    "Fecha mantenida",
+                    f"La pasada se registrará en la fecha: {fecha}"
+                )
 
         try:
             registrar_turno(

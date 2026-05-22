@@ -15,6 +15,7 @@ from PyQt6.QtGui import QColor
 
 from database.db import DB_PATH
 from services.sincronizacion import obtener_sincronizador
+from services.validador_horas_limite import validar_hora_turno_nocturno
 
 
 # =============================================================================
@@ -101,23 +102,38 @@ def _actualizar_pasada(
     hora: str,
     turno: str,
     objetivo_id: int,
-    supervisor_id: int
+    supervisor_id: int,
+    fecha: str | None = None
 ) -> None:
 
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
 
-    cursor.execute("""
-        UPDATE pasadas
-        SET hora = ?, turno = ?, objetivo_id = ?, supervisor_id = ?
-        WHERE id = ?
-    """, (
-        hora,
-        turno,
-        objetivo_id,
-        supervisor_id,
-        pasada_id
-    ))
+    if fecha:
+        cursor.execute("""
+            UPDATE pasadas
+            SET fecha = ?, hora = ?, turno = ?, objetivo_id = ?, supervisor_id = ?
+            WHERE id = ?
+        """, (
+            fecha,
+            hora,
+            turno,
+            objetivo_id,
+            supervisor_id,
+            pasada_id
+        ))
+    else:
+        cursor.execute("""
+            UPDATE pasadas
+            SET hora = ?, turno = ?, objetivo_id = ?, supervisor_id = ?
+            WHERE id = ?
+        """, (
+            hora,
+            turno,
+            objetivo_id,
+            supervisor_id,
+            pasada_id
+        ))
 
     conexion.commit()
     conexion.close()
@@ -175,6 +191,9 @@ class DialogoEditarPasada(QDialog):
             _,
             _
         ) = info
+
+        self.pasada_id = pasada_id
+        self.fecha_original = fecha
 
         layout = QVBoxLayout()
 
@@ -253,16 +272,35 @@ class DialogoEditarPasada(QDialog):
         turno = self.input_turno.currentText()
         objetivo_id = self.input_objetivo.currentData()
         supervisor_id = self.input_supervisor.currentData()
+        fecha = self.fecha_original
 
         objetivo_nombre = self.input_objetivo.currentText()
         supervisor_nombre = self.input_supervisor.currentText()
+
+        # Validar horas límite (07:00-07:59) para turnos nocturnos
+        es_valida, sugerencia = validar_hora_turno_nocturno(fecha, hora, turno)
+        
+        if not es_valida and sugerencia and sugerencia.get('tipo') == 'hora_limite':
+            respuesta = QMessageBox.question(
+                self,
+                "⚠️ Hora límite de turno nocturno",
+                f"{sugerencia['razon']}\n\n"
+                f"Hora actual: {hora}\n"
+                f"Fecha actual: {fecha}\n"
+                f"{sugerencia['pregunta']}",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if respuesta == QMessageBox.StandardButton.Yes:
+                fecha = sugerencia['fecha_sugerida']
 
         _actualizar_pasada(
             self.pasada_id,
             hora,
             turno,
             objetivo_id,
-            supervisor_id
+            supervisor_id,
+            fecha
         )
 
         from services.logger import registrar_accion
