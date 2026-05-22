@@ -1,134 +1,151 @@
 # =============================================================================
 # VESP Organizations - Sistema de Control de Objetivos
 # Pantalla para importar datos desde Excel existente
-# Soporta formato con bloque diurno y nocturno en columnas separadas
 # =============================================================================
 
-import sqlite3
-import datetime
+from datetime import date
+
+from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QFileDialog, QMessageBox, QTextEdit,
-    QComboBox, QSpinBox
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt
-from database.db import DB_PATH
-from openpyxl import load_workbook
+
+from models.objetivos import agregar_objetivo, listar_objetivos
+from services.importador_universal import get_importador
+from services.logger import registrar_accion
+from services.sesion import get_usuario_id
 
 
-# =============================================================================
-# FUNCIONES DE IMPORTACIÓN
-# =============================================================================
+class DialogoResolverObjetivos(QDialog):
+    """Dialogo para resolver objetivos importados que no existen aún."""
 
-def _obtener_o_crear_objetivo(cursor, nombre: str) -> int:
-    """Busca un objetivo por nombre o lo crea si no existe. Retorna su ID."""
-    cursor.execute("SELECT id FROM objetivos WHERE nombre = ?", (nombre,))
-    resultado = cursor.fetchone()
-    if resultado:
-        return resultado[0]
+    def __init__(self, objetivos_faltantes, objetivos_existentes, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Resolver objetivos importados")
+        self.setMinimumWidth(700)
+        self.objetivos_faltantes = objetivos_faltantes
+        self.objetivos_existentes = objetivos_existentes
+        self.controles = []
 
-    hoy = datetime.datetime.now().strftime("%Y-%m-%d")
-    cursor.execute("""
-        INSERT INTO objetivos (nombre, fecha_inicio, dias_semana)
-        VALUES (?, ?, ?)
-    """, (nombre, hoy, "1,2,3,4,5,6,7"))
-    return cursor.lastrowid
+        layout = QVBoxLayout(self)
+        layout.addWidget(
+            QLabel(
+                "Ajustá el objetivo correspondiente para cada nombre importado. "
+                "Si no existe, seleccioná 'Crear nuevo' y escribí el nombre."
+            )
+        )
+
+        form_layout = QFormLayout()
+        for nombre in objetivos_faltantes:
+            combo = QComboBox()
+            combo.addItems([obj.nombre for obj in objetivos_existentes])
+            combo.addItem("-- Crear nuevo --")
+            combo.setCurrentIndex(0 if objetivos_existentes else combo.count() - 1)
+
+            line_edit = QLineEdit()
+            line_edit.setPlaceholderText("Nombre del nuevo objetivo")
+            line_edit.setVisible(False)
+
+            combo.currentIndexChanged.connect(
+                lambda _=None, line=line_edit, combo=combo: self._alternar_linea(combo, line)
+            )
+
+            contenedor = QHBoxLayout()
+            contenedor.addWidget(combo)
+            contenedor.addWidget(line_edit)
+
+            form_layout.addRow(nombre, contenedor)
+            self.controles.append((nombre, combo, line_edit))
+
+        layout.addLayout(form_layout)
+
+        botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        botones.accepted.connect(self.accept)
+        botones.rejected.connect(self.reject)
+        layout.addWidget(botones)
+
+    def _alternar_linea(self, combo: QComboBox, line_edit: QLineEdit) -> None:
+        line_edit.setVisible(combo.currentText() == "-- Crear nuevo --")
+
+    def obtener_mapeo(self):
+        mapeo = {}
+        for nombre, combo, line_edit in self.controles:
+            seleccionado = combo.currentText()
+            if seleccionado == "-- Crear nuevo --":
+                nuevo_nombre = line_edit.text().strip()
+                if not nuevo_nombre:
+                    raise ValueError(f"Completá el nombre del objetivo para: {nombre}")
+
+                objetivo = agregar_objetivo(
+                    nuevo_nombre,
+                    date.today().isoformat(),
+                    "Lunes,Martes,Miércoles,Jueves,Viernes,Sábado,Domingo",
+                )
+                mapeo[nombre] = objetivo.id
+                continue
+
+            objetivo = next(
+                (obj for obj in self.objetivos_existentes if obj.nombre == seleccionado),
+                None,
+            )
+            if objetivo is None:
+                raise ValueError(f"No se encontró el objetivo seleccionado: {seleccionado}")
+            mapeo[nombre] = objetivo.id
+
+        return mapeo
 
 
-def _obtener_o_crear_supervisor(cursor, nombre: str) -> int | None:
-    """Busca un supervisor por nombre o lo crea si no existe. Retorna su ID."""
-    if not nombre or str(nombre).strip() in ("", "None", "none"):
-        return None
+class PreviewWorker(QObject):
+    finished = pyqtSignal(int, dict)
+    error = pyqtSignal(int, str)
 
-    nombre = str(nombre).strip()
-    cursor.execute("SELECT id FROM supervisores WHERE nombre = ?", (nombre,))
-    resultado = cursor.fetchone()
-    if resultado:
-        return resultado[0]
+    def __init__(self, importador, ruta_archivo, sheet_names=None, token=0):
+        super().__init__()
+        self.importador = importador
+        self.ruta_archivo = ruta_archivo
+        self.sheet_names = sheet_names
+        self.token = token
 
-    cursor.execute("INSERT INTO supervisores (nombre) VALUES (?)", (nombre,))
-    return cursor.lastrowid
-
-
-def _normalizar_fecha(fecha_raw) -> str:
-    """Convierte distintos formatos de fecha a yyyy-MM-dd."""
-    if isinstance(fecha_raw, datetime.datetime):
-        return fecha_raw.strftime("%Y-%m-%d")
-    if isinstance(fecha_raw, datetime.date):
-        return fecha_raw.strftime("%Y-%m-%d")
-    if isinstance(fecha_raw, str):
-        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y"):
-            try:
-                return datetime.datetime.strptime(fecha_raw, fmt).strftime("%Y-%m-%d")
-            except Exception:
-                pass
-    return datetime.datetime.now().strftime("%Y-%m-%d")
-
-
-def importar_bloque(cursor, ws, turno: str, col_supervisor: int,
-                    col_objetivo: int, col_veces: int,
-                    col_fecha: int | None, fila_inicio: int) -> tuple:
-    """
-    Importa un bloque de pasadas (diurno o nocturno) desde el Excel.
-    La fecha se lee de la misma fila en la columna indicada.
-    Retorna (pasadas_importadas, errores).
-    """
-    pasadas = 0
-    errores = []
-    fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d")
-
-    for fila_num, fila in enumerate(ws.iter_rows(min_row=fila_inicio, values_only=True), fila_inicio):
+    def run(self) -> None:
         try:
-            if not fila or all(v is None for v in fila):
-                continue
+            preview = self.importador.previsualizar_archivo(
+                self.ruta_archivo,
+                sheet_names=self.sheet_names,
+            )
+            self.finished.emit(self.token, preview)
+        except Exception as exc:
+            self.error.emit(self.token, str(exc))
 
-            # Leer fecha de la columna configurada en esa misma fila
-            if col_fecha and len(fila) >= col_fecha and fila[col_fecha - 1] is not None:
-                fecha_actual = _normalizar_fecha(fila[col_fecha - 1])
-
-            objetivo_nombre = str(fila[col_objetivo - 1]).strip() if len(fila) >= col_objetivo and fila[col_objetivo - 1] else None
-            supervisor_nombre = str(fila[col_supervisor - 1]).strip() if col_supervisor and len(fila) >= col_supervisor and fila[col_supervisor - 1] else ""
-            veces_raw = fila[col_veces - 1] if len(fila) >= col_veces else None
-
-            if not objetivo_nombre or objetivo_nombre.lower() in ("none", "objetivo", ""):
-                continue
-
-            try:
-                veces = int(float(str(veces_raw))) if veces_raw else 0
-            except Exception:
-                veces = 0
-
-            if veces == 0:
-                continue
-
-            objetivo_id = _obtener_o_crear_objetivo(cursor, objetivo_nombre)
-            supervisor_id = _obtener_o_crear_supervisor(cursor, supervisor_nombre)
-
-            for _ in range(veces):
-                cursor.execute("""
-                    INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (fecha_actual, "No especificado", turno, objetivo_id, supervisor_id))
-
-            pasadas += veces
-
-        except Exception as e:
-            errores.append(f"Fila {fila_num} ({turno}): {e}")
-
-    return pasadas, errores
-
-
-# =============================================================================
-# PANTALLA DE IMPORTACIÓN
-# =============================================================================
 
 class ImportarExcel(QWidget):
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Importar desde Excel")
-        self.setGeometry(200, 200, 650, 600)
+        self.setGeometry(200, 200, 900, 700)
         self.ruta_archivo = None
+        self._preview_token = 0
+        self._preview_thread = None
+        self._preview_worker = None
+        self._hoja_previsualizacion_pedida = None
+        self.objetivo_mapeo = {}
+        self.unresolved_objectives = []
 
         layout = QVBoxLayout()
 
@@ -138,18 +155,13 @@ class ImportarExcel(QWidget):
         layout.addWidget(titulo)
 
         desc = QLabel(
-            "El Excel tiene dos bloques: uno para turno diurno y otro para nocturno.\n"
-            "Indicá en qué columna está cada dato.\n"
-            "Las columnas se numeran desde 1 (A=1, B=2, C=3...)\n"
-            "La fecha se lee de la misma fila en la columna indicada."
+            "Seleccioná el archivo y luego el día/turno que querés importar. "
+            "Si el archivo tiene hojas tipo 27-5 (D) o 27-5 (N), podés ver y cargar una sola hoja."
         )
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc.setStyleSheet("color: #888; font-size: 11px;")
         layout.addWidget(desc)
 
-        layout.addSpacing(8)
-
-        # Selector de archivo
         fila_archivo = QHBoxLayout()
         self.label_archivo = QLabel("Ningún archivo seleccionado")
         self.label_archivo.setStyleSheet("color: #888;")
@@ -159,148 +171,368 @@ class ImportarExcel(QWidget):
         fila_archivo.addWidget(boton_archivo)
         layout.addLayout(fila_archivo)
 
-        layout.addSpacing(8)
+        self.label_seleccion = QLabel("Seleccioná el día/turno que querés importar.")
+        self.label_seleccion.setStyleSheet("color: #cccccc;")
+        layout.addWidget(self.label_seleccion)
 
-        # Fila de inicio
-        fila_inicio_layout = QHBoxLayout()
-        fila_inicio_layout.addWidget(QLabel("Fila donde empiezan los datos:"))
-        self.fila_inicio = QSpinBox()
-        self.fila_inicio.setMinimum(1)
-        self.fila_inicio.setMaximum(20)
-        self.fila_inicio.setValue(3)
-        fila_inicio_layout.addWidget(self.fila_inicio)
-        fila_inicio_layout.addStretch()
-        layout.addLayout(fila_inicio_layout)
+        self.sheet_combo = QComboBox()
+        self.sheet_combo.setEnabled(False)
+        self.sheet_combo.currentIndexChanged.connect(self._solicitar_previsualizacion)
+        layout.addWidget(self.sheet_combo)
 
-        layout.addSpacing(8)
+        self.preview_status = QLabel("Esperando archivo...")
+        self.preview_status.setStyleSheet("color: #a0a0a0; font-size: 11px;")
+        layout.addWidget(self.preview_status)
 
-        # Bloque diurno
-        label_diurno = QLabel("☀ Bloque DIURNO")
-        label_diurno.setStyleSheet("font-size: 13px; font-weight: bold; color: #FFD700;")
-        layout.addWidget(label_diurno)
+        self.preview_table = QTableWidget(0, 7)
+        self.preview_table.setHorizontalHeaderLabels(
+            ["Hoja", "Fecha", "Hora", "Turno", "Supervisor", "Objetivo", "Notas"]
+        )
+        self.preview_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.preview_table.setAlternatingRowColors(True)
+        self.preview_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.preview_table.horizontalHeader().setStretchLastSection(True)
+        self.preview_table.verticalHeader().setVisible(False)
+        self.preview_table.setMinimumHeight(260)
+        self.preview_table.setStyleSheet(
+            "QTableWidget { background-color: #1f1f1f; color: #f0f0f0; gridline-color: #444; }"
+            "QHeaderView::section { background-color: #2a2a2a; color: #ffffff; padding: 4px; }"
+        )
+        layout.addWidget(self.preview_table)
 
-        grid_diurno = QHBoxLayout()
-        self.diurno_fecha = self._combo_col("Fecha:", 1, grid_diurno)
-        self.diurno_supervisor = self._combo_col("Supervisor:", 3, grid_diurno)
-        self.diurno_objetivo = self._combo_col("Objetivo:", 4, grid_diurno)
-        self.diurno_veces = self._combo_col("Veces:", 6, grid_diurno)
-        layout.addLayout(grid_diurno)
+        controles_objetivos = QHBoxLayout()
+        self.objetivo_status = QLabel("No hay objetivos pendientes.")
+        self.objetivo_status.setStyleSheet("color: #d0d0d0; font-size: 11px;")
+        self.boton_resolver_objetivos = QPushButton("Resolver objetivos")
+        self.boton_resolver_objetivos.setEnabled(False)
+        self.boton_resolver_objetivos.clicked.connect(self._resolver_objetivos)
+        controles_objetivos.addWidget(self.objetivo_status)
+        controles_objetivos.addWidget(self.boton_resolver_objetivos)
+        layout.addLayout(controles_objetivos)
 
-        layout.addSpacing(8)
-
-        # Bloque nocturno
-        label_nocturno = QLabel("🌙 Bloque NOCTURNO")
-        label_nocturno.setStyleSheet("font-size: 13px; font-weight: bold; color: #4FC3F7;")
-        layout.addWidget(label_nocturno)
-
-        grid_nocturno = QHBoxLayout()
-        self.nocturno_fecha = self._combo_col("Fecha:", 1, grid_nocturno)
-        self.nocturno_supervisor = self._combo_col("Supervisor:", 8, grid_nocturno)
-        self.nocturno_objetivo = self._combo_col("Objetivo:", 9, grid_nocturno)
-        self.nocturno_veces = self._combo_col("Veces:", 10, grid_nocturno)
-        layout.addLayout(grid_nocturno)
-
-        layout.addSpacing(10)
-
-        boton_importar = QPushButton("Importar datos")
-        boton_importar.setFixedHeight(40)
-        boton_importar.clicked.connect(self._importar)
-        layout.addWidget(boton_importar)
+        self.boton_importar = QPushButton("Importar datos")
+        self.boton_importar.setFixedHeight(40)
+        self.boton_importar.clicked.connect(self._importar)
+        self.boton_importar.setEnabled(False)
+        layout.addWidget(self.boton_importar)
 
         self.log = QTextEdit()
         self.log.setReadOnly(True)
-        self.log.setFixedHeight(100)
+        self.log.setMinimumHeight(140)
         self.log.setStyleSheet("font-size: 11px;")
         layout.addWidget(self.log)
 
         self.setLayout(layout)
 
-    def _combo_col(self, label: str, default: int, layout) -> QComboBox:
-        """Crea un combo de selección de columna con label."""
-        col_layout = QVBoxLayout()
-        col_layout.addWidget(QLabel(label))
-        combo = QComboBox()
-        combo.addItems([str(i) for i in range(1, 21)])
-        combo.setCurrentIndex(default - 1)
-        col_layout.addWidget(combo)
-        layout.addLayout(col_layout)
-        return combo
+    def _limpiar_previsualizacion_thread(self) -> None:
+        if self._preview_thread is not None and self._preview_thread.isRunning():
+            self._preview_thread.quit()
+            self._preview_thread.wait(200)
+        self._preview_thread = None
+        self._preview_worker = None
+
+    def _set_estado_previsualizacion(self, mensaje: str, color: str = "#a0a0a0") -> None:
+        self.preview_status.setText(mensaje)
+        self.preview_status.setStyleSheet(f"color: {color}; font-size: 11px;")
 
     def _seleccionar_archivo(self) -> None:
-        """Abre el diálogo para seleccionar el archivo Excel."""
-        ruta, _ = QFileDialog.getOpenFileName(
-            self, "Seleccionar Excel", "",
-            "Excel (*.xlsx *.xls)"
-        )
+        ruta, _ = QFileDialog.getOpenFileName(self, "Seleccionar Excel", "", "Excel (*.xlsx *.xls)")
         if ruta:
             self.ruta_archivo = ruta
             self.label_archivo.setText(ruta.split("/")[-1].split("\\")[-1])
             self.label_archivo.setStyleSheet("color: #4CAF50;")
+            self._cargar_previsualizacion()
+
+    def _cargar_previsualizacion(self) -> None:
+        self._limpiar_previsualizacion_thread()
+        self.sheet_combo.blockSignals(True)
+        self.sheet_combo.clear()
+        self.sheet_combo.setEnabled(False)
+        self.boton_importar.setEnabled(False)
+        self.preview_table.setRowCount(0)
+        self._hoja_previsualizacion_pedida = None
+        self.objetivo_mapeo = {}
+        self.unresolved_objectives = []
+        self.objetivo_status.setText("No hay objetivos pendientes.")
+        self.boton_resolver_objetivos.setEnabled(False)
+        self._set_estado_previsualizacion("Previsualizando archivo...", "#ffd166")
+
+        if not self.ruta_archivo:
+            self._set_estado_previsualizacion("Esperando archivo...", "#a0a0a0")
+            self.sheet_combo.blockSignals(False)
+            return
+
+        self._preview_token += 1
+        token = self._preview_token
+        self._preview_worker = PreviewWorker(get_importador(), self.ruta_archivo, token=token)
+        self._preview_thread = QThread(self)
+        self._preview_worker.moveToThread(self._preview_thread)
+        self._preview_thread.started.connect(self._preview_worker.run)
+        self._preview_worker.finished.connect(self._on_preview_cargado)
+        self._preview_worker.error.connect(self._on_preview_error)
+        self._preview_worker.finished.connect(self._preview_thread.quit)
+        self._preview_worker.error.connect(self._preview_thread.quit)
+        self._preview_worker.finished.connect(self._preview_worker.deleteLater)
+        self._preview_worker.error.connect(self._preview_worker.deleteLater)
+        self._preview_thread.finished.connect(self._preview_thread.deleteLater)
+        self._preview_thread.start()
+        self.sheet_combo.blockSignals(False)
+
+    def _solicitar_previsualizacion(self) -> None:
+        if not self.ruta_archivo:
+            return
+
+        hoja_seleccionada = self.sheet_combo.currentData()
+        self._hoja_previsualizacion_pedida = hoja_seleccionada
+        self._limpiar_previsualizacion_thread()
+        self.boton_importar.setEnabled(False)
+        self.preview_table.setRowCount(0)
+        self.objetivo_mapeo = {}
+        self.unresolved_objectives = []
+        self.objetivo_status.setText("No hay objetivos pendientes.")
+        self.boton_resolver_objetivos.setEnabled(False)
+        self._set_estado_previsualizacion("Actualizando previsualización...", "#ffd166")
+
+        self._preview_token += 1
+        token = self._preview_token
+        sheet_names = [hoja_seleccionada] if hoja_seleccionada else None
+        self._preview_worker = PreviewWorker(get_importador(), self.ruta_archivo, sheet_names=sheet_names, token=token)
+        self._preview_thread = QThread(self)
+        self._preview_worker.moveToThread(self._preview_thread)
+        self._preview_thread.started.connect(self._preview_worker.run)
+        self._preview_worker.finished.connect(self._on_preview_cargado)
+        self._preview_worker.error.connect(self._on_preview_error)
+        self._preview_worker.finished.connect(self._preview_thread.quit)
+        self._preview_worker.error.connect(self._preview_thread.quit)
+        self._preview_worker.finished.connect(self._preview_worker.deleteLater)
+        self._preview_worker.error.connect(self._preview_worker.deleteLater)
+        self._preview_thread.finished.connect(self._preview_thread.deleteLater)
+        self._preview_thread.start()
+
+    def _on_preview_cargado(self, token: int, preview: dict) -> None:
+        if token != self._preview_token:
+            return
+
+        self._preview_thread = None
+        self._preview_worker = None
+
+        if preview.get("tipo") != "control_recorridos":
+            self.sheet_combo.blockSignals(True)
+            self.sheet_combo.clear()
+            self.sheet_combo.setEnabled(False)
+            self.sheet_combo.blockSignals(False)
+            self.label_seleccion.setText("No se detectó CONTROL_RECORRIDOS. Se importará con el flujo legacy.")
+            self._set_estado_previsualizacion(
+                "El archivo no parece tener hojas con formato CONTROL_RECORRIDOS. Se usará la importación legacy.",
+                "#ff8a80",
+            )
+            self.preview_table.setRowCount(0)
+            self.boton_importar.setEnabled(True)
+            return
+
+        opciones = preview.get("sheet_options", [])
+        if not opciones:
+            self.label_seleccion.setText("No se encontraron hojas válidas en el archivo.")
+            self._set_estado_previsualizacion("No se pudieron detectar hojas con el formato esperado.", "#ff8a80")
+            self.preview_table.setRowCount(0)
+            self.boton_importar.setEnabled(False)
+            self.sheet_combo.setEnabled(False)
+            return
+
+        self.sheet_combo.blockSignals(True)
+        self.sheet_combo.clear()
+        for opcion in opciones:
+            self.sheet_combo.addItem(
+                f"{opcion['title']} | {opcion['fecha']} | {opcion['turno']}",
+                opcion['title'],
+            )
+
+        hoja_seleccionada = self._hoja_previsualizacion_pedida
+        if hoja_seleccionada is None:
+            hoja_seleccionada = self.sheet_combo.currentData()
+
+        indice = 0
+        if hoja_seleccionada is not None:
+            indices = self.sheet_combo.findData(hoja_seleccionada)
+            if indices >= 0:
+                indice = indices
+
+        self.sheet_combo.setCurrentIndex(indice)
+        self.sheet_combo.setEnabled(True)
+        self.sheet_combo.blockSignals(False)
+
+        self.label_seleccion.setText("Seleccioná el día/turno que querés importar.")
+
+        hoja_seleccionada = self.sheet_combo.currentData()
+        registros = preview.get("registros", [])
+        if hoja_seleccionada:
+            registros = [registro for registro in registros if getattr(registro, "sheet_title", None) == hoja_seleccionada]
+
+        if not registros:
+            self.unresolved_objectives = []
+            self.objetivo_status.setText("No hay objetivos pendientes.")
+            self.boton_resolver_objetivos.setEnabled(False)
+            self._set_estado_previsualizacion(
+                "La hoja seleccionada no tiene registros detectados para previsualizar.",
+                "#ff8a80",
+            )
+            self.preview_table.setRowCount(0)
+            self.boton_importar.setEnabled(True)
+            return
+
+        self._renderizar_tabla_previsualizacion(registros, hoja_seleccionada)
+        objetivos_no_resueltos = preview.get("objetivos_no_resueltos", [])
+        self.unresolved_objectives = list(objetivos_no_resueltos)
+        if self.unresolved_objectives:
+            self.objetivo_status.setText(
+                f"Objetivos pendientes de resolución: {len(self.unresolved_objectives)}"
+            )
+            self.boton_resolver_objetivos.setEnabled(True)
+        else:
+            self.objetivo_status.setText("No hay objetivos pendientes.")
+            self.boton_resolver_objetivos.setEnabled(False)
+        self._set_estado_previsualizacion(
+            f"Se encontraron {len(registros)} registros para importar en {hoja_seleccionada}.",
+            "#8affc1",
+        )
+        self.boton_importar.setEnabled(True)
+
+    def _on_preview_error(self, token: int, mensaje: str) -> None:
+        if token != self._preview_token:
+            return
+
+        self._preview_thread = None
+        self._preview_worker = None
+        self._set_estado_previsualizacion(f"No se pudo previsualizar el archivo: {mensaje}", "#ff8a80")
+        self.preview_table.setRowCount(0)
+        self.boton_importar.setEnabled(False)
+
+    def _renderizar_tabla_previsualizacion(self, registros, hoja_seleccionada: str) -> None:
+        self.preview_table.setRowCount(0)
+        headers = self.preview_table.horizontalHeader()
+        headers.setStretchLastSection(True)
+
+        for fila, registro in enumerate(registros[:100]):
+            self.preview_table.insertRow(fila)
+            valores = [
+                hoja_seleccionada or getattr(registro, "sheet_title", ""),
+                getattr(registro, "fecha", ""),
+                getattr(registro, "hora", ""),
+                getattr(registro, "turno", ""),
+                getattr(registro, "supervisor", "") or "Sin supervisor",
+                getattr(registro, "objetivo", ""),
+                getattr(registro, "notas", "") or "",
+            ]
+            for columna, valor in enumerate(valores):
+                self.preview_table.setItem(fila, columna, QTableWidgetItem(str(valor)))
+
+        if len(registros) > 100:
+            self.preview_table.setRowCount(100)
+            self.preview_table.insertRow(100)
+            self.preview_table.setItem(100, 0, QTableWidgetItem("..."))
+            self.preview_table.setItem(100, 1, QTableWidgetItem(f"{len(registros) - 100} registros más"))
+            for columna in range(2, 7):
+                self.preview_table.setItem(100, columna, QTableWidgetItem(""))
+
+    def _resolver_objetivos(self) -> None:
+        if not self.unresolved_objectives:
+            self.objetivo_status.setText("No hay objetivos pendientes.")
+            self.boton_resolver_objetivos.setEnabled(False)
+            return
+
+        objetivos_existentes = listar_objetivos()
+        dialogo = DialogoResolverObjetivos(
+            self.unresolved_objectives,
+            objetivos_existentes,
+            parent=self,
+        )
+        if dialogo.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        self.objetivo_mapeo = dialogo.obtener_mapeo()
+        self.objetivo_status.setText(
+            f"Objetivos asignados: {len(self.objetivo_mapeo)} de {len(self.unresolved_objectives)}"
+        )
 
     def _importar(self) -> None:
-        """Ejecuta la importación de ambos bloques."""
         if not self.ruta_archivo:
             QMessageBox.warning(self, "Error", "Seleccioná un archivo Excel primero.")
             return
 
+        importador = get_importador()
+        self.log.clear()
+
         try:
-            wb = load_workbook(self.ruta_archivo, data_only=True)
-            ws = wb.active
+            preview = importador.previsualizar_archivo(self.ruta_archivo)
+            if preview.get("tipo") == "control_recorridos":
+                hoja_seleccionada = self.sheet_combo.currentData()
+                self.log.append(
+                    f"Detectado CONTROL_RECORRIDOS. Hoja seleccionada: {hoja_seleccionada or 'todas las hojas'}"
+                )
 
-            conexion = sqlite3.connect(DB_PATH)
-            cursor = conexion.cursor()
+                preview_filtrada = importador.previsualizar_archivo(
+                    self.ruta_archivo,
+                    sheet_names=[hoja_seleccionada] if hoja_seleccionada else None,
+                )
 
-            self.log.clear()
-            self.log.append("Importando bloque diurno...")
+                objetivos_no_resueltos = list(preview_filtrada.get("objetivos_no_resueltos", []))
+                if objetivos_no_resueltos:
+                    if set(self.objetivo_mapeo.keys()) != set(objetivos_no_resueltos):
+                        self.log.append(
+                            "Se requieren objetivos para continuar: "
+                            + ", ".join(objetivos_no_resueltos)
+                        )
+                        objetivos_existentes = listar_objetivos()
+                        dialogo = DialogoResolverObjetivos(
+                            objetivos_no_resueltos,
+                            objetivos_existentes,
+                            parent=self,
+                        )
+                        if dialogo.exec() != QDialog.DialogCode.Accepted:
+                            self.log.append("Importación cancelada por el usuario.")
+                            return
+                        self.objetivo_mapeo = dialogo.obtener_mapeo()
+                    resultado = importador.importar_control_recorridos(
+                        self.ruta_archivo,
+                        objetivo_mapeo=self.objetivo_mapeo,
+                        sheet_names=[hoja_seleccionada] if hoja_seleccionada else None,
+                    )
+                else:
+                    resultado = importador.importar_control_recorridos(
+                        self.ruta_archivo,
+                        sheet_names=[hoja_seleccionada] if hoja_seleccionada else None,
+                    )
+            else:
+                self.log.append("No se detectó CONTROL_RECORRIDOS; usando importación legacy.")
+                resultado = importador.importar_excel(self.ruta_archivo)
 
-            pasadas_dia, errores_dia = importar_bloque(
-                cursor, ws, "diurno",
-                col_supervisor=int(self.diurno_supervisor.currentText()),
-                col_objetivo=int(self.diurno_objetivo.currentText()),
-                col_veces=int(self.diurno_veces.currentText()),
-                col_fecha=int(self.diurno_fecha.currentText()),
-                fila_inicio=self.fila_inicio.value()
-            )
+            self.log.append(f"✓ Importados: {resultado.registros_validos}")
+            self.log.append(f"✓ Duplicados omitidos: {resultado.registros_duplicados}")
 
-            self.log.append(f"✓ Diurno: {pasadas_dia} pasadas importadas.")
-            self.log.append("Importando bloque nocturno...")
+            if resultado.errores:
+                self.log.append("⚠ Errores:")
+                for error in resultado.errores[:8]:
+                    self.log.append(f"  • {error}")
 
-            pasadas_noche, errores_noche = importar_bloque(
-                cursor, ws, "nocturno",
-                col_supervisor=int(self.nocturno_supervisor.currentText()),
-                col_objetivo=int(self.nocturno_objetivo.currentText()),
-                col_veces=int(self.nocturno_veces.currentText()),
-                col_fecha=int(self.nocturno_fecha.currentText()),
-                fila_inicio=self.fila_inicio.value()
-            )
+            if resultado.registros_validos > 0:
+                registrar_accion(
+                    get_usuario_id(),
+                    f"Importó Excel: {resultado.registros_validos} pasadas desde "
+                    f"{self.ruta_archivo.split('/')[-1].split('\\')[-1]}",
+                )
 
-            self.log.append(f"✓ Nocturno: {pasadas_noche} pasadas importadas.")
-
-            conexion.commit()
-            conexion.close()
-
-            total = pasadas_dia + pasadas_noche
-            errores = errores_dia + errores_noche
-
-            if errores:
-                self.log.append(f"⚠ {len(errores)} errores encontrados:")
-                for e in errores[:5]:
-                    self.log.append(f"  {e}")
-
-            from services.logger import registrar_accion
-            from services.sesion import get_usuario_id
-            registrar_accion(
-                get_usuario_id(),
-                f"Importó Excel: {total} pasadas ({pasadas_dia} diurnas, {pasadas_noche} nocturnas)"
-            )
-
-            QMessageBox.information(
-                self, "Listo",
-                f"Importación completada.\n"
-                f"Diurno: {pasadas_dia} pasadas\n"
-                f"Nocturno: {pasadas_noche} pasadas\n"
-                f"Total: {total} pasadas"
-            )
+            if resultado.exitoso:
+                QMessageBox.information(
+                    self,
+                    "Listo",
+                    f"Importación completada. {resultado.registros_validos} pasadas importadas.",
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Importación parcial",
+                    f"Se importaron {resultado.registros_validos} pasadas. Revisá el log para ver los errores.",
+                )
 
         except Exception as e:
             self.log.append(f"✗ Error: {e}")
