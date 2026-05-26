@@ -229,6 +229,34 @@ def obtener_informacion_backups() -> Dict[str, any]:
         }
 
 
+def restaurar_backup(archivo_backup: Optional[str] = None) -> bool:
+    """Restaura la base de datos desde un backup disponible.
+
+    Si no se pasa un archivo, intenta usar el último backup registrado.
+    """
+    try:
+        from database.db import DB_PATH
+        from database.gestor_db import gestor_db
+
+        if archivo_backup is None:
+            info = obtener_informacion_backups()
+            archivo_backup = info.get('último_backup')
+
+        if not archivo_backup:
+            raise BackupError("No hay backups disponibles para restaurar")
+
+        ruta_backup = archivo_backup if os.path.isabs(archivo_backup) else os.path.join(BACKUP_DIR, archivo_backup)
+        validar_integridad_backup(ruta_backup)
+
+        gestor_db.cerrar_conexion()
+        shutil.copy2(ruta_backup, DB_PATH)
+        gestor_db.cerrar_conexion()
+        return True
+    except Exception as e:
+        logger.error(f"Error restaurando backup: {e}")
+        raise BackupError(f"Error restaurando backup: {str(e)}")
+
+
 def validar_integridad_backup(archivo_backup: str) -> Tuple[bool, str]:
     """Valida integridad de un archivo de backup.
     
