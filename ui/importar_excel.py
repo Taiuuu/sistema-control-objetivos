@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QListWidget,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -146,6 +147,8 @@ class ImportarExcel(QWidget):
         self._hoja_previsualizacion_pedida = None
         self.objetivo_mapeo = {}
         self.unresolved_objectives = []
+        self.objetivos_pendientes_label = None
+        self.objetivos_pendientes_lista = None
 
         layout = QVBoxLayout()
 
@@ -184,6 +187,12 @@ class ImportarExcel(QWidget):
         self.preview_status.setStyleSheet("color: #a0a0a0; font-size: 11px;")
         layout.addWidget(self.preview_status)
 
+        self.resumen_objetivos_label = QLabel("")
+        self.resumen_objetivos_label.setStyleSheet("color: #c0c0c0; font-size: 11px;")
+        self.resumen_objetivos_label.setWordWrap(True)
+        self.resumen_objetivos_label.setVisible(False)
+        layout.addWidget(self.resumen_objetivos_label)
+
         self.preview_table = QTableWidget(0, 7)
         self.preview_table.setHorizontalHeaderLabels(
             ["Hoja", "Fecha", "Hora", "Turno", "Supervisor", "Objetivo", "Notas"]
@@ -209,6 +218,19 @@ class ImportarExcel(QWidget):
         controles_objetivos.addWidget(self.objetivo_status)
         controles_objetivos.addWidget(self.boton_resolver_objetivos)
         layout.addLayout(controles_objetivos)
+
+        self.objetivos_pendientes_label = QLabel("Objetivos no encontrados en la base:")
+        self.objetivos_pendientes_label.setStyleSheet("font-size: 12px; color: #f57f17; font-weight: bold;")
+        self.objetivos_pendientes_label.setVisible(False)
+        layout.addWidget(self.objetivos_pendientes_label)
+
+        self.objetivos_pendientes_lista = QListWidget()
+        self.objetivos_pendientes_lista.setVisible(False)
+        self.objetivos_pendientes_lista.setMinimumHeight(100)
+        self.objetivos_pendientes_lista.setStyleSheet(
+            "QListWidget { background-color: #121212; color: #ffffff; border: 1px solid #444; }"
+        )
+        layout.addWidget(self.objetivos_pendientes_lista)
 
         self.boton_importar = QPushButton("Importar datos")
         self.boton_importar.setFixedHeight(40)
@@ -277,6 +299,8 @@ class ImportarExcel(QWidget):
         self._preview_thread.finished.connect(self._preview_thread.deleteLater)
         self._preview_thread.start()
         self.sheet_combo.blockSignals(False)
+        self._actualizar_objetivos_no_resueltos()
+        self._actualizar_resumen_objetivos([])
 
     def _solicitar_previsualizacion(self) -> None:
         if not self.ruta_archivo:
@@ -308,6 +332,8 @@ class ImportarExcel(QWidget):
         self._preview_worker.error.connect(self._preview_worker.deleteLater)
         self._preview_thread.finished.connect(self._preview_thread.deleteLater)
         self._preview_thread.start()
+        self._actualizar_objetivos_no_resueltos()
+        self._actualizar_resumen_objetivos([])
 
     def _on_preview_cargado(self, token: int, preview: dict) -> None:
         if token != self._preview_token:
@@ -377,20 +403,26 @@ class ImportarExcel(QWidget):
                 "#ff8a80",
             )
             self.preview_table.setRowCount(0)
+            self._actualizar_objetivos_no_resueltos()
+            self._actualizar_resumen_objetivos([])
             self.boton_importar.setEnabled(True)
             return
 
         self._renderizar_tabla_previsualizacion(registros, hoja_seleccionada)
+        self._actualizar_resumen_objetivos(registros)
         objetivos_no_resueltos = preview.get("objetivos_no_resueltos", [])
         self.unresolved_objectives = list(objetivos_no_resueltos)
         if self.unresolved_objectives:
             self.objetivo_status.setText(
                 f"Objetivos pendientes de resolución: {len(self.unresolved_objectives)}"
             )
+            self.objetivo_status.setStyleSheet("color: #ffb74d; font-size: 11px;")
             self.boton_resolver_objetivos.setEnabled(True)
         else:
             self.objetivo_status.setText("No hay objetivos pendientes.")
+            self.objetivo_status.setStyleSheet("color: #d0d0d0; font-size: 11px;")
             self.boton_resolver_objetivos.setEnabled(False)
+        self._actualizar_objetivos_no_resueltos()
         self._set_estado_previsualizacion(
             f"Se encontraron {len(registros)} registros para importar en {hoja_seleccionada}.",
             "#8affc1",
@@ -406,6 +438,7 @@ class ImportarExcel(QWidget):
         self._set_estado_previsualizacion(f"No se pudo previsualizar el archivo: {mensaje}", "#ff8a80")
         self.preview_table.setRowCount(0)
         self.boton_importar.setEnabled(False)
+        self._actualizar_resumen_objetivos([])
 
     def _renderizar_tabla_previsualizacion(self, registros, hoja_seleccionada: str) -> None:
         self.preview_table.setRowCount(0)
@@ -450,9 +483,18 @@ class ImportarExcel(QWidget):
             return
 
         self.objetivo_mapeo = dialogo.obtener_mapeo()
-        self.objetivo_status.setText(
-            f"Objetivos asignados: {len(self.objetivo_mapeo)} de {len(self.unresolved_objectives)}"
-        )
+        incompletos = [o for o in self.unresolved_objectives if o not in self.objetivo_mapeo]
+        if incompletos:
+            self.unresolved_objectives = incompletos
+            self.objetivo_status.setText(
+                f"Faltan {len(incompletos)} objetivos por resolver."
+            )
+            self.objetivo_status.setStyleSheet("color: #ff8a80; font-size: 11px;")
+        else:
+            self.unresolved_objectives = []
+            self.objetivo_status.setText("Todos los objetivos pendientes fueron resueltos.")
+            self.objetivo_status.setStyleSheet("color: #8affc1; font-size: 11px;")
+        self._actualizar_objetivos_no_resueltos()
 
     def _importar(self) -> None:
         if not self.ruta_archivo:
@@ -537,3 +579,33 @@ class ImportarExcel(QWidget):
         except Exception as e:
             self.log.append(f"✗ Error: {e}")
             QMessageBox.critical(self, "Error", f"No se pudo importar: {e}")
+
+    def _actualizar_objetivos_no_resueltos(self) -> None:
+        if self.unresolved_objectives:
+            self.objetivos_pendientes_label.setVisible(True)
+            self.objetivos_pendientes_lista.setVisible(True)
+            self.objetivos_pendientes_lista.clear()
+            for nombre in self.unresolved_objectives:
+                self.objetivos_pendientes_lista.addItem(nombre)
+        else:
+            self.objetivos_pendientes_label.setVisible(False)
+            self.objetivos_pendientes_lista.setVisible(False)
+            self.objetivos_pendientes_lista.clear()
+
+    def _actualizar_resumen_objetivos(self, registros) -> None:
+        if not registros:
+            self.resumen_objetivos_label.setText("")
+            self.resumen_objetivos_label.setVisible(False)
+            return
+
+        contador = {}
+        for registro in registros:
+            objetivo = getattr(registro, "objetivo", "") or "Sin objetivo"
+            contador[objetivo] = contador.get(objetivo, 0) + 1
+
+        lineas = [f"{nombre}: {cantidad} pasadas" for nombre, cantidad in sorted(contador.items())]
+        if len(lineas) > 8:
+            lineas = lineas[:8] + [f"... y {len(contador) - 8} objetivos más"]
+
+        self.resumen_objetivos_label.setText(" | ".join(lineas))
+        self.resumen_objetivos_label.setVisible(True)
