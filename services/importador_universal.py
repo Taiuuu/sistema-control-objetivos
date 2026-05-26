@@ -9,7 +9,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Callable
 
 import pandas as pd
 from openpyxl import load_workbook
@@ -150,6 +150,7 @@ class ImportadorUniversal:
         self,
         ruta_archivo: str,
         objetivo_mapeo: Optional[Dict[str, int]] = None,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
         sheet_names: Optional[List[str]] = None,
     ) -> ResultadoImportacion:
         """Importa un archivo CONTROL_RECORRIDOS con mapeo opcional de objetivos."""
@@ -157,13 +158,18 @@ class ImportadorUniversal:
         if preview.get('tipo') != 'control_recorridos':
             return self.importar_excel(ruta_archivo)
 
-        return self.importar_registros(preview['registros'], objetivo_mapeo=objetivo_mapeo)
+        return self.importar_registros(preview['registros'], objetivo_mapeo=objetivo_mapeo, progress_callback=progress_callback)
 
-    def importar_registros(self, registros: List[RegistroImportacion], objetivo_mapeo: Optional[Dict[str, int]] = None) -> ResultadoImportacion:
-        """Procesa una lista de registros ya normalizados."""
-        return self._procesar_registros(registros, objetivo_mapeo=objetivo_mapeo or {})
+    def importar_registros(
+        self,
+        registros: List[RegistroImportacion],
+        objetivo_mapeo: Optional[Dict[str, int]] = None,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+    ) -> ResultadoImportacion:
+        """Procesa una lista de registros ya normalizados con progreso opcional."""
+        return self._procesar_registros(registros, objetivo_mapeo=objetivo_mapeo or {}, progress_callback=progress_callback)
 
-    def importar_json_tablet(self, ruta_archivo: str) -> ResultadoImportacion:
+    def importar_json_tablet(self, ruta_archivo: str, progress_callback: Optional[Callable[[int, int], None]] = None) -> ResultadoImportacion:
         """Importa datos desde archivo JSON de tablet."""
         try:
             with open(ruta_archivo, 'r', encoding='utf-8') as f:
@@ -186,7 +192,7 @@ class ImportadorUniversal:
                 except Exception:
                     continue
 
-            return self.importar_registros(registros)
+            return self.importar_registros(registros, progress_callback=progress_callback)
 
         except Exception as e:
             return ResultadoImportacion(
@@ -227,14 +233,16 @@ class ImportadorUniversal:
                 exitoso=False,
             )
 
-    def _procesar_registros(self, registros: List[RegistroImportacion], objetivo_mapeo: Optional[Dict[str, int]] = None) -> ResultadoImportacion:
+    def _procesar_registros(self, registros: List[RegistroImportacion], objetivo_mapeo: Optional[Dict[str, int]] = None, progress_callback: Optional[Callable[[int, int], None]] = None) -> ResultadoImportacion:
         """Procesa una lista de registros y los importa."""
         total = len(registros)
         validos = 0
         errores = []
         duplicados = []
         objetivo_mapeo = objetivo_mapeo or {}
+        procesados = 0
 
+        abort = False
         for registro in registros:
             try:
                 supervisor_id = self._obtener_supervisor_id(registro.supervisor)
@@ -286,6 +294,17 @@ class ImportadorUniversal:
 
             except Exception as e:
                 errores.append(f"Error procesando registro: {str(e)}")
+            finally:
+                procesados += 1
+                try:
+                    if progress_callback:
+                        progress_callback(procesados, total)
+                except Exception:
+                    # Si el callback lanza (por ejemplo cancelación), abortamos el procesamiento
+                    errores.append("Importación cancelada por usuario.")
+                    abort = True
+            if abort:
+                break
 
         return ResultadoImportacion(
             total_registros=total,
