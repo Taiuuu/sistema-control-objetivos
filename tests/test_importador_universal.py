@@ -41,3 +41,42 @@ def test_parsear_hoja_control_recorridos_limpia_texto():
     assert registros[0].objetivo == "Revisar placa"
     assert registros[0].supervisor == "Juan Perez"
     assert registros[0].notas == "sin observaciones"
+
+
+def test_crear_pasada_offline_calcula_fecha_operativa(monkeypatch):
+    import services.sync_manager as sync_module
+
+    captured = {}
+
+    class DummyProvider:
+        def crear_pasada(self, pasada):
+            captured["fecha_operativa"] = pasada.fecha_operativa
+            return True
+
+    def fake_agregar_cambio_pendiente(self, tipo, operacion, datos):
+        captured["cambio"] = {
+            "tipo": tipo,
+            "operacion": operacion,
+            "datos": datos,
+        }
+
+    monkeypatch.setattr(sync_module, "get_data_provider", lambda: DummyProvider())
+    monkeypatch.setattr(sync_module.SyncManager, "_guardar_cambios_pendientes", lambda self: None)
+    monkeypatch.setattr(sync_module.SyncManager, "_cargar_cambios_pendientes", lambda self: None)
+
+    manager = sync_module.SyncManager.__new__(sync_module.SyncManager)
+    manager.cambios_pendientes = []
+    manager.agregar_cambio_pendiente = fake_agregar_cambio_pendiente.__get__(manager, sync_module.SyncManager)
+
+    resultado = manager.crear_pasada_offline(
+        fecha="2026-05-26",
+        hora="03:00",
+        turno="nocturno",
+        supervisor_id=7,
+        objetivo_id=9,
+        notas="prueba",
+    )
+
+    assert resultado is True
+    assert captured["fecha_operativa"] == "2026-05-25"
+    assert captured["cambio"]["datos"]["fecha_operativa"] == "2026-05-25"

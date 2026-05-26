@@ -11,6 +11,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 import threading
 from services.data_provider import get_data_provider, Pasada, Objetivo
+from services.gestor_turnos import GestorTurnos
 
 
 @dataclass
@@ -131,9 +132,18 @@ class SyncManager:
                            supervisor_id: int, objetivo_id: int, notas: str = None) -> bool:
         """Crea una pasada que se sincronizará cuando haya conexión."""
 
-        # Calcular fecha operativa (lógica de turnos nocturnos)
-        from services.gestor_turnos import calcular_fecha_operativa
-        fecha_operativa = calcular_fecha_operativa(fecha, hora, turno)
+        fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
+        for formato in ("%H:%M:%S", "%H:%M"):
+            try:
+                hora_obj = datetime.strptime(hora, formato).time()
+                break
+            except ValueError:
+                hora_obj = None
+        if hora_obj is None:
+            raise ValueError(f"Formato de hora inválido: {hora}")
+
+        fecha_operativa_obj = GestorTurnos.calcular_fecha_operativa(fecha_obj, hora_obj, turno)
+        fecha_operativa = fecha_operativa_obj.strftime("%Y-%m-%d")
 
         # Crear en local
         pasada_data = {
