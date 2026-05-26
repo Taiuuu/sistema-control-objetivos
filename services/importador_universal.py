@@ -490,25 +490,40 @@ class ImportadorUniversal:
         return registros
 
     def _parsear_control_recorridos_legacy(self, ws, sheet_date: date, turno: str) -> List[RegistroImportacion]:
-        """Parsea el formato legacy basado en bloques fijos de columnas."""
+        """
+        Parsea el formato CONTROL_RECORRIDOS real con 3 bloques horizontales.
+        Cada bloque representa una pasada adicional al mismo objetivo.
+        Estructura por bloque: NO | OBJETIVO | TURNO | MOVIL | HORA | SUPERVISOR
+        Bloques: cols 1-6 (1ra pasada), cols 8-13 (2da pasada), cols 15-20 (3ra pasada).
+        Solo se importan filas cuyo TURNO coincide con el turno del nombre de la hoja.
+        """
         registros = []
 
-        for bloque in self._bloques_control_recorridos():
-            for fila in ws.iter_rows(min_row=1, min_col=bloque['inicio'], max_col=bloque['fin'], values_only=True):
-                objetivo = self._limpiar_valor(fila[0])
-                supervisor = self._limpiar_valor(fila[1])
-                hora_raw = self._limpiar_valor(fila[2])
-                veces_raw = self._limpiar_valor(fila[3])
-                notas = self._limpiar_valor(fila[4])
+        for fila in ws.iter_rows(min_row=3, max_row=ws.max_row, values_only=True):
+            for (c_obj, c_turno, c_hora, c_sup) in self._bloques_control_recorridos():
+                idx_obj   = c_obj - 1
+                idx_turno = c_turno - 1
+                idx_hora  = c_hora - 1
+                idx_sup   = c_sup - 1
 
-                if not objetivo or self._es_encabezado(objetivo):
+                if len(fila) <= idx_hora:
                     continue
 
-                repeticiones = self._parsear_repeticiones(veces_raw)
-                if repeticiones <= 0:
-                    repeticiones = 1
+                objetivo  = self._limpiar_valor(fila[idx_obj])
+                turno_raw = fila[idx_turno]
+                hora_raw  = fila[idx_hora]
+                supervisor = self._limpiar_valor(fila[idx_sup]) if len(fila) > idx_sup else None
 
-                if not hora_raw:
+                if not objetivo or turno_raw is None or hora_raw is None:
+                    continue
+
+                if self._es_encabezado(objetivo):
+                    continue
+
+                # El turno de la fila debe coincidir con el del nombre de la hoja
+                t = str(turno_raw).strip().upper()
+                turno_fila = 'diurno' if t in ('DIA', 'DIURNO', 'D') else 'nocturno' if t in ('NOCHE', 'NOCTURNO', 'N') else None
+                if turno_fila != turno:
                     continue
 
                 try:
@@ -516,19 +531,18 @@ class ImportadorUniversal:
                 except Exception:
                     continue
 
-                for _ in range(repeticiones):
-                    registros.append(
-                        RegistroImportacion(
-                            fecha=fecha_import.strftime('%Y-%m-%d'),
-                            hora=hora_normalizada,
-                            turno=turno,
-                            supervisor=supervisor or '',
-                            objetivo=objetivo,
-                            notas=notas,
-                            fuente='excel',
-                            sheet_title=ws.title,
-                        )
+                registros.append(
+                    RegistroImportacion(
+                        fecha=fecha_import.strftime('%Y-%m-%d'),
+                        hora=hora_normalizada,
+                        turno=turno,
+                        supervisor=supervisor or '',
+                        objetivo=objetivo,
+                        notas=None,
+                        fuente='excel',
+                        sheet_title=ws.title,
                     )
+                )
 
         return registros
 
@@ -555,12 +569,17 @@ class ImportadorUniversal:
 
         return opciones
 
-    def _bloques_control_recorridos(self) -> List[Dict[str, int]]:
-        """Define las columnas esperadas para los tres bloques horizontales."""
+    def _bloques_control_recorridos(self) -> List[Tuple[int, int, int, int]]:
+        """
+        Define los bloques de columnas del formato CONTROL_RECORRIDOS real.
+        Cada bloque tiene: NO | OBJETIVO | TURNO | MOVIL | HORA | SUPERVISOR
+        Retorna tuplas (col_objetivo, col_turno, col_hora, col_supervisor) — 1-indexed.
+        Bloque 1: cols 1-6, Bloque 2: cols 8-13, Bloque 3: cols 15-20.
+        """
         return [
-            {'inicio': 1, 'fin': 5},
-            {'inicio': 8, 'fin': 12},
-            {'inicio': 15, 'fin': 19},
+            (2, 3, 5, 6),    # bloque 1: cols 1-6
+            (9, 10, 12, 13), # bloque 2: cols 8-13
+            (16, 17, 19, 20), # bloque 3: cols 15-20
         ]
 
     def _parsear_nombre_sheet(self, sheet_name: str) -> Tuple[Optional[date], Optional[str]]:
@@ -603,7 +622,11 @@ class ImportadorUniversal:
         return mejor, turno
 
     def _normalizar_hora_y_fecha(self, hora_raw: Any, fecha_base: date) -> Tuple[date, str]:
-        """Normaliza horas con formato inválido y soporta horas >= 24."""
+        """Normaliza horas con formato inválido y soporta horas >= 24. Acepta datetime.time."""
+        # openpyxl puede devolver datetime.time directamente
+        if isinstance(hora_raw, time):
+            return fecha_base, hora_raw.strftime('%H:%M')
+
         texto = str(hora_raw).strip()
         texto = texto.replace(';', ':').replace(',', '.').replace('h', '').replace('H', '')
         texto = texto.replace(' ', '')
