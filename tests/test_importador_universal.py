@@ -80,3 +80,49 @@ def test_crear_pasada_offline_calcula_fecha_operativa(monkeypatch):
     assert resultado is True
     assert captured["fecha_operativa"] == "2026-05-25"
     assert captured["cambio"]["datos"]["fecha_operativa"] == "2026-05-25"
+
+
+def test_procesar_registros_control_recorridos_acepta_horas_fuera_de_rango(monkeypatch):
+    import services.sync_manager as sync_module
+    from services.importador_universal import RegistroImportacion
+
+    importador = ImportadorUniversal()
+    importador.sync_manager = sync_module.get_sync_manager()
+
+    class DummyProvider:
+        def crear_pasada(self, pasada):
+            return True
+
+    class DummySyncManager:
+        def agregar_cambio_pendiente(self, *args, **kwargs):
+            return None
+
+        def crear_pasada_offline(self, *args, **kwargs):
+            return True
+
+    monkeypatch.setattr(sync_module, "get_data_provider", lambda: DummyProvider())
+    monkeypatch.setattr(sync_module.SyncManager, "_guardar_cambios_pendientes", lambda self: None)
+    monkeypatch.setattr(sync_module.SyncManager, "_cargar_cambios_pendientes", lambda self: None)
+    monkeypatch.setattr(importador, "_obtener_supervisor_id", lambda nombre: 7)
+    monkeypatch.setattr(importador, "_obtener_objetivo_id", lambda nombre: 9)
+    monkeypatch.setattr(importador, "sync_manager", DummySyncManager())
+    monkeypatch.setattr("services.gestor_turnos.GestorTurnos.calcular_fecha_operativa", lambda *args, **kwargs: (_ for _ in ()).throw(ValueError("Hora fuera del rango")))
+
+    registros = [
+        RegistroImportacion(
+            fecha="2026-05-27",
+            hora="03:11",
+            turno="diurno",
+            supervisor="Supervisor test",
+            objetivo="Objetivo test",
+            notas="prueba",
+            fuente="excel",
+            sheet_title="27-5 (D)",
+        )
+    ]
+
+    resultado = importador._procesar_registros(registros)
+
+    assert resultado.registros_validos == 1
+    assert resultado.registros_errores == 0
+    assert resultado.exitoso is True

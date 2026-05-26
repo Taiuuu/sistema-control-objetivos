@@ -24,9 +24,11 @@ def crear_base_datos() -> None:
         CREATE TABLE IF NOT EXISTS objetivos (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre       TEXT    NOT NULL,
+            descripcion  TEXT,
             fecha_inicio TEXT,
             fecha_fin    TEXT,
-            dias_semana  TEXT
+            dias_semana  TEXT,
+            activo       INTEGER DEFAULT 1
         )
     """)
 
@@ -47,6 +49,8 @@ def crear_base_datos() -> None:
             turno         TEXT,
             objetivo_id   INTEGER,
             supervisor_id INTEGER,
+            notas         TEXT,
+            fecha_operativa TEXT,
             FOREIGN KEY (objetivo_id)   REFERENCES objetivos(id),
             FOREIGN KEY (supervisor_id) REFERENCES supervisores(id)
         )
@@ -132,6 +136,8 @@ def crear_base_datos() -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_usuario_id ON logs(usuario_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_fecha ON logs(fecha DESC)")
 
+    migrar_objetivos_campos(cursor)
+    migrar_pasadas_campos(cursor)
     _crear_admin_si_no_existe(cursor)
 
     conexion.commit()
@@ -234,6 +240,80 @@ def migrar_usuarios_activo() -> None:
         conexion.rollback()
     finally:
         conexion.close()
+
+
+def migrar_pasadas_campos(cursor: sqlite3.Cursor | None = None) -> None:
+    """Añade columnas esperadas en pasadas y rellena valores por defecto."""
+    conexion = None
+    actualizar_cursor = cursor
+
+    if actualizar_cursor is None:
+        conexion = conectar()
+        actualizar_cursor = conexion.cursor()
+
+    try:
+        for columna_def in (
+            "notas TEXT",
+            "fecha_operativa TEXT",
+        ):
+            try:
+                actualizar_cursor.execute(f"ALTER TABLE pasadas ADD COLUMN {columna_def}")
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+
+        actualizar_cursor.execute(
+            "UPDATE pasadas SET notas = COALESCE(notas, '') WHERE notas IS NULL"
+        )
+        actualizar_cursor.execute(
+            "UPDATE pasadas SET fecha_operativa = COALESCE(fecha_operativa, fecha) WHERE fecha_operativa IS NULL OR fecha_operativa = ''"
+        )
+        if conexion is not None:
+            conexion.commit()
+    except Exception as e:
+        if conexion is not None:
+            conexion.rollback()
+        raise
+    finally:
+        if conexion is not None:
+            conexion.close()
+
+
+def migrar_objetivos_campos(cursor: sqlite3.Cursor | None = None) -> None:
+    """Añade columnas esperadas en objetivos y rellena valores por defecto."""
+    conexion = None
+    actualizar_cursor = cursor
+
+    if actualizar_cursor is None:
+        conexion = conectar()
+        actualizar_cursor = conexion.cursor()
+
+    try:
+        for columna_def in (
+            "descripcion TEXT",
+            "activo INTEGER DEFAULT 1",
+        ):
+            try:
+                actualizar_cursor.execute(f"ALTER TABLE objetivos ADD COLUMN {columna_def}")
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+
+        actualizar_cursor.execute(
+            "UPDATE objetivos SET descripcion = COALESCE(descripcion, '') WHERE descripcion IS NULL"
+        )
+        actualizar_cursor.execute(
+            "UPDATE objetivos SET activo = 1 WHERE activo IS NULL"
+        )
+        if conexion is not None:
+            conexion.commit()
+    except Exception as e:
+        if conexion is not None:
+            conexion.rollback()
+        raise
+    finally:
+        if conexion is not None:
+            conexion.close()
 
 
 # =============================================================================

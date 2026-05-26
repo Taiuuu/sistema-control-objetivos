@@ -9,12 +9,14 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from difflib import get_close_matches
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 from openpyxl import load_workbook
 
 from database.gestor_db import gestor_db
+from models.objetivos import agregar_objetivo
 from models.supervisores import agregar_supervisor
 from services.gestor_turnos import GestorTurnos
 from services.sync_manager import get_sync_manager
@@ -258,7 +260,11 @@ class ImportadorUniversal:
                 try:
                     fecha = datetime.strptime(registro.fecha, "%Y-%m-%d").date()
                     hora = datetime.strptime(registro.hora, "%H:%M").time()
-                    fecha_operativa = GestorTurnos.calcular_fecha_operativa(fecha, hora, registro.turno)
+                    es_control_recorridos = bool(registro.sheet_title)
+                    if es_control_recorridos:
+                        fecha_operativa = fecha
+                    else:
+                        fecha_operativa = GestorTurnos.calcular_fecha_operativa(fecha, hora, registro.turno)
                 except ValueError as e:
                     errores.append(f"Error en formato de fecha/hora ({registro.fecha} {registro.hora}): {e}")
                     continue
@@ -274,6 +280,7 @@ class ImportadorUniversal:
                     supervisor_id,
                     objetivo_id,
                     registro.notas,
+                    validar_turno=not es_control_recorridos,
                 ):
                     validos += 1
                 else:
@@ -707,18 +714,58 @@ class ImportadorUniversal:
         except Exception:
             return None
 
+    def _normalizar_objetivo_buscado(self, nombre_objetivo: str) -> str:
+        """Normaliza nombres de objetivos con alias comunes para resolver imports reales."""
+        texto = self._normalizar_texto(nombre_objetivo)
+
+        reemplazos = {
+            'cam': 'c a m',
+            'poli': 'polideportivo',
+            'oficina': 'oficinas racaval',
+            'granja educativa': 'granja',
+            'palacio': 'palacio municipal',
+            'centro integral de la mujer': 'secretaria de la mujer',
+        }
+
+        for clave, valor in reemplazos.items():
+            texto = texto.replace(clave, valor)
+
+        texto = re.sub(r'\s+', ' ', texto).strip()
+        return texto
+
     def _obtener_objetivo_id(self, nombre_objetivo: str) -> Optional[int]:
-        """Busca un objetivo existente por nombre normalizado."""
+        """Busca un objetivo existente por nombre normalizado con alias y creación de respaldo."""
         if not nombre_objetivo:
             return None
 
-        normalized = self._normalizar_texto(nombre_objetivo)
         filas = gestor_db.ejecutar("SELECT id, nombre FROM objetivos")
-        for fila in filas:
-            if self._normalizar_texto(fila['nombre']) == normalized:
+        nombres_normalizados = [self._normalizar_texto(fila['nombre']) for fila in filas]
+
+        normalized = self._normalizar_texto(nombre_objetivo)
+        for fila, nombre_normalizado in zip(filas, nombres_normalizados):
+            if nombre_normalizado == normalized:
                 return int(fila['id'])
 
-        return None
+        alias_normalizado = self._normalizar_objetivo_buscado(nombre_objetivo)
+        for fila, nombre_normalizado in zip(filas, nombres_normalizados):
+            if nombre_normalizado == alias_normalizado:
+                return int(fila['id'])
+
+        cercano = get_close_matches(alias_normalizado, nombres_normalizados, n=1, cutoff=0.78)
+        if cercano:
+            for fila, nombre_normalizado in zip(filas, nombres_normalizados):
+                if nombre_normalizado == cercano[0]:
+                    return int(fila['id'])
+
+        try:
+            nuevo_objetivo = agregar_objetivo(
+                nombre_objetivo.strip(),
+                date.today().isoformat(),
+                "Lunes,Martes,Miércoles,Jueves,Viernes,Sábado,Domingo",
+            )
+            return int(nuevo_objetivo.id)
+        except Exception:
+            return None
 
     def _es_duplicado(self, supervisor_id: int, objetivo_id: int, fecha_operativa: str, hora: str, turno: str) -> bool:
         """Verifica si una pasada ya existe (duplicada)."""

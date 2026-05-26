@@ -129,7 +129,8 @@ class SyncManager:
         return False  # Por ahora simular fallo
 
     def crear_pasada_offline(self, fecha: str, hora: str, turno: str,
-                           supervisor_id: int, objetivo_id: int, notas: str = None) -> bool:
+                           supervisor_id: int, objetivo_id: int, notas: str = None,
+                           validar_turno: bool = True) -> bool:
         """Crea una pasada que se sincronizará cuando haya conexión."""
 
         fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
@@ -142,8 +143,11 @@ class SyncManager:
         if hora_obj is None:
             raise ValueError(f"Formato de hora inválido: {hora}")
 
-        fecha_operativa_obj = GestorTurnos.calcular_fecha_operativa(fecha_obj, hora_obj, turno)
-        fecha_operativa = fecha_operativa_obj.strftime("%Y-%m-%d")
+        if validar_turno:
+            fecha_operativa_obj = GestorTurnos.calcular_fecha_operativa(fecha_obj, hora_obj, turno)
+            fecha_operativa = fecha_operativa_obj.strftime("%Y-%m-%d")
+        else:
+            fecha_operativa = fecha
 
         # Crear en local
         pasada_data = {
