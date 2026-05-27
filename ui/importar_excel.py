@@ -5,7 +5,7 @@
 
 from datetime import date, datetime
 
-from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal, QTimer
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -282,6 +282,9 @@ class ImportarExcel(QWidget):
         self.sheet_turno_map = {}
         self.objetivos_pendientes_label = None
         self.objetivos_pendientes_lista = None
+        # import worker/thread handles
+        self.import_thread = None
+        self.import_worker = None
 
         layout = QVBoxLayout()
 
@@ -414,12 +417,82 @@ class ImportarExcel(QWidget):
 
         self.setLayout(layout)
 
+        # Busy overlay (covers the widget to indicate background activity)
+        self._overlay = QWidget(self)
+        self._overlay.setVisible(False)
+        self._overlay.setStyleSheet(
+            "background-color: rgba(0,0,0,0.55); border-radius: 6px;"
+        )
+        ov_layout = QVBoxLayout(self._overlay)
+        ov_layout.setContentsMargins(20, 20, 20, 20)
+        ov_layout.setSpacing(10)
+        self._overlay_label = QLabel("")
+        self._overlay_label.setStyleSheet("color: #ffffff; font-size: 13px;")
+        ov_layout.addWidget(self._overlay_label, alignment=Qt.AlignmentFlag.AlignCenter)
+        self._overlay_progress = QProgressBar()
+        self._overlay_progress.setMinimum(0)
+        self._overlay_progress.setMaximum(0)  # indeterminate by default
+        self._overlay_progress.setFixedWidth(300)
+        ov_layout.addWidget(self._overlay_progress, alignment=Qt.AlignmentFlag.AlignCenter)
+        self._overlay.resize(self.size())
+
+        # Timer to allow subtle UI animations if needed in future
+        self._overlay_timer = QTimer(self)
+        self._overlay_timer.setInterval(500)
+
     def _limpiar_previsualizacion_thread(self) -> None:
         if self._preview_thread is not None and self._preview_thread.isRunning():
             self._preview_thread.quit()
             self._preview_thread.wait(200)
         self._preview_thread = None
         self._preview_worker = None
+
+    def _limpiar_import_thread(self) -> None:
+        """Intentar limpiar el hilo/worker de importación si existe."""
+        try:
+            if getattr(self, 'import_thread', None) is not None and self.import_thread.isRunning():
+                # solicitar cancelación al worker si está disponible
+                if getattr(self, 'import_worker', None) is not None:
+                    try:
+                        self.import_worker.cancelled = True
+                    except Exception:
+                        pass
+                self.import_thread.quit()
+                self.import_thread.wait(200)
+        except Exception:
+            pass
+        finally:
+            self.import_thread = None
+            self.import_worker = None
+
+    def _show_busy_overlay(self, mensaje: str, determinate: bool = False) -> None:
+        """Mostrar overlay que cubre la vista para indicar operación en segundo plano."""
+        self._overlay_label.setText(mensaje)
+        if determinate:
+            # determinate: mostrar barra con rango 0-100
+            self._overlay_progress.setRange(0, 100)
+            self._overlay_progress.setValue(0)
+        else:
+            # indeterminate
+            self._overlay_progress.setRange(0, 0)
+        self._overlay.setGeometry(self.rect())
+        self._overlay.setVisible(True)
+        self._overlay.raise_()
+
+    def _hide_busy_overlay(self) -> None:
+        try:
+            self._overlay.setVisible(False)
+        except Exception:
+            pass
+
+    def resizeEvent(self, event):
+        # mantener overlay cubriendo toda la vista
+        try:
+            if getattr(self, '_overlay', None) is not None:
+                self._overlay.setGeometry(self.rect())
+        except Exception:
+            pass
+        return super().resizeEvent(event)
 
     def _reset_previsualizacion(self) -> None:
         self.sheet_combo.blockSignals(True)
@@ -471,6 +544,10 @@ class ImportarExcel(QWidget):
     def _iniciar_previsualizacion_thread(self, sheet_names=None) -> None:
         self._limpiar_previsualizacion_thread()
         self._preview_token += 1
+        try:
+            self._show_busy_overlay("Previsualizando archivo...", determinate=False)
+        except Exception:
+            pass
         token = self._preview_token
         self._preview_worker = PreviewWorker(
             get_importador(),
@@ -510,8 +587,12 @@ class ImportarExcel(QWidget):
         if token != self._preview_token:
             return
 
-        self._preview_thread = None
-        self._preview_worker = None
+        # limpiar referencias al hilo/worker de previsualización (evita referencias colgantes)
+        self._limpiar_previsualizacion_thread()
+        try:
+            self._hide_busy_overlay()
+        except Exception:
+            pass
 
         if preview.get("tipo") != "control_recorridos":
             self.sheet_combo.blockSignals(True)
@@ -629,9 +710,12 @@ class ImportarExcel(QWidget):
     def _on_preview_error(self, token: int, mensaje: str) -> None:
         if token != self._preview_token:
             return
-
-        self._preview_thread = None
-        self._preview_worker = None
+        # asegurarse de limpiar hilos previos
+        self._limpiar_previsualizacion_thread()
+        try:
+            self._hide_busy_overlay()
+        except Exception:
+            pass
         self._set_estado_previsualizacion(f"No se pudo previsualizar el archivo: {mensaje}", "#ff8a80")
         self.preview_table.setRowCount(0)
         self.boton_importar.setEnabled(False)
@@ -758,9 +842,18 @@ class ImportarExcel(QWidget):
             self.boton_cancelar_importacion.setVisible(True)
             self.boton_importar.setEnabled(False)
 
+            # mostrar overlay durante importación (determinate)
+            try:
+                self._show_busy_overlay("Importando...", determinate=True)
+            except Exception:
+                pass
+
             # Preparar mapeo de turnos desde la UI (si existe)
             sheet_turno_map = self.sheet_turno_map
+            # limpiar hilos de importación previos si existen
+            self._limpiar_import_thread()
 
+            # crear nuevo worker / thread
             self.import_worker = ImportWorker(
                 importador,
                 self.ruta_archivo,
@@ -911,11 +1004,33 @@ class ImportarExcel(QWidget):
         self.progress_bar.setMaximum(total)
         self.progress_bar.setValue(processed)
         self.estado_banner.setText(f"Importando... {processed}/{total}")
+        try:
+            # actualizar overlay si está visible y es determinate
+            if getattr(self, '_overlay', None) is not None and self._overlay.isVisible():
+                if self._overlay_progress.maximum() > 0 and total:
+                    val = int(processed * 100 / total)
+                    self._overlay_progress.setValue(val)
+        except Exception:
+            pass
 
     def _on_import_finished(self, resultado) -> None:
-        self._handle_import_result(resultado)
+        try:
+            self._handle_import_result(resultado)
+        finally:
+            # asegurar limpieza de recursos del hilo
+            try:
+                self._hide_busy_overlay()
+            except Exception:
+                pass
+            self._limpiar_import_thread()
 
     def _on_import_error(self, mensaje: str) -> None:
+        # limpiar recursos antes de actualizar UI
+        try:
+            self._hide_busy_overlay()
+        except Exception:
+            pass
+        self._limpiar_import_thread()
         self.progress_bar.setVisible(False)
         self.boton_cancelar_importacion.setVisible(False)
         self.boton_importar.setEnabled(True)
@@ -924,10 +1039,23 @@ class ImportarExcel(QWidget):
 
     def _cancelar_importacion(self) -> None:
         try:
-            if hasattr(self, 'import_worker'):
-                self.import_worker.cancelled = True
+            if getattr(self, 'import_worker', None) is not None:
+                try:
+                    self.import_worker.cancelled = True
+                except Exception:
+                    pass
                 self.boton_cancelar_importacion.setEnabled(False)
                 self.log.append("Solicitud de cancelación enviada...")
+
+            # intentar detener el hilo si está corriendo
+            if getattr(self, 'import_thread', None) is not None and self.import_thread.isRunning():
+                try:
+                    self.import_thread.quit()
+                    self.import_thread.wait(200)
+                except Exception:
+                    pass
+            # limpiar referencias
+            self._limpiar_import_thread()
         except Exception:
             pass
 
