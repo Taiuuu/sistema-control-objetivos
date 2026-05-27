@@ -522,44 +522,83 @@ class ImportadorUniversal:
         Cada bloque representa una pasada adicional al mismo objetivo.
         Estructura por bloque: NO | OBJETIVO | TURNO | MOVIL | HORA | SUPERVISOR
         Bloques: cols 1-6 (1ra pasada), cols 8-13 (2da pasada), cols 15-20 (3ra pasada).
-        Solo se importan filas cuyo TURNO coincide con el turno del nombre de la hoja.
+
+        FIX:
+        - Algunas filas vienen con turno vacío o inconsistente.
+        - Si la hoja ya define el turno (ej: 18-5 (N)),
+        usamos el turno de la hoja como fallback.
+        - Esto evita perder pasadas válidas.
         """
+
         registros = []
 
         for fila in ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=True):
-            if self._es_fila_encabezado_global_control_recorridos(fila):
-                continue
-
+            fila_es_encabezado = self._es_fila_encabezado_global_control_recorridos(fila)
             for (c_obj, c_turno, c_hora, c_sup) in self._bloques_control_recorridos():
-                idx_obj   = c_obj - 1
+
+                idx_obj = c_obj - 1
                 idx_turno = c_turno - 1
-                idx_hora  = c_hora - 1
-                idx_sup   = c_sup - 1
+                idx_hora = c_hora - 1
+                idx_sup = c_sup - 1
 
                 if len(fila) <= idx_hora:
                     continue
+                objetivo = self._limpiar_valor(fila[idx_obj])
 
-                objetivo  = self._limpiar_valor(fila[idx_obj])
-                turno_raw = fila[idx_turno]
-                hora_raw  = fila[idx_hora]
-                supervisor = self._limpiar_valor(fila[idx_sup]) if len(fila) > idx_sup else None
+                turno_raw = fila[idx_turno] if len(fila) > idx_turno else None
+                hora_raw = fila[idx_hora]
+                supervisor = (
+                    self._limpiar_valor(fila[idx_sup])
+                    if len(fila) > idx_sup
+                    else None
+                )
 
-                if not objetivo or turno_raw is None or hora_raw is None:
+                if not objetivo or hora_raw is None:
+                    continue
+                if fila_es_encabezado and self._es_encabezado(objetivo):
                     continue
 
-                if self._es_encabezado(objetivo):
+                # ==========================================================
+                # NORMALIZAR TURNO DE FILA
+                # ==========================================================
+
+                turno_fila = None
+
+                if turno_raw is not None:
+                    t = str(turno_raw).strip().upper()
+
+                    if t in ('DIA', 'DIURNO', 'D'):
+                        turno_fila = 'diurno'
+
+                    elif t in ('NOCHE', 'NOCTURNO', 'N'):
+                        turno_fila = 'nocturno'
+
+                # ==========================================================
+                # FIX PRINCIPAL:
+                # Si la fila no tiene turno válido,
+                # usar el turno de la hoja.
+                # ==========================================================
+
+                turno_final = turno_fila or turno
+
+                # Si sigue sin haber turno, ignorar
+                if turno_final is None:
                     continue
 
-                # El turno de la fila debe coincidir con el del nombre de la hoja
-                t = str(turno_raw).strip().upper() if turno_raw is not None else ''
-                turno_fila = 'diurno' if t in ('DIA', 'DIURNO', 'D') else 'nocturno' if t in ('NOCHE', 'NOCTURNO', 'N') else None
-                # Si el parser fue llamado con turno concreto, la fila debe coincidir.
-                # Si turno es None lo tratamos como comodín y aceptamos cualquier fila.
-                if turno is not None and turno_fila != turno:
-                    continue
+                # ==========================================================
+                # VALIDAR COHERENCIA SOLO SI LA FILA TIENE TURNO EXPLÍCITO
+                # ==========================================================
+
+                if turno_fila is not None and turno is not None:
+                    if turno_fila != turno:
+                        continue
 
                 try:
-                    fecha_import, hora_normalizada = self._normalizar_hora_y_fecha(hora_raw, sheet_date)
+                    fecha_import, hora_normalizada = self._normalizar_hora_y_fecha(
+                        hora_raw,
+                        sheet_date,
+                    )
+
                 except Exception:
                     continue
 
@@ -567,7 +606,7 @@ class ImportadorUniversal:
                     RegistroImportacion(
                         fecha=fecha_import.strftime('%Y-%m-%d'),
                         hora=hora_normalizada,
-                        turno=turno,
+                        turno=turno_final,
                         supervisor=supervisor or '',
                         objetivo=objetivo,
                         notas=None,
