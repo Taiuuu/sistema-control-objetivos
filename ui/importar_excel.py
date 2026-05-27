@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QListWidget,
+    QScrollArea,
     QTableWidget,
     QTableWidgetItem,
     QCompleter,
@@ -53,19 +54,30 @@ class DialogoResolverObjetivos(QDialog):
             )
         )
 
-        form_layout = QFormLayout()
+        # Contenedor scrolleable
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setMinimumHeight(350)
+
+        scroll_widget = QWidget()
+        form_layout = QFormLayout(scroll_widget)
+
         existing_names = [obj.nombre for obj in objetivos_existentes]
+
         for nombre in objetivos_faltantes:
             combo = QComboBox()
             combo.setEditable(True)
             combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+
             completer = QCompleter(existing_names)
             completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
             combo.setCompleter(completer)
+
             combo.addItems(existing_names)
             combo.addItem("-- Crear nuevo --")
 
             mejor_coincidencia = self.initial_mapping.get(nombre)
+
             if not mejor_coincidencia:
                 mejor_coincidencia = next(
                     (
@@ -83,12 +95,17 @@ class DialogoResolverObjetivos(QDialog):
 
             line_edit = QLineEdit()
             line_edit.setPlaceholderText("Nombre del nuevo objetivo")
-            line_edit.setVisible(combo.currentText() == "-- Crear nuevo --")
+
+            line_edit.setVisible(
+                combo.currentText() == "-- Crear nuevo --"
+            )
+
             if combo.currentText() == "-- Crear nuevo --":
                 line_edit.setText(nombre)
 
             combo.currentIndexChanged.connect(
-                lambda _=None, line=line_edit, combo=combo: self._alternar_linea(combo, line)
+                lambda _=None, line=line_edit, combo=combo:
+                self._alternar_linea(combo, line)
             )
 
             contenedor = QHBoxLayout()
@@ -96,9 +113,14 @@ class DialogoResolverObjetivos(QDialog):
             contenedor.addWidget(line_edit)
 
             form_layout.addRow(nombre, contenedor)
+
             self.controles.append((nombre, combo, line_edit))
 
-        layout.addLayout(form_layout)
+        scroll_widget.setLayout(form_layout)
+
+        scroll_area.setWidget(scroll_widget)
+
+        layout.addWidget(scroll_area)
 
         botones = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel

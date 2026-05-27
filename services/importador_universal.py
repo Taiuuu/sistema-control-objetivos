@@ -14,9 +14,9 @@ from typing import Any, Dict, List, Optional, Tuple, Callable
 import pandas as pd
 from openpyxl import load_workbook
 
-from database.gestor_db import gestor_db
-from services.gestor_turnos import GestorTurnos
-from services.sync_manager import get_sync_manager
+from database import gestor_db
+from .gestor_turnos import GestorTurnos
+from .sync_manager import get_sync_manager
 
 
 @dataclass
