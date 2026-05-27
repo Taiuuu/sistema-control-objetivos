@@ -40,26 +40,26 @@ git clone https://github.com/Taiuuu/sistema-control-objetivos.git
 cd sistema-control-objetivos
 ```
 
-2. Crea un entorno virtual y activa:
+1. Crea un entorno virtual y activa:
 
 ```bash
 python -m venv venv
 venv\Scripts\activate
 ```
 
-3. Instala dependencias:
+1. Instala dependencias:
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-4. Copia la plantilla de variables de entorno:
+1. Copia la plantilla de variables de entorno:
 
 ```bash
 copy .env.example .env
 ```
 
-5. Ajusta `JWT_SECRET_KEY` y `ENCRYPTION_KEY` en `.env`.
+1. Ajusta `JWT_SECRET_KEY` y `ENCRYPTION_KEY` en `.env`.
 
 ## Ejecución
 

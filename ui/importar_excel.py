@@ -642,8 +642,15 @@ class ImportarExcel(QWidget):
             self.objetivo_status.setStyleSheet("color: #ff8a80; font-size: 11px;")
         else:
             self.unresolved_objectives = []
-            self.objetivo_status.setText("Todos los objetivos pendientes fueron resueltos.")
-            self.objetivo_status.setStyleSheet("color: #8affc1; font-size: 11px;")
+
+            self.objetivo_status.setText(
+                "Todos los objetivos pendientes fueron resueltos."
+            )
+            self.objetivo_status.setStyleSheet(
+                "color: #8affc1; font-size: 11px;"
+            )
+            self.boton_resolver_objetivos.setEnabled(False)
+            self.boton_importar.setEnabled(True)
         self._actualizar_objetivos_no_resueltos()
 
     def _importar(self) -> None:
