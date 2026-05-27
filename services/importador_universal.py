@@ -152,11 +152,20 @@ class ImportadorUniversal:
         objetivo_mapeo: Optional[Dict[str, int]] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
         sheet_names: Optional[List[str]] = None,
+        sheet_turno_map: Optional[Dict[str, str]] = None,
     ) -> ResultadoImportacion:
         """Importa un archivo CONTROL_RECORRIDOS con mapeo opcional de objetivos."""
         preview = self.previsualizar_archivo(ruta_archivo, sheet_names=sheet_names)
         if preview.get('tipo') != 'control_recorridos':
             return self.importar_excel(ruta_archivo)
+
+        # Si se proporciona un mapeo de turno por sheet, aplicarlo a registros cuyo sheet tuvo turno comodín
+        if sheet_turno_map:
+            for r in preview.get('registros', []):
+                if (r.sheet_title and r.turno is None) or (r.turno in (None, '')):
+                    mapped = sheet_turno_map.get(r.sheet_title)
+                    if mapped:
+                        r.turno = mapped
 
         return self.importar_registros(preview['registros'], objetivo_mapeo=objetivo_mapeo, progress_callback=progress_callback)
 
@@ -334,8 +343,13 @@ class ImportadorUniversal:
         for ws in workbook.worksheets:
             try:
                 sheet_date, turno = self._parsear_nombre_sheet(ws.title)
-                if not sheet_date or not turno:
+                # Permitir títulos literales tipo "CONTROL RECORRIDOS" (sin fecha/turno)
+                if (not sheet_date or turno is None) and not re.search(r'control', ws.title, re.IGNORECASE):
                     continue
+                # Si el nombre es literal "CONTROL..." usamos fecha hoy y turno comodín (None)
+                if not sheet_date:
+                    sheet_date = date.today()
+
                 if sheet_names_set is not None and ws.title not in sheet_names_set:
                     continue
 
@@ -499,7 +513,9 @@ class ImportadorUniversal:
         """
         registros = []
 
-        for fila in ws.iter_rows(min_row=3, max_row=ws.max_row, values_only=True):
+        # Algunos archivos colocan los primeros datos ya en la fila 2,
+        # mientras que la fila 1 solo contiene títulos generales.
+        for fila in ws.iter_rows(min_row=2, max_row=ws.max_row, values_only=True):
             for (c_obj, c_turno, c_hora, c_sup) in self._bloques_control_recorridos():
                 idx_obj   = c_obj - 1
                 idx_turno = c_turno - 1
@@ -521,9 +537,11 @@ class ImportadorUniversal:
                     continue
 
                 # El turno de la fila debe coincidir con el del nombre de la hoja
-                t = str(turno_raw).strip().upper()
+                t = str(turno_raw).strip().upper() if turno_raw is not None else ''
                 turno_fila = 'diurno' if t in ('DIA', 'DIURNO', 'D') else 'nocturno' if t in ('NOCHE', 'NOCTURNO', 'N') else None
-                if turno_fila != turno:
+                # Si el parser fue llamado con turno concreto, la fila debe coincidir.
+                # Si turno es None lo tratamos como comodín y aceptamos cualquier fila.
+                if turno is not None and turno_fila != turno:
                     continue
 
                 try:

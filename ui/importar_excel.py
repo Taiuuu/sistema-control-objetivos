@@ -31,6 +31,7 @@ from models.objetivos import agregar_objetivo, listar_objetivos
 from services.importador_universal import get_importador
 from services.logger import registrar_accion
 from services.sesion import get_usuario_id
+from datetime import datetime
 
 
 class DialogoResolverObjetivos(QDialog):
@@ -119,6 +120,45 @@ class DialogoResolverObjetivos(QDialog):
         return mapeo
 
 
+class DialogoAsignarTurnos(QDialog):
+    """Dialogo para asignar 'diurno'/'nocturno' a hojas con turno indeterminado."""
+
+    def __init__(self, sheet_options, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Asignar turnos a hojas")
+        self.setMinimumWidth(400)
+        self.sheet_options = sheet_options
+        self.controles = []
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Asigná el turno para cada hoja detectada sin turno:"))
+
+        form_layout = QFormLayout()
+        for opt in sheet_options:
+            if opt.get('turno') in (None, ''):
+                combo = QComboBox()
+                combo.addItem("diurno")
+                combo.addItem("nocturno")
+                combo.setCurrentIndex(0)
+                form_layout.addRow(opt.get('title', ''), combo)
+                self.controles.append((opt.get('title'), combo))
+
+        layout.addLayout(form_layout)
+
+        botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        botones.accepted.connect(self.accept)
+        botones.rejected.connect(self.reject)
+        layout.addWidget(botones)
+
+    def obtener_mapeo(self):
+        mapeo = {}
+        for title, combo in self.controles:
+            mapeo[title] = combo.currentText()
+        return mapeo
+
+
 class PreviewWorker(QObject):
     finished = pyqtSignal(int, dict)
     error = pyqtSignal(int, str)
@@ -146,12 +186,13 @@ class ImportWorker(QObject):
     finished = pyqtSignal(object)
     error = pyqtSignal(str)
 
-    def __init__(self, importador, ruta_archivo, sheet_names=None, objetivo_mapeo=None):
+    def __init__(self, importador, ruta_archivo, sheet_names=None, objetivo_mapeo=None, sheet_turno_map=None):
         super().__init__()
         self.importador = importador
         self.ruta_archivo = ruta_archivo
         self.sheet_names = sheet_names
         self.objetivo_mapeo = objetivo_mapeo or {}
+        self.sheet_turno_map = sheet_turno_map or {}
         self.cancelled = False
 
     def _on_progress(self, processed: int, total: int) -> None:
@@ -165,6 +206,7 @@ class ImportWorker(QObject):
                 self.ruta_archivo,
                 objetivo_mapeo=self.objetivo_mapeo,
                 sheet_names=self.sheet_names,
+                sheet_turno_map=self.sheet_turno_map,
                 progress_callback=self._on_progress,
             )
             self.finished.emit(resultado)
@@ -220,6 +262,11 @@ class ImportarExcel(QWidget):
         self.sheet_combo.setEnabled(False)
         self.sheet_combo.currentIndexChanged.connect(self._solicitar_previsualizacion)
         layout.addWidget(self.sheet_combo)
+
+        self.boton_asignar_turnos = QPushButton("Asignar turnos")
+        self.boton_asignar_turnos.setEnabled(False)
+        self.boton_asignar_turnos.clicked.connect(self._abrir_dialogo_asignar_turnos)
+        layout.addWidget(self.boton_asignar_turnos)
 
         self.estado_banner = QLabel("Esperando archivo...")
         self.estado_banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -347,6 +394,8 @@ class ImportarExcel(QWidget):
         self._hoja_previsualizacion_pedida = None
         self.objetivo_mapeo = {}
         self.unresolved_objectives = []
+        self.sheet_turno_map = {}
+        self._last_preview = None
         self.objetivo_status.setText("No hay objetivos pendientes.")
         self.boton_resolver_objetivos.setEnabled(False)
         self._set_estado_previsualizacion("Previsualizando archivo...", "#ffd166")
@@ -431,6 +480,7 @@ class ImportarExcel(QWidget):
             return
 
         opciones = preview.get("sheet_options", [])
+        self._last_preview = preview
         if not opciones:
             self.label_seleccion.setText("No se encontraron hojas válidas en el archivo.")
             self._set_estado_previsualizacion("No se pudieron detectar hojas con el formato esperado.", "#ff8a80")
@@ -446,6 +496,10 @@ class ImportarExcel(QWidget):
                 f"{opcion['title']} | {opcion['fecha']} | {opcion['turno']}",
                 opcion['title'],
             )
+
+        # Habilitar asignar turnos si hay hojas sin turno
+        tiene_indeterminadas = any(opt.get('turno') in (None, '') for opt in opciones)
+        self.boton_asignar_turnos.setEnabled(tiene_indeterminadas)
 
         hoja_seleccionada = self._hoja_previsualizacion_pedida
         if hoja_seleccionada is None:
@@ -636,7 +690,16 @@ class ImportarExcel(QWidget):
             self.boton_cancelar_importacion.setVisible(True)
             self.boton_importar.setEnabled(False)
 
-            self.import_worker = ImportWorker(importador, self.ruta_archivo, sheet_names=[hoja_seleccionada] if hoja_seleccionada else None, objetivo_mapeo=self.objetivo_mapeo)
+            # Preparar mapeo de turnos desde la UI (si existe)
+            sheet_turno_map = self.sheet_turno_map if hasattr(self, 'sheet_turno_map') else None
+
+            self.import_worker = ImportWorker(
+                importador,
+                self.ruta_archivo,
+                sheet_names=[hoja_seleccionada] if hoja_seleccionada else None,
+                objetivo_mapeo=self.objetivo_mapeo,
+                sheet_turno_map=sheet_turno_map,
+            )
             self.import_thread = QThread(self)
             self.import_worker.moveToThread(self.import_thread)
             self.import_thread.started.connect(self.import_worker.run)
@@ -795,3 +858,30 @@ class ImportarExcel(QWidget):
                 self.log.append("Solicitud de cancelación enviada...")
         except Exception:
             pass
+
+    def _abrir_dialogo_asignar_turnos(self) -> None:
+        if not self._last_preview:
+            return
+
+        opciones = self._last_preview.get('sheet_options', [])
+        dialogo = DialogoAsignarTurnos(opciones, parent=self)
+        if dialogo.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        mapeo = dialogo.obtener_mapeo()
+        # Guardar mapeo local
+        self.sheet_turno_map = mapeo
+
+        # Aplicar mapeo a la previsualización en memoria y refrescar vista
+        registros = self._last_preview.get('registros', [])
+        for r in registros:
+            if getattr(r, 'sheet_title', None) in mapeo and (getattr(r, 'turno', None) in (None, '')):
+                r.turno = mapeo.get(r.sheet_title)
+
+        # Actualizar sheet_options turnos para display
+        for opt in opciones:
+            if opt.get('title') in mapeo:
+                opt['turno'] = mapeo[opt.get('title')]
+
+        # Re-renderizar la misma previsualización (simular carga)
+        self._on_preview_cargado(self._preview_token, self._last_preview)
