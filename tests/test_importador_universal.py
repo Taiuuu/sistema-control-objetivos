@@ -43,6 +43,34 @@ def test_parsear_hoja_control_recorridos_limpia_texto():
     assert registros[0].notas == "sin observaciones"
 
 
+def test_parsear_control_recorridos_legacy_ignora_fila_global_y_detecta_datos_en_fila_dos():
+    importador = ImportadorUniversal()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "18-5 (N)"
+
+    ws["A1"] = "CONTROL DE RECORRIDOS"
+    ws["A2"] = 11
+    ws["B2"] = "CENTRO INTEGRAL DE LA MUJER"
+    ws["C2"] = "NOCHE"
+    ws["D2"] = "L-200"
+    ws["E2"] = "00:28"
+    ws["F2"] = "LUCIANO, DANIEL ACACIO"
+
+    ws["H2"] = 11
+    ws["I2"] = "CENTRO INTEGRAL DE LA MUJER"
+    ws["J2"] = "NOCHE"
+    ws["K2"] = "HILUX"
+    ws["L2"] = "07:18"
+    ws["M2"] = "GONZALEZ, MAXIMILIANO"
+
+    registros = importador._parsear_control_recorridos_legacy(ws, date(2026, 5, 18), "nocturno")
+
+    assert len(registros) == 2
+    assert registros[0].objetivo == "CENTRO INTEGRAL DE LA MUJER"
+    assert registros[1].objetivo == "CENTRO INTEGRAL DE LA MUJER"
+
+
 def test_crear_pasada_offline_calcula_fecha_operativa(monkeypatch):
     import services.sync_manager as sync_module
 

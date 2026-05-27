@@ -503,6 +503,19 @@ class ImportadorUniversal:
 
         return registros
 
+    def _es_fila_encabezado_global_control_recorridos(self, fila) -> bool:
+        """Detecta filas iniciales que contienen títulos generales o cabeceras del formato CONTROL_RECORRIDOS."""
+        for valor in fila:
+            texto = self._limpiar_valor(valor)
+            if not texto:
+                continue
+
+            normalizado = self._normalizar_texto(texto)
+            if any(keyword in normalizado for keyword in ('control', 'fecha', 'objetivo', 'turno', 'movil', 'supervisor')):
+                return True
+
+        return False
+
     def _parsear_control_recorridos_legacy(self, ws, sheet_date: date, turno: str) -> List[RegistroImportacion]:
         """
         Parsea el formato CONTROL_RECORRIDOS real con 3 bloques horizontales.
@@ -513,9 +526,10 @@ class ImportadorUniversal:
         """
         registros = []
 
-        # Algunos archivos colocan los primeros datos ya en la fila 2,
-        # mientras que la fila 1 solo contiene títulos generales.
-        for fila in ws.iter_rows(min_row=2, max_row=ws.max_row, values_only=True):
+        for fila in ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=True):
+            if self._es_fila_encabezado_global_control_recorridos(fila):
+                continue
+
             for (c_obj, c_turno, c_hora, c_sup) in self._bloques_control_recorridos():
                 idx_obj   = c_obj - 1
                 idx_turno = c_turno - 1
