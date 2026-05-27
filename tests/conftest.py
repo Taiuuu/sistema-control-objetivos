@@ -24,7 +24,40 @@ def test_db():
     
     # Limpiar después de los tests
     if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir)
+        # Intentar cerrar cualquier conexión abierta y reintentar eliminación (Windows lock)
+        try:
+            import gc
+            from database import gestor_db as gd
+            try:
+                gd.cerrar_conexion()
+            except Exception:
+                pass
+            try:
+                from database import db as db_module
+                try:
+                    db_module.gestor_db.cerrar_conexion()
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            gc.collect()
+        except Exception:
+            pass
+
+        # Reintentar rmtree hasta 3 veces
+        import time
+        for _ in range(3):
+            try:
+                shutil.rmtree(temp_dir)
+                break
+            except PermissionError:
+                time.sleep(0.1)
+        else:
+            # Último intento forzado
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception:
+                pass
 
 
 @pytest.fixture
@@ -34,17 +67,27 @@ def db_initialized(test_db):
     sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from database import db as db_module
-    
-    # Monkeypatch DB_PATH
+    import database.gestor_db as gestor_db_module
+
+    # Cerrar cualquier conexión previa y parchear DB_PATH
+    try:
+        gestor_db_module.gestor_db.cerrar_conexion()
+    except Exception:
+        pass
+
     original_path = db_module.DB_PATH
     db_module.DB_PATH = test_db
-    
+
     # Crear tablas
     db_module.crear_base_datos()
-    
+
     yield test_db
-    
-    # Restaurar
+
+    # Cerrar conexiones y restaurar
+    try:
+        gestor_db_module.gestor_db.cerrar_conexion()
+    except Exception:
+        pass
     db_module.DB_PATH = original_path
 
 
@@ -55,8 +98,19 @@ def admin_user(db_initialized):
     sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from services.usuarios import crear_usuario
-    
-    user_id = crear_usuario("admin_test", "Prueba123!", "admin", debe_cambiar_password=False)
+    try:
+        user = crear_usuario("admin_test", "Prueba123!", "admin", debe_cambiar_password=False)
+        user_id = user['id']
+    except Exception:
+        # Si ya existe, leerlo directamente desde la DB de pruebas
+        import sqlite3
+        conexion = sqlite3.connect(db_initialized)
+        cur = conexion.cursor()
+        cur.execute("SELECT id FROM usuarios WHERE username = ?", ("admin_test",))
+        row = cur.fetchone()
+        conexion.close()
+        user_id = row[0] if row else None
+
     return {"id": user_id, "username": "admin_test", "password": "Prueba123!", "rol": "admin"}
 
 
@@ -67,8 +121,18 @@ def operador_user(db_initialized):
     sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from services.usuarios import crear_usuario
-    
-    user_id = crear_usuario("operador_test", "Prueba123!", "operador", debe_cambiar_password=False)
+    try:
+        user = crear_usuario("operador_test", "Prueba123!", "operador", debe_cambiar_password=False)
+        user_id = user['id']
+    except Exception:
+        import sqlite3
+        conexion = sqlite3.connect(db_initialized)
+        cur = conexion.cursor()
+        cur.execute("SELECT id FROM usuarios WHERE username = ?", ("operador_test",))
+        row = cur.fetchone()
+        conexion.close()
+        user_id = row[0] if row else None
+
     return {"id": user_id, "username": "operador_test", "password": "Prueba123!", "rol": "operador"}
 
 
@@ -89,7 +153,7 @@ def test_objetivo(db_initialized, admin_user):
         VALUES (?, ?)
     """, ("Objetivo Test", "1,2,3,4,5"))
     
-    conectar.commit()
+    conexion.commit()
     obj_id = cursor.lastrowid
     conexion.close()
     

@@ -264,6 +264,11 @@ class CacheInteligente:
             @wraps(func)
             def wrapper(*args, **kwargs):
                 clave = f"{func.__name__}:{args}:{kwargs}"
+                try:
+                    from database import db as db_module
+                    clave = f"{db_module.DB_PATH}:{clave}"
+                except Exception:
+                    pass
 
                 valor = self.get(clave)
                 if valor is not None:

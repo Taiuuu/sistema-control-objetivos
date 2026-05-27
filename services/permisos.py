@@ -102,7 +102,19 @@ def tiene_permiso(permiso: str) -> bool:
     Returns:
         True si tiene el permiso, False si no
     """
-    rol_actual = get_rol()
+    # Intentar extraer rol desde JWT si estamos en contexto de Flask
+    rol_actual = None
+    try:
+        from flask_jwt_extended import get_jwt
+        claims = get_jwt()
+        rol_actual = claims.get('rol') or claims.get('role')
+    except Exception:
+        pass
+
+    # Si no hay rol en JWT, caer back al gestor de sesión global
+    if not rol_actual:
+        rol_actual = get_rol()
+
     if not rol_actual:
         return False
 

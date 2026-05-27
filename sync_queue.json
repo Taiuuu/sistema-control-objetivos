@@ -5099,6 +5099,125 @@
       "timestamp": 1779817776.8363929,
       "intentos": 0,
       "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779888456_277162660204722866",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-04-23",
+        "hora": "14:30",
+        "turno": "diurno",
+        "supervisor_id": 1,
+        "objetivo_id": 1,
+        "notas": "Prueba de sincronización",
+        "fecha_operativa": "2026-04-23"
+      },
+      "timestamp": 1779888456.6730819,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779888736_8032710114638706969",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-04-23",
+        "hora": "14:30",
+        "turno": "diurno",
+        "supervisor_id": 1,
+        "objetivo_id": 1,
+        "notas": "Prueba de sincronización",
+        "fecha_operativa": "2026-04-23"
+      },
+      "timestamp": 1779888736.4062366,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779889171_-9047793889554454139",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-04-23",
+        "hora": "14:30",
+        "turno": "diurno",
+        "supervisor_id": 1,
+        "objetivo_id": 1,
+        "notas": "Prueba de sincronización",
+        "fecha_operativa": "2026-04-23"
+      },
+      "timestamp": 1779889171.1788404,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779889377_-1029910552834744199",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-04-23",
+        "hora": "14:30",
+        "turno": "diurno",
+        "supervisor_id": 1,
+        "objetivo_id": 1,
+        "notas": "Prueba de sincronización",
+        "fecha_operativa": "2026-04-23"
+      },
+      "timestamp": 1779889377.198301,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779889602_-5136631336371701552",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-04-23",
+        "hora": "14:30",
+        "turno": "diurno",
+        "supervisor_id": 1,
+        "objetivo_id": 1,
+        "notas": "Prueba de sincronización",
+        "fecha_operativa": "2026-04-23"
+      },
+      "timestamp": 1779889602.4468021,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779889774_278894633078653486",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-04-23",
+        "hora": "14:30",
+        "turno": "diurno",
+        "supervisor_id": 1,
+        "objetivo_id": 1,
+        "notas": "Prueba de sincronización",
+        "fecha_operativa": "2026-04-23"
+      },
+      "timestamp": 1779889774.4279382,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779890233_4074398758472972090",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-04-23",
+        "hora": "14:30",
+        "turno": "diurno",
+        "supervisor_id": 1,
+        "objetivo_id": 1,
+        "notas": "Prueba de sincronización",
+        "fecha_operativa": "2026-04-23"
+      },
+      "timestamp": 1779890233.3030663,
+      "intentos": 0,
+      "ultimo_error": null
     }
   ],
   "ultima_sync": null

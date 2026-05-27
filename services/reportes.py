@@ -314,9 +314,18 @@ def generar_reporte_mensual(anio: int, mes: int) -> Dict[str, Any]:
                FROM objetivos ORDER BY nombre"""
         )
         
+        reporte = {
+            'anio': anio,
+            'mes': mes,
+            'periodo': f"{mes:02d}/{anio}",
+            'total_dias': total_dias,
+            'objetivos': [],
+            'cumplimiento_total': 0.0
+        }
+
         if not objetivos:
             logger.warning(f"No hay objetivos para reporte {mes}/{anio}")
-            raise DatosInsuficientesReporte("No hay objetivos en el sistema")
+            return reporte
         
         # Obtener todas las pasadas del mes en una sola query (optimización)
         query_pasadas = """
@@ -389,7 +398,9 @@ def generar_reporte_mensual(anio: int, mes: int) -> Dict[str, Any]:
                 'dias_esperados': dias_esperados,
                 'dias_con_pasada': dias_con_pasada,
                 'dias_sin_pasada': dias_esperados - dias_con_pasada,
-                'cumplimiento_porcentaje': round(cumplimiento, 1)
+                'dias_sin_control': dias_esperados - dias_con_pasada,
+                'cumplimiento_porcentaje': round(cumplimiento, 1),
+                'cumplimiento': round(cumplimiento, 1)
             })
         
         # Cumplimiento total

@@ -3,23 +3,11 @@
 # Gestión de temas de la aplicación
 # =============================================================================
 
-# Estado global del tema
-tema_actual = "oscuro"
-
-import json
-from pathlib import Path
-from typing import Optional
-
-# =============================================================================
-# VESP Organizations - Sistema de Control de Objetivos
-# Gestión de temas de la aplicación
-# =============================================================================
-
+import hashlib
 import json
 import os
-import hashlib
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List, Optional
 
 # =============================================================================
 # CONFIGURACIÓN DE TEMAS
@@ -286,7 +274,6 @@ def obtener_tema_manager() -> TemaManager:
     if _tema_manager is None:
         _tema_manager = TemaManager()
     return _tema_manager
-
 # =============================================================================
 # FUNCIONES DE ACCESO RÁPIDO (LEGACY)
 # =============================================================================
@@ -344,11 +331,6 @@ def obtener_preview_tema(nombre_tema: str) -> Optional[Dict[str, Any]]:
     """Obtiene preview de un tema."""
     manager = obtener_tema_manager()
     return manager.obtener_preview_tema(nombre_tema)
-
-def obtener_tema_actual():
-    """Retorna el tema actual de la aplicación."""
-    return obtener_tema_manager().tema_actual
-
 
 def establecer_tema_actual(tema):
     """Establece el tema actual de la aplicación."""

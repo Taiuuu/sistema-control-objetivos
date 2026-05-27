@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 import sqlite3
 import bcrypt
-from database.db import DB_PATH
+from database import db as db_module
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -16,7 +16,7 @@ def _verificar_usuario(usuario: str, contrasena: str) -> dict:
     Verifica credenciales contra la base de datos.
     Returns: dict con 'valido', 'usuario_id', 'rol', 'mensaje'
     """
-    conexion = sqlite3.connect(DB_PATH)
+    conexion = sqlite3.connect(db_module.DB_PATH)
     cursor = conexion.cursor()
     
     try:
@@ -51,9 +51,10 @@ def login():
     """
     Endpoint de login con validación de contraseña.
     """
-    data = request.get_json()
-    usuario = data.get('usuario', '')
-    contrasena = data.get('contrasena', '')
+    data = request.get_json() or {}
+    # Accept both Spanish and English keys for compatibility with tests/clients
+    usuario = data.get('usuario') or data.get('username') or ''
+    contrasena = data.get('contrasena') or data.get('password') or ''
 
     if not usuario or not contrasena:
         return jsonify({'error': 'Usuario y contraseña requeridos'}), 400
@@ -75,6 +76,7 @@ def login():
     
     return jsonify({
         'access_token': access_token,
+        'token_type': 'Bearer',
         'username': resultado['username'],
         'rol': resultado['rol'],
         'debe_cambiar_password': resultado['debe_cambiar_password']

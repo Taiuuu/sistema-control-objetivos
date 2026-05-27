@@ -12,13 +12,13 @@ class TestCrearUsuario:
     
     def test_crear_usuario_operador(self, db_initialized):
         """Debe crear un usuario operador correctamente."""
-        user_id = crear_usuario("nuevo_user", "Contrasena123!", "operador", debe_cambiar_password=False)
+        usuario = crear_usuario("nuevo_user", "Contrasena123!", "operador", debe_cambiar_password=False)
         
-        assert user_id > 0
+        assert usuario['id'] > 0
         
         conexion = sqlite3.connect(db_initialized)
         cursor = conexion.cursor()
-        cursor.execute("SELECT username, rol, debe_cambiar_password FROM usuarios WHERE id = ?", (user_id,))
+        cursor.execute("SELECT username, rol, debe_cambiar_password FROM usuarios WHERE id = ?", (usuario['id'],))
         resultado = cursor.fetchone()
         conexion.close()
         
@@ -29,13 +29,13 @@ class TestCrearUsuario:
     
     def test_crear_usuario_admin(self, db_initialized):
         """Debe crear un usuario admin correctamente."""
-        user_id = crear_usuario("admin_nuevo", "Contrasena123!", "admin", debe_cambiar_password=False)
+        usuario = crear_usuario("admin_nuevo", "Contrasena123!", "admin", debe_cambiar_password=False)
         
-        assert user_id > 0
+        assert usuario['id'] > 0
         
         conexion = sqlite3.connect(db_initialized)
         cursor = conexion.cursor()
-        cursor.execute("SELECT rol FROM usuarios WHERE id = ?", (user_id,))
+        cursor.execute("SELECT rol FROM usuarios WHERE id = ?", (usuario['id'],))
         resultado = cursor.fetchone()
         conexion.close()
         
@@ -50,11 +50,11 @@ class TestCrearUsuario:
     
     def test_contrasena_hasheada(self, db_initialized):
         """La contraseña debe guardarse hasheada."""
-        user_id = crear_usuario("usuario_secured", "Contrasena123!", "operador")
+        usuario = crear_usuario("usuario_secured", "Contrasena123!", "operador")
         
         conexion = sqlite3.connect(db_initialized)
         cursor = conexion.cursor()
-        cursor.execute("SELECT password FROM usuarios WHERE id = ?", (user_id,))
+        cursor.execute("SELECT password FROM usuarios WHERE id = ?", (usuario['id'],))
         password_hash = cursor.fetchone()[0]
         conexion.close()
         
