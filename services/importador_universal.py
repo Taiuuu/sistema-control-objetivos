@@ -15,7 +15,6 @@ import pandas as pd
 from openpyxl import load_workbook
 
 from database.gestor_db import gestor_db
-from models.supervisores import agregar_supervisor
 from services.gestor_turnos import GestorTurnos
 from services.sync_manager import get_sync_manager
 
@@ -68,32 +67,103 @@ class ImportadorUniversal:
         ruta_archivo: str,
         sheet_names: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """Previsualiza un archivo Excel y detecta si es CONTROL_RECORRIDOS."""
+        """
+        Previsualiza un archivo Excel y detecta si es CONTROL_RECORRIDOS.
+
+        NUEVA LÓGICA:
+        - NO resuelve automáticamente objetivos
+        - NO resuelve automáticamente supervisores
+        - Devuelve TODOS los detectados para mapeo manual
+        """
         try:
-            wb = load_workbook(ruta_archivo, data_only=True)
+
+            wb = load_workbook(
+                ruta_archivo,
+                data_only=True,
+            )
+
             sheet_options = self._listar_sheet_options(wb)
+
             if not sheet_options:
                 return {
                     'tipo': 'legacy',
                     'registros': [],
+                    'objetivos_detectados': [],
+                    'supervisores_detectados': [],
                     'objetivos_no_resueltos': [],
                     'supervisores_no_resueltos': [],
                     'sheet_options': [],
                 }
 
-            control = self._parsear_control_recorridos(wb, sheet_names=sheet_names)
-            control['sheet_options'] = sheet_options
-            return control
-        except Exception:
-            pass
+            control = self._parsear_control_recorridos(
+                wb,
+                sheet_names=sheet_names,
+            )
 
-        return {
-            'tipo': 'legacy',
-            'registros': [],
-            'objetivos_no_resueltos': [],
-            'supervisores_no_resueltos': [],
-            'sheet_options': [],
-        }
+            registros = control.get('registros', [])
+
+            # =====================================================
+            # EXTRAER TODOS LOS OBJETIVOS DETECTADOS
+            # =====================================================
+
+            objetivos_detectados = sorted({
+                r.objetivo.strip()
+                for r in registros
+                if r.objetivo and str(r.objetivo).strip()
+            })
+
+            # =====================================================
+            # EXTRAER TODOS LOS SUPERVISORES DETECTADOS
+            # =====================================================
+
+            supervisores_detectados = sorted({
+                r.supervisor.strip()
+                for r in registros
+                if r.supervisor and str(r.supervisor).strip()
+            })
+
+            # =====================================================
+            # DETERMINAR OBJETIVOS Y SUPERVISORES NO RESUELTOS
+            # =====================================================
+
+            objetivos_no_resueltos = [
+                nombre
+                for nombre in objetivos_detectados
+                if self._obtener_objetivo_id(nombre) is None
+            ]
+
+            supervisores_no_resueltos = [
+                nombre
+                for nombre in supervisores_detectados
+                if self._obtener_supervisor_id(nombre) is None
+            ]
+
+            # =====================================================
+            # RESPUESTA FINAL
+            # =====================================================
+
+            return {
+                'tipo': 'control_recorridos',
+                'registros': registros,
+                'objetivos_detectados': objetivos_detectados,
+                'supervisores_detectados': supervisores_detectados,
+                'objetivos_no_resueltos': objetivos_no_resueltos,
+                'supervisores_no_resueltos': supervisores_no_resueltos,
+                'sheet_options': sheet_options,
+            }
+
+        except Exception as e:
+
+            return {
+                'tipo': 'legacy',
+                'registros': [],
+                'objetivos_detectados': [],
+                'supervisores_detectados': [],
+                'objetivos_no_resueltos': [],
+                'supervisores_no_resueltos': [],
+                'sheet_options': [],
+                'error': str(e),
+            }
 
     def importar_excel(self, ruta_archivo: str) -> ResultadoImportacion:
         """Importa datos desde archivo Excel."""
@@ -149,20 +219,12 @@ class ImportadorUniversal:
     def importar_control_recorridos(
         self,
         ruta_archivo: str,
-        objetivo_mapeo: Optional[Dict[str, int]] = None,
+        objetivo_mapeo: Dict[str, int],
+        supervisor_mapeo: Dict[str, int],
         progress_callback: Optional[Callable[[int, int], None]] = None,
         sheet_names: Optional[List[str]] = None,
         sheet_turno_map: Optional[Dict[str, str]] = None,
     ) -> ResultadoImportacion:
-        """
-        Importa un archivo CONTROL_RECORRIDOS con mapeo opcional de objetivos.
-        
-        IMPORTANTE:
-        - Si un objetivo fue mapeado manualmente, NO debe volver a validarse.
-        - Evita duplicar validaciones entre hojas día/noche.
-        """
-
-        objetivo_mapeo = objetivo_mapeo or {}
 
         preview = self.previsualizar_archivo(
             ruta_archivo,
@@ -174,57 +236,30 @@ class ImportadorUniversal:
 
         registros = preview.get('registros', [])
 
-        # =========================================================
-        # Aplicar mapeo de turnos por hoja si existe
-        # =========================================================
+        # =====================================================
+        # Aplicar turno manual por hoja
+        # =====================================================
+
         if sheet_turno_map:
             for r in registros:
-                if (r.sheet_title and r.turno is None) or (r.turno in (None, '')):
-                    mapped = sheet_turno_map.get(r.sheet_title)
+
+                if (
+                    (r.sheet_title and r.turno is None)
+                    or
+                    (r.turno in (None, ''))
+                ):
+
+                    mapped = sheet_turno_map.get(
+                        r.sheet_title
+                    )
+
                     if mapped:
                         r.turno = mapped
 
-        # =========================================================
-        # FILTRAR objetivos ya resueltos manualmente
-        # =========================================================
-        objetivos_pendientes = set()
-
-        for r in registros:
-
-            # Si ya existe en el mapeo manual -> NO volver a validar
-            if r.objetivo in objetivo_mapeo:
-                continue
-
-            # Si existe automáticamente en DB -> tampoco validar
-            objetivo_existente = self._obtener_objetivo_id(r.objetivo)
-
-            if objetivo_existente is not None:
-                continue
-
-            objetivos_pendientes.add(r.objetivo)
-
-        # =========================================================
-        # Si todavía quedan objetivos sin resolver -> bloquear
-        # =========================================================
-        if objetivos_pendientes:
-            return ResultadoImportacion(
-                total_registros=len(registros),
-                registros_validos=0,
-                registros_errores=len(objetivos_pendientes),
-                registros_duplicados=0,
-                errores=[
-                    f"Objetivos no resueltos: {', '.join(sorted(objetivos_pendientes))}"
-                ],
-                duplicados=[],
-                exitoso=False,
-            )
-
-        # =========================================================
-        # IMPORTAR DIRECTAMENTE
-        # =========================================================
         return self.importar_registros(
             registros,
             objetivo_mapeo=objetivo_mapeo,
+            supervisor_mapeo=supervisor_mapeo,
             progress_callback=progress_callback,
         )
 
@@ -232,10 +267,17 @@ class ImportadorUniversal:
         self,
         registros: List[RegistroImportacion],
         objetivo_mapeo: Optional[Dict[str, int]] = None,
+        supervisor_mapeo: Optional[Dict[str, int]] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> ResultadoImportacion:
-        """Procesa una lista de registros ya normalizados con progreso opcional."""
-        return self._procesar_registros(registros, objetivo_mapeo=objetivo_mapeo or {}, progress_callback=progress_callback)
+        """Procesa una lista de registros ya normalizados."""
+
+        return self._procesar_registros(
+            registros,
+            objetivo_mapeo=objetivo_mapeo or {},
+            supervisor_mapeo=supervisor_mapeo or {},
+            progress_callback=progress_callback,
+        )
 
     def importar_json_tablet(self, ruta_archivo: str, progress_callback: Optional[Callable[[int, int], None]] = None) -> ResultadoImportacion:
         """Importa datos desde archivo JSON de tablet."""
@@ -301,53 +343,129 @@ class ImportadorUniversal:
                 exitoso=False,
             )
 
-    def _procesar_registros(self, registros: List[RegistroImportacion], objetivo_mapeo: Optional[Dict[str, int]] = None, progress_callback: Optional[Callable[[int, int], None]] = None) -> ResultadoImportacion:
-        """Procesa una lista de registros y los importa."""
+    def _procesar_registros(
+        self,
+        registros: List[RegistroImportacion],
+        objetivo_mapeo: Optional[Dict[str, int]] = None,
+        supervisor_mapeo: Optional[Dict[str, int]] = None,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+    ) -> ResultadoImportacion:
+        """Procesa registros importados."""
+
         total = len(registros)
+
         validos = 0
+
         errores = []
+
         duplicados = []
+
         objetivo_mapeo = objetivo_mapeo or {}
+
+        supervisor_mapeo = supervisor_mapeo or {}
+
         procesados = 0
 
         abort = False
+
         for registro in registros:
+
             try:
-                supervisor_id = self._obtener_supervisor_id(registro.supervisor)
-                if registro.objetivo in objetivo_mapeo:
-                    objetivo_id = objetivo_mapeo[registro.objetivo]
-                else:
-                    objetivo_id = self._obtener_objetivo_id(registro.objetivo)
+
+                supervisor_id = supervisor_mapeo.get(
+                    registro.supervisor
+                )
+
+                objetivo_id = objetivo_mapeo.get(
+                    registro.objetivo
+                )
 
                 if not supervisor_id:
-                    errores.append(f"Supervisor no encontrado: {registro.supervisor}")
+
+                    errores.append(
+                        f"Supervisor sin mapear: "
+                        f"{registro.supervisor}"
+                    )
+
                     continue
 
                 if not objetivo_id:
-                    errores.append(f"Objetivo no encontrado: {registro.objetivo}")
+
+                    errores.append(
+                        f"Objetivo sin mapear: "
+                        f"{registro.objetivo}"
+                    )
+
                     continue
 
-                if registro.turno not in ['diurno', 'nocturno']:
-                    errores.append(f"Turno inválido: {registro.turno}")
+                if registro.turno not in [
+                    'diurno',
+                    'nocturno',
+                ]:
+
+                    errores.append(
+                        f"Turno inválido: "
+                        f"{registro.turno}"
+                    )
+
                     continue
 
                 try:
-                    fecha = datetime.strptime(registro.fecha, "%Y-%m-%d").date()
-                    hora = datetime.strptime(registro.hora, "%H:%M").time()
-                    es_control_recorridos = bool(registro.sheet_title)
+
+                    fecha = datetime.strptime(
+                        registro.fecha,
+                        "%Y-%m-%d"
+                    ).date()
+
+                    hora = datetime.strptime(
+                        registro.hora,
+                        "%H:%M"
+                    ).time()
+
+                    es_control_recorridos = bool(
+                        registro.sheet_title
+                    )
+
                     if es_control_recorridos:
+
                         fecha_operativa = fecha
+
                     else:
-                        fecha_operativa = GestorTurnos.calcular_fecha_operativa(fecha, hora, registro.turno)
+
+                        fecha_operativa = (
+                            GestorTurnos
+                            .calcular_fecha_operativa(
+                                fecha,
+                                hora,
+                                registro.turno,
+                            )
+                        )
+
                 except ValueError as e:
-                    errores.append(f"Error en formato de fecha/hora ({registro.fecha} {registro.hora}): {e}")
+
+                    errores.append(
+                        f"Error en formato fecha/hora "
+                        f"({registro.fecha} "
+                        f"{registro.hora}): {e}"
+                    )
+
                     continue
 
-                if self._es_duplicado(supervisor_id, objetivo_id, fecha_operativa.strftime('%Y-%m-%d'), registro.hora, registro.turno):
-                    duplicados.append(registro.to_dict())
+                if self._es_duplicado(
+                    supervisor_id,
+                    objetivo_id,
+                    fecha_operativa.strftime('%Y-%m-%d'),
+                    registro.hora,
+                    registro.turno,
+                ):
+
+                    duplicados.append(
+                        registro.to_dict()
+                    )
+
                     continue
 
-                if self.sync_manager.crear_pasada_offline(
+                creado = self.sync_manager.crear_pasada_offline(
                     registro.fecha,
                     registro.hora,
                     registro.turno,
@@ -355,22 +473,47 @@ class ImportadorUniversal:
                     objetivo_id,
                     registro.notas,
                     validar_turno=not es_control_recorridos,
-                ):
+                )
+
+                if creado:
+
                     validos += 1
+
                 else:
-                    errores.append(f"Error creando pasada: {registro.supervisor} - {registro.objetivo}")
+
+                    errores.append(
+                        f"Error creando pasada: "
+                        f"{registro.supervisor} - "
+                        f"{registro.objetivo}"
+                    )
 
             except Exception as e:
-                errores.append(f"Error procesando registro: {str(e)}")
+
+                errores.append(
+                    f"Error procesando registro: {str(e)}"
+                )
+
             finally:
+
                 procesados += 1
+
                 try:
+
                     if progress_callback:
-                        progress_callback(procesados, total)
+
+                        progress_callback(
+                            procesados,
+                            total,
+                        )
+
                 except Exception:
-                    # Si el callback lanza (por ejemplo cancelación), abortamos el procesamiento
-                    errores.append("Importación cancelada por usuario.")
+
+                    errores.append(
+                        "Importación cancelada por usuario."
+                    )
+
                     abort = True
+
             if abort:
                 break
 
@@ -381,7 +524,7 @@ class ImportadorUniversal:
             registros_duplicados=len(duplicados),
             errores=errores,
             duplicados=duplicados,
-            exitoso=len(errores) == 0,
+            exitoso=(len(errores) == 0),
         )
 
     def _parsear_control_recorridos(
@@ -390,43 +533,67 @@ class ImportadorUniversal:
         sheet_names: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Parsea un workbook CONTROL_RECORRIDOS y devuelve registros normalizados."""
+
         if isinstance(workbook_or_path, str):
             workbook = load_workbook(workbook_or_path, data_only=True)
         else:
             workbook = workbook_or_path
 
         registros = []
-        objetivos_no_resueltos = set()
-        sheet_names_set = set(sheet_names) if sheet_names else None
+
+        sheet_names_set = (
+            set(sheet_names)
+            if sheet_names
+            else None
+        )
 
         for ws in workbook.worksheets:
+
             try:
-                sheet_date, turno = self._parsear_nombre_sheet(ws.title)
-                # Permitir títulos literales tipo "CONTROL RECORRIDOS" (sin fecha/turno)
-                if (not sheet_date or turno is None) and not re.search(r'control', ws.title, re.IGNORECASE):
+                sheet_date, turno = self._parsear_nombre_sheet(
+                    ws.title
+                )
+
+                if (
+                    (not sheet_date or turno is None)
+                    and
+                    not re.search(
+                        r'control',
+                        ws.title,
+                        re.IGNORECASE,
+                    )
+                ):
                     continue
-                # Si el nombre es literal "CONTROL..." usamos fecha hoy y turno comodín (None)
+
                 if not sheet_date:
                     sheet_date = date.today()
 
-                if sheet_names_set is not None and ws.title not in sheet_names_set:
+                if (
+                    sheet_names_set is not None
+                    and ws.title not in sheet_names_set
+                ):
                     continue
 
-                hoja_registros = self._parsear_hoja_control_recorridos(ws, sheet_date, turno)
+                hoja_registros = (
+                    self._parsear_hoja_control_recorridos(
+                        ws,
+                        sheet_date,
+                        turno,
+                    )
+                )
+
                 if not hoja_registros:
                     continue
 
                 registros.extend(hoja_registros)
-                for registro in hoja_registros:
-                    if self._obtener_objetivo_id(registro.objetivo) is None:
-                        objetivos_no_resueltos.add(registro.objetivo)
+
             except Exception:
                 continue
 
         return {
             'tipo': 'control_recorridos',
             'registros': registros,
-            'objetivos_no_resueltos': sorted(objetivos_no_resueltos),
+            'objetivos_no_resueltos': [],
             'supervisores_no_resueltos': [],
         }
 
@@ -863,26 +1030,36 @@ class ImportadorUniversal:
 
         raise ValueError(f"Tipo de hora no soportado: {type(hora)}")
 
-    def _obtener_supervisor_id(self, nombre_supervisor: str) -> Optional[int]:
-        """Obtiene o crea un supervisor según su nombre."""
+    def _obtener_supervisor_id(
+        self,
+        nombre_supervisor: str,
+    ) -> Optional[int]:
+        """Busca supervisor existente por nombre normalizado."""
+
         if not nombre_supervisor:
             return None
 
         nombre = str(nombre_supervisor).strip()
-        if not nombre or nombre.lower() in ('none', 'n/a'):
+
+        if not nombre:
             return None
 
         normalized = self._normalizar_texto(nombre)
-        filas = gestor_db.ejecutar("SELECT id, nombre FROM supervisores")
+
+        filas = gestor_db.ejecutar(
+            "SELECT id, nombre FROM supervisores"
+        )
+
         for fila in filas:
-            if self._normalizar_texto(fila['nombre']) == normalized:
+
+            if (
+                self._normalizar_texto(fila['nombre'])
+                == normalized
+            ):
+
                 return int(fila['id'])
 
-        try:
-            supervisor = agregar_supervisor(nombre)
-            return int(supervisor.id)
-        except Exception:
-            return None
+        return None
 
     def _obtener_objetivo_id(self, nombre_objetivo: str) -> Optional[int]:
         """Busca un objetivo existente por nombre normalizado."""

@@ -3,7 +3,7 @@
 # Pantalla para importar datos desde Excel existente
 # =============================================================================
 
-from datetime import date
+from datetime import date, datetime
 
 from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -31,18 +31,18 @@ from models.objetivos import agregar_objetivo, listar_objetivos
 from services.importador_universal import get_importador
 from services.logger import registrar_accion
 from services.sesion import get_usuario_id
-from datetime import datetime
 
 
 class DialogoResolverObjetivos(QDialog):
-    """Dialogo para resolver objetivos importados que no existen aún."""
+    """Dialogo para resolver objetivos importados."""
 
-    def __init__(self, objetivos_faltantes, objetivos_existentes, parent=None):
+    def __init__(self, objetivos_faltantes, objetivos_existentes, initial_mapping=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Resolver objetivos importados")
         self.setMinimumWidth(700)
         self.objetivos_faltantes = objetivos_faltantes
         self.objetivos_existentes = objetivos_existentes
+        self.initial_mapping = initial_mapping or {}
         self.controles = []
 
         layout = QVBoxLayout(self)
@@ -54,20 +54,38 @@ class DialogoResolverObjetivos(QDialog):
         )
 
         form_layout = QFormLayout()
+        existing_names = [obj.nombre for obj in objetivos_existentes]
         for nombre in objetivos_faltantes:
             combo = QComboBox()
             combo.setEditable(True)
             combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-            completer = QCompleter([obj.nombre for obj in objetivos_existentes])
+            completer = QCompleter(existing_names)
             completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
             combo.setCompleter(completer)
-            combo.addItems([obj.nombre for obj in objetivos_existentes])
+            combo.addItems(existing_names)
             combo.addItem("-- Crear nuevo --")
-            combo.setCurrentIndex(0 if objetivos_existentes else combo.count() - 1)
+
+            mejor_coincidencia = self.initial_mapping.get(nombre)
+            if not mejor_coincidencia:
+                mejor_coincidencia = next(
+                    (
+                        obj.nombre
+                        for obj in objetivos_existentes
+                        if obj.nombre.strip().lower() == nombre.strip().lower()
+                    ),
+                    None,
+                )
+
+            if mejor_coincidencia:
+                combo.setCurrentText(mejor_coincidencia)
+            else:
+                combo.setCurrentIndex(combo.count() - 1)
 
             line_edit = QLineEdit()
             line_edit.setPlaceholderText("Nombre del nuevo objetivo")
-            line_edit.setVisible(False)
+            line_edit.setVisible(combo.currentText() == "-- Crear nuevo --")
+            if combo.currentText() == "-- Crear nuevo --":
+                line_edit.setText(nombre)
 
             combo.currentIndexChanged.connect(
                 lambda _=None, line=line_edit, combo=combo: self._alternar_linea(combo, line)
@@ -92,10 +110,21 @@ class DialogoResolverObjetivos(QDialog):
     def _alternar_linea(self, combo: QComboBox, line_edit: QLineEdit) -> None:
         line_edit.setVisible(combo.currentText() == "-- Crear nuevo --")
 
+    def _buscar_objetivo_por_nombre(self, nombre: str):
+        nombre_normalizado = str(nombre).strip().lower()
+        return next(
+            (
+                obj
+                for obj in self.objetivos_existentes
+                if obj.nombre.strip().lower() == nombre_normalizado
+            ),
+            None,
+        )
+
     def obtener_mapeo(self):
         mapeo = {}
         for nombre, combo, line_edit in self.controles:
-            seleccionado = combo.currentText()
+            seleccionado = combo.currentText().strip()
             if seleccionado == "-- Crear nuevo --":
                 nuevo_nombre = line_edit.text().strip()
                 if not nuevo_nombre:
@@ -109,10 +138,7 @@ class DialogoResolverObjetivos(QDialog):
                 mapeo[nombre] = objetivo.id
                 continue
 
-            objetivo = next(
-                (obj for obj in self.objetivos_existentes if obj.nombre == seleccionado),
-                None,
-            )
+            objetivo = self._buscar_objetivo_por_nombre(seleccionado)
             if objetivo is None:
                 raise ValueError(f"No se encontró el objetivo seleccionado: {seleccionado}")
             mapeo[nombre] = objetivo.id
@@ -186,12 +212,13 @@ class ImportWorker(QObject):
     finished = pyqtSignal(object)
     error = pyqtSignal(str)
 
-    def __init__(self, importador, ruta_archivo, sheet_names=None, objetivo_mapeo=None, sheet_turno_map=None):
+    def __init__(self, importador, ruta_archivo, sheet_names=None, objetivo_mapeo=None, supervisor_mapeo=None, sheet_turno_map=None):
         super().__init__()
         self.importador = importador
         self.ruta_archivo = ruta_archivo
         self.sheet_names = sheet_names
         self.objetivo_mapeo = objetivo_mapeo or {}
+        self.supervisor_mapeo = supervisor_mapeo or {}
         self.sheet_turno_map = sheet_turno_map or {}
         self.cancelled = False
 
@@ -205,6 +232,7 @@ class ImportWorker(QObject):
             resultado = self.importador.importar_control_recorridos(
                 self.ruta_archivo,
                 objetivo_mapeo=self.objetivo_mapeo,
+                supervisor_mapeo=self.supervisor_mapeo,
                 sheet_names=self.sheet_names,
                 sheet_turno_map=self.sheet_turno_map,
                 progress_callback=self._on_progress,
@@ -225,8 +253,11 @@ class ImportarExcel(QWidget):
         self._preview_thread = None
         self._preview_worker = None
         self._hoja_previsualizacion_pedida = None
+        self._last_preview = None
+        self._detected_objectives = []
         self.objetivo_mapeo = {}
         self.unresolved_objectives = []
+        self.sheet_turno_map = {}
         self.objetivos_pendientes_label = None
         self.objetivos_pendientes_lista = None
 
@@ -368,6 +399,25 @@ class ImportarExcel(QWidget):
         self._preview_thread = None
         self._preview_worker = None
 
+    def _reset_previsualizacion(self) -> None:
+        self.sheet_combo.blockSignals(True)
+        self.sheet_combo.clear()
+        self.sheet_combo.setEnabled(False)
+        self.boton_importar.setEnabled(False)
+        self.preview_table.setRowCount(0)
+        self._hoja_previsualizacion_pedida = None
+        self._detected_objectives = []
+        self.objetivo_mapeo = {}
+        self.unresolved_objectives = []
+        self._last_preview = None
+        self.objetivo_status.setText("No hay objetivos pendientes.")
+        self.boton_resolver_objetivos.setEnabled(False)
+        self._actualizar_objetivos_no_resueltos()
+        self._actualizar_resumen_objetivos([])
+        self._actualizar_resumen_detalle(0, 0, 0, 0, "")
+        self.errors_list.clear()
+        self.errors_list.setVisible(False)
+
     def _set_estado_previsualizacion(self, mensaje: str, color: str = "#a0a0a0") -> None:
         self.preview_status.setText(mensaje)
         self.preview_status.setStyleSheet(f"color: {color}; font-size: 11px;")
@@ -385,19 +435,8 @@ class ImportarExcel(QWidget):
             self._cargar_previsualizacion()
 
     def _cargar_previsualizacion(self) -> None:
-        self._limpiar_previsualizacion_thread()
-        self.sheet_combo.blockSignals(True)
-        self.sheet_combo.clear()
-        self.sheet_combo.setEnabled(False)
-        self.boton_importar.setEnabled(False)
-        self.preview_table.setRowCount(0)
-        self._hoja_previsualizacion_pedida = None
-        self.objetivo_mapeo = {}
-        self.unresolved_objectives = []
+        self._reset_previsualizacion()
         self.sheet_turno_map = {}
-        self._last_preview = None
-        self.objetivo_status.setText("No hay objetivos pendientes.")
-        self.boton_resolver_objetivos.setEnabled(False)
         self._set_estado_previsualizacion("Previsualizando archivo...", "#ffd166")
 
         if not self.ruta_archivo:
@@ -405,9 +444,18 @@ class ImportarExcel(QWidget):
             self.sheet_combo.blockSignals(False)
             return
 
+        self._iniciar_previsualizacion_thread()
+
+    def _iniciar_previsualizacion_thread(self, sheet_names=None) -> None:
+        self._limpiar_previsualizacion_thread()
         self._preview_token += 1
         token = self._preview_token
-        self._preview_worker = PreviewWorker(get_importador(), self.ruta_archivo, token=token)
+        self._preview_worker = PreviewWorker(
+            get_importador(),
+            self.ruta_archivo,
+            sheet_names=sheet_names,
+            token=token,
+        )
         self._preview_thread = QThread(self)
         self._preview_worker.moveToThread(self._preview_thread)
         self._preview_thread.started.connect(self._preview_worker.run)
@@ -420,9 +468,6 @@ class ImportarExcel(QWidget):
         self._preview_thread.finished.connect(self._preview_thread.deleteLater)
         self._preview_thread.start()
         self.sheet_combo.blockSignals(False)
-        self._actualizar_objetivos_no_resueltos()
-        self._actualizar_resumen_objetivos([])
-        self._actualizar_resumen_detalle(0, 0, 0, 0, "")
 
     def _solicitar_previsualizacion(self) -> None:
         if not self.ruta_archivo:
@@ -430,33 +475,14 @@ class ImportarExcel(QWidget):
 
         hoja_seleccionada = self.sheet_combo.currentData()
         self._hoja_previsualizacion_pedida = hoja_seleccionada
-        self._limpiar_previsualizacion_thread()
         self.boton_importar.setEnabled(False)
         self.preview_table.setRowCount(0)
-        self.objetivo_mapeo = {}
-        self.unresolved_objectives = []
         self.objetivo_status.setText("No hay objetivos pendientes.")
         self.boton_resolver_objetivos.setEnabled(False)
         self._set_estado_previsualizacion("Actualizando previsualización...", "#ffd166")
 
-        self._preview_token += 1
-        token = self._preview_token
         sheet_names = [hoja_seleccionada] if hoja_seleccionada else None
-        self._preview_worker = PreviewWorker(get_importador(), self.ruta_archivo, sheet_names=sheet_names, token=token)
-        self._preview_thread = QThread(self)
-        self._preview_worker.moveToThread(self._preview_thread)
-        self._preview_thread.started.connect(self._preview_worker.run)
-        self._preview_worker.finished.connect(self._on_preview_cargado)
-        self._preview_worker.error.connect(self._on_preview_error)
-        self._preview_worker.finished.connect(self._preview_thread.quit)
-        self._preview_worker.error.connect(self._preview_thread.quit)
-        self._preview_worker.finished.connect(self._preview_worker.deleteLater)
-        self._preview_worker.error.connect(self._preview_worker.deleteLater)
-        self._preview_thread.finished.connect(self._preview_thread.deleteLater)
-        self._preview_thread.start()
-        self._actualizar_objetivos_no_resueltos()
-        self._actualizar_resumen_objetivos([])
-        self._actualizar_resumen_detalle(0, 0, 0, 0, "")
+        self._iniciar_previsualizacion_thread(sheet_names=sheet_names)
 
     def _on_preview_cargado(self, token: int, preview: dict) -> None:
         if token != self._preview_token:
@@ -481,6 +507,7 @@ class ImportarExcel(QWidget):
 
         opciones = preview.get("sheet_options", [])
         self._last_preview = preview
+        self._detected_objectives = preview.get("objetivos_detectados", [])
         if not opciones:
             self.label_seleccion.setText("No se encontraron hojas válidas en el archivo.")
             self._set_estado_previsualizacion("No se pudieron detectar hojas con el formato esperado.", "#ff8a80")
@@ -523,9 +550,9 @@ class ImportarExcel(QWidget):
             registros = [registro for registro in registros if getattr(registro, "sheet_title", None) == hoja_seleccionada]
 
         if not registros:
-            self.unresolved_objectives = []
-            self.objetivo_status.setText("No hay objetivos pendientes.")
-            self.boton_resolver_objetivos.setEnabled(False)
+            self.unresolved_objectives = list(preview.get("objetivos_no_resueltos", []))
+            self.objetivo_status.setText("No hay registros para previsualizar.")
+            self.boton_resolver_objetivos.setEnabled(bool(self._detected_objectives))
             self._set_estado_previsualizacion(
                 "La hoja seleccionada no tiene registros detectados para previsualizar.",
                 "#ff8a80",
@@ -533,8 +560,6 @@ class ImportarExcel(QWidget):
             self.preview_table.setRowCount(0)
             self._actualizar_objetivos_no_resueltos()
             self._actualizar_resumen_objetivos([])
-            objetivos_no_resueltos = preview.get("objetivos_no_resueltos", [])
-            self.unresolved_objectives = list(objetivos_no_resueltos)
             self._actualizar_resumen_detalle(
                 len(registros),
                 0,
@@ -542,12 +567,13 @@ class ImportarExcel(QWidget):
                 len(preview.get('sheet_options', [])),
                 hoja_seleccionada or "",
             )
-            # validar registros para mostrar errores por fila
             self._validar_registros_preview(registros)
             self.boton_importar.setEnabled(True)
             return
 
         self._renderizar_tabla_previsualizacion(registros, hoja_seleccionada)
+        objetivos_no_resueltos = preview.get("objetivos_no_resueltos", [])
+        self.unresolved_objectives = list(objetivos_no_resueltos)
         self._actualizar_resumen_detalle(
             len(registros),
             len(set(registro.objetivo for registro in registros)),
@@ -558,8 +584,6 @@ class ImportarExcel(QWidget):
         self._actualizar_resumen_objetivos(registros)
         # validar registros para mostrar errores por fila
         self._validar_registros_preview(registros)
-        objetivos_no_resueltos = preview.get("objetivos_no_resueltos", [])
-        self.unresolved_objectives = list(objetivos_no_resueltos)
         if self.unresolved_objectives:
             self.objetivo_status.setText(
                 f"Objetivos pendientes de resolución: {len(self.unresolved_objectives)}"
@@ -568,9 +592,11 @@ class ImportarExcel(QWidget):
             self.boton_resolver_objetivos.setEnabled(True)
             self.boton_importar.setEnabled(False)
         else:
-            self.objetivo_status.setText("No hay objetivos pendientes.")
+            self.objetivo_status.setText(
+                f"Objetivos detectados: {len(self._detected_objectives)}"
+            )
             self.objetivo_status.setStyleSheet("color: #d0d0d0; font-size: 11px;")
-            self.boton_resolver_objetivos.setEnabled(False)
+            self.boton_resolver_objetivos.setEnabled(bool(self._detected_objectives))
             self.boton_importar.setEnabled(True)
         self._actualizar_objetivos_no_resueltos()
         self._set_estado_previsualizacion(
@@ -618,31 +644,44 @@ class ImportarExcel(QWidget):
                 self.preview_table.setItem(100, columna, QTableWidgetItem(""))
 
     def _resolver_objetivos(self) -> None:
-        if not self.unresolved_objectives:
-            self.objetivo_status.setText("No hay objetivos pendientes.")
+        if not self._detected_objectives:
+            self.objetivo_status.setText("No hay objetivos detectados.")
             self.boton_resolver_objetivos.setEnabled(False)
             return
 
         objetivos_existentes = listar_objetivos()
+        initial_mapping = {
+            nombre: next(
+                (
+                    obj.nombre
+                    for obj in objetivos_existentes
+                    if obj.nombre.strip().lower() == nombre.strip().lower()
+                ),
+                None,
+            )
+            for nombre in self._detected_objectives
+        }
+
         dialogo = DialogoResolverObjetivos(
-            self.unresolved_objectives,
+            self._detected_objectives,
             objetivos_existentes,
+            initial_mapping=initial_mapping,
             parent=self,
         )
         if dialogo.exec() != QDialog.DialogCode.Accepted:
             return
 
         self.objetivo_mapeo = dialogo.obtener_mapeo()
-        incompletos = [o for o in self.unresolved_objectives if o not in self.objetivo_mapeo]
+        incompletos = [o for o in self._detected_objectives if o not in self.objetivo_mapeo]
         if incompletos:
             self.unresolved_objectives = incompletos
             self.objetivo_status.setText(
                 f"Faltan {len(incompletos)} objetivos por resolver."
             )
             self.objetivo_status.setStyleSheet("color: #ff8a80; font-size: 11px;")
+            self.boton_importar.setEnabled(False)
         else:
             self.unresolved_objectives = []
-
             self.objetivo_status.setText(
                 "Todos los objetivos pendientes fueron resueltos."
             )
@@ -698,13 +737,14 @@ class ImportarExcel(QWidget):
             self.boton_importar.setEnabled(False)
 
             # Preparar mapeo de turnos desde la UI (si existe)
-            sheet_turno_map = self.sheet_turno_map if hasattr(self, 'sheet_turno_map') else None
+            sheet_turno_map = self.sheet_turno_map
 
             self.import_worker = ImportWorker(
                 importador,
                 self.ruta_archivo,
                 sheet_names=[hoja_seleccionada] if hoja_seleccionada else None,
                 objetivo_mapeo=self.objetivo_mapeo,
+                supervisor_mapeo={},
                 sheet_turno_map=sheet_turno_map,
             )
             self.import_thread = QThread(self)
@@ -723,6 +763,38 @@ class ImportarExcel(QWidget):
         except Exception as e:
             self.log.append(f"✗ Error: {e}")
             QMessageBox.critical(self, "Error", f"No se pudo importar: {e}")
+
+    def _handle_import_result(self, resultado) -> None:
+        self.progress_bar.setVisible(False)
+        self.boton_cancelar_importacion.setVisible(False)
+        self.boton_importar.setEnabled(True)
+
+        self.log.append(f"✓ Importados: {resultado.registros_validos}")
+        self.log.append(f"✓ Duplicados omitidos: {resultado.registros_duplicados}")
+        if resultado.errores:
+            self.log.append("⚠ Errores:")
+            for error in resultado.errores[:8]:
+                self.log.append(f"  • {error}")
+
+        if resultado.registros_validos > 0:
+            registrar_accion(
+                get_usuario_id(),
+                f"Importó Excel: {resultado.registros_validos} pasadas desde "
+                f"{self.ruta_archivo.split('/')[-1].split('\\')[-1]}",
+            )
+
+        if resultado.exitoso:
+            QMessageBox.information(
+                self,
+                "Listo",
+                f"Importación completada. {resultado.registros_validos} pasadas importadas.",
+            )
+        else:
+            QMessageBox.warning(
+                self,
+                "Importación parcial",
+                f"Se importaron {resultado.registros_validos} pasadas. Revisá el log para ver los errores.",
+            )
 
     def _actualizar_objetivos_no_resueltos(self) -> None:
         if self.unresolved_objectives:
@@ -819,36 +891,7 @@ class ImportarExcel(QWidget):
         self.estado_banner.setText(f"Importando... {processed}/{total}")
 
     def _on_import_finished(self, resultado) -> None:
-        self.progress_bar.setVisible(False)
-        self.boton_cancelar_importacion.setVisible(False)
-        self.boton_importar.setEnabled(True)
-        # mostrar resultado
-        self.log.append(f"✓ Importados: {resultado.registros_validos}")
-        self.log.append(f"✓ Duplicados omitidos: {resultado.registros_duplicados}")
-        if resultado.errores:
-            self.log.append("⚠ Errores:")
-            for error in resultado.errores[:8]:
-                self.log.append(f"  • {error}")
-
-        if resultado.registros_validos > 0:
-            registrar_accion(
-                get_usuario_id(),
-                f"Importó Excel: {resultado.registros_validos} pasadas desde "
-                f"{self.ruta_archivo.split('/')[-1].split('\\')[-1]}",
-            )
-
-        if resultado.exitoso:
-            QMessageBox.information(
-                self,
-                "Listo",
-                f"Importación completada. {resultado.registros_validos} pasadas importadas.",
-            )
-        else:
-            QMessageBox.warning(
-                self,
-                "Importación parcial",
-                f"Se importaron {resultado.registros_validos} pasadas. Revisá el log para ver los errores.",
-            )
+        self._handle_import_result(resultado)
 
     def _on_import_error(self, mensaje: str) -> None:
         self.progress_bar.setVisible(False)
