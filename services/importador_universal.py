@@ -154,20 +154,79 @@ class ImportadorUniversal:
         sheet_names: Optional[List[str]] = None,
         sheet_turno_map: Optional[Dict[str, str]] = None,
     ) -> ResultadoImportacion:
-        """Importa un archivo CONTROL_RECORRIDOS con mapeo opcional de objetivos."""
-        preview = self.previsualizar_archivo(ruta_archivo, sheet_names=sheet_names)
+        """
+        Importa un archivo CONTROL_RECORRIDOS con mapeo opcional de objetivos.
+        
+        IMPORTANTE:
+        - Si un objetivo fue mapeado manualmente, NO debe volver a validarse.
+        - Evita duplicar validaciones entre hojas día/noche.
+        """
+
+        objetivo_mapeo = objetivo_mapeo or {}
+
+        preview = self.previsualizar_archivo(
+            ruta_archivo,
+            sheet_names=sheet_names,
+        )
+
         if preview.get('tipo') != 'control_recorridos':
             return self.importar_excel(ruta_archivo)
 
-        # Si se proporciona un mapeo de turno por sheet, aplicarlo a registros cuyo sheet tuvo turno comodín
+        registros = preview.get('registros', [])
+
+        # =========================================================
+        # Aplicar mapeo de turnos por hoja si existe
+        # =========================================================
         if sheet_turno_map:
-            for r in preview.get('registros', []):
+            for r in registros:
                 if (r.sheet_title and r.turno is None) or (r.turno in (None, '')):
                     mapped = sheet_turno_map.get(r.sheet_title)
                     if mapped:
                         r.turno = mapped
 
-        return self.importar_registros(preview['registros'], objetivo_mapeo=objetivo_mapeo, progress_callback=progress_callback)
+        # =========================================================
+        # FILTRAR objetivos ya resueltos manualmente
+        # =========================================================
+        objetivos_pendientes = set()
+
+        for r in registros:
+
+            # Si ya existe en el mapeo manual -> NO volver a validar
+            if r.objetivo in objetivo_mapeo:
+                continue
+
+            # Si existe automáticamente en DB -> tampoco validar
+            objetivo_existente = self._obtener_objetivo_id(r.objetivo)
+
+            if objetivo_existente is not None:
+                continue
+
+            objetivos_pendientes.add(r.objetivo)
+
+        # =========================================================
+        # Si todavía quedan objetivos sin resolver -> bloquear
+        # =========================================================
+        if objetivos_pendientes:
+            return ResultadoImportacion(
+                total_registros=len(registros),
+                registros_validos=0,
+                registros_errores=len(objetivos_pendientes),
+                registros_duplicados=0,
+                errores=[
+                    f"Objetivos no resueltos: {', '.join(sorted(objetivos_pendientes))}"
+                ],
+                duplicados=[],
+                exitoso=False,
+            )
+
+        # =========================================================
+        # IMPORTAR DIRECTAMENTE
+        # =========================================================
+        return self.importar_registros(
+            registros,
+            objetivo_mapeo=objetivo_mapeo,
+            progress_callback=progress_callback,
+        )
 
     def importar_registros(
         self,

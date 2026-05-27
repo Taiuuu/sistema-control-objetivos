@@ -5218,6 +5218,2165 @@
       "timestamp": 1779890233.3030663,
       "intentos": 0,
       "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_4355430831609693120",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "13:51",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 14,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.513533,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_9140270017736399664",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "16:15",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 51,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.5244274,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-8666570206268524720",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "13:03",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 42,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.534559,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-747512085132405344",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "17:22",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 4,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.5462816,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-75248904626555165",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "10:47",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 52,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.5577774,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_7691017632494867660",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "10:33",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 5,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.5684466,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_5945614091346255758",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "08:12",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 6,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.5820405,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_7356160447812885068",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "08:47",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 7,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.5943012,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-4423243465654519898",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "19:35",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 8,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.6093524,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_1101785029718161460",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "09:24",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 55,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.620843,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_4324651361944985745",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "16:40",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 41,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.631223,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-1736912663622194635",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "08:05",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 53,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.6468918,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_3547910410708968256",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "10:50",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 10,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.657113,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-2597019840999591172",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "11:12",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 9,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.6684275,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-7378242126880027794",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "09:20",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 1,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.680663,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-2319229287072522076",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "10:03",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 2,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.6917052,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-3534608520226255200",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "18:26",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 11,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.704043,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-6173769230968638556",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "16:14",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 13,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.7153828,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_2170687811795491084",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "11:43",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 57,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.72604,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-1683960300055791519",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "19:00",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 56,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.7390134,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_209568971089297095",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "13:35",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 58,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.7520838,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-6417554000168904059",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "13:18",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 22,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.7624488,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_6853268018921311572",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "17:07",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 27,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.7781372,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-2612985527176807605",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "11:54",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 29,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.7906406,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-7546202416336339955",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "14:53",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 30,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.8035548,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_7336889295688882262",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "07:19",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 32,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.815324,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_3087184732805101762",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "15:52",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 39,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.8264444,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_6775976810843775296",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "08:45",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 35,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.8377447,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-9209136394111117101",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "09:53",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 36,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.8489163,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_7576058872051626502",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "18:36",
+        "turno": "diurno",
+        "supervisor_id": 32,
+        "objetivo_id": 37,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.859624,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-3003199633833068004",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "15:25",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 54,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.8743155,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_3638614015742715374",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "11:37",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 40,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.8863432,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901232_-2364586632384240220",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "17:22",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 4,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901232.897347,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901468_8841439169611992797",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "21:39",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 14,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901468.9252017,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901468_2729016944555466785",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "00:53",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 51,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901468.9379292,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901468_562201604265711929",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "21:04",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 42,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901468.9538236,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901468_5367433552022858589",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "01:51",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 4,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901468.967559,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901468_-5383954686328890720",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "23:20",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 52,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901468.9828885,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901468_3810242119701202810",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "23:27",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 5,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901468.9973238,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_820584725289583937",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "05:40",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 6,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.011909,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_3207037040063312532",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "04:00",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 7,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.0401356,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-8724074569953747556",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "03:22",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 8,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.0565622,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-1427859226875680686",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "01:40",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 55,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.0730913,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_7425165176921668063",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "02:57",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 41,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.087901,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-974143115905001138",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "19:35",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 53,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.1064136,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-6755054584981258840",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "20:20",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 10,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.1212044,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-8385326867186126674",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "20:35",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 9,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.1389651,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-3337444766906943067",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "20:56",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 1,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.1542287,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-1826021482350820442",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "21:20",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 2,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.168337,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-578447041967761978",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "00:52",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 11,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.1859198,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-221183186893296926",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "23:48",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 13,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.2044764,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_5285095220164303003",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "02:06",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 56,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.2203524,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_6305238145521182146",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "22:55",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 25,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.2418551,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-181940374396718809",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "02:13",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 27,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.258464,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-5558847491867064298",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "21:53",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 29,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.2783809,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_6730408534250538700",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "22:38",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 30,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.2943068,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_6902401370331601997",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "19:39",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 32,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.3174088,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-1465510588101586044",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "00:31",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 39,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.3342686,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_-2425205769160833576",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "00:00",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 35,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.3555117,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_8063944643008237158",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "02:30",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 36,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.3722887,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_8620710132706291261",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "23:06",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 37,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.390503,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_5375967561335987283",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "02:41",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 54,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.415263,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901469_2518544803774693375",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-23",
+        "hora": "03:41",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 40,
+        "notas": null,
+        "fecha_operativa": "2026-05-23"
+      },
+      "timestamp": 1779901469.4322007,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_1393880915696223020",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "16:03",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 51,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.494224,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-3438761752418472217",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "09:42",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 4,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.507057,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_1852846673050192688",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "08:23",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 52,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.5197334,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-2455778513993894553",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "16:31",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 5,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.5326314,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_8076382072113242732",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "07:49",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 6,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.5457752,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_6857568950993679017",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "13:41",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 7,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.5597644,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_1162602382934944842",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "17:38",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 8,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.5726273,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_3889902189181607438",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "16:54",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 55,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.5867429,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-6233170924879667936",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "07:57",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 41,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.5982094,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-2199508279376952207",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "11:37",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 53,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.6113892,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-8601138430168558458",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "14:07",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 10,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.6245055,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_7741426231062697720",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "15:36",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 9,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.6380143,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_1881516971270654930",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "15:24",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 1,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.6492722,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-7905713635775750777",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "14:55",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 2,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.6621792,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-4491072313123980186",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "12:23",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 11,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.674738,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_7498568057555996446",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "17:31",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 13,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.6883342,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_4804142829869713763",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "14:21",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 57,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.7024164,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-4187424409549330511",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "11:13",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 25,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.7158282,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_813903541245627341",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "13:18",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 58,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.727962,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-3952882935725875552",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "12:46",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 22,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.741529,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-6123055850711908506",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "09:21",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 27,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.756142,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_8522481209014567669",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "09:41",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 29,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.7698534,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-6862815541759767771",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "11:06",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 32,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.78463,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-1422931069782817397",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "10:25",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 39,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.7978008,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_4942300888381841500",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "16:08",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 35,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.813457,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-3904991549444015246",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "13:05",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 36,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.829142,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_3613708625790369489",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "09:07",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 37,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.8431053,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-203419728288302619",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "08:38",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 54,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.858203,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_7583615716929112051",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "17:20",
+        "turno": "diurno",
+        "supervisor_id": 35,
+        "objetivo_id": 40,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.8726532,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-2559063732879103687",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "18:10",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 36,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.8846385,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779901920_-8825631469484834948",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "16:48",
+        "turno": "diurno",
+        "supervisor_id": 33,
+        "objetivo_id": 54,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779901920.899594,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_3071304100143298954",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "20:46",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 14,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.7711732,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_-5488484069503359157",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "04:27",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 51,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.7843559,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_-6944099783195604379",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "19:53",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 42,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.797905,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_-4596650126958085751",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "03:49",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 4,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.8103437,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_-4992133547960167091",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "22:46",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 52,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.8231976,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_6853736339489379202",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "01:20",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 5,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.8418572,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_-132519218419813204",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "02:16",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 6,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.8552315,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_-1838868716234101140",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "05:17",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 7,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.8690865,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_456163859738984716",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "03:33",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 8,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.882111,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_-3642224303438576408",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "06:10",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 55,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.8950036,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_2340875917093867526",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "02:35",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 41,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.9072216,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_786557968774548517",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "01:53",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 53,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.9220388,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_3139100004143429881",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "00:33",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 10,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.937734,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_7007739574769417749",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "00:51",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 9,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.9518485,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_-289079351643128031",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "00:05",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 1,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.9650817,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_-674817346352042110",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "21:31",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 2,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.9789066,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902213_-1380783075700308253",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "00:31",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 11,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902213.9927454,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_-5080337277045274805",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "00:05",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 13,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.0076025,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_2632529580246186185",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "23:25",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 57,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.022259,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_-3569653219050612383",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "06:19",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 56,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.036516,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_-6000105838937976306",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "02:52",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 25,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.0500958,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_-442004493830396464",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "03:24",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 27,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.0650065,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_-4728493222350943837",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "04:11",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 29,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.0801907,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_-8443688200013225511",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "21:31",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 30,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.095033,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_7250663256519191049",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "01:00",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 32,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.1155424,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_-6785200890922735242",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "04:08",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 39,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.1307442,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_-8581715091437260908",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "02:07",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 35,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.1448388,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_8816712808978493030",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "23:09",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 36,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.1587827,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_9167357757593088589",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "22:28",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 37,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.17271,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_3045041558509952331",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "03:05",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 54,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.186663,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_-6640465418636420817",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "04:49",
+        "turno": "nocturno",
+        "supervisor_id": 36,
+        "objetivo_id": 40,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.1999085,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_-6769995958918171760",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "06:42",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 52,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.2143362,
+      "intentos": 0,
+      "ultimo_error": null
+    },
+    {
+      "id": "pasada_crear_1779902214_-7381609719816565619",
+      "tipo": "pasada",
+      "operacion": "crear",
+      "datos": {
+        "fecha": "2026-05-24",
+        "hora": "05:44",
+        "turno": "nocturno",
+        "supervisor_id": 34,
+        "objetivo_id": 55,
+        "notas": null,
+        "fecha_operativa": "2026-05-24"
+      },
+      "timestamp": 1779902214.2283123,
+      "intentos": 0,
+      "ultimo_error": null
     }
   ],
   "ultima_sync": null
