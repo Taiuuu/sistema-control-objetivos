@@ -948,51 +948,69 @@ class ImportadorUniversal:
     ) -> Tuple[Optional[date], Optional[str]]:
         """
         Extrae fecha y turno desde nombres tipo:
+
         11-5 (D)
         11/5 (N)
-        11-5 diurno
+        11-5(D)
+        11-5 DIURNO
+        11-5 NOCTURNO
         """
 
-        match = re.match(
-            r'^\s*(\d{1,2})\s*[-/]\s*(\d{1,2})(?:\s*\(([DN])\)|\s*(diurno|nocturno))?\s*$',
-            sheet_name.strip(),
-            re.IGNORECASE,
+        texto = str(sheet_name).strip().upper()
+
+        match_fecha = re.search(
+            r'(\d{1,2})\s*[-/]\s*(\d{1,2})',
+            texto,
         )
 
-        if not match:
+        if not match_fecha:
             return None, None
 
-        dia = int(match.group(1))
-        mes = int(match.group(2))
+        dia = int(match_fecha.group(1))
+        mes = int(match_fecha.group(2))
 
-        turno_code = (
-            match.group(3)
-            or match.group(4)
-            or ''
-        ).upper()
+        turno = None
 
-        if turno_code in ('D', 'DIURNO'):
+        if any(x in texto for x in ['(D)', ' DIURNO', ' DIA', ' D']):
             turno = 'diurno'
 
-        elif turno_code in ('N', 'NOCTURNO'):
+        elif any(x in texto for x in ['(N)', ' NOCTURNO', ' NOCHE', ' N']):
             turno = 'nocturno'
 
-        else:
+        if turno is None:
             return None, None
 
-        try:
+        today = date.today()
 
-            fecha = date(
-                date.today().year,
-                mes,
-                dia,
+        candidatos = [
+            today.year - 1,
+            today.year,
+            today.year + 1,
+        ]
+
+        mejor = None
+        mejor_delta = None
+
+        for year in candidatos:
+
+            try:
+                fecha = date(year, mes, dia)
+
+            except ValueError:
+                continue
+
+            delta = abs(
+                (fecha - today).days
             )
 
-        except ValueError:
+            if mejor is None or delta < mejor_delta:
+                mejor = fecha
+                mejor_delta = delta
 
+        if mejor is None:
             return None, None
 
-        return fecha, turno
+        return mejor, turno
 
     def _normalizar_hora_y_fecha(self, hora_raw: Any, fecha_base: date) -> Tuple[date, str]:
         """Normaliza horas con formato inválido y soporta horas >= 24. Acepta datetime.time."""
