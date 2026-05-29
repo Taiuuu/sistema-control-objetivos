@@ -852,23 +852,6 @@ class ImportadorUniversal:
                     if turno is not None and turno_fila != turno:
                         continue
 
-                # ======================================================
-                # Validar formato básico de hora
-                # ======================================================
-
-                if isinstance(hora_raw, str):
-
-                    hora_test = hora_raw.strip()
-
-                    if not hora_test:
-                        continue
-
-                    if not re.match(
-                        r'^\d{1,2}:\d{2}(:\d{2})?$',
-                        hora_test
-                    ):
-                        continue
-
                 try:
 
                     fecha_import, hora_normalizada = (
@@ -906,26 +889,65 @@ class ImportadorUniversal:
 
         return registros
 
-    def _listar_sheet_options(self, workbook_or_path) -> List[Dict[str, Any]]:
-        """Devuelve las hojas reconocidas como CONTROL_RECORRIDOS y su metadata."""
+    def _listar_sheet_options(self, workbook_or_path):
+        print('\n====================')
+        print('DEBUG LISTAR SHEETS')
+        print('====================')
+
         if isinstance(workbook_or_path, str):
-            workbook = load_workbook(workbook_or_path, data_only=True)
+
+            print(f'Abriendo workbook: {workbook_or_path}')
+
+            workbook = load_workbook(
+                workbook_or_path,
+                data_only=True,
+            )
+
         else:
+
             workbook = workbook_or_path
 
-        opciones = []
-        for ws in workbook.worksheets:
-            sheet_date, turno = self._parsear_nombre_sheet(ws.title)
-            if not sheet_date or not turno:
-                continue
+        print(f'Total hojas: {len(workbook.worksheets)}')
 
-            opciones.append(
-                {
-                    'title': ws.title,
-                    'fecha': sheet_date.isoformat(),
-                    'turno': turno,
-                }
-            )
+        opciones = []
+
+        for ws in workbook.worksheets:
+
+            print('--------------------')
+            print(f'HOJA RAW: {repr(ws.title)}')
+
+            try:
+
+                sheet_date, turno = self._parsear_nombre_sheet(
+                    ws.title
+                )
+
+                print(f'PARSE RESULT -> fecha={sheet_date} turno={turno}')
+
+                if not sheet_date or not turno:
+
+                    print('IGNORADA')
+                    continue
+
+                opciones.append(
+                    {
+                        'title': ws.title,
+                        'fecha': sheet_date.isoformat(),
+                        'turno': turno,
+                    }
+                )
+
+                print('ACEPTADA')
+
+            except Exception as e:
+
+                print(f'ERROR EN HOJA: {e}')
+
+                import traceback
+                traceback.print_exc()
+
+        print('\nRESULTADO FINAL:')
+        print(opciones)
 
         return opciones
 
@@ -1012,42 +1034,148 @@ class ImportadorUniversal:
 
         return mejor, turno
 
-    def _normalizar_hora_y_fecha(self, hora_raw: Any, fecha_base: date) -> Tuple[date, str]:
-        """Normaliza horas con formato inválido y soporta horas >= 24. Acepta datetime.time."""
-        # openpyxl puede devolver datetime.time directamente
+    def _normalizar_hora_y_fecha(
+        self,
+        hora_raw: Any,
+        fecha_base: date
+    ) -> Tuple[date, str]:
+        """
+        Normaliza horas provenientes de Excel / Google Sheets.
+        Extremadamente tolerante a formatos sucios.
+        """
+
+        from datetime import timedelta, time
+        import re
+
+        # =====================================================
+        # 1. datetime.time directo
+        # =====================================================
         if isinstance(hora_raw, time):
             return fecha_base, hora_raw.strftime('%H:%M')
 
-        texto = str(hora_raw).strip()
-        texto = texto.replace(';', ':').replace(',', '.').replace('h', '').replace('H', '')
-        texto = texto.replace(' ', '')
+        # =====================================================
+        # 2. NaN / None / vacíos
+        # =====================================================
+        if hora_raw is None:
+            raise ValueError("Hora vacía")
 
-        if texto.lower() in ('none', 'n/a', 'na', ''):
-            raise ValueError('Hora vacía')
+        # =====================================================
+        # 3. Convertir a string base
+        # =====================================================
+        if isinstance(hora_raw, float):
+            if hora_raw.is_integer():
+                texto = str(int(hora_raw))
+            else:
+                texto = str(hora_raw)
+        elif isinstance(hora_raw, int):
+            texto = str(hora_raw)
+        else:
+            texto = str(hora_raw)
 
-        if re.fullmatch(r'\d{3,4}', texto):
+        # =====================================================
+        # 4. Limpieza extrema (IMPORTANTE)
+        # =====================================================
+        texto = texto.strip().lower()
+
+        texto = (
+            texto.replace('\n', '')
+            .replace('\t', '')
+            .replace('h', '')
+            .replace('hs', '')
+            .replace('horas', '')
+            .replace(' ', '')
+        )
+
+        # normalizar separadores raros
+        texto = texto.replace(';', ':')
+        texto = texto.replace(',', '.')
+        texto = texto.replace('-', ':')
+        texto = texto.replace('::', ':')
+
+        # =====================================================
+        # 5. vacíos reales
+        # =====================================================
+        if texto in ('', 'none', 'n/a', 'na', ':', '.', '::'):
+            raise ValueError("Hora vacía")
+
+        # =====================================================
+        # 6. FIXES de formatos incompletos
+        # =====================================================
+
+        # ":30" o ";30" ya quedó como ":30"
+        if re.fullmatch(r':\d{1,2}', texto):
+            texto = '00' + texto
+
+        # "03:" / "03:" / "03:" (con espacios ya removidos)
+        if re.fullmatch(r'\d{1,2}:', texto):
+            texto = texto + '00'
+
+        # ".30" → "00.30"
+        if re.fullmatch(r'\.\d{1,2}', texto):
+            texto = '00' + texto
+
+        # "3." → "3.00"
+        if re.fullmatch(r'\d{1,2}\.', texto):
+            texto = texto + '00'
+
+        # =====================================================
+        # 7. Parseo principal
+        # =====================================================
+        hora = None
+        minuto = None
+
+        # SOLO MINUTOS (5 → 00:05)
+        if re.fullmatch(r'\d{1,2}', texto):
+            hora = 0
+            minuto = int(texto)
+
+        # HHMM (2149 → 21:49)
+        elif re.fullmatch(r'\d{3,4}', texto):
             if len(texto) == 3:
                 hora = int(texto[0])
                 minuto = int(texto[1:])
             else:
                 hora = int(texto[:2])
                 minuto = int(texto[2:])
-        elif re.fullmatch(r'\d{1,2}:\d{1,2}:\d{1,2}', texto):
-            hora, minuto, _ = [int(part) for part in texto.split(':')]
-        elif re.fullmatch(r'\d{1,2}:\d{1,2}', texto):
-            hora, minuto = [int(part) for part in texto.split(':')]
-        elif re.fullmatch(r'\d{1,2}\.\d{1,2}', texto):
-            hora, minuto = [int(part) for part in texto.split('.')]
-        elif re.fullmatch(r'\d{1,2}\.\d{1,2}\.\d{1,2}', texto):
-            hora, minuto, _ = [int(part) for part in texto.split('.')]
+
+        # HH:MM o HH.MM
+        elif re.fullmatch(r'\d{1,2}[:.]\d{1,2}', texto):
+            sep = ':' if ':' in texto else '.'
+            hora, minuto = [int(x) for x in texto.split(sep)]
+
+        # HH:MM:SS o HH.MM.SS
+        elif re.fullmatch(r'\d{1,2}[:.]\d{1,2}[:.]\d{1,2}', texto):
+            sep = ':' if ':' in texto else '.'
+            parts = texto.split(sep)
+            hora, minuto = int(parts[0]), int(parts[1])
+
         else:
             raise ValueError(f"Formato de hora no reconocido: {hora_raw}")
 
+        # =====================================================
+        # 8. validaciones duras
+        # =====================================================
+        if minuto is None or hora is None:
+            raise ValueError(f"Hora inválida: {hora_raw}")
+
+        if minuto >= 60:
+            raise ValueError(f"Minutos inválidos: {hora_raw}")
+
+        if hora < 0:
+            raise ValueError(f"Hora inválida: {hora_raw}")
+
+        # =====================================================
+        # 9. overflow de días (26:30 → +1 día 02:30)
+        # =====================================================
         total_minutos = hora * 60 + minuto
-        dias_desplazados = total_minutos // (24 * 60)
+
+        dias = total_minutos // (24 * 60)
         total_minutos = total_minutos % (24 * 60)
-        fecha_resultado = fecha_base + timedelta(days=dias_desplazados)
+
+        fecha_resultado = fecha_base + timedelta(days=dias)
+
         hora_resultado = f"{total_minutos // 60:02d}:{total_minutos % 60:02d}"
+
         return fecha_resultado, hora_resultado
 
     def _parsear_repeticiones(self, valor: Any) -> int:
