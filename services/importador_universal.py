@@ -466,7 +466,7 @@ class ImportadorUniversal:
                     continue
 
                 creado = self.sync_manager.crear_pasada_offline(
-                    registro.fecha,
+                    fecha_operativa.strftime('%Y-%m-%d'),
                     registro.hora,
                     registro.turno,
                     supervisor_id,
@@ -597,38 +597,23 @@ class ImportadorUniversal:
             'supervisores_no_resueltos': [],
         }
 
-    def _parsear_hoja_control_recorridos(self, ws, sheet_date: date, turno: str) -> List[RegistroImportacion]:
-        """Intenta primero el parseo por encabezados y usa legacy como respaldo."""
-        header_row, encabezados = self._buscar_encabezados_control(ws)
-        header_registros = []
-        if encabezados:
-            header_registros = self._parsear_con_encabezados_control(
-                ws,
-                sheet_date,
-                turno,
-                encabezados,
-                header_row,
-            )
+    def _parsear_hoja_control_recorridos(
+        self,
+        ws,
+        sheet_date: date,
+        turno: str
+    ) -> List[RegistroImportacion]:
+        """
+        Parser principal de CONTROL_RECORRIDOS.
+        Usa exclusivamente el formato legacy real
+        de 3 bloques horizontales.
+        """
 
-        legacy_registros = self._parsear_control_recorridos_legacy(ws, sheet_date, turno)
-
-        if header_registros and legacy_registros:
-            merged = {(
-                r.fecha,
-                r.hora,
-                r.turno,
-                r.supervisor,
-                r.objetivo,
-                r.notas or '',
-                r.sheet_title or '',
-            ): r for r in header_registros + legacy_registros}
-            return list(merged.values())
-
-        if header_registros:
-            return header_registros
-
-        return legacy_registros
-
+        return self._parsear_control_recorridos_legacy(
+            ws,
+            sheet_date,
+            turno,
+        )
     def _buscar_encabezados_control(self, ws) -> Tuple[Optional[int], Dict[str, Optional[int]]]:
         """Busca la fila de encabezado más probable en la hoja."""
         max_col = ws.max_column
@@ -741,7 +726,7 @@ class ImportadorUniversal:
                 return True
 
         return False
-
+    
     def _parsear_control_recorridos_legacy(
         self,
         ws,
@@ -768,13 +753,42 @@ class ImportadorUniversal:
         - Si la fila no tiene turno:
         se usa el turno de la hoja como fallback.
         """
+
         import re
+
         registros = []
-        for fila in ws.iter_rows(
-            min_row=1,
-            max_row=ws.max_row,
-            values_only=True,
+
+        for row_idx, fila in enumerate(
+            ws.iter_rows(
+                min_row=1,
+                max_row=ws.max_row,
+                values_only=True,
+            ),
+            start=1,
         ):
+
+            # ======================================================
+            # FIX:
+            # Ignorar filas ocultas por filtros de Excel
+            # ======================================================
+
+            if ws.row_dimensions[row_idx].hidden:
+                continue
+
+            # ======================================================
+            # FIX:
+            # Ignorar filas completamente vacías
+            # ======================================================
+
+            if not fila:
+                continue
+
+            if all(
+                self._limpiar_valor(valor) is None
+                for valor in fila
+            ):
+                continue
+
             for (c_obj, c_turno, c_hora, c_sup) in self._bloques_control_recorridos():
 
                 idx_obj = c_obj - 1
@@ -784,13 +798,17 @@ class ImportadorUniversal:
 
                 if len(fila) <= idx_hora:
                     continue
+
                 objetivo = self._limpiar_valor(fila[idx_obj])
+
                 turno_raw = (
                     fila[idx_turno]
                     if len(fila) > idx_turno
                     else None
                 )
+
                 hora_raw = fila[idx_hora]
+
                 supervisor = (
                     self._limpiar_valor(fila[idx_sup])
                     if len(fila) > idx_sup
@@ -807,9 +825,11 @@ class ImportadorUniversal:
 
                 if self._es_encabezado(objetivo):
                     continue
+
                 turno_fila = None
 
                 if turno_raw is not None:
+
                     t = str(turno_raw).strip().upper()
 
                     if t in ('DIA', 'DIURNO', 'D'):
@@ -822,12 +842,24 @@ class ImportadorUniversal:
 
                 if turno_final is None:
                     continue
+
+                # ======================================================
+                # Validar coherencia entre turno fila y turno hoja
+                # ======================================================
+
                 if turno_fila is not None:
 
                     if turno is not None and turno_fila != turno:
                         continue
+
+                # ======================================================
+                # Validar formato básico de hora
+                # ======================================================
+
                 if isinstance(hora_raw, str):
+
                     hora_test = hora_raw.strip()
+
                     if not hora_test:
                         continue
 
@@ -847,12 +879,13 @@ class ImportadorUniversal:
                     )
 
                 except Exception as e:
+
                     print(
-                        f'[CONTROL_RECORRIDOS ERROR] '
+                        f'[CONTROL SHEET ERROR] '
                         f'Hoja={ws.title} | '
+                        f'Fila={row_idx} | '
                         f'Objetivo={objetivo} | '
                         f'Hora={hora_raw} | '
-                        f'Turno={turno_final} | '
                         f'Error={e}'
                     )
 
@@ -909,44 +942,57 @@ class ImportadorUniversal:
             (16, 17, 19, 20), # bloque 3: cols 15-20
         ]
 
-    def _parsear_nombre_sheet(self, sheet_name: str) -> Tuple[Optional[date], Optional[str]]:
-        """Extrae fecha y turno desde el nombre del sheet, ej. 11-5 (D) o 11/5 (D)."""
+    def _parsear_nombre_sheet(
+        self,
+        sheet_name: str
+    ) -> Tuple[Optional[date], Optional[str]]:
+        """
+        Extrae fecha y turno desde nombres tipo:
+        11-5 (D)
+        11/5 (N)
+        11-5 diurno
+        """
+
         match = re.match(
             r'^\s*(\d{1,2})\s*[-/]\s*(\d{1,2})(?:\s*\(([DN])\)|\s*(diurno|nocturno))?\s*$',
             sheet_name.strip(),
             re.IGNORECASE,
         )
+
         if not match:
             return None, None
 
         dia = int(match.group(1))
         mes = int(match.group(2))
-        turno_code = (match.group(3) or match.group(4) or '').upper()
-        turno = 'diurno' if turno_code in ('D', 'DIURNO') else 'nocturno' if turno_code in ('N', 'NOCTURNO') else None
 
-        if turno is None:
+        turno_code = (
+            match.group(3)
+            or match.group(4)
+            or ''
+        ).upper()
+
+        if turno_code in ('D', 'DIURNO'):
+            turno = 'diurno'
+
+        elif turno_code in ('N', 'NOCTURNO'):
+            turno = 'nocturno'
+
+        else:
             return None, None
 
-        today = date.today()
-        candidatos = [today.year - 1, today.year, today.year + 1]
-        mejor = None
-        mejor_delta = None
+        try:
 
-        for year in candidatos:
-            try:
-                fecha = date(year, mes, dia)
-            except ValueError:
-                continue
+            fecha = date(
+                date.today().year,
+                mes,
+                dia,
+            )
 
-            delta = abs((fecha - today).days)
-            if mejor is None or delta < mejor_delta:
-                mejor = fecha
-                mejor_delta = delta
+        except ValueError:
 
-        if mejor is None:
             return None, None
 
-        return mejor, turno
+        return fecha, turno
 
     def _normalizar_hora_y_fecha(self, hora_raw: Any, fecha_base: date) -> Tuple[date, str]:
         """Normaliza horas con formato inválido y soporta horas >= 24. Acepta datetime.time."""
@@ -1074,36 +1120,67 @@ class ImportadorUniversal:
         if not nombre:
             return None
 
+        if self._cache_supervisores is None:
+
+            self._cache_supervisores = {}
+
+            filas = gestor_db.ejecutar(
+                "SELECT id, nombre FROM supervisores"
+            )
+
+            for fila in filas:
+
+                key = self._normalizar_texto(
+                    fila['nombre']
+                )
+
+                self._cache_supervisores[key] = int(
+                    fila['id']
+                )
+
         normalized = self._normalizar_texto(nombre)
 
-        filas = gestor_db.ejecutar(
-            "SELECT id, nombre FROM supervisores"
+        return self._cache_supervisores.get(
+            normalized
         )
 
-        for fila in filas:
+    def _obtener_objetivo_id(
+        self,
+        nombre_objetivo: str
+    ) -> Optional[int]:
+        """Busca objetivo existente por nombre normalizado."""
 
-            if (
-                self._normalizar_texto(fila['nombre'])
-                == normalized
-            ):
-
-                return int(fila['id'])
-
-        return None
-
-    def _obtener_objetivo_id(self, nombre_objetivo: str) -> Optional[int]:
-        """Busca un objetivo existente por nombre normalizado."""
         if not nombre_objetivo:
             return None
 
-        filas = gestor_db.ejecutar("SELECT id, nombre FROM objetivos")
-        normalized = self._normalizar_texto(nombre_objetivo)
+        nombre = str(nombre_objetivo).strip()
 
-        for fila in filas:
-            if self._normalizar_texto(fila['nombre']) == normalized:
-                return int(fila['id'])
+        if not nombre:
+            return None
 
-        return None
+        if self._cache_objetivos is None:
+
+            self._cache_objetivos = {}
+
+            filas = gestor_db.ejecutar(
+                "SELECT id, nombre FROM objetivos"
+            )
+
+            for fila in filas:
+
+                key = self._normalizar_texto(
+                    fila['nombre']
+                )
+
+                self._cache_objetivos[key] = int(
+                    fila['id']
+                )
+
+        normalized = self._normalizar_texto(nombre)
+
+        return self._cache_objetivos.get(
+            normalized
+        )
 
     def _es_duplicado(self, supervisor_id: int, objetivo_id: int, fecha_operativa: str, hora: str, turno: str) -> bool:
         """Verifica si una pasada ya existe (duplicada)."""
