@@ -62,6 +62,9 @@ class ImportadorUniversal:
     def __init__(self):
         self.sync_manager = get_sync_manager()
 
+        self._cache_objetivos: Dict[str, int] = {}
+        self._cache_supervisores: Dict[str, int] = {}
+
     def previsualizar_archivo(
         self,
         ruta_archivo: str,
@@ -76,7 +79,6 @@ class ImportadorUniversal:
         - Devuelve TODOS los detectados para mapeo manual
         """
         try:
-
             wb = load_workbook(
                 ruta_archivo,
                 data_only=True,
@@ -84,9 +86,12 @@ class ImportadorUniversal:
 
             sheet_options = self._listar_sheet_options(wb)
 
+            # =====================================================
+            # Manejo si no hay hojas válidas
+            # =====================================================
             if not sheet_options:
                 return {
-                    'tipo': 'legacy',
+                    'tipo': 'empty',
                     'registros': [],
                     'objetivos_detectados': [],
                     'supervisores_detectados': [],
@@ -95,6 +100,9 @@ class ImportadorUniversal:
                     'sheet_options': [],
                 }
 
+            # =====================================================
+            # Parsear hojas CONTROL_RECORRIDOS
+            # =====================================================
             control = self._parsear_control_recorridos(
                 wb,
                 sheet_names=sheet_names,
@@ -105,7 +113,6 @@ class ImportadorUniversal:
             # =====================================================
             # EXTRAER TODOS LOS OBJETIVOS DETECTADOS
             # =====================================================
-
             objetivos_detectados = sorted({
                 r.objetivo.strip()
                 for r in registros
@@ -115,7 +122,6 @@ class ImportadorUniversal:
             # =====================================================
             # EXTRAER TODOS LOS SUPERVISORES DETECTADOS
             # =====================================================
-
             supervisores_detectados = sorted({
                 r.supervisor.strip()
                 for r in registros
@@ -125,12 +131,13 @@ class ImportadorUniversal:
             # =====================================================
             # DETERMINAR OBJETIVOS Y SUPERVISORES NO RESUELTOS
             # =====================================================
-
-            objetivos_no_resueltos = [
-                nombre
-                for nombre in objetivos_detectados
-                if self._obtener_objetivo_id(nombre) is None
-            ]
+            objetivos_no_resueltos = []
+            for nombre in objetivos_detectados:
+                try:
+                    if self._obtener_objetivo_id(nombre) is None:
+                        objetivos_no_resueltos.append(nombre)
+                except Exception:
+                    objetivos_no_resueltos.append(nombre)
 
             supervisores_no_resueltos = [
                 nombre
@@ -141,7 +148,6 @@ class ImportadorUniversal:
             # =====================================================
             # RESPUESTA FINAL
             # =====================================================
-
             return {
                 'tipo': 'control_recorridos',
                 'registros': registros,
@@ -153,23 +159,27 @@ class ImportadorUniversal:
             }
 
         except Exception as e:
-
+            # =====================================================
+            # ERROR EXPLÍCITO: no usar legacy
+            # =====================================================
+            import traceback
+            traceback.print_exc()
             return {
-                'tipo': 'legacy',
+                'tipo': 'error',
+                'error': str(e),
                 'registros': [],
                 'objetivos_detectados': [],
                 'supervisores_detectados': [],
                 'objetivos_no_resueltos': [],
                 'supervisores_no_resueltos': [],
                 'sheet_options': [],
-                'error': str(e),
             }
-
+    
     def importar_excel(self, ruta_archivo: str) -> ResultadoImportacion:
         """Importa datos desde archivo Excel."""
         try:
             preview = self.previsualizar_archivo(ruta_archivo)
-            if preview.get('tipo') == 'control_recorridos':
+            if preview.get('tipo') in ('control_recorridos') and len(preview.get('registros', [])) > 0:
                 return self.importar_registros(preview['registros'])
 
             df = pd.read_excel(ruta_archivo, sheet_name='Pasadas')
@@ -231,8 +241,8 @@ class ImportadorUniversal:
             sheet_names=sheet_names,
         )
 
-        if preview.get('tipo') != 'control_recorridos':
-            return self.importar_excel(ruta_archivo)
+        if preview.get('tipo') in ('control_recorridos') and len(preview.get('registros', [])) > 0:
+            return self.importar_registros(preview['registros'])
 
         registros = preview.get('registros', [])
 
@@ -242,26 +252,17 @@ class ImportadorUniversal:
 
         if sheet_turno_map:
             for r in registros:
+                mapped = sheet_turno_map.get(r.sheet_title)
 
-                if (
-                    (r.sheet_title and r.turno is None)
-                    or
-                    (r.turno in (None, ''))
-                ):
+                if mapped:
+                    r.turno = mapped
 
-                    mapped = sheet_turno_map.get(
-                        r.sheet_title
-                    )
-
-                    if mapped:
-                        r.turno = mapped
-
-        return self.importar_registros(
-            registros,
-            objetivo_mapeo=objetivo_mapeo,
-            supervisor_mapeo=supervisor_mapeo,
-            progress_callback=progress_callback,
-        )
+                return self.importar_registros(
+                    registros,
+                    objetivo_mapeo=objetivo_mapeo,
+                    supervisor_mapeo=supervisor_mapeo,
+                    progress_callback=progress_callback,
+                )
 
     def importar_registros(
         self,
@@ -964,73 +965,46 @@ class ImportadorUniversal:
             (16, 17, 19, 20), # bloque 3: cols 15-20
         ]
 
-    def _parsear_nombre_sheet(
-        self,
-        sheet_name: str
-    ) -> Tuple[Optional[date], Optional[str]]:
-        """
-        Extrae fecha y turno desde nombres tipo:
-
-        11-5 (D)
-        11/5 (N)
-        11-5(D)
-        11-5 DIURNO
-        11-5 NOCTURNO
-        """
+    def _parsear_nombre_sheet(self, sheet_name: str):
+        import re
 
         texto = str(sheet_name).strip().upper()
 
-        match_fecha = re.search(
-            r'(\d{1,2})\s*[-/]\s*(\d{1,2})',
-            texto,
-        )
-
-        if not match_fecha:
+        # fecha
+        match = re.search(r'(\d{1,2})\s*[-/]\s*(\d{1,2})', texto)
+        if not match:
             return None, None
 
-        dia = int(match_fecha.group(1))
-        mes = int(match_fecha.group(2))
+        dia = int(match.group(1))
+        mes = int(match.group(2))
 
         turno = None
 
-        if any(x in texto for x in ['(D)', ' DIURNO', ' DIA', ' D']):
+        if re.search(r'\(D\)|DIURNO|\bD\b', texto):
             turno = 'diurno'
-
-        elif any(x in texto for x in ['(N)', ' NOCTURNO', ' NOCHE', ' N']):
+        elif re.search(r'\(N\)|NOCTURNO|\bN\b', texto):
             turno = 'nocturno'
 
         if turno is None:
             return None, None
 
+        from datetime import date
+
         today = date.today()
-
-        candidatos = [
-            today.year - 1,
-            today.year,
-            today.year + 1,
-        ]
-
         mejor = None
         mejor_delta = None
 
-        for year in candidatos:
-
+        for year in [today.year - 1, today.year, today.year + 1]:
             try:
                 fecha = date(year, mes, dia)
-
-            except ValueError:
+            except:
                 continue
 
-            delta = abs(
-                (fecha - today).days
-            )
+            delta = abs((fecha - today).days)
 
             if mejor is None or delta < mejor_delta:
                 mejor = fecha
                 mejor_delta = delta
-
-        if mejor is None:
-            return None, None
 
         return mejor, turno
 
@@ -1040,97 +1014,92 @@ class ImportadorUniversal:
         fecha_base: date
     ) -> Tuple[date, str]:
         """
-        Normaliza horas provenientes de Excel / Google Sheets.
-        Extremadamente tolerante a formatos sucios.
+        Normaliza horas provenientes de Excel / Google Sheets / inputs sucios.
+
+        Soporta:
+        - 2149 -> 21:49
+        - 205 -> 02:05
+        - 14 -> 00:14
+        - 5 -> 00:05
+        - 2149.0 -> 21:49
+        - 21:49 / 21;49 / 21.49
+        - 03: / 03; -> 03:00
+        - :30 / ;30 -> 00:30
+        - 26:30 -> día siguiente 02:30
+        - datetime.time
         """
 
         from datetime import timedelta, time
         import re
 
-        # =====================================================
-        # 1. datetime.time directo
-        # =====================================================
+        # =========================
+        # 1. TIME directo
+        # =========================
         if isinstance(hora_raw, time):
-            return fecha_base, hora_raw.strftime('%H:%M')
+            return fecha_base, hora_raw.strftime("%H:%M")
 
-        # =====================================================
-        # 2. NaN / None / vacíos
-        # =====================================================
+        # =========================
+        # 2. Normalizar a string base
+        # =========================
         if hora_raw is None:
             raise ValueError("Hora vacía")
 
-        # =====================================================
-        # 3. Convertir a string base
-        # =====================================================
         if isinstance(hora_raw, float):
             if hora_raw.is_integer():
                 texto = str(int(hora_raw))
             else:
                 texto = str(hora_raw)
-        elif isinstance(hora_raw, int):
-            texto = str(hora_raw)
         else:
             texto = str(hora_raw)
 
-        # =====================================================
-        # 4. Limpieza extrema (IMPORTANTE)
-        # =====================================================
+        # =========================
+        # 3. Limpieza fuerte
+        # =========================
         texto = texto.strip().lower()
 
         texto = (
-            texto.replace('\n', '')
-            .replace('\t', '')
-            .replace('h', '')
-            .replace('hs', '')
-            .replace('horas', '')
-            .replace(' ', '')
+            texto.replace("\u00a0", " ")
+                .replace("h", "")
+                .replace("hora", "")
+                .replace(" ", "")
         )
 
-        # normalizar separadores raros
-        texto = texto.replace(';', ':')
-        texto = texto.replace(',', '.')
-        texto = texto.replace('-', ':')
-        texto = texto.replace('::', ':')
+        # Unificar separadores raros
+        texto = texto.replace(";", ":").replace(".", ":")
 
-        # =====================================================
-        # 5. vacíos reales
-        # =====================================================
-        if texto in ('', 'none', 'n/a', 'na', ':', '.', '::'):
+        # =========================
+        # 4. Casos vacíos
+        # =========================
+        if texto in ("", "none", "n/a", "na", "null"):
             raise ValueError("Hora vacía")
 
-        # =====================================================
-        # 6. FIXES de formatos incompletos
-        # =====================================================
+        # =========================
+        # 5. Normalizaciones especiales
+        # =========================
 
-        # ":30" o ";30" ya quedó como ":30"
-        if re.fullmatch(r':\d{1,2}', texto):
-            texto = '00' + texto
+        # ":30" o "30:" o ";30"
+        if re.fullmatch(r":\d{1,2}", texto):
+            texto = "0" + texto
 
-        # "03:" / "03:" / "03:" (con espacios ya removidos)
-        if re.fullmatch(r'\d{1,2}:', texto):
-            texto = texto + '00'
+        if re.fullmatch(r"\d{1,2}:", texto):
+            texto = texto + "00"
 
-        # ".30" → "00.30"
-        if re.fullmatch(r'\.\d{1,2}', texto):
-            texto = '00' + texto
+        # "03" -> 00:03 (solo si no es HHMM)
+        # lo dejamos para más abajo
 
-        # "3." → "3.00"
-        if re.fullmatch(r'\d{1,2}\.', texto):
-            texto = texto + '00'
-
-        # =====================================================
-        # 7. Parseo principal
-        # =====================================================
+        # =========================
+        # 6. Parsing
+        # =========================
         hora = None
         minuto = None
 
-        # SOLO MINUTOS (5 → 00:05)
-        if re.fullmatch(r'\d{1,2}', texto):
+        # SOLO MINUTOS: "12"
+        if re.fullmatch(r"\d{1,2}", texto):
             hora = 0
             minuto = int(texto)
 
-        # HHMM (2149 → 21:49)
-        elif re.fullmatch(r'\d{3,4}', texto):
+        # HHMM: 2149 / 205
+        elif re.fullmatch(r"\d{3,4}", texto):
             if len(texto) == 3:
                 hora = int(texto[0])
                 minuto = int(texto[1:])
@@ -1138,45 +1107,35 @@ class ImportadorUniversal:
                 hora = int(texto[:2])
                 minuto = int(texto[2:])
 
-        # HH:MM o HH.MM
-        elif re.fullmatch(r'\d{1,2}[:.]\d{1,2}', texto):
-            sep = ':' if ':' in texto else '.'
-            hora, minuto = [int(x) for x in texto.split(sep)]
-
-        # HH:MM:SS o HH.MM.SS
-        elif re.fullmatch(r'\d{1,2}[:.]\d{1,2}[:.]\d{1,2}', texto):
-            sep = ':' if ':' in texto else '.'
-            parts = texto.split(sep)
-            hora, minuto = int(parts[0]), int(parts[1])
+        # HH:MM
+        elif re.fullmatch(r"\d{1,2}:\d{1,2}", texto):
+            hora, minuto = map(int, texto.split(":"))
 
         else:
             raise ValueError(f"Formato de hora no reconocido: {hora_raw}")
 
-        # =====================================================
-        # 8. validaciones duras
-        # =====================================================
-        if minuto is None or hora is None:
-            raise ValueError(f"Hora inválida: {hora_raw}")
-
-        if minuto >= 60:
+        # =========================
+        # 7. Validaciones
+        # =========================
+        if minuto < 0 or minuto >= 60:
             raise ValueError(f"Minutos inválidos: {hora_raw}")
 
         if hora < 0:
             raise ValueError(f"Hora inválida: {hora_raw}")
 
-        # =====================================================
-        # 9. overflow de días (26:30 → +1 día 02:30)
-        # =====================================================
+        # =========================
+        # 8. Overflow (26:30 -> día siguiente)
+        # =========================
         total_minutos = hora * 60 + minuto
 
         dias = total_minutos // (24 * 60)
         total_minutos = total_minutos % (24 * 60)
 
-        fecha_resultado = fecha_base + timedelta(days=dias)
+        fecha_final = fecha_base + timedelta(days=dias)
 
-        hora_resultado = f"{total_minutos // 60:02d}:{total_minutos % 60:02d}"
+        hora_final = f"{total_minutos // 60:02d}:{total_minutos % 60:02d}"
 
-        return fecha_resultado, hora_resultado
+        return fecha_final, hora_final
 
     def _parsear_repeticiones(self, valor: Any) -> int:
         texto = self._limpiar_valor(valor)
@@ -1227,30 +1186,11 @@ class ImportadorUniversal:
         raise ValueError(f"Tipo de fecha no soportado: {type(fecha)}")
 
     def _formatear_hora(self, hora) -> str:
-        """Convierte diversos formatos de hora a HH:MM."""
-        if isinstance(hora, str):
-            for fmt in ['%H:%M', '%H:%M:%S', '%I:%M %p']:
-                try:
-                    return datetime.strptime(hora, fmt).strftime('%H:%M')
-                except ValueError:
-                    continue
-
-            texto = hora.strip().replace(';', ':').replace('.', ':').replace(' ', '')
-            if re.fullmatch(r'\d{3,4}', texto):
-                if len(texto) == 3:
-                    hora_parse = int(texto[0])
-                    minuto_parse = int(texto[1:])
-                else:
-                    hora_parse = int(texto[:2])
-                    minuto_parse = int(texto[2:])
-                return f"{hora_parse:02d}:{minuto_parse:02d}"
-
-            raise ValueError(f"Formato de hora no reconocido: {hora}")
-
-        if isinstance(hora, time):
-            return hora.strftime('%H:%M')
-
-        raise ValueError(f"Tipo de hora no soportado: {type(hora)}")
+        fecha_dummy, hora_norm = self._normalizar_hora_y_fecha(
+            hora,
+            date.today()
+        )
+        return hora_norm
 
     def _obtener_supervisor_id(
         self,
