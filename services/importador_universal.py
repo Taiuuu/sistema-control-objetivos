@@ -742,24 +742,39 @@ class ImportadorUniversal:
 
         return False
 
-    def _parsear_control_recorridos_legacy(self, ws, sheet_date: date, turno: str) -> List[RegistroImportacion]:
+    def _parsear_control_recorridos_legacy(
+        self,
+        ws,
+        sheet_date: date,
+        turno: str
+    ) -> List[RegistroImportacion]:
         """
         Parsea el formato CONTROL_RECORRIDOS real con 3 bloques horizontales.
+
         Cada bloque representa una pasada adicional al mismo objetivo.
-        Estructura por bloque: NO | OBJETIVO | TURNO | MOVIL | HORA | SUPERVISOR
-        Bloques: cols 1-6 (1ra pasada), cols 8-13 (2da pasada), cols 15-20 (3ra pasada).
 
-        FIX:
-        - Algunas filas vienen con turno vacío o inconsistente.
-        - Si la hoja ya define el turno (ej: 18-5 (N)),
-        usamos el turno de la hoja como fallback.
-        - Esto evita perder pasadas válidas.
+        Estructura por bloque:
+        NO | OBJETIVO | TURNO | MOVIL | HORA | SUPERVISOR
+
+        Bloques:
+        - cols 1-6   -> primera pasada
+        - cols 8-13  -> segunda pasada
+        - cols 15-20 -> tercera pasada
+
+        Reglas:
+        - El turno REAL válido es el de la hoja.
+        - Si la fila tiene turno explícito y no coincide con la hoja:
+        se ignora.
+        - Si la fila no tiene turno:
+        se usa el turno de la hoja como fallback.
         """
-
+        import re
         registros = []
-
-        for fila in ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=True):
-            fila_es_encabezado = self._es_fila_encabezado_global_control_recorridos(fila)
+        for fila in ws.iter_rows(
+            min_row=1,
+            max_row=ws.max_row,
+            values_only=True,
+        ):
             for (c_obj, c_turno, c_hora, c_sup) in self._bloques_control_recorridos():
 
                 idx_obj = c_obj - 1
@@ -770,8 +785,11 @@ class ImportadorUniversal:
                 if len(fila) <= idx_hora:
                     continue
                 objetivo = self._limpiar_valor(fila[idx_obj])
-
-                turno_raw = fila[idx_turno] if len(fila) > idx_turno else None
+                turno_raw = (
+                    fila[idx_turno]
+                    if len(fila) > idx_turno
+                    else None
+                )
                 hora_raw = fila[idx_hora]
                 supervisor = (
                     self._limpiar_valor(fila[idx_sup])
@@ -779,15 +797,16 @@ class ImportadorUniversal:
                     else None
                 )
 
-                if not objetivo or hora_raw is None:
-                    continue
-                if fila_es_encabezado and self._es_encabezado(objetivo):
+                if (
+                    not objetivo
+                    or str(objetivo).strip() == ''
+                    or hora_raw is None
+                    or str(hora_raw).strip() == ''
+                ):
                     continue
 
-                # ==========================================================
-                # NORMALIZAR TURNO DE FILA
-                # ==========================================================
-
+                if self._es_encabezado(objetivo):
+                    continue
                 turno_fila = None
 
                 if turno_raw is not None:
@@ -799,33 +818,44 @@ class ImportadorUniversal:
                     elif t in ('NOCHE', 'NOCTURNO', 'N'):
                         turno_fila = 'nocturno'
 
-                # ==========================================================
-                # FIX PRINCIPAL:
-                # Si la fila no tiene turno válido,
-                # usar el turno de la hoja.
-                # ==========================================================
-
                 turno_final = turno_fila or turno
 
-                # Si sigue sin haber turno, ignorar
                 if turno_final is None:
                     continue
+                if turno_fila is not None:
 
-                # ==========================================================
-                # VALIDAR COHERENCIA SOLO SI LA FILA TIENE TURNO EXPLÍCITO
-                # ==========================================================
+                    if turno is not None and turno_fila != turno:
+                        continue
+                if isinstance(hora_raw, str):
+                    hora_test = hora_raw.strip()
+                    if not hora_test:
+                        continue
 
-                if turno_fila is not None and turno is not None:
-                    if turno_fila != turno:
+                    if not re.match(
+                        r'^\d{1,2}:\d{2}(:\d{2})?$',
+                        hora_test
+                    ):
                         continue
 
                 try:
-                    fecha_import, hora_normalizada = self._normalizar_hora_y_fecha(
-                        hora_raw,
-                        sheet_date,
+
+                    fecha_import, hora_normalizada = (
+                        self._normalizar_hora_y_fecha(
+                            hora_raw,
+                            sheet_date,
+                        )
                     )
 
-                except Exception:
+                except Exception as e:
+                    print(
+                        f'[CONTROL_RECORRIDOS ERROR] '
+                        f'Hoja={ws.title} | '
+                        f'Objetivo={objetivo} | '
+                        f'Hora={hora_raw} | '
+                        f'Turno={turno_final} | '
+                        f'Error={e}'
+                    )
+
                     continue
 
                 registros.append(
