@@ -424,6 +424,55 @@ def dar_de_baja_objetivo(
     except Exception as e:
         logger.error(f"Error inesperado: {e}")
         raise DatabaseError("UPDATE", str(e))
+    
+# =============================================================================
+# FUNCIONES DE ELIMINAR (HARD DELETE)
+# =============================================================================
+
+def eliminar_objetivo(objetivo_id: int) -> bool:
+    """Elimina físicamente un objetivo de la base de datos.
+    
+    Args:
+        objetivo_id: ID del objetivo a eliminar.
+    
+    Returns:
+        True si fue eliminado correctamente.
+    
+    Raises:
+        ValidationError: Si el ID no es válido.
+        ObjetivoNoEncontrado: Si no existe el objetivo.
+        DatabaseError: Si hay error en la base de datos.
+    """
+    try:
+        objetivo_id = validar_id(objetivo_id)
+
+        # Verificar que existe
+        objetivo = obtener_objetivo(objetivo_id)
+
+        with gestor_db.transaction() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM objetivos WHERE id = ?",
+                (objetivo_id,)
+            )
+
+        # Notificar cambio
+        notificar_cambio("objetivos", "DELETE", {
+            "id": objetivo_id,
+            "nombre": objetivo.nombre
+        })
+
+        invalidar_objetivos()
+
+        logger.warning(f"Objetivo eliminado permanentemente: {objetivo.nombre} (ID: {objetivo_id})")
+
+        return True
+
+    except (ValidationError, ObjetivoError):
+        raise
+    except Exception as e:
+        logger.error(f"Error eliminando objetivo: {e}")
+        raise DatabaseError("DELETE", str(e))
 
 
 # =============================================================================
