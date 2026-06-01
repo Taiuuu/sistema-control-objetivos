@@ -179,7 +179,7 @@ class ImportadorUniversal:
         """Importa datos desde archivo Excel."""
         try:
             preview = self.previsualizar_archivo(ruta_archivo)
-            if preview.get('tipo') in ('control_recorridos') and len(preview.get('registros', [])) > 0:
+            if preview.get('tipo') == 'control_recorridos' and len(preview.get('registros', [])) > 0:
                 return self.importar_registros(preview['registros'])
 
             df = pd.read_excel(ruta_archivo, sheet_name='Pasadas')
@@ -241,28 +241,37 @@ class ImportadorUniversal:
             sheet_names=sheet_names,
         )
 
-        if preview.get('tipo') in ('control_recorridos') and len(preview.get('registros', [])) > 0:
-            return self.importar_registros(preview['registros'])
+        if (
+            preview.get('tipo') == 'control_recorridos'
+            and len(preview.get('registros', [])) > 0
+        ):
+            registros = preview['registros']
 
-        registros = preview.get('registros', [])
+            if sheet_turno_map:
+                for r in registros:
+                    mapped = sheet_turno_map.get(
+                        r.sheet_title
+                    )
 
-        # =====================================================
-        # Aplicar turno manual por hoja
-        # =====================================================
+                    if mapped:
+                        r.turno = mapped
 
-        if sheet_turno_map:
-            for r in registros:
-                mapped = sheet_turno_map.get(r.sheet_title)
+            return self.importar_registros(
+                registros,
+                objetivo_mapeo=objetivo_mapeo,
+                supervisor_mapeo=supervisor_mapeo,
+                progress_callback=progress_callback,
+            )
 
-                if mapped:
-                    r.turno = mapped
-
-                return self.importar_registros(
-                    registros,
-                    objetivo_mapeo=objetivo_mapeo,
-                    supervisor_mapeo=supervisor_mapeo,
-                    progress_callback=progress_callback,
-                )
+        return ResultadoImportacion(
+            total_registros=0,
+            registros_validos=0,
+            registros_errores=1,
+            registros_duplicados=0,
+            errores=['No se encontraron registros válidos'],
+            duplicados=[],
+            exitoso=False,
+        )
 
     def importar_registros(
         self,
@@ -966,12 +975,32 @@ class ImportadorUniversal:
         ]
 
     def _parsear_nombre_sheet(self, sheet_name: str):
+        """
+        Extrae fecha y turno desde nombres tipo:
+
+        01-05 D
+        01/05 N
+        01-05 (D)
+        01-05 DIURNO
+        01-05 NOCTURNO
+
+        IMPORTANTE:
+        Todas las hojas CONTROL_RECORRIDOS pertenecen
+        al año operativo actual configurado por la aplicación.
+
+        No intenta adivinar años.
+        """
+
         import re
+        from datetime import date
 
         texto = str(sheet_name).strip().upper()
 
-        # fecha
-        match = re.search(r'(\d{1,2})\s*[-/]\s*(\d{1,2})', texto)
+        match = re.search(
+            r'(\d{1,2})\s*[-/]\s*(\d{1,2})',
+            texto
+        )
+
         if not match:
             return None, None
 
@@ -982,31 +1011,29 @@ class ImportadorUniversal:
 
         if re.search(r'\(D\)|DIURNO|\bD\b', texto):
             turno = 'diurno'
+
         elif re.search(r'\(N\)|NOCTURNO|\bN\b', texto):
             turno = 'nocturno'
 
         if turno is None:
             return None, None
 
-        from datetime import date
+        # =====================================================
+        # AÑO FIJO
+        # =====================================================
 
-        today = date.today()
-        mejor = None
-        mejor_delta = None
+        YEAR_IMPORTACION = 2026
 
-        for year in [today.year - 1, today.year, today.year + 1]:
-            try:
-                fecha = date(year, mes, dia)
-            except:
-                continue
+        try:
+            fecha = date(
+                YEAR_IMPORTACION,
+                mes,
+                dia
+            )
+        except ValueError:
+            return None, None
 
-            delta = abs((fecha - today).days)
-
-            if mejor is None or delta < mejor_delta:
-                mejor = fecha
-                mejor_delta = delta
-
-        return mejor, turno
+        return fecha, turno
 
     def _normalizar_hora_y_fecha(
         self,
@@ -1206,9 +1233,7 @@ class ImportadorUniversal:
         if not nombre:
             return None
 
-        if self._cache_supervisores is None:
-
-            self._cache_supervisores = {}
+        if not self._cache_supervisores:
 
             filas = gestor_db.ejecutar(
                 "SELECT id, nombre FROM supervisores"
@@ -1229,7 +1254,7 @@ class ImportadorUniversal:
         return self._cache_supervisores.get(
             normalized
         )
-
+    
     def _obtener_objetivo_id(
         self,
         nombre_objetivo: str
@@ -1244,9 +1269,7 @@ class ImportadorUniversal:
         if not nombre:
             return None
 
-        if self._cache_objetivos is None:
-
-            self._cache_objetivos = {}
+        if not self._cache_objetivos:
 
             filas = gestor_db.ejecutar(
                 "SELECT id, nombre FROM objetivos"
@@ -1267,7 +1290,7 @@ class ImportadorUniversal:
         return self._cache_objetivos.get(
             normalized
         )
-
+    
     def _es_duplicado(self, supervisor_id: int, objetivo_id: int, fecha_operativa: str, hora: str, turno: str) -> bool:
         """Verifica si una pasada ya existe (duplicada)."""
         resultados = gestor_db.ejecutar(
