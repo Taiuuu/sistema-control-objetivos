@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple, Callable
 import pandas as pd
 from openpyxl import load_workbook
 
-from database import gestor_db
+from database.gestor_db import gestor_db
 from .gestor_turnos import GestorTurnos
 from .sync_manager import get_sync_manager
 
@@ -64,6 +64,38 @@ class ImportadorUniversal:
 
         self._cache_objetivos: Dict[str, int] = {}
         self._cache_supervisores: Dict[str, int] = {}
+        self._cache_inicializado = False
+
+    def _inicializar_caches(self) -> None:
+        """Inicializa los caches de objetivos y supervisores una sola vez."""
+        if self._cache_inicializado:
+            return
+        
+        # Cargar objetivos
+        try:
+            filas = gestor_db.ejecutar(
+                "SELECT id, nombre FROM objetivos"
+            )
+            for fila in filas:
+                key = self._normalizar_texto(fila['nombre'])
+                self._cache_objetivos[key] = int(fila['id'])
+            print(f"[CACHE] Cargados {len(self._cache_objetivos)} objetivos")
+        except Exception as e:
+            print(f"[ERROR] No se pudieron cargar objetivos: {e}")
+
+        # Cargar supervisores
+        try:
+            filas = gestor_db.ejecutar(
+                "SELECT id, nombre FROM supervisores"
+            )
+            for fila in filas:
+                key = self._normalizar_texto(fila['nombre'])
+                self._cache_supervisores[key] = int(fila['id'])
+            print(f"[CACHE] Cargados {len(self._cache_supervisores)} supervisores")
+        except Exception as e:
+            print(f"[ERROR] No se pudieron cargar supervisores: {e}")
+        
+        self._cache_inicializado = True
 
     def previsualizar_archivo(
         self,
@@ -74,11 +106,15 @@ class ImportadorUniversal:
         Previsualiza un archivo Excel y detecta si es CONTROL_RECORRIDOS.
 
         NUEVA LÓGICA:
-        - NO resuelve automáticamente objetivos
-        - NO resuelve automáticamente supervisores
-        - Devuelve TODOS los detectados para mapeo manual
+        - Extrae TODOS los objetivos detectados
+        - Determina cuáles existen en BD (resueltos) y cuáles no
+        - Devuelve mapeos preparados para auto-resolver objetivos existentes
+        - El usuario solo ve objetivos NO resueltos que necesitan crear o mapear
         """
         try:
+            # Inicializar caches una sola vez
+            self._inicializar_caches()
+            
             wb = load_workbook(
                 ruta_archivo,
                 data_only=True,
@@ -95,6 +131,8 @@ class ImportadorUniversal:
                     'registros': [],
                     'objetivos_detectados': [],
                     'supervisores_detectados': [],
+                    'objetivos_resueltos': {},  # NUEVO: objetivos que SÍ existen
+                    'supervisores_resueltos': {},  # NUEVO: supervisores que SÍ existen
                     'objetivos_no_resueltos': [],
                     'supervisores_no_resueltos': [],
                     'sheet_options': [],
@@ -111,7 +149,7 @@ class ImportadorUniversal:
             registros = control.get('registros', [])
 
             # =====================================================
-            # EXTRAER TODOS LOS OBJETIVOS DETECTADOS
+            # EXTRAER TODOS LOS OBJETIVOS Y SUPERVISORES DETECTADOS
             # =====================================================
             objetivos_detectados = sorted({
                 r.objetivo.strip()
@@ -119,9 +157,6 @@ class ImportadorUniversal:
                 if r.objetivo and str(r.objetivo).strip()
             })
 
-            # =====================================================
-            # EXTRAER TODOS LOS SUPERVISORES DETECTADOS
-            # =====================================================
             supervisores_detectados = sorted({
                 r.supervisor.strip()
                 for r in registros
@@ -129,21 +164,35 @@ class ImportadorUniversal:
             })
 
             # =====================================================
-            # DETERMINAR OBJETIVOS Y SUPERVISORES NO RESUELTOS
+            # CLASIFICAR EN RESUELTOS Y NO RESUELTOS
             # =====================================================
+            objetivos_resueltos = {}
             objetivos_no_resueltos = []
+            
             for nombre in objetivos_detectados:
-                try:
-                    if self._obtener_objetivo_id(nombre) is None:
-                        objetivos_no_resueltos.append(nombre)
-                except Exception:
+                objetivo_id = self._obtener_objetivo_id(nombre)
+                if objetivo_id is not None:
+                    objetivos_resueltos[nombre] = objetivo_id
+                else:
                     objetivos_no_resueltos.append(nombre)
 
-            supervisores_no_resueltos = [
-                nombre
-                for nombre in supervisores_detectados
-                if self._obtener_supervisor_id(nombre) is None
-            ]
+            supervisores_resueltos = {}
+            supervisores_no_resueltos = []
+            
+            for nombre in supervisores_detectados:
+                supervisor_id = self._obtener_supervisor_id(nombre)
+                if supervisor_id is not None:
+                    supervisores_resueltos[nombre] = supervisor_id
+                else:
+                    supervisores_no_resueltos.append(nombre)
+
+            # =====================================================
+            # LOG DE RESUMEN
+            # =====================================================
+            print(f"\n[PREVIEW] Archivo: {ruta_archivo}")
+            print(f"  Total registros: {len(registros)}")
+            print(f"  Objetivos: {len(objetivos_detectados)} ({len(objetivos_resueltos)} resueltos, {len(objetivos_no_resueltos)} nuevos)")
+            print(f"  Supervisores: {len(supervisores_detectados)} ({len(supervisores_resueltos)} resueltos, {len(supervisores_no_resueltos)} nuevos)")
 
             # =====================================================
             # RESPUESTA FINAL
@@ -153,6 +202,8 @@ class ImportadorUniversal:
                 'registros': registros,
                 'objetivos_detectados': objetivos_detectados,
                 'supervisores_detectados': supervisores_detectados,
+                'objetivos_resueltos': objetivos_resueltos,
+                'supervisores_resueltos': supervisores_resueltos,
                 'objetivos_no_resueltos': objetivos_no_resueltos,
                 'supervisores_no_resueltos': supervisores_no_resueltos,
                 'sheet_options': sheet_options,
@@ -160,16 +211,19 @@ class ImportadorUniversal:
 
         except Exception as e:
             # =====================================================
-            # ERROR EXPLÍCITO: no usar legacy
+            # ERROR EXPLÍCITO
             # =====================================================
             import traceback
             traceback.print_exc()
+            print(f"[ERROR PREVIEW] {e}")
             return {
                 'tipo': 'error',
                 'error': str(e),
                 'registros': [],
                 'objetivos_detectados': [],
                 'supervisores_detectados': [],
+                'objetivos_resueltos': {},
+                'supervisores_resueltos': {},
                 'objetivos_no_resueltos': [],
                 'supervisores_no_resueltos': [],
                 'sheet_options': [],
@@ -229,48 +283,91 @@ class ImportadorUniversal:
     def importar_control_recorridos(
         self,
         ruta_archivo: str,
-        objetivo_mapeo: Dict[str, int],
-        supervisor_mapeo: Dict[str, int],
+        objetivo_mapeo: Optional[Dict[str, int]] = None,
+        supervisor_mapeo: Optional[Dict[str, int]] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
         sheet_names: Optional[List[str]] = None,
         sheet_turno_map: Optional[Dict[str, str]] = None,
+        preview_precalculado: Optional[Dict[str, Any]] = None,
     ) -> ResultadoImportacion:
-
-        preview = self.previsualizar_archivo(
-            ruta_archivo,
-            sheet_names=sheet_names,
-        )
-
-        if (
-            preview.get('tipo') == 'control_recorridos'
-            and len(preview.get('registros', [])) > 0
-        ):
-            registros = preview['registros']
-
-            if sheet_turno_map:
-                for r in registros:
-                    mapped = sheet_turno_map.get(
-                        r.sheet_title
-                    )
-
-                    if mapped:
-                        r.turno = mapped
-
-            return self.importar_registros(
-                registros,
-                objetivo_mapeo=objetivo_mapeo,
-                supervisor_mapeo=supervisor_mapeo,
-                progress_callback=progress_callback,
+        """
+        Importa CONTROL_RECORRIDOS con auto-resolución de objetivos y supervisores.
+        
+        Si objetivo_mapeo o supervisor_mapeo es None, auto-resuelve los que existen en BD.
+        Si preview_precalculado se proporciona, lo reutiliza (evita doble parseo).
+        """
+        
+        # Inicializar caches
+        self._inicializar_caches()
+        
+        # Usar preview precalculado si está disponible
+        if preview_precalculado is not None:
+            preview = preview_precalculado
+        else:
+            preview = self.previsualizar_archivo(
+                ruta_archivo,
+                sheet_names=sheet_names,
             )
 
-        return ResultadoImportacion(
-            total_registros=0,
-            registros_validos=0,
-            registros_errores=1,
-            registros_duplicados=0,
-            errores=['No se encontraron registros válidos'],
-            duplicados=[],
-            exitoso=False,
+        if preview.get('tipo') != 'control_recorridos':
+            return ResultadoImportacion(
+                total_registros=0,
+                registros_validos=0,
+                registros_errores=1,
+                registros_duplicados=0,
+                errores=[f"Tipo de archivo inválido: {preview.get('tipo')}"],
+                duplicados=[],
+                exitoso=False,
+            )
+
+        registros = preview.get('registros', [])
+        if len(registros) == 0:
+            return ResultadoImportacion(
+                total_registros=0,
+                registros_validos=0,
+                registros_errores=1,
+                registros_duplicados=0,
+                errores=['No se encontraron registros válidos'],
+                duplicados=[],
+                exitoso=False,
+            )
+
+        # ================================================================
+        # AUTO-RESOLVER OBJETIVOS Y SUPERVISORES QUE EXISTEN EN BD
+        # ================================================================
+        
+        # Mapeo final que combina auto-resueltos + custom mapeos
+        mapeo_objetivo_final = dict(preview.get('objetivos_resueltos', {}))
+        if objetivo_mapeo:
+            mapeo_objetivo_final.update(objetivo_mapeo)
+
+        mapeo_supervisor_final = dict(preview.get('supervisores_resueltos', {}))
+        if supervisor_mapeo:
+            mapeo_supervisor_final.update(supervisor_mapeo)
+
+        # ================================================================
+        # LOG DE MAPEOS
+        # ================================================================
+        print(f"\n[IMPORTACIÓN] Mapeos finales:")
+        print(f"  Objetivos mapeados: {len(mapeo_objetivo_final)}")
+        for nombre, obj_id in sorted(mapeo_objetivo_final.items()):
+            print(f"    {nombre} -> ID {obj_id}")
+        print(f"  Supervisores mapeados: {len(mapeo_supervisor_final)}")
+        for nombre, sup_id in sorted(mapeo_supervisor_final.items()):
+            print(f"    {nombre} -> ID {sup_id}")
+
+        # Aplicar mapeo de turnos por sheet si es necesario
+        if sheet_turno_map:
+            for r in registros:
+                mapped = sheet_turno_map.get(r.sheet_title)
+                if mapped:
+                    r.turno = mapped
+
+        return self.importar_registros(
+            registros,
+            objetivo_mapeo=mapeo_objetivo_final,
+            supervisor_mapeo=mapeo_supervisor_final,
+            progress_callback=progress_callback,
         )
 
     def importar_registros(
@@ -360,68 +457,85 @@ class ImportadorUniversal:
         supervisor_mapeo: Optional[Dict[str, int]] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> ResultadoImportacion:
-        """Procesa registros importados."""
+        """Procesa registros importados con auto-resolución de referencias."""
 
         total = len(registros)
-
         validos = 0
-
         errores = []
-
         duplicados = []
 
         objetivo_mapeo = objetivo_mapeo or {}
-
         supervisor_mapeo = supervisor_mapeo or {}
 
         procesados = 0
-
         abort = False
 
+        # Inicializar caches para búsquedas adicionales
+        self._inicializar_caches()
+
+        print(f"\n[PROCESAMIENTO] Iniciando con {total} registros")
+        print(f"  Mapeo objetivos: {len(objetivo_mapeo)} entradas")
+        print(f"  Mapeo supervisores: {len(supervisor_mapeo)} entradas")
+
         for registro in registros:
-
             try:
-
-                supervisor_id = supervisor_mapeo.get(
-                    registro.supervisor
-                )
-
-                objetivo_id = objetivo_mapeo.get(
-                    registro.objetivo
-                )
+                # ============================================================
+                # 1. RESOLVER SUPERVISOR
+                # ============================================================
+                supervisor_id = supervisor_mapeo.get(registro.supervisor)
+                
+                if not supervisor_id:
+                    # Intentar resolver por caché
+                    supervisor_id = self._obtener_supervisor_id(registro.supervisor)
 
                 if not supervisor_id:
-
                     errores.append(
-                        f"Supervisor sin mapear: "
-                        f"{registro.supervisor}"
+                        f"Supervisor no encontrado: '{registro.supervisor}'"
                     )
-
+                    print(f"  [ERROR] Supervisor: {registro.supervisor}")
+                    procesados += 1
                     continue
+
+                # ============================================================
+                # 2. RESOLVER OBJETIVO
+                # ============================================================
+                objetivo_id = objetivo_mapeo.get(registro.objetivo)
+                
+                if not objetivo_id:
+                    # Intentar resolver por caché
+                    objetivo_id = self._obtener_objetivo_id(registro.objetivo)
 
                 if not objetivo_id:
-
                     errores.append(
-                        f"Objetivo sin mapear: "
-                        f"{registro.objetivo}"
+                        f"Objetivo no encontrado: '{registro.objetivo}'"
                     )
-
+                    print(f"  [ERROR] Objetivo: {registro.objetivo}")
+                    procesados += 1
                     continue
 
-                if registro.turno not in [
-                    'diurno',
-                    'nocturno',
-                ]:
-
+                # ============================================================
+                # 3. VALIDAR TURNO
+                # ============================================================
+                turno_normalizado = str(registro.turno).strip().lower()
+                if turno_normalizado not in ['diurno', 'nocturno', 'd', 'n']:
                     errores.append(
-                        f"Turno inválido: "
-                        f"{registro.turno}"
+                        f"Turno inválido: '{registro.turno}' "
+                        f"(debe ser 'diurno' o 'nocturno')"
                     )
-
+                    print(f"  [ERROR] Turno inválido: {turno_normalizado}")
+                    procesados += 1
                     continue
 
+                # Normalizar turno
+                if turno_normalizado in ('d', 'dia', 'diurno'):
+                    turno_normalizado = 'diurno'
+                elif turno_normalizado in ('n', 'noche', 'nocturno'):
+                    turno_normalizado = 'nocturno'
+
+                # ============================================================
+                # 4. PARSEAR FECHA Y HORA
+                # ============================================================
                 try:
-
                     fecha = datetime.strptime(
                         registro.fecha,
                         "%Y-%m-%d"
@@ -432,100 +546,105 @@ class ImportadorUniversal:
                         "%H:%M"
                     ).time()
 
-                    es_control_recorridos = bool(
-                        registro.sheet_title
-                    )
+                    es_control_recorridos = bool(registro.sheet_title)
 
                     if es_control_recorridos:
-
                         fecha_operativa = fecha
-
                     else:
-
                         fecha_operativa = (
                             GestorTurnos
                             .calcular_fecha_operativa(
                                 fecha,
                                 hora,
-                                registro.turno,
+                                turno_normalizado,
                             )
                         )
 
                 except ValueError as e:
-
                     errores.append(
-                        f"Error en formato fecha/hora "
-                        f"({registro.fecha} "
-                        f"{registro.hora}): {e}"
+                        f"Formato fecha/hora inválido "
+                        f"(fecha: {registro.fecha}, hora: {registro.hora}): {e}"
                     )
-
+                    print(f"  [ERROR] Fecha/hora: {e}")
+                    procesados += 1
                     continue
 
+                # ============================================================
+                # 5. VERIFICAR DUPLICADOS
+                # ============================================================
                 if self._es_duplicado(
                     supervisor_id,
                     objetivo_id,
                     fecha_operativa.strftime('%Y-%m-%d'),
                     registro.hora,
-                    registro.turno,
+                    turno_normalizado,
                 ):
-
-                    duplicados.append(
-                        registro.to_dict()
-                    )
-
+                    duplicados.append(registro.to_dict())
+                    print(f"  [DUP] {fecha_operativa} {registro.hora} "
+                          f"{turno_normalizado}: {registro.objetivo}")
+                    procesados += 1
                     continue
 
-                creado = self.sync_manager.crear_pasada_offline(
-                    fecha_operativa.strftime('%Y-%m-%d'),
-                    registro.hora,
-                    registro.turno,
-                    supervisor_id,
-                    objetivo_id,
-                    registro.notas,
-                    validar_turno=not es_control_recorridos,
-                )
-
-                if creado:
-
-                    validos += 1
-
-                else:
-
-                    errores.append(
-                        f"Error creando pasada: "
-                        f"{registro.supervisor} - "
-                        f"{registro.objetivo}"
+                # ============================================================
+                # 6. CREAR PASADA
+                # ============================================================
+                try:
+                    creado = self.sync_manager.crear_pasada_offline(
+                        fecha_operativa.strftime('%Y-%m-%d'),
+                        registro.hora,
+                        turno_normalizado,
+                        supervisor_id,
+                        objetivo_id,
+                        registro.notas,
+                        validar_turno=not es_control_recorridos,
                     )
 
-            except Exception as e:
+                    if creado:
+                        validos += 1
+                        print(f"  [OK] {fecha_operativa} {registro.hora}: "
+                              f"{registro.objetivo}")
+                    else:
+                        errores.append(
+                            f"No se pudo crear pasada: "
+                            f"{registro.supervisor} - {registro.objetivo}"
+                        )
+                        print(f"  [ERROR] No se creó pasada")
 
+                except Exception as e:
+                    errores.append(
+                        f"Error creando pasada: {str(e)}"
+                    )
+                    print(f"  [ERROR] Excepción: {e}")
+
+            except Exception as e:
                 errores.append(
                     f"Error procesando registro: {str(e)}"
                 )
+                print(f"  [ERROR] Excepción general: {e}")
 
             finally:
-
                 procesados += 1
 
                 try:
-
                     if progress_callback:
-
-                        progress_callback(
-                            procesados,
-                            total,
-                        )
-
-                except Exception:
-
+                        progress_callback(procesados, total)
+                except Exception as e:
                     errores.append(
-                        "Importación cancelada por usuario."
+                        f"Importación cancelada: {e}"
                     )
-
                     abort = True
 
             if abort:
                 break
+
+        # ================================================================
+        # RESUMEN FINAL
+        # ================================================================
+        print(f"\n[RESUMEN FINAL]")
+        print(f"  Total: {total}")
+        print(f"  Válidos: {validos}")
+        print(f"  Errores: {len(errores)}")
+        print(f"  Duplicados: {len(duplicados)}")
 
         return ResultadoImportacion(
             total_registros=total,
@@ -534,7 +653,7 @@ class ImportadorUniversal:
             registros_duplicados=len(duplicados),
             errores=errores,
             duplicados=duplicados,
-            exitoso=(len(errores) == 0),
+            exitoso=(len(errores) == 0 and validos > 0),
         )
 
     def _parsear_control_recorridos(
@@ -767,6 +886,9 @@ class ImportadorUniversal:
         import re
 
         registros = []
+        filas_procesadas = 0
+        filas_salidas = 0
+        filas_con_error = 0
 
         for row_idx, fila in enumerate(
             ws.iter_rows(
@@ -778,124 +900,134 @@ class ImportadorUniversal:
         ):
 
             # ======================================================
-            # FIX:
-            # Ignorar filas ocultas por filtros de Excel
+            # FIX: Ignorar filas ocultas por filtros de Excel
             # ======================================================
 
             if ws.row_dimensions[row_idx].hidden:
+                filas_salidas += 1
                 continue
 
             # ======================================================
-            # FIX:
-            # Ignorar filas completamente vacías
+            # FIX: Ignorar filas completamente vacías
             # ======================================================
 
             if not fila:
+                filas_salidas += 1
                 continue
 
             if all(
                 self._limpiar_valor(valor) is None
                 for valor in fila
             ):
+                filas_salidas += 1
                 continue
 
-            for (c_obj, c_turno, c_hora, c_sup) in self._bloques_control_recorridos():
+            # Procesar cada bloque en la fila
+            for bloque_idx, (c_obj, c_turno, c_hora, c_sup) in enumerate(self._bloques_control_recorridos()):
 
                 idx_obj = c_obj - 1
                 idx_turno = c_turno - 1
                 idx_hora = c_hora - 1
                 idx_sup = c_sup - 1
 
+                # Saltar si la fila no tiene suficientes columnas
                 if len(fila) <= idx_hora:
                     continue
 
-                objetivo = self._limpiar_valor(fila[idx_obj])
+                try:
+                    objetivo = self._limpiar_valor(fila[idx_obj])
+                    turno_raw = (
+                        fila[idx_turno]
+                        if len(fila) > idx_turno
+                        else None
+                    )
+                    hora_raw = fila[idx_hora]
+                    supervisor = (
+                        self._limpiar_valor(fila[idx_sup])
+                        if len(fila) > idx_sup
+                        else None
+                    )
 
-                turno_raw = (
-                    fila[idx_turno]
-                    if len(fila) > idx_turno
-                    else None
-                )
-
-                hora_raw = fila[idx_hora]
-
-                supervisor = (
-                    self._limpiar_valor(fila[idx_sup])
-                    if len(fila) > idx_sup
-                    else None
-                )
-
-                if (
-                    not objetivo
-                    or str(objetivo).strip() == ''
-                    or hora_raw is None
-                    or str(hora_raw).strip() == ''
-                ):
-                    continue
-
-                if self._es_encabezado(objetivo):
-                    continue
-
-                turno_fila = None
-
-                if turno_raw is not None:
-
-                    t = str(turno_raw).strip().upper()
-
-                    if t in ('DIA', 'DIURNO', 'D'):
-                        turno_fila = 'diurno'
-
-                    elif t in ('NOCHE', 'NOCTURNO', 'N'):
-                        turno_fila = 'nocturno'
-
-                turno_final = turno_fila or turno
-
-                if turno_final is None:
-                    continue
-
-                # ======================================================
-                # Validar coherencia entre turno fila y turno hoja
-                # ======================================================
-
-                if turno_fila is not None:
-
-                    if turno is not None and turno_fila != turno:
+                    # Validaciones básicas
+                    if (
+                        not objetivo
+                        or str(objetivo).strip() == ''
+                        or hora_raw is None
+                        or str(hora_raw).strip() == ''
+                    ):
                         continue
 
-                try:
+                    if self._es_encabezado(objetivo):
+                        continue
 
-                    fecha_import, hora_normalizada = (
-                        self._normalizar_hora_y_fecha(
-                            hora_raw,
-                            sheet_date,
+                    # Resolver turno
+                    turno_fila = None
+
+                    if turno_raw is not None:
+                        t = str(turno_raw).strip().upper()
+
+                        if t in ('DIA', 'DIURNO', 'D'):
+                            turno_fila = 'diurno'
+
+                        elif t in ('NOCHE', 'NOCTURNO', 'N'):
+                            turno_fila = 'nocturno'
+
+                    turno_final = turno_fila or turno
+
+                    if turno_final is None:
+                        filas_con_error += 1
+                        continue
+
+                    # Validar coherencia entre turno fila y turno hoja
+                    if turno_fila is not None and turno is not None and turno_fila != turno:
+                        continue
+
+                    # Normalizar hora y fecha
+                    try:
+                        fecha_import, hora_normalizada = (
+                            self._normalizar_hora_y_fecha(
+                                hora_raw,
+                                sheet_date,
+                            )
+                        )
+                    except Exception as e:
+                        print(
+                            f'[PARSE ERROR] '
+                            f'Hoja={ws.title} | '
+                            f'Fila={row_idx} | '
+                            f'Bloque={bloque_idx+1} | '
+                            f'Objetivo={objetivo} | '
+                            f'Hora={hora_raw} | '
+                            f'Error: {e}'
+                        )
+                        filas_con_error += 1
+                        continue
+
+                    # Crear registro
+                    registros.append(
+                        RegistroImportacion(
+                            fecha=fecha_import.strftime('%Y-%m-%d'),
+                            hora=hora_normalizada,
+                            turno=turno_final,
+                            supervisor=supervisor or '',
+                            objetivo=objetivo,
+                            notas=None,
+                            fuente='excel',
+                            sheet_title=ws.title,
                         )
                     )
+                    filas_procesadas += 1
 
                 except Exception as e:
+                    print(f'[BLOQUE ERROR] Hoja={ws.title}, Fila={row_idx}, Bloque={bloque_idx+1}: {e}')
+                    filas_con_error += 1
 
-                    print(
-                        f'[CONTROL SHEET ERROR] '
-                        f'Hoja={ws.title} | '
-                        f'Fila={row_idx} | '
-                        f'Objetivo={objetivo} | '
-                        f'Hora={hora_raw} | '
-                        f'Error={e}'
-                    )
-
-                    continue
-
-                registros.append(
-                    RegistroImportacion(
-                        fecha=fecha_import.strftime('%Y-%m-%d'),
-                        hora=hora_normalizada,
-                        turno=turno_final,
-                        supervisor=supervisor or '',
-                        objetivo=objetivo,
-                        notas=None,
-                        fuente='excel',
-                        sheet_title=ws.title,
-                    )
-                )
+        # Log resumen
+        print(f"[PARSE SUMMARY] Hoja: {ws.title} | "
+              f"Registros: {len(registros)} | "
+              f"Filas procesadas: {filas_procesadas} | "
+              f"Filas salidas: {filas_salidas} | "
+              f"Filas con error: {filas_con_error}")
 
         return registros
 
@@ -1054,6 +1186,7 @@ class ImportadorUniversal:
         - :30 / ;30 -> 00:30
         - 26:30 -> día siguiente 02:30
         - datetime.time
+        - datetime.datetime
         """
 
         from datetime import timedelta, time
@@ -1064,9 +1197,15 @@ class ImportadorUniversal:
         # =========================
         if isinstance(hora_raw, time):
             return fecha_base, hora_raw.strftime("%H:%M")
+        
+        # =========================
+        # 2. DATETIME directo
+        # =========================
+        if isinstance(hora_raw, datetime):
+            return fecha_base, hora_raw.strftime("%H:%M")
 
         # =========================
-        # 2. Normalizar a string base
+        # 3. Normalizar a string base
         # =========================
         if hora_raw is None:
             raise ValueError("Hora vacía")
@@ -1080,7 +1219,7 @@ class ImportadorUniversal:
             texto = str(hora_raw)
 
         # =========================
-        # 3. Limpieza fuerte
+        # 4. Limpieza fuerte
         # =========================
         texto = texto.strip().lower()
 
@@ -1095,13 +1234,13 @@ class ImportadorUniversal:
         texto = texto.replace(";", ":").replace(".", ":")
 
         # =========================
-        # 4. Casos vacíos
+        # 5. Casos vacíos
         # =========================
-        if texto in ("", "none", "n/a", "na", "null"):
-            raise ValueError("Hora vacía")
+        if texto in ("", "none", "n/a", "na", "null", "-", "--"):
+            raise ValueError("Hora vacía o inválida")
 
         # =========================
-        # 5. Normalizaciones especiales
+        # 6. Normalizaciones especiales
         # =========================
 
         # ":30" o "30:" o ";30"
@@ -1111,11 +1250,8 @@ class ImportadorUniversal:
         if re.fullmatch(r"\d{1,2}:", texto):
             texto = texto + "00"
 
-        # "03" -> 00:03 (solo si no es HHMM)
-        # lo dejamos para más abajo
-
         # =========================
-        # 6. Parsing
+        # 7. Parsing
         # =========================
         hora = None
         minuto = None
@@ -1139,19 +1275,19 @@ class ImportadorUniversal:
             hora, minuto = map(int, texto.split(":"))
 
         else:
-            raise ValueError(f"Formato de hora no reconocido: {hora_raw}")
+            raise ValueError(f"Formato de hora no reconocido: '{hora_raw}' (procesado como '{texto}')")
 
         # =========================
-        # 7. Validaciones
+        # 8. Validaciones
         # =========================
         if minuto < 0 or minuto >= 60:
-            raise ValueError(f"Minutos inválidos: {hora_raw}")
+            raise ValueError(f"Minutos inválidos: {minuto} (entrada: {hora_raw})")
 
         if hora < 0:
-            raise ValueError(f"Hora inválida: {hora_raw}")
+            raise ValueError(f"Hora inválida: {hora} (entrada: {hora_raw})")
 
         # =========================
-        # 8. Overflow (26:30 -> día siguiente)
+        # 9. Overflow (26:30 -> día siguiente 02:30)
         # =========================
         total_minutos = hora * 60 + minuto
 
@@ -1233,27 +1369,12 @@ class ImportadorUniversal:
         if not nombre:
             return None
 
-        if not self._cache_supervisores:
-
-            filas = gestor_db.ejecutar(
-                "SELECT id, nombre FROM supervisores"
-            )
-
-            for fila in filas:
-
-                key = self._normalizar_texto(
-                    fila['nombre']
-                )
-
-                self._cache_supervisores[key] = int(
-                    fila['id']
-                )
+        # Asegurar que los caches estén inicializados
+        if not self._cache_inicializado:
+            self._inicializar_caches()
 
         normalized = self._normalizar_texto(nombre)
-
-        return self._cache_supervisores.get(
-            normalized
-        )
+        return self._cache_supervisores.get(normalized)
     
     def _obtener_objetivo_id(
         self,
@@ -1269,27 +1390,12 @@ class ImportadorUniversal:
         if not nombre:
             return None
 
-        if not self._cache_objetivos:
-
-            filas = gestor_db.ejecutar(
-                "SELECT id, nombre FROM objetivos"
-            )
-
-            for fila in filas:
-
-                key = self._normalizar_texto(
-                    fila['nombre']
-                )
-
-                self._cache_objetivos[key] = int(
-                    fila['id']
-                )
+        # Asegurar que los caches estén inicializados
+        if not self._cache_inicializado:
+            self._inicializar_caches()
 
         normalized = self._normalizar_texto(nombre)
-
-        return self._cache_objetivos.get(
-            normalized
-        )
+        return self._cache_objetivos.get(normalized)
     
     def _es_duplicado(self, supervisor_id: int, objetivo_id: int, fecha_operativa: str, hora: str, turno: str) -> bool:
         """Verifica si una pasada ya existe (duplicada)."""

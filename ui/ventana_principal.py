@@ -37,6 +37,7 @@ from ui.gestionar_usuarios import GestionarUsuarios
 from ui.ayuda import Ayuda
 from ui.transferir_datos import TransferirDatos
 from ui.importar_excel import ImportarExcel
+from ui.deshacer_importacion import DeshacerImportacion
 from ui.dashboard import Dashboard
 from ui.vista_auditoria import VistaAuditoria
 from ui.vista_validaciones import VistaValidaciones
@@ -370,6 +371,7 @@ class VentanaPrincipal(QWidget):
         add_btn("📅", "Reporte objetivo",    self.abrir_reporte_mensual_objetivo, "(Ctrl+Ñ)")
         add_btn("💾", "Transferir datos",    self.abrir_transferir_datos)
         add_btn("📥", "Importar Excel",      self.abrir_importar_excel)
+        add_btn("🔄", "Deshacer import.",    self.abrir_deshacer_importacion)
         add_btn("❓", "Ayuda",               self.abrir_ayuda,              "(Ctrl+H)")
 
         if tiene_permiso('usuarios.ver'):
@@ -1695,6 +1697,8 @@ class VentanaPrincipal(QWidget):
     def abrir_importar_excel(self) -> None:
         self._abrir_ventana('importar_excel', ImportarExcel)
 
+    def abrir_deshacer_importacion(self) -> None:
+        self._abrir_ventana('deshacer_importacion', DeshacerImportacion)
 
     def abrir_auditoria(self) -> None:
         self._abrir_ventana('auditoria', VistaAuditoria)
