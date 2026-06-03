@@ -1423,9 +1423,12 @@ class ImportadorUniversal:
         return texto
 
 
-importador = ImportadorUniversal()
+_importador: Optional[ImportadorUniversal] = None
 
 
 def get_importador() -> ImportadorUniversal:
-    """Obtiene el importador universal."""
-    return importador
+    """Obtiene el importador universal (inicialización diferida)."""
+    global _importador
+    if _importador is None:
+        _importador = ImportadorUniversal()
+    return _importador

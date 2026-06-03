@@ -1,0 +1,32 @@
+ERRORES Y FALLAS
+Admin por defecto 0000 sin obligar cambio — database/db.py — Instalación nueva queda con acceso total predecible.
+API embebida sin autenticación — services/api_rest.py — Cualquier cliente local puede leer/insertar pasadas en el puerto 5000.
+Claves reales en .env.example — raíz del repo — Riesgo de filtración de JWT y cifrado si se versiona o copia tal cual.
+Rutas Flask de objetivos rotas — api/routes/objetivos.py — Trata Objetivo como tupla (obj[0]) y llama agregar_objetivo con argumentos en orden incorrecto; la API falla o guarda mal.
+psutil no está en requirements.txt — services/cache.py — Instalación limpia rompe al importar modelos/caché.
+FK de SQLite nunca activadas + DELETE de objetivos — models/objetivos.py / conexiones DB — Eliminar objetivos deja pasadas huérfanas y reportes inconsistentes.
+Tests fallando — .pytest_cache (test_usuarios, test_api) — La suite no es confiable para detectar regresiones.
+Cola de sync que no drena — services/sync_manager.py — Siempre offline, _enviar_cambio_a_servidor devuelve False; sync_queue.json crece sin límite.
+Hilo infinito al importar — sync_manager.py + importador_universal.py (singleton) — Cada import arranca monitor y escribe en disco aunque no haya servidor.
+Edición de objetivos fuera del modelo — ui/lista_objetivos.py — SQL directo sin notificar_cambio ni invalidar caché; otras pantallas quedan desfasadas.
+Variables JWT inconsistentes — README.md / .env.example / api/app.py — VESP_JWT_SECRET vs JWT_SECRET_KEY; riesgo de secretos por defecto (vesp-api-secret-key-2024).
+App sin .env no arranca módulos de sesión — services/encriptacion.py — RuntimeError al importar si falta VESP_ENCRYPTION_KEY.
+Backup con copy2 sobre SQLite en WAL — services/backup.py — Copias en caliente pueden quedar inconsistentes.
+sync_queue.json en el repo — raíz — Datos operativos locales mezclados con el código.
+Flask en modo debug en 0.0.0.0 — api/app.py — Si se lanza aparte, expone depuración y CORS abierto en la red.
+POSIBLES MEJORAS
+Forzar cambio de contraseña del admin inicial y política de primer arranque — Cierra el vector de acceso más obvio en producción.
+Unificar en una sola API (Flask con JWT) y retirar el WSGI sin auth — Menos superficie de ataque y un solo contrato HTTP.
+Centralizar acceso a BD en gestor_db desde la UI — Menos bloqueos SQLite y código duplicado.
+Activar PRAGMA foreign_keys=ON y borrado en cascada o bloqueo al eliminar objetivos — Integridad referencial real.
+Completar SyncManager o desactivarlo por feature flag — Evita hilos, I/O y colas fantasma hasta tener backend real.
+Añadir psutil (o quitar la dependencia) y fijar variables en conftest.py para CI — Instalación y tests reproducibles.
+Arreglar api/routes/objetivos.py y alinear tests con el contrato real — API REST usable desde integraciones.
+Usar actualizar_objetivo del modelo en lista_objetivos — Validación, caché y sincronización coherentes.
+Backup con sqlite3.backup() o checkpoint WAL — Copias de seguridad confiables con la app abierta.
+Placeholders en .env.example y rotar secretos expuestos — Onboarding seguro sin filtrar claves reales.
+Ignorar sync_queue.json y datos locales en .gitignore — Repo limpio de estado de máquina.
+Estandarizar dias_semana (números vs nombres) en UI, importador y validadores — Menos errores silenciosos en reportes.
+Decoradores requiere_permiso en pantallas sensibles (eliminar, importar, usuarios) — Permisos del rol aplicados de forma uniforme.
+Lazy-init del importador (sin singleton al importar módulo) — Arranque más rápido y menos efectos secundarios.
+Tests de estabilidad que ejecuten funciones reales, no solo assert triviales — Mayor valor del CI con poco código nuevo.

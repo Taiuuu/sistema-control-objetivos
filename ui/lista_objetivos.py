@@ -156,7 +156,7 @@ class ListaObjetivos(QWidget):
 
         # Info de permisos
         rol_actual = get_rol()
-        es_admin = rol_actual == "administrador"
+        es_admin = rol_actual == "admin"
         
         if es_admin:
             info_label = QLabel("⚠ Modo administrador: puedes eliminar objetivos permanentemente")
@@ -194,7 +194,8 @@ class ListaObjetivos(QWidget):
         objetivos = _cargar_objetivos()
         self.tabla.setRowCount(len(objetivos))
         
-        es_admin = get_rol() == "administrador"
+        es_admin = get_rol() in ("administrador", "admin")
+
 
         for i, o in enumerate(objetivos):
             dias_texto = ", ".join([DIAS_MAP.get(d, d) for d in o[4].split(",")])
@@ -209,23 +210,23 @@ class ListaObjetivos(QWidget):
             boton_editar.clicked.connect(lambda checked, obj=o: self._editar(obj))
             self.tabla.setCellWidget(i, 4, boton_editar)
 
-            if not o[3]:
+            # "Dar de baja": siempre visible para admin, solo sin fecha fin para el resto
+            if not o[3] or es_admin:
                 boton_baja = QPushButton("Dar de baja")
                 boton_baja.clicked.connect(
                     lambda checked, obj_id=o[0], nombre=o[1]: self._dar_de_baja(obj_id, nombre)
                 )
                 self.tabla.setCellWidget(i, 5, boton_baja)
-            
-            # Agregar botón de eliminar permanentemente solo para admins
+
+            # "Eliminar": solo para admins, y solo si la tabla tiene columna 6
             if es_admin:
-                boton_eliminar = QPushButton("🗑 Eliminar")
+                boton_eliminar = QPushButton("Eliminar")
                 boton_eliminar.setStyleSheet("background-color: #d32f2f; color: white; font-weight: bold;")
                 boton_eliminar.clicked.connect(
                     lambda checked, obj_id=o[0], nombre=o[1]: self._eliminar_permanentemente(obj_id, nombre)
                 )
-                col_eliminar = 6
-                self.tabla.setCellWidget(i, col_eliminar, boton_eliminar)
-
+                self.tabla.setCellWidget(i, 6, boton_eliminar)
+    
     def _editar(self, objetivo: tuple) -> None:
         self.dialogo_edicion = DialogoEditarObjetivo(objetivo, self)
         if self.dialogo_edicion.exec():
@@ -253,76 +254,44 @@ class ListaObjetivos(QWidget):
 
     def _eliminar_permanentemente(self, objetivo_id: int, nombre: str) -> None:
         """Elimina un objetivo de forma permanente de la base de datos.
-        
         Solo disponible para administradores.
-        Requiere confirmación doble por seguridad.
         """
-        # Verificar que es admin
-        if get_rol() != "administrador":
+        if get_rol() not in ("administrador", "admin"):
             QMessageBox.critical(
                 self, "Acceso denegado",
                 "Solo los administradores pueden eliminar objetivos permanentemente."
             )
             return
-        
-        # Primera confirmación
-        dialogo1 = QMessageBox.warning(
-            self, "⚠ Advertencia",
-            f"¿Seguro que querés ELIMINAR PERMANENTEMENTE '{nombre}'?\n\n"
-            f"Esta acción:\n"
-            f"• Elimina el objetivo de la base de datos\n"
-            f"• NO se puede deshacer\n"
-            f"• Las pasadas relacionadas permanecerán en la BD\n\n"
-            f"Haz click en 'Sí' para confirmar.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if dialogo1 != QMessageBox.StandardButton.Yes:
-            return
-        
-        # Segunda confirmación (confirmación de verdad)
-        dialogo2 = QMessageBox.critical(
-            self, "🗑 ELIMINAR - CONFIRMACIÓN FINAL",
-            f"⚠️ CONFIRMACIÓN FINAL ⚠️\n\n"
-            f"Vas a eliminar definitivamente: '{nombre}'\n\n"
-            f"Escribi el nombre exacto para confirmar:",
-            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
-        )
-        
-        if dialogo2 != QMessageBox.StandardButton.Ok:
-            return
-        
-        # Pedir que escriba el nombre para confirmar
-        nombre_confirmado, ok = QInputDialog.getText(
+
+        confirmacion, ok = QInputDialog.getText(
             self,
             "Confirmación de eliminación",
-            f"Escribí el nombre exacto '{nombre}' para confirmar la eliminación:"
+            f"Escribí 'ELIMINAR' para confirmar la eliminación permanente de '{nombre}':"
         )
-        
-        if not ok or nombre_confirmado != nombre:
+
+        if not ok or confirmacion != "ELIMINAR":
             QMessageBox.warning(
                 self, "Cancelado",
-                "La eliminación ha sido cancelada. El nombre no coincide o fue cancelado."
+                "La eliminación ha sido cancelada. Confirmación incorrecta."
             )
             return
-        
-        # Proceder con la eliminación
+
         try:
             eliminar_objetivo(objetivo_id)
-            
+
             from services.logger import registrar_accion
             from services.sesion import get_usuario_id
             registrar_accion(
                 get_usuario_id(),
                 f"⚠️ ELIMINÓ PERMANENTEMENTE objetivo: {nombre} (ID: {objetivo_id})"
             )
-            
+
             QMessageBox.information(
                 self, "✓ Eliminado",
                 f"Objetivo '{nombre}' ha sido eliminado permanentemente de la base de datos."
             )
             self._cargar_tabla()
-            
+
         except Exception as e:
             QMessageBox.critical(
                 self, "Error",

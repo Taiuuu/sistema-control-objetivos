@@ -24,6 +24,7 @@ Versión: 2.0.0
 
 import os
 import shutil
+import sqlite3
 import logging
 import datetime
 import hashlib
@@ -119,7 +120,7 @@ def hacer_backup() -> bool:
         destino = os.path.join(BACKUP_DIR, f"seguridad_{timestamp}.db")
         
         try:
-            shutil.copy2(DB_PATH, destino)
+            _copiar_bd_con_sqlite_backup(DB_PATH, destino)
         except OSError as e:
             if "space" in str(e).lower() or "disk full" in str(e).lower():
                 logger.error(f"Sin espacio en disco para backup: {e}")
@@ -249,7 +250,7 @@ def restaurar_backup(archivo_backup: Optional[str] = None) -> bool:
         validar_integridad_backup(ruta_backup)
 
         gestor_db.cerrar_conexion()
-        shutil.copy2(ruta_backup, DB_PATH)
+        _copiar_bd_con_sqlite_backup(ruta_backup, DB_PATH)
         gestor_db.cerrar_conexion()
         return True
     except Exception as e:
@@ -316,6 +317,19 @@ def validar_integridad_backup(archivo_backup: str) -> Tuple[bool, str]:
 # =============================================================================
 # FUNCIONES PRIVADAS
 # =============================================================================
+
+def _copiar_bd_con_sqlite_backup(origen: str, destino: str) -> None:
+    """Copia la base SQLite de forma consistente (compatible con WAL)."""
+    conexion_origen = sqlite3.connect(origen, timeout=30.0)
+    conexion_destino = sqlite3.connect(destino)
+    try:
+        conexion_origen.execute("PRAGMA busy_timeout=30000")
+        conexion_origen.backup(conexion_destino)
+        conexion_destino.commit()
+    finally:
+        conexion_destino.close()
+        conexion_origen.close()
+
 
 def _hash_archivo(ruta: str) -> str:
     """Calcula hash SHA256 del archivo mediante lectura en bloques.

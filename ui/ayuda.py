@@ -41,7 +41,7 @@ class Ayuda(QWidget):
 
         # Logo y título principal
         logo = QLabel()
-        pixmap = QPixmap(ruta_asset("assets/vesp.png")).scaled(
+        pixmap = QPixmap(ruta_asset("assets/vespLBFV.png")).scaled(
             60, 60,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation

@@ -228,7 +228,7 @@ class LoginWindow(QWidget):
         self.move(100, 100)
         self.resize(400, 540)
         self.setMinimumSize(360, 520)
-        self.setWindowIcon(QIcon(ruta_asset("assets/vesp.png")))
+        self.setWindowIcon(QIcon(ruta_asset("assets/vespLogoDarkGreen.svg")))
 
         layout = QVBoxLayout()
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -236,7 +236,7 @@ class LoginWindow(QWidget):
 
         # Logo
         logo_label = QLabel()
-        pixmap = QPixmap(ruta_asset("assets/vesp.png")).scaled(
+        pixmap = QPixmap(ruta_asset("assets/vespLogoDarkGreen.svg")).scaled(
             180, 180,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation

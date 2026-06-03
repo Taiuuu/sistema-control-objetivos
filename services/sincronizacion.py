@@ -37,6 +37,7 @@ except ImportError:
     requests = None
 
 from .exceptions import SincronizacionError, ConflictoSincronizacion
+from .config_app import sync_remoto_habilitado
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -192,8 +193,8 @@ class SincronizadorDatos(QObject):
             # Emitir señal principal
             self.datos_cambiados.emit(tabla, operacion_upper, datos)
             
-            # Enviar SSE a API (no bloqueante)
-            if requests:
+            # SSE remoto solo si hay servidor configurado
+            if sync_remoto_habilitado() and requests:
                 self._enviar_sse_async(tabla, operacion_upper, datos)
             
             # Invalidar caché según tabla

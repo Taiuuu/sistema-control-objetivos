@@ -181,7 +181,7 @@ class VentanaPrincipal(QWidget):
         self.move(80, 60)
         self.resize(1340, 660)
         self.setMinimumSize(720, 440)
-        self.setWindowIcon(QIcon(ruta_asset("assets/vesp.png")))
+        self.setWindowIcon(QIcon(ruta_asset("assets/vespLogoDarkGreen.svg")))
 
         self._oscuro = obtener_tema_actual() == "oscuro"
 
@@ -303,7 +303,7 @@ class VentanaPrincipal(QWidget):
         self.btn_colapsar.clicked.connect(self._toggle_sidebar)
 
         self.logo_label = QLabel()
-        pixmap = QPixmap(ruta_asset("assets/vesp.png")).scaled(
+        pixmap = QPixmap(ruta_asset("assets/vespLogoDarkGreen.svg")).scaled(
             36, 36, Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation
         )

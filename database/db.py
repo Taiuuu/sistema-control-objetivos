@@ -8,12 +8,20 @@ import os
 import bcrypt
 
 
-DB_PATH = os.path.join(os.path.expanduser("~"), "VESP Control", "seguridad.db")
+_env_db = os.environ.get("VESP_DB_PATH") or os.environ.get("TEST_DB_PATH")
+DB_PATH = _env_db if _env_db else os.path.join(os.path.expanduser("~"), "VESP Control", "seguridad.db")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 
+def configurar_conexion_sqlite(conexion: sqlite3.Connection) -> sqlite3.Connection:
+    """Activa integridad referencial y modo WAL en la conexión."""
+    conexion.execute("PRAGMA foreign_keys=ON")
+    conexion.execute("PRAGMA journal_mode=WAL")
+    return conexion
+
+
 def conectar() -> sqlite3.Connection:
-    return sqlite3.connect(DB_PATH)
+    return configurar_conexion_sqlite(sqlite3.connect(DB_PATH))
 
 
 def crear_base_datos() -> None:
@@ -327,4 +335,4 @@ def _crear_admin_si_no_existe(cursor: sqlite3.Cursor) -> None:
         cursor.execute("""
             INSERT INTO usuarios (username, password, rol, debe_cambiar_password)
             VALUES (?, ?, ?, ?)
-        """, ("admin", password_hash, "admin", 0))
+        """, ("admin", password_hash, "admin", 1))

@@ -452,6 +452,10 @@ def eliminar_objetivo(objetivo_id: int) -> bool:
         with gestor_db.transaction() as conn:
             cursor = conn.cursor()
             cursor.execute(
+                "DELETE FROM pasadas WHERE objetivo_id = ?",
+                (objetivo_id,)
+            )
+            cursor.execute(
                 "DELETE FROM objetivos WHERE id = ?",
                 (objetivo_id,)
             )

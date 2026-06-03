@@ -12,6 +12,7 @@ from functools import wraps
 import time
 
 from database import db as db_module
+from database.db import configurar_conexion_sqlite
 
 
 class GestorDB:
@@ -62,8 +63,8 @@ class GestorDB:
         """Crea una nueva conexión optimizada."""
         conn = sqlite3.connect(db_module.DB_PATH, check_same_thread=False, timeout=30.0)
         conn.row_factory = sqlite3.Row
-        # Optimizaciones de rendimiento SQLite
-        conn.execute("PRAGMA journal_mode=WAL")
+        configurar_conexion_sqlite(conn)
+        # Optimizaciones de rendimiento SQLite (WAL ya aplicado en configurar_conexion)
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA cache_size=-64000")  # 64MB cache
         conn.execute("PRAGMA temp_store=MEMORY")
