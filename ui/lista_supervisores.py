@@ -13,7 +13,8 @@ from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtGui import QColor
 from models.supervisores import (
     listar_supervisores, actualizar_supervisor,
-    dar_de_baja_supervisor, reactivar_supervisor
+    dar_de_baja_supervisor, reactivar_supervisor,
+    eliminar_supervisor,
 )
 from services.sincronizacion import obtener_sincronizador
 
@@ -257,6 +258,15 @@ class ListaSupervisores(QWidget):
                 )
                 fila_btn.addWidget(btn_reactivar)
 
+            btn_eliminar = QPushButton("Eliminar")
+            btn_eliminar.setFixedHeight(26)
+            btn_eliminar.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_eliminar.setStyleSheet("color: #e74c3c; font-weight: 600;")
+            btn_eliminar.clicked.connect(
+                lambda _, sid=sup_id, n=nombre: self._eliminar(sid, n)
+            )
+            fila_btn.addWidget(btn_eliminar)
+
             self.tabla.setCellWidget(i, 4, contenedor)
             self.tabla.setRowHeight(i, 36)
 
@@ -316,6 +326,28 @@ class ListaSupervisores(QWidget):
             from services.sesion import get_usuario_id
             registrar_accion(get_usuario_id(), f"Reactivó supervisor id={sup_id}")
             self._cargar_tabla()
+
+    def _eliminar(self, sup_id: int, nombre: str) -> None:
+        confirmar = QMessageBox.question(
+            self, "Eliminar supervisor",
+            f"¿Eliminar permanentemente a <b>{nombre}</b>?<br>"
+            "Esta acción no se puede deshacer.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if confirmar != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            eliminar_supervisor(sup_id)
+            from services.logger import registrar_accion
+            from services.sesion import get_usuario_id
+            registrar_accion(get_usuario_id(), f"Eliminó supervisor id={sup_id} nombre={nombre}")
+            self._cargar_tabla()
+        except Exception as e:
+            QMessageBox.critical(
+                self, "No se pudo eliminar",
+                f"<b>{nombre}</b> no puede eliminarse.<br><br>{e}<br><br>"
+                "Si tiene pasadas registradas, primero darlo de baja en vez de eliminar.",
+            )
 
     def _on_datos_cambiados(self, tabla, operacion, datos):
         if tabla == "supervisores":

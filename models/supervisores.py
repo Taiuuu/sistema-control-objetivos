@@ -463,6 +463,44 @@ def reactivar_supervisor(supervisor_id: int) -> Supervisor:
         logger.error(f"Error inesperado: {e}")
         raise DatabaseError("UPDATE", str(e))
 
+# =============================================================================
+# FUNCIONES DE ELIMINACIÓN (DELETE)
+# =============================================================================
+
+def eliminar_supervisor(supervisor_id: int) -> None:
+    """Elimina permanentemente un supervisor del sistema.
+    
+    Args:
+        supervisor_id: ID del supervisor a eliminar.
+    
+    Raises:
+        ValidationError: Si el ID no es válido.
+        SupervisorNoEncontrado: Si no existe el supervisor.
+        DatabaseError: Si hay error en la base de datos (ej: pasadas asociadas).
+    """
+    try:
+        supervisor_id = validar_id(supervisor_id)
+        
+        supervisor = obtener_supervisor(supervisor_id)
+        
+        with gestor_db.transaction() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM supervisores WHERE id = ?",
+                (supervisor_id,)
+            )
+        
+        notificar_cambio("supervisores", "DELETE", {"id": supervisor_id})
+        invalidar_supervisores()
+        
+        logger.info(f"Supervisor eliminado: {supervisor.nombre} (ID: {supervisor_id})")
+        
+    except (ValidationError, SupervisorError) as e:
+        logger.error(f"Error eliminando supervisor: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Error inesperado al eliminar supervisor: {e}")
+        raise DatabaseError("DELETE", str(e))
 
 # =============================================================================
 # FUNCIONES AUXILIARES PRIVADAS

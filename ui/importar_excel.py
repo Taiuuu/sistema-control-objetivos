@@ -1245,83 +1245,76 @@ class ImportarExcel(QWidget):
             QMessageBox.warning(self, "Error", "Seleccioná un archivo Excel primero.")
             return
 
+        if not self._last_preview:
+            QMessageBox.warning(self, "Error", "No hay previsualización cargada.")
+            return
+
+        if self.unresolved_objectives:
+            QMessageBox.warning(
+                self, "Objetivos pendientes",
+                f"Hay {len(self.unresolved_objectives)} objetivos sin resolver. "
+                "Usá 'Resolver objetivos' antes de importar."
+            )
+            return
+
+        if self.unresolved_supervisores:
+            QMessageBox.warning(
+                self, "Supervisores pendientes",
+                f"Hay {len(self.unresolved_supervisores)} supervisores sin resolver. "
+                "Usá 'Resolver supervisores' antes de importar."
+            )
+            return
+
         importador = get_importador()
         self.log.clear()
 
+        hoja_seleccionada = self.sheet_combo.currentData()
+        self.log.append(
+            f"Detectado CONTROL_RECORRIDOS. Hoja seleccionada: {hoja_seleccionada or 'todas las hojas'}"
+        )
+
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(True)
+        self.boton_cancelar_importacion.setVisible(True)
+        self.boton_importar.setEnabled(False)
+
         try:
-            preview = importador.previsualizar_archivo(self.ruta_archivo)
-            if preview.get("tipo") != "control_recorridos":
-                self.log.append("No se detectó CONTROL_RECORRIDOS; usando importación legacy.")
-                resultado = importador.importar_excel(self.ruta_archivo)
-                # legacy import is synchronous
-                self._handle_import_result(resultado)
-                return
+            self._show_busy_overlay("Importando...", determinate=True)
+        except Exception:
+            pass
 
-            hoja_seleccionada = self.sheet_combo.currentData()
-            self.log.append(
-                f"Detectado CONTROL_RECORRIDOS. Hoja seleccionada: {hoja_seleccionada or 'todas las hojas'}"
-            )
+        self._limpiar_import_thread()
 
-            objetivos_no_resueltos = list(preview.get("objetivos_no_resueltos", []))
-            if objetivos_no_resueltos and set(self.objetivo_mapeo.keys()) != set(objetivos_no_resueltos):
-                self.log.append(
-                    "Se requieren objetivos para continuar: " + ", ".join(objetivos_no_resueltos)
-                )
-                objetivos_existentes = listar_objetivos()
-                dialogo = DialogoResolverObjetivos(
-                    objetivos_no_resueltos,
-                    objetivos_existentes,
-                    parent=self,
-                )
-                if dialogo.exec() != QDialog.DialogCode.Accepted:
-                    self.log.append("Importación cancelada por el usuario.")
-                    return
-                self.objetivo_mapeo = dialogo.obtener_mapeo()
+        # Filtrar registros por rango antes de pasar al worker
+        preview_filtrado = dict(self._last_preview)
+        registros_filtrados = self._filtrar_registros_por_rango(
+            self._last_preview.get("registros", [])
+        )
+        preview_filtrado["registros"] = registros_filtrados
+        self.log.append(f"Registros a importar (con rango aplicado): {len(registros_filtrados)}")
 
-            # Preparar worker de import
-            self.progress_bar.setValue(0)
-            self.progress_bar.setVisible(True)
-            self.boton_cancelar_importacion.setVisible(True)
-            self.boton_importar.setEnabled(False)
-
-            # mostrar overlay durante importación (determinate)
-            try:
-                self._show_busy_overlay("Importando...", determinate=True)
-            except Exception:
-                pass
-
-            # Preparar mapeo de turnos desde la UI (si existe)
-            sheet_turno_map = self.sheet_turno_map
-            # limpiar hilos de importación previos si existen
-            self._limpiar_import_thread()
-
-            # crear nuevo worker / thread con preview precalculado (evita doble parseo)
-            self.import_worker = ImportWorker(
-                importador,
-                self.ruta_archivo,
-                sheet_names=[hoja_seleccionada] if hoja_seleccionada else None,
-                objetivo_mapeo=self.objetivo_mapeo,
-                supervisor_mapeo=self.supervisor_mapeo,
-                sheet_turno_map=sheet_turno_map,
-                preview_precalculado=preview,  # NUEVO: pasar preview para evitar doble llamada
-            )
-            self.import_thread = QThread(self)
-            self.import_worker.moveToThread(self.import_thread)
-            self.import_thread.started.connect(self.import_worker.run)
-            self.import_worker.progress.connect(self._on_import_progress)
-            self.import_worker.finished.connect(self._on_import_finished)
-            self.import_worker.error.connect(self._on_import_error)
-            self.import_worker.finished.connect(self.import_thread.quit)
-            self.import_worker.error.connect(self.import_thread.quit)
-            self.import_worker.finished.connect(self.import_worker.deleteLater)
-            self.import_worker.error.connect(self.import_worker.deleteLater)
-            self.import_thread.finished.connect(self.import_thread.deleteLater)
-            self.import_thread.start()
-
-        except Exception as e:
-            self.log.append(f"✗ Error: {e}")
-            QMessageBox.critical(self, "Error", f"No se pudo importar: {e}")
-
+        self.import_worker = ImportWorker(
+            importador,
+            self.ruta_archivo,
+            sheet_names=[hoja_seleccionada] if hoja_seleccionada else None,
+            objetivo_mapeo=self.objetivo_mapeo,
+            supervisor_mapeo=self.supervisor_mapeo,
+            sheet_turno_map=self.sheet_turno_map,
+            preview_precalculado=preview_filtrado,
+        )
+        self.import_thread = QThread(self)
+        self.import_worker.moveToThread(self.import_thread)
+        self.import_thread.started.connect(self.import_worker.run)
+        self.import_worker.progress.connect(self._on_import_progress)
+        self.import_worker.finished.connect(self._on_import_finished)
+        self.import_worker.error.connect(self._on_import_error)
+        self.import_worker.finished.connect(self.import_thread.quit)
+        self.import_worker.error.connect(self.import_thread.quit)
+        self.import_worker.finished.connect(self.import_worker.deleteLater)
+        self.import_worker.error.connect(self.import_worker.deleteLater)
+        self.import_thread.finished.connect(self.import_thread.deleteLater)
+        self.import_thread.start()
+            
     def _handle_import_result(self, resultado) -> None:
         self.progress_bar.setVisible(False)
         self.boton_cancelar_importacion.setVisible(False)
