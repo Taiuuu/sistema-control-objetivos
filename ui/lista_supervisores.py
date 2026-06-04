@@ -14,7 +14,7 @@ from PyQt6.QtGui import QColor
 from models.supervisores import (
     listar_supervisores, actualizar_supervisor,
     dar_de_baja_supervisor, reactivar_supervisor,
-    eliminar_supervisor,
+    eliminar_supervisor, reasignar_pasadas_supervisor,
 )
 from services.sincronizacion import obtener_sincronizador
 
@@ -342,13 +342,72 @@ class ListaSupervisores(QWidget):
             from services.sesion import get_usuario_id
             registrar_accion(get_usuario_id(), f"Eliminó supervisor id={sup_id} nombre={nombre}")
             self._cargar_tabla()
+        except Exception:
+            # Tiene pasadas — ofrecer reasignación
+            self._eliminar_con_reasignacion(sup_id, nombre)
+
+    def _eliminar_con_reasignacion(self, sup_id: int, nombre: str) -> None:
+        otros = [s for s in listar_supervisores(solo_activos=False) if s.id != sup_id]
+        if not otros:
+            QMessageBox.critical(
+                self, "No se puede eliminar",
+                f"<b>{nombre}</b> tiene pasadas registradas y no hay otros "
+                "supervisores a quienes reasignarlas.",
+            )
+            return
+
+        dialogo = QDialog(self)
+        dialogo.setWindowTitle("Reasignar pasadas antes de eliminar")
+        dialogo.setFixedWidth(420)
+        lay = QVBoxLayout(dialogo)
+
+        lay.addWidget(QLabel(
+            f"<b>{nombre}</b> tiene pasadas registradas.<br>"
+            "Seleccioná a quién reasignarlas antes de eliminar:"
+        ))
+
+        combo = QComboBox()
+        for s in otros:
+            estado = "Activo" if s.fecha_baja is None else "Baja"
+            combo.addItem(f"{s.nombre}  [{estado}]", s.id)
+        lay.addWidget(combo)
+
+        botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        botones.accepted.connect(dialogo.accept)
+        botones.rejected.connect(dialogo.reject)
+        lay.addWidget(botones)
+
+        if dialogo.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        destino_id = combo.currentData()
+        destino_nombre = combo.currentText()
+
+        try:
+            reasignadas = reasignar_pasadas_supervisor(sup_id, destino_id)
+            eliminar_supervisor(sup_id)
+            from services.logger import registrar_accion
+            from services.sesion import get_usuario_id
+            registrar_accion(
+                get_usuario_id(),
+                f"Eliminó supervisor id={sup_id} nombre={nombre}, "
+                f"reasignó {reasignadas} pasadas a id={destino_id}",
+            )
+            QMessageBox.information(
+                self, "Listo",
+                f"Se reasignaron <b>{reasignadas}</b> pasadas a <b>{destino_nombre}</b> "
+                f"y se eliminó <b>{nombre}</b>.",
+            )
+            self._cargar_tabla()
         except Exception as e:
             QMessageBox.critical(
-                self, "No se pudo eliminar",
-                f"<b>{nombre}</b> no puede eliminarse.<br><br>{e}<br><br>"
-                "Si tiene pasadas registradas, primero darlo de baja en vez de eliminar.",
+                self, "Error",
+                f"No se pudo completar la operación:<br>{e}",
             )
-
+            
     def _on_datos_cambiados(self, tabla, operacion, datos):
         if tabla == "supervisores":
             self._cargar_tabla()
