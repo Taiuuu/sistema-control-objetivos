@@ -501,7 +501,7 @@ def eliminar_supervisor(supervisor_id: int) -> None:
     except Exception as e:
         logger.error(f"Error inesperado al eliminar supervisor: {e}")
         raise DatabaseError("DELETE", str(e))
-
+    
 # =============================================================================
 # FUNCIONES AUXILIARES PRIVADAS
 # =============================================================================
@@ -533,3 +533,44 @@ def _buscar_supervisor_por_nombre(nombre: str) -> Optional[Supervisor]:
         )
     except Exception:
         return None
+
+def reasignar_pasadas_supervisor(
+    supervisor_id_origen: int,
+    supervisor_id_destino: int,
+) -> int:
+    """Reasigna todas las pasadas de un supervisor a otro.
+    
+    Returns:
+        Cantidad de pasadas reasignadas.
+    """
+    try:
+        supervisor_id_origen = validar_id(supervisor_id_origen)
+        supervisor_id_destino = validar_id(supervisor_id_destino)
+
+        with gestor_db.transaction() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE pasadas SET supervisor_id = ? WHERE supervisor_id = ?",
+                (supervisor_id_destino, supervisor_id_origen)
+            )
+            reasignadas = cursor.rowcount
+
+        notificar_cambio("pasadas", "UPDATE", {
+            "supervisor_id_origen": supervisor_id_origen,
+            "supervisor_id_destino": supervisor_id_destino,
+        })
+
+        logger.info(
+            f"Reasignadas {reasignadas} pasadas de supervisor "
+            f"ID {supervisor_id_origen} -> ID {supervisor_id_destino}"
+        )
+        return reasignadas
+
+    except (ValidationError, SupervisorError) as e:
+        logger.error(f"Error reasignando pasadas: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Error inesperado reasignando pasadas: {e}")
+        raise DatabaseError("UPDATE", str(e))
+
+    
