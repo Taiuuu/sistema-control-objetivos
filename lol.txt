@@ -30,3 +30,33 @@ Estandarizar dias_semana (números vs nombres) en UI, importador y validadores �
 Decoradores requiere_permiso en pantallas sensibles (eliminar, importar, usuarios) — Permisos del rol aplicados de forma uniforme.
 Lazy-init del importador (sin singleton al importar módulo) — Arranque más rápido y menos efectos secundarios.
 Tests de estabilidad que ejecuten funciones reales, no solo assert triviales — Mayor valor del CI con poco código nuevo.
+
+
+I have too many scattered .md files in the docs/ folder that are hard 
+to maintain and bloat the context window. I need you to consolidate them 
+into a single CONTEXT.md at the project root.
+
+Rules:
+- Read ALL .md files in docs/ before doing anything
+- Produce a single CONTEXT.md with these sections in this order:
+  1. Project summary (what it is, who uses it, current version)
+  2. Tech stack and exact versions
+  3. Folder structure (condensed, only what exists and is active)
+  4. Features by module (consolidate duplicates, keep latest version)
+  5. Architecture decisions (what's decided and must not change)
+  6. Stability status (resolved issues, pending issues, known risks)
+  7. Roadmap (only confirmed next steps, not speculation)
+  8. Working conventions (naming, style, patterns used in this project)
+
+Consolidation rules:
+- If two files contradict each other, keep the most recent information
+- If something is "planned" or "future", summarize it in one line max
+- Remove all emoji, decorative headers, and markdown tables where a 
+  plain list works just as well
+- Keep it under 300 lines total — this file will be injected as context 
+  on every session so size matters
+- Do NOT delete the original files yet — just produce CONTEXT.md
+
+After writing CONTEXT.md, tell me:
+- Which files were fully absorbed and can be deleted
+- Which files had unique content worth keeping separately
