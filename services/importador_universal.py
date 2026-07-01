@@ -840,6 +840,7 @@ class ImportadorUniversal:
                 'objetivo': None,
                 'supervisor': None,
                 'hora': None,
+                'turno': None,
                 'veces': None,
                 'notas': None,
             }
@@ -856,6 +857,8 @@ class ImportadorUniversal:
                     columnas['supervisor'] = columna
                 elif 'hora' in normalizado and columnas['hora'] is None:
                     columnas['hora'] = columna
+                elif 'turno' in normalizado and columnas['turno'] is None:
+                    columnas['turno'] = columna
                 elif ('veces' in normalizado or 'cantidad' in normalizado) and columnas['veces'] is None:
                     columnas['veces'] = columna
                 elif ('nota' in normalizado or 'observacion' in normalizado) and columnas['notas'] is None:
@@ -871,6 +874,23 @@ class ImportadorUniversal:
             return None, {}
 
         return mejor_fila, mejor_columnas
+
+    def _resolver_turno_excel(self, turno_raw: Any, turno_fallback: Optional[str]) -> Optional[str]:
+        """Resuelve el turno desde la celda de Excel o usa el turno de la hoja como fallback."""
+        if turno_raw is None:
+            return turno_fallback
+
+        texto = self._limpiar_valor(turno_raw)
+        if not texto:
+            return turno_fallback
+
+        turno_normalizado = texto.strip().lower()
+        if turno_normalizado in ('d', 'dia', 'diurno', 'diaria', 'diario', 'day', 'dayshift'):
+            return 'diurno'
+        if turno_normalizado in ('n', 'noche', 'nocturno', 'night', 'nightshift'):
+            return 'nocturno'
+
+        return turno_fallback
 
     def _parsear_con_encabezados_control(
         self,
@@ -901,6 +921,9 @@ class ImportadorUniversal:
             veces_raw = self._limpiar_valor(
                 ws.cell(row=fila, column=columnas['veces']).value
             ) if columnas['veces'] is not None else None
+            turno_raw = self._limpiar_valor(
+                ws.cell(row=fila, column=columnas['turno']).value
+            ) if columnas.get('turno') is not None else None
 
             repeticiones = self._parsear_repeticiones(veces_raw)
             if repeticiones <= 0:
@@ -911,12 +934,13 @@ class ImportadorUniversal:
             except Exception:
                 continue
 
+            turno_registro = self._resolver_turno_excel(turno_raw, turno)
             for _ in range(repeticiones):
                 registros.append(
                     RegistroImportacion(
                         fecha=fecha_import.strftime('%Y-%m-%d'),
                         hora=hora_normalizada,
-                        turno=turno,
+                        turno=turno_registro or turno,
                         supervisor=supervisor or '',
                         objetivo=objetivo,
                         notas=notas,
@@ -1044,26 +1068,11 @@ class ImportadorUniversal:
                     if self._es_encabezado(objetivo):
                         continue
 
-                    # Resolver turno
-                    turno_fila = None
-
-                    if turno_raw is not None:
-                        t = str(turno_raw).strip().upper()
-
-                        if t in ('DIA', 'DIURNO', 'D'):
-                            turno_fila = 'diurno'
-
-                        elif t in ('NOCHE', 'NOCTURNO', 'N'):
-                            turno_fila = 'nocturno'
-
-                    turno_final = turno_fila or turno
+                    # Resolver turno desde la celda de Excel o desde la hoja como fallback.
+                    turno_final = self._resolver_turno_excel(turno_raw, turno)
 
                     if turno_final is None:
                         filas_con_error += 1
-                        continue
-
-                    # Validar coherencia entre turno fila y turno hoja
-                    if turno_fila is not None and turno is not None and turno_fila != turno:
                         continue
 
                     # Normalizar hora y fecha

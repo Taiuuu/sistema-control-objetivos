@@ -43,6 +43,35 @@ def test_parsear_hoja_control_recorridos_limpia_texto():
     assert registros[0].notas == "sin observaciones"
 
 
+def test_parsear_con_encabezados_control_respecta_turno_del_excel():
+    importador = ImportadorUniversal()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "27-5 (D)"
+
+    ws["A1"] = "Objetivo"
+    ws["B1"] = "Supervisor"
+    ws["C1"] = "Hora"
+    ws["D1"] = "Turno"
+
+    ws["A2"] = "Pase prueba"
+    ws["B2"] = "Juan Perez"
+    ws["C2"] = "03:15"
+    ws["D2"] = "Nocturno"
+
+    header_row, columnas = importador._buscar_encabezados_control(ws)
+    registros = importador._parsear_con_encabezados_control(
+        ws,
+        date(2026, 5, 27),
+        "diurno",
+        columnas,
+        header_row,
+    )
+
+    assert len(registros) == 1
+    assert registros[0].turno == "nocturno"
+
+
 def test_parsear_control_recorridos_legacy_ignora_fila_global_y_detecta_datos_en_fila_dos():
     importador = ImportadorUniversal()
     wb = Workbook()
