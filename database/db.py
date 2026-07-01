@@ -19,9 +19,17 @@ def configurar_conexion_sqlite(conexion: sqlite3.Connection) -> sqlite3.Connecti
     conexion.execute("PRAGMA journal_mode=WAL")
     return conexion
 
+_sqlite3_connect_original = sqlite3.connect
+
+def _sqlite3_connect_with_pragmas(*args, **kwargs):
+    conexion = _sqlite3_connect_original(*args, **kwargs)
+    return configurar_conexion_sqlite(conexion)
+
+sqlite3.connect = _sqlite3_connect_with_pragmas
+
 
 def conectar() -> sqlite3.Connection:
-    return configurar_conexion_sqlite(sqlite3.connect(DB_PATH))
+    return sqlite3.connect(DB_PATH)
 
 
 def crear_base_datos() -> None:

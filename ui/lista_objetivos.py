@@ -149,20 +149,20 @@ class ListaObjetivos(QWidget):
 
         # Info de permisos
         rol_actual = get_rol()
-        es_admin = rol_actual == "admin"
+        self.es_admin = rol_actual in ("administrador", "admin")
         
-        if es_admin:
+        if self.es_admin:
             info_label = QLabel("⚠ Modo administrador: puedes eliminar objetivos permanentemente")
             info_label.setStyleSheet("color: #ff9800; font-weight: bold;")
             layout.addWidget(info_label)
 
         self.tabla = QTableWidget()
         # Agregar columna de eliminar si es admin
-        num_cols = 7 if es_admin else 6
+        num_cols = 7 if self.es_admin else 6
         self.tabla.setColumnCount(num_cols)
         
         headers = ["Nombre", "Inicio", "Fin", "Días", "Editar", "Dar de baja"]
-        if es_admin:
+        if self.es_admin:
             headers.append("🗑 Eliminar")
         
         self.tabla.setHorizontalHeaderLabels(headers)
@@ -172,7 +172,7 @@ class ListaObjetivos(QWidget):
         self.tabla.setColumnWidth(3, 200)
         self.tabla.setColumnWidth(4, 80)
         self.tabla.setColumnWidth(5, 100)
-        if es_admin:
+        if self.es_admin:
             self.tabla.setColumnWidth(6, 100)
         layout.addWidget(self.tabla)
 
@@ -186,9 +186,6 @@ class ListaObjetivos(QWidget):
     def _cargar_tabla(self) -> None:
         objetivos = _cargar_objetivos()
         self.tabla.setRowCount(len(objetivos))
-        
-        es_admin = get_rol() in ("administrador", "admin")
-
 
         for i, o in enumerate(objetivos):
             dias_texto = ", ".join([DIAS_MAP.get(d, d) for d in (o.dias_semana or "").split(",")])
@@ -204,7 +201,7 @@ class ListaObjetivos(QWidget):
             self.tabla.setCellWidget(i, 4, boton_editar)
 
             # "Dar de baja": siempre visible para admin, solo sin fecha fin para el resto
-            if not o.fecha_fin or es_admin:
+            if not o.fecha_fin or self.es_admin:
                 boton_baja = QPushButton("Dar de baja")
                 boton_baja.clicked.connect(
                     lambda checked, obj_id=o.id, nombre=o.nombre: self._dar_de_baja(obj_id, nombre)
@@ -212,7 +209,7 @@ class ListaObjetivos(QWidget):
                 self.tabla.setCellWidget(i, 5, boton_baja)
 
             # "Eliminar": solo para admins, y solo si la tabla tiene columna 6
-            if es_admin:
+            if self.es_admin:
                 boton_eliminar = QPushButton("Eliminar")
                 boton_eliminar.setStyleSheet("background-color: #d32f2f; color: white; font-weight: bold;")
                 boton_eliminar.clicked.connect(
