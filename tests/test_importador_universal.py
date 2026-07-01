@@ -200,3 +200,26 @@ def test_no_agrega_objetivos_faltantes(monkeypatch):
     assert resultado.registros_errores == 1
     assert "Objetivo no encontrado" in resultado.errores[0]
     assert resultado.exitoso is False
+
+
+def test_filtrar_registros_por_rango_respecta_limites_fecha_y_turno():
+    from services.importador_universal import RegistroImportacion
+
+    importador = ImportadorUniversal()
+    registros = [
+        RegistroImportacion(fecha="2026-06-01", hora="08:00", turno="diurno", supervisor="S", objetivo="O", fuente="excel", sheet_title="01-6 (D)"),
+        RegistroImportacion(fecha="2026-06-11", hora="00:30", turno="nocturno", supervisor="S", objetivo="O", fuente="excel", sheet_title="11-6 (N)"),
+        RegistroImportacion(fecha="2026-06-12", hora="08:00", turno="diurno", supervisor="S", objetivo="O", fuente="excel", sheet_title="12-6 (D)"),
+        RegistroImportacion(fecha="2026-06-13", hora="00:30", turno="nocturno", supervisor="S", objetivo="O", fuente="excel", sheet_title="13-6 (N)"),
+        RegistroImportacion(fecha="2026-06-13", hora="08:00", turno="diurno", supervisor="S", objetivo="O", fuente="excel", sheet_title="13-6 (D)"),
+        RegistroImportacion(fecha="2026-06-30", hora="00:30", turno="nocturno", supervisor="S", objetivo="O", fuente="excel", sheet_title="30-6 (N)"),
+    ]
+
+    filtrados = importador.filtrar_registros_por_rango(
+        registros,
+        rango_desde=(date(2026, 6, 11), "nocturno"),
+        rango_hasta=(date(2026, 6, 13), "diurno"),
+    )
+
+    assert [r.fecha for r in filtrados] == ["2026-06-11", "2026-06-12", "2026-06-13", "2026-06-13"]
+    assert [r.turno for r in filtrados] == ["nocturno", "diurno", "nocturno", "diurno"]

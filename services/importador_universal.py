@@ -450,6 +450,78 @@ class ImportadorUniversal:
                 exitoso=False,
             )
 
+    def filtrar_registros_por_rango(
+        self,
+        registros: List[RegistroImportacion],
+        rango_desde: Optional[Tuple[date, str]] = None,
+        rango_hasta: Optional[Tuple[date, str]] = None,
+    ) -> List[RegistroImportacion]:
+        """Filtra registros por un rango de fechas/turnos inclusive."""
+        if rango_desde is None and rango_hasta is None:
+            return list(registros)
+
+        def _orden_turno(turno: Optional[str]) -> int:
+            turno_norm = str(turno or "").strip().lower()
+            if turno_norm in ("n", "noche", "nocturno"):
+                return 0
+            if turno_norm in ("d", "dia", "diurno"):
+                return 1
+            return 2
+
+        def _comparar_fecha_turno(
+            registro_fecha: str,
+            registro_turno: str,
+            limite_fecha: date,
+            limite_turno: str,
+        ) -> int:
+            try:
+                reg_date = datetime.strptime(registro_fecha, "%Y-%m-%d").date()
+            except Exception:
+                return 0
+
+            if reg_date < limite_fecha:
+                return -1
+            if reg_date > limite_fecha:
+                return 1
+
+            reg_turno = _orden_turno(registro_turno)
+            lim_turno = _orden_turno(limite_turno)
+
+            if reg_turno < lim_turno:
+                return -1
+            if reg_turno > lim_turno:
+                return 1
+            return 0
+
+        filtrados: List[RegistroImportacion] = []
+        for registro in registros:
+            incluir = True
+
+            if rango_desde is not None:
+                cmp = _comparar_fecha_turno(
+                    registro.fecha,
+                    registro.turno,
+                    rango_desde[0],
+                    rango_desde[1],
+                )
+                if cmp < 0:
+                    incluir = False
+
+            if incluir and rango_hasta is not None:
+                cmp = _comparar_fecha_turno(
+                    registro.fecha,
+                    registro.turno,
+                    rango_hasta[0],
+                    rango_hasta[1],
+                )
+                if cmp > 0:
+                    incluir = False
+
+            if incluir:
+                filtrados.append(registro)
+
+        return filtrados
+
     def _procesar_registros(
         self,
         registros: List[RegistroImportacion],
@@ -732,17 +804,29 @@ class ImportadorUniversal:
         sheet_date: date,
         turno: str
     ) -> List[RegistroImportacion]:
+        """Parser principal de CONTROL_RECORRIDOS.
+
+        Soporta el formato legacy de 3 bloques horizontales y, si la hoja
+        tiene encabezados tipo Objetivo/Supervisor/Hora, también el formato
+        tabular simple.
         """
-        Parser principal de CONTROL_RECORRIDOS.
-        Usa exclusivamente el formato legacy real
-        de 3 bloques horizontales.
-        """
+
+        header_row, columnas = self._buscar_encabezados_control(ws)
+        if header_row is not None and columnas:
+            return self._parsear_con_encabezados_control(
+                ws,
+                sheet_date,
+                turno,
+                columnas,
+                header_row,
+            )
 
         return self._parsear_control_recorridos_legacy(
             ws,
             sheet_date,
             turno,
         )
+
     def _buscar_encabezados_control(self, ws) -> Tuple[Optional[int], Dict[str, Optional[int]]]:
         """Busca la fila de encabezado más probable en la hoja."""
         max_col = ws.max_column

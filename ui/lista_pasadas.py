@@ -15,6 +15,7 @@ from PyQt6.QtGui import QColor
 
 from database.db import DB_PATH
 from services.sincronizacion import obtener_sincronizador
+from services.sesion import get_rol
 from services.validador_horas_limite import validar_hora_turno_nocturno
 
 
@@ -70,6 +71,18 @@ def _eliminar_pasada(pasada_id: int) -> None:
 
     conexion.commit()
     conexion.close()
+
+
+def _eliminar_pasadas_por_fecha(fecha: str) -> int:
+    conexion = sqlite3.connect(DB_PATH)
+    cursor = conexion.cursor()
+
+    cursor.execute("DELETE FROM pasadas WHERE fecha = ?", (fecha,))
+    eliminadas = cursor.rowcount
+
+    conexion.commit()
+    conexion.close()
+    return eliminadas
 
 
 def _obtener_info_pasada(pasada_id: int):
@@ -366,7 +379,12 @@ class ListaPasadas(QWidget):
         btn_buscar = QPushButton("Buscar")
         btn_buscar.clicked.connect(self._cargar_tabla)
 
+        self.btn_eliminar_dia = QPushButton("Eliminar día (Admin)")
+        self.btn_eliminar_dia.clicked.connect(self._eliminar_dia_actual)
+        self.btn_eliminar_dia.setVisible(False)
+
         fila.addWidget(btn_buscar)
+        fila.addWidget(self.btn_eliminar_dia)
         fila.addStretch()
 
         layout.addLayout(fila)
@@ -398,6 +416,7 @@ class ListaPasadas(QWidget):
 
         self.setLayout(layout)
 
+        self._actualizar_permisos()
         self._cargar_tabla()
 
         self.sincronizador = obtener_sincronizador()
@@ -405,8 +424,13 @@ class ListaPasadas(QWidget):
             self._on_datos_cambiados
         )
 
+    def _actualizar_permisos(self):
+        rol_actual = str(get_rol() or "").lower()
+        self.btn_eliminar_dia.setVisible(rol_actual in {"admin", "administrador"})
+
     def _cargar_tabla(self):
 
+        self._actualizar_permisos()
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
         supervisor_id = self.selector_supervisor.currentData() or None
         turno = self.selector_turno.currentText()
@@ -456,6 +480,40 @@ class ListaPasadas(QWidget):
 
         if dialogo.exec():
             self._cargar_tabla()
+
+    def _eliminar_dia_actual(self):
+        rol_actual = str(get_rol() or "").lower()
+        if rol_actual not in {"admin", "administrador"}:
+            QMessageBox.warning(self, "Acceso denegado", "Solo los administradores pueden borrar todas las pasadas de un día.")
+            return
+
+        fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
+        respuesta = QMessageBox.question(
+            self,
+            "Confirmar eliminación masiva",
+            f"¿Seguro que querés eliminar TODAS las pasadas del día {fecha}?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+
+        if respuesta != QMessageBox.StandardButton.Yes:
+            return
+
+        eliminadas = _eliminar_pasadas_por_fecha(fecha)
+        from services.logger import registrar_accion
+        from services.sesion import get_usuario_id
+
+        registrar_accion(
+            get_usuario_id(),
+            f"Eliminó {eliminadas} pasadas del día {fecha}"
+        )
+        self.sincronizador.notificar_cambio("pasadas", "DELETE", {"fecha": fecha, "cantidad": eliminadas})
+
+        if eliminadas == 0:
+            QMessageBox.information(self, "Sin resultados", f"No había pasadas para eliminar en {fecha}.")
+        else:
+            QMessageBox.information(self, "Listo", f"Se eliminaron {eliminadas} pasadas del día {fecha}.")
+
+        self._cargar_tabla()
 
     def _eliminar(self, pasada_id: int):
 

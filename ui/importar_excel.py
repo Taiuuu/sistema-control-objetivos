@@ -811,62 +811,12 @@ class ImportarExcel(QWidget):
     
     def _filtrar_registros_por_rango(self, registros: List[Any]) -> List[Any]:
         """Filtra registros por el rango de fechas/turnos seleccionado."""
-        if self.rango_desde is None and self.rango_hasta is None:
-            return registros
-        
-        from datetime import date
-        
-        def comparar_fecha_turno(registro_fecha: str, registro_turno: str, limite_fecha: date, limite_turno: str) -> int:
-            """
-            Compara fecha y turno de un registro con un límite.
-            Retorna: -1 si registro < límite, 0 si =, 1 si > límite
-            """
-            try:
-                reg_date = datetime.strptime(registro_fecha, "%Y-%m-%d").date()
-                
-                if reg_date < limite_fecha:
-                    return -1
-                elif reg_date > limite_fecha:
-                    return 1
-                else:
-                    # Misma fecha, comparar turno
-                    reg_turno_norm = str(registro_turno).strip().lower()
-                    limite_turno_norm = str(limite_turno).strip().lower()
-                    
-                    if reg_turno_norm == limite_turno_norm:
-                        return 0
-                    elif reg_turno_norm in ('d', 'dia', 'diurno') and limite_turno_norm in ('n', 'noche', 'nocturno'):
-                        return -1
-                    elif reg_turno_norm in ('n', 'noche', 'nocturno') and limite_turno_norm in ('d', 'dia', 'diurno'):
-                        return 1
-                    else:
-                        return 0
-            except Exception:
-                return 0
-        
-        filtrados = []
-        for registro in registros:
-            fecha_reg = registro.fecha
-            turno_reg = registro.turno
-            
-            incluir = True
-            
-            # Validar desde
-            if self.rango_desde is not None:
-                cmp = comparar_fecha_turno(fecha_reg, turno_reg, self.rango_desde[0], self.rango_desde[1])
-                if cmp < 0:
-                    incluir = False
-            
-            # Validar hasta
-            if self.rango_hasta is not None and incluir:
-                cmp = comparar_fecha_turno(fecha_reg, turno_reg, self.rango_hasta[0], self.rango_hasta[1])
-                if cmp > 0:
-                    incluir = False
-            
-            if incluir:
-                filtrados.append(registro)
-        
-        return filtrados
+        importador = get_importador()
+        return importador.filtrar_registros_por_rango(
+            registros,
+            rango_desde=self.rango_desde,
+            rango_hasta=self.rango_hasta,
+        )
 
     def _set_estado_previsualizacion(self, mensaje: str, color: str = "#a0a0a0") -> None:
         self.preview_status.setText(mensaje)
