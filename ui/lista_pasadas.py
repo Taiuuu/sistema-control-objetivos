@@ -8,7 +8,8 @@ import sqlite3
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTableWidget, QTableWidgetItem, QPushButton,
-    QDateEdit, QTimeEdit, QComboBox, QMessageBox, QDialog
+    QDateEdit, QTimeEdit, QComboBox, QMessageBox, QDialog,
+    QSpinBox
 )
 from PyQt6.QtCore import QDate, QTime
 from PyQt6.QtGui import QColor
@@ -78,6 +79,28 @@ def _eliminar_pasadas_por_fecha(fecha: str) -> int:
     cursor = conexion.cursor()
 
     cursor.execute("DELETE FROM pasadas WHERE fecha = ?", (fecha,))
+    eliminadas = cursor.rowcount
+
+    conexion.commit()
+    conexion.close()
+    return eliminadas
+
+
+def _eliminar_pasadas_por_mes(año: int, mes: int) -> int:
+    conexion = sqlite3.connect(DB_PATH)
+    cursor = conexion.cursor()
+
+    # Calcular primer y último día del mes
+    from datetime import date
+    import calendar
+    
+    primer_dia = date(año, mes, 1)
+    ultimo_dia = date(año, mes, calendar.monthrange(año, mes)[1])
+    
+    cursor.execute(
+        "DELETE FROM pasadas WHERE fecha >= ? AND fecha <= ?",
+        (primer_dia.strftime('%Y-%m-%d'), ultimo_dia.strftime('%Y-%m-%d'))
+    )
     eliminadas = cursor.rowcount
 
     conexion.commit()
@@ -389,6 +412,36 @@ class ListaPasadas(QWidget):
 
         layout.addLayout(fila)
 
+        # Filtros para mes
+        fila_mes = QHBoxLayout()
+
+        fila_mes.addWidget(QLabel("Eliminar pasadas por mes (Admin):"))
+
+        fila_mes.addWidget(QLabel("Mes:"))
+        self.selector_mes = QComboBox()
+        self.selector_mes.addItems([
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ])
+        self.selector_mes.setCurrentIndex((QDate.currentDate().month() - 1) % 12)
+        fila_mes.addWidget(self.selector_mes)
+
+        fila_mes.addWidget(QLabel("Año:"))
+        self.selector_ano = QSpinBox()
+        self.selector_ano.setMinimum(2020)
+        self.selector_ano.setMaximum(2099)
+        self.selector_ano.setValue(QDate.currentDate().year())
+        fila_mes.addWidget(self.selector_ano)
+
+        self.btn_eliminar_mes = QPushButton("Eliminar mes (Admin)")
+        self.btn_eliminar_mes.clicked.connect(self._eliminar_mes_actual)
+        self.btn_eliminar_mes.setVisible(False)
+
+        fila_mes.addWidget(self.btn_eliminar_mes)
+        fila_mes.addStretch()
+
+        layout.addLayout(fila_mes)
+
         # Tabla
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(6)
@@ -426,7 +479,9 @@ class ListaPasadas(QWidget):
 
     def _actualizar_permisos(self):
         rol_actual = str(get_rol() or "").lower()
-        self.btn_eliminar_dia.setVisible(rol_actual in {"admin", "administrador"})
+        es_admin = rol_actual in {"admin", "administrador"}
+        self.btn_eliminar_dia.setVisible(es_admin)
+        self.btn_eliminar_mes.setVisible(es_admin)
 
     def _cargar_tabla(self):
 
@@ -512,6 +567,49 @@ class ListaPasadas(QWidget):
             QMessageBox.information(self, "Sin resultados", f"No había pasadas para eliminar en {fecha}.")
         else:
             QMessageBox.information(self, "Listo", f"Se eliminaron {eliminadas} pasadas del día {fecha}.")
+
+        self._cargar_tabla()
+
+    def _eliminar_mes_actual(self):
+        rol_actual = str(get_rol() or "").lower()
+        if rol_actual not in {"admin", "administrador"}:
+            QMessageBox.warning(self, "Acceso denegado", "Solo los administradores pueden borrar todas las pasadas de un mes.")
+            return
+
+        mes_idx = self.selector_mes.currentIndex()
+        mes = mes_idx + 1
+        año = self.selector_ano.value()
+        
+        meses_nombres = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ]
+        mes_nombre = meses_nombres[mes_idx]
+
+        respuesta = QMessageBox.question(
+            self,
+            "Confirmar eliminación masiva",
+            f"¿Seguro que querés eliminar TODAS las pasadas de {mes_nombre} {año}?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+
+        if respuesta != QMessageBox.StandardButton.Yes:
+            return
+
+        eliminadas = _eliminar_pasadas_por_mes(año, mes)
+        from services.logger import registrar_accion
+        from services.sesion import get_usuario_id
+
+        registrar_accion(
+            get_usuario_id(),
+            f"Eliminó {eliminadas} pasadas del mes {mes_nombre} {año}"
+        )
+        self.sincronizador.notificar_cambio("pasadas", "DELETE", {"mes": mes, "año": año, "cantidad": eliminadas})
+
+        if eliminadas == 0:
+            QMessageBox.information(self, "Sin resultados", f"No había pasadas para eliminar en {mes_nombre} {año}.")
+        else:
+            QMessageBox.information(self, "Listo", f"Se eliminaron {eliminadas} pasadas de {mes_nombre} {año}.")
 
         self._cargar_tabla()
 

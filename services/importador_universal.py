@@ -471,7 +471,7 @@ class ImportadorUniversal:
         def _comparar_fecha_turno(
             registro_fecha: str,
             registro_turno: str,
-            limite_fecha: date,
+            limite_fecha: date | str,
             limite_turno: str,
         ) -> int:
             try:
@@ -479,9 +479,18 @@ class ImportadorUniversal:
             except Exception:
                 return 0
 
-            if reg_date < limite_fecha:
+            # Convertir limite_fecha a date si es string
+            if isinstance(limite_fecha, str):
+                try:
+                    lim_date = datetime.strptime(limite_fecha, "%Y-%m-%d").date()
+                except Exception:
+                    return 0
+            else:
+                lim_date = limite_fecha
+
+            if reg_date < lim_date:
                 return -1
-            if reg_date > limite_fecha:
+            if reg_date > lim_date:
                 return 1
 
             reg_turno = _orden_turno(registro_turno)
@@ -1038,8 +1047,8 @@ class ImportadorUniversal:
                 idx_hora = c_hora - 1
                 idx_sup = c_sup - 1
 
-                # Saltar si la fila no tiene suficientes columnas
-                if len(fila) <= idx_hora:
+                # Saltar si la fila no tiene ni siquiera la columna de objetivo
+                if len(fila) <= idx_obj:
                     continue
 
                 try:
@@ -1057,50 +1066,51 @@ class ImportadorUniversal:
                     )
 
                     # Validaciones básicas
-                    if (
-                        not objetivo
-                        or str(objetivo).strip() == ''
-                        or hora_raw is None
-                        or str(hora_raw).strip() == ''
-                    ):
+                    if not objetivo or str(objetivo).strip() == '':
                         continue
 
                     if self._es_encabezado(objetivo):
                         continue
 
                     # Resolver turno desde la celda de Excel o desde la hoja como fallback.
+                    # El turno de la celda tiene PRIORIDAD sobre el turno de la hoja
                     turno_final = self._resolver_turno_excel(turno_raw, turno)
 
                     if turno_final is None:
-                        filas_con_error += 1
-                        continue
+                        turno_final = turno  # Usar turno de hoja como último recurso
 
-                    # Normalizar hora y fecha
-                    try:
-                        fecha_import, hora_normalizada = (
-                            self._normalizar_hora_y_fecha(
-                                hora_raw,
-                                sheet_date,
+                    # ===== CAMBIO CLAVE: HORA AHORA ES OPCIONAL =====
+                    # Permitir filas sin hora registrada (listas base sin pasadas)
+                    hora_normalizada = None
+                    fecha_import = sheet_date
+
+                    if hora_raw is not None and str(hora_raw).strip() != '':
+                        # Si hay hora, intentar normalizarla
+                        try:
+                            fecha_import, hora_normalizada = (
+                                self._normalizar_hora_y_fecha(
+                                    hora_raw,
+                                    sheet_date,
+                                )
                             )
-                        )
-                    except Exception as e:
-                        print(
-                            f'[PARSE ERROR] '
-                            f'Hoja={ws.title} | '
-                            f'Fila={row_idx} | '
-                            f'Bloque={bloque_idx+1} | '
-                            f'Objetivo={objetivo} | '
-                            f'Hora={hora_raw} | '
-                            f'Error: {e}'
-                        )
-                        filas_con_error += 1
-                        continue
+                        except Exception as e:
+                            # Hora inválida: loguear pero continuar sin hora
+                            print(
+                                f'[HORA INVÁLIDA] '
+                                f'Hoja={ws.title} | '
+                                f'Fila={row_idx} | '
+                                f'Bloque={bloque_idx+1} | '
+                                f'Objetivo={objetivo} | '
+                                f'Hora={hora_raw} | '
+                                f'Continuando sin hora: {e}'
+                            )
+                            hora_normalizada = None
 
-                    # Crear registro
+                    # Crear registro incluso sin hora
                     registros.append(
                         RegistroImportacion(
                             fecha=fecha_import.strftime('%Y-%m-%d'),
-                            hora=hora_normalizada,
+                            hora=hora_normalizada or '',
                             turno=turno_final,
                             supervisor=supervisor or '',
                             objetivo=objetivo,
