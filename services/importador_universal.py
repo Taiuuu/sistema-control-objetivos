@@ -908,8 +908,8 @@ class ImportadorUniversal:
             if not objetivo or self._es_encabezado(objetivo):
                 continue
 
-            hora_raw = self._limpiar_valor(ws.cell(row=fila, column=columnas['hora']).value)
-            if not hora_raw:
+            hora_raw = ws.cell(row=fila, column=columnas['hora']).value
+            if hora_raw is None or str(hora_raw).strip() == '':
                 continue
 
             supervisor = self._limpiar_valor(
@@ -1366,6 +1366,9 @@ class ImportadorUniversal:
         # HH:MM
         elif re.fullmatch(r"\d{1,2}:\d{1,2}", texto):
             hora, minuto = map(int, texto.split(":"))
+
+        elif re.fullmatch(r"\d{1,2}:\d{1,2}:\d{1,2}", texto):
+            hora, minuto, _ = map(int, texto.split(":"))
 
         else:
             raise ValueError(f"Formato de hora no reconocido: '{hora_raw}' (procesado como '{texto}')")
