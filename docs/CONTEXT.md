@@ -128,6 +128,9 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - Soft-delete with recorded end date
 - Hard delete (admin only): requires typing exact name, logged in audit trail
 - Real-time search in main table
+- The objectives REST API previously treated `Objetivo` instances like tuples in some endpoints (`obj[0]`, `obj[1]`) and now serializes them correctly as dicts based on the real model fields (`id`, `nombre`, `fecha_inicio`, `fecha_fin`, `dias_semana`, `activo`); signature mismatches between the API and the model functions for creating, updating, and deleting objectives were also corrected
+- SQLite foreign key enforcement is enabled through the shared DB configuration used by the database manager and objective-related flows; objective hard deletes now remove dependent `pasadas` rows explicitly, log the dependency count, and raise a clear database error if the delete cannot be completed so no data is silently lost
+- The objectives list UI no longer uses direct SQL for objective updates; it reads and writes through the objective model layer so the UI stays aligned with persistence and cache/sync invalidation
 
 ### Supervisors
 - Create and delete supervisors (deletion requires reassignment flow)
@@ -228,7 +231,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - ui/importar_excel.py: "Deshacer importación" feature added with filters + double confirmation
 
 ### Pending (high priority)
-- database/db.py: FOREIGN KEY enforcement not yet enabled on transactions
+- database/db.py: foreign key enforcement is enabled consistently through the shared SQLite configuration used by the database manager and objective-related flows
 - ui/login.py: input validation (max length, character whitelist) — **verificar estado real, ver nota de conflicto arriba**
 - services/permisos.py: decorators lack try-except and logging on failure
 - importador_universal.py legacy parser: descarta filas cuando el turno de la celda no coincide
@@ -315,4 +318,5 @@ VESP_LOG_LEVEL=INFO
 
 - `VESP_JWT_SECRET` is required by the Flask API at startup; the app fails fast if it is missing.
 - `VESP_API_DEBUG` defaults to `false` and does not enable debug mode unless explicitly set.
+- `VESP_ENCRYPTION_KEY` is validated only when encryption/decryption functionality is actually used; importing the module no longer fails if the variable is missing.
 - The legacy JWT secret configuration name is not used anywhere in the project.

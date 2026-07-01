@@ -23,15 +23,8 @@ import secrets
 load_dotenv()
 
 _clave_raw = os.environ.get('VESP_ENCRYPTION_KEY')
-
-if not _clave_raw:
-    raise RuntimeError(
-        "Falta el archivo .env con VESP_ENCRYPTION_KEY.\n"
-        "Copiá .env.example como .env y completá la clave."
-    )
-
-_clave_bytes = hashlib.sha256(_clave_raw.encode()).digest()
-MASTER_KEY = base64.urlsafe_b64encode(_clave_bytes)
+_clave_bytes = hashlib.sha256(_clave_raw.encode()).digest() if _clave_raw else None
+MASTER_KEY = base64.urlsafe_b64encode(_clave_bytes) if _clave_bytes else None
 
 # Algoritmo y parámetros
 KEY_LENGTH = 32  # 256 bits para AES-256
@@ -69,6 +62,11 @@ def encriptar_datos(datos: str) -> str:
     Returns:
         String base64 con salt + IV + datos encriptados
     """
+    if not _clave_raw:
+        raise RuntimeError(
+            "Falta la variable de entorno VESP_ENCRYPTION_KEY para usar la funcionalidad de cifrado."
+        )
+
     # Generar salt e IV
     salt = _generate_salt()
     iv = secrets.token_bytes(IV_LENGTH)
@@ -98,6 +96,11 @@ def desencriptar_datos(datos_encriptados: str) -> str:
     Returns:
         String desencriptado original
     """
+    if not _clave_raw:
+        raise RuntimeError(
+            "Falta la variable de entorno VESP_ENCRYPTION_KEY para usar la funcionalidad de cifrado."
+        )
+
     try:
         # Decodificar de base64
         combined = base64.b64decode(datos_encriptados)

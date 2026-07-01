@@ -3,7 +3,6 @@
 # Pantalla de listado y gestión de objetivos
 # =============================================================================
 
-import sqlite3
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget,
     QTableWidgetItem, QPushButton, QMessageBox, QDialog,
@@ -11,8 +10,13 @@ from PyQt6.QtWidgets import (
     QInputDialog
 )
 from PyQt6.QtCore import QDate
-from database.db import DB_PATH
-from models.objetivos import dar_de_baja_objetivo, eliminar_objetivo
+from models.objetivos import (
+    actualizar_objetivo,
+    dar_de_baja_objetivo,
+    eliminar_objetivo,
+    listar_objetivos,
+)
+from models.types import Objetivo
 from services.sincronizacion import obtener_sincronizador
 from services.sesion import get_rol
 
@@ -29,32 +33,20 @@ DIAS_NOMBRES = {
 }
 
 
-def _cargar_objetivos() -> list:
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute("SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos")
-    resultado = cursor.fetchall()
-    conexion.close()
-    return resultado
+def _cargar_objetivos() -> list[Objetivo]:
+    return listar_objetivos()
 
 
 def _actualizar_objetivo(objetivo_id: int, nombre: str, fecha_inicio: str,
                           fecha_fin: str | None, dias_semana: str) -> None:
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    cursor.execute("""
-        UPDATE objetivos SET nombre = ?, fecha_inicio = ?, fecha_fin = ?, dias_semana = ?
-        WHERE id = ?
-    """, (nombre, fecha_inicio, fecha_fin, dias_semana, objetivo_id))
-    conexion.commit()
-    conexion.close()
+    actualizar_objetivo(objetivo_id, nombre, fecha_inicio, dias_semana, fecha_fin)
 
 
 class DialogoEditarObjetivo(QDialog):
 
-    def __init__(self, objetivo: tuple, parent=None):
+    def __init__(self, objetivo: Objetivo, parent=None):
         super().__init__(parent)
-        self.objetivo_id = objetivo[0]
+        self.objetivo_id = objetivo.id
         self.setWindowTitle("Editar objetivo")
         self.setFixedSize(400, 480)
 
@@ -62,34 +54,34 @@ class DialogoEditarObjetivo(QDialog):
 
         # Nombre
         layout.addWidget(QLabel("Nombre:"))
-        self.input_nombre = QLineEdit(objetivo[1])
+        self.input_nombre = QLineEdit(objetivo.nombre)
         layout.addWidget(self.input_nombre)
 
         # Fecha inicio
         layout.addWidget(QLabel("Fecha inicio:"))
         self.input_inicio = QDateEdit()
         self.input_inicio.setCalendarPopup(True)
-        self.input_inicio.setDate(QDate.fromString(objetivo[2], "yyyy-MM-dd"))
+        self.input_inicio.setDate(QDate.fromString(objetivo.fecha_inicio, "yyyy-MM-dd"))
         layout.addWidget(self.input_inicio)
 
         # Fecha fin opcional
         self.check_fin = QCheckBox("Tiene fecha de finalización:")
-        self.check_fin.setChecked(objetivo[3] is not None)
+        self.check_fin.setChecked(objetivo.fecha_fin is not None)
         self.check_fin.toggled.connect(self._toggle_fecha_fin)
         layout.addWidget(self.check_fin)
 
         self.input_fin = QDateEdit()
         self.input_fin.setCalendarPopup(True)
-        if objetivo[3]:
-            self.input_fin.setDate(QDate.fromString(objetivo[3], "yyyy-MM-dd"))
+        if objetivo.fecha_fin:
+            self.input_fin.setDate(QDate.fromString(objetivo.fecha_fin, "yyyy-MM-dd"))
         else:
             self.input_fin.setDate(QDate.currentDate())
-        self.input_fin.setEnabled(objetivo[3] is not None)
+        self.input_fin.setEnabled(objetivo.fecha_fin is not None)
         layout.addWidget(self.input_fin)
 
         # Días de cobertura
         layout.addWidget(QLabel("Días de cobertura:"))
-        dias_actuales = objetivo[4].split(",") if objetivo[4] else []
+        dias_actuales = objetivo.dias_semana.split(",") if objetivo.dias_semana else []
         self.dias = {}
         for nombre_dia, numero in DIAS_NOMBRES.items():
             cb = QCheckBox(nombre_dia)
@@ -199,11 +191,11 @@ class ListaObjetivos(QWidget):
 
 
         for i, o in enumerate(objetivos):
-            dias_texto = ", ".join([DIAS_MAP.get(d, d) for d in o[4].split(",")])
-            fin_texto = o[3] if o[3] else "Sin fecha fin"
+            dias_texto = ", ".join([DIAS_MAP.get(d, d) for d in (o.dias_semana or "").split(",")])
+            fin_texto = o.fecha_fin if o.fecha_fin else "Sin fecha fin"
 
-            self.tabla.setItem(i, 0, QTableWidgetItem(o[1]))
-            self.tabla.setItem(i, 1, QTableWidgetItem(o[2]))
+            self.tabla.setItem(i, 0, QTableWidgetItem(o.nombre))
+            self.tabla.setItem(i, 1, QTableWidgetItem(o.fecha_inicio))
             self.tabla.setItem(i, 2, QTableWidgetItem(fin_texto))
             self.tabla.setItem(i, 3, QTableWidgetItem(dias_texto))
 
@@ -212,10 +204,10 @@ class ListaObjetivos(QWidget):
             self.tabla.setCellWidget(i, 4, boton_editar)
 
             # "Dar de baja": siempre visible para admin, solo sin fecha fin para el resto
-            if not o[3] or es_admin:
+            if not o.fecha_fin or es_admin:
                 boton_baja = QPushButton("Dar de baja")
                 boton_baja.clicked.connect(
-                    lambda checked, obj_id=o[0], nombre=o[1]: self._dar_de_baja(obj_id, nombre)
+                    lambda checked, obj_id=o.id, nombre=o.nombre: self._dar_de_baja(obj_id, nombre)
                 )
                 self.tabla.setCellWidget(i, 5, boton_baja)
 
@@ -224,11 +216,11 @@ class ListaObjetivos(QWidget):
                 boton_eliminar = QPushButton("Eliminar")
                 boton_eliminar.setStyleSheet("background-color: #d32f2f; color: white; font-weight: bold;")
                 boton_eliminar.clicked.connect(
-                    lambda checked, obj_id=o[0], nombre=o[1]: self._eliminar_permanentemente(obj_id, nombre)
+                    lambda checked, obj_id=o.id, nombre=o.nombre: self._eliminar_permanentemente(obj_id, nombre)
                 )
                 self.tabla.setCellWidget(i, 6, boton_eliminar)
     
-    def _editar(self, objetivo: tuple) -> None:
+    def _editar(self, objetivo: Objetivo) -> None:
         self.dialogo_edicion = DialogoEditarObjetivo(objetivo, self)
         if self.dialogo_edicion.exec():
             self._cargar_tabla()

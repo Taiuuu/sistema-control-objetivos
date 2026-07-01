@@ -17,6 +17,7 @@ Versión: 2.0.0
 """
 
 import logging
+import sqlite3
 from datetime import datetime
 from typing import List, Optional
 
@@ -452,13 +453,26 @@ def eliminar_objetivo(objetivo_id: int) -> bool:
         with gestor_db.transaction() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "DELETE FROM pasadas WHERE objetivo_id = ?",
+                "SELECT COUNT(*) FROM pasadas WHERE objetivo_id = ?",
                 (objetivo_id,)
             )
+            pasadas_asociadas = cursor.fetchone()[0]
+            if pasadas_asociadas:
+                logger.warning(
+                    "Eliminando %s pasada(s) asociada(s) al objetivo %s antes de borrar el objetivo",
+                    pasadas_asociadas,
+                    objetivo_id,
+                )
+                cursor.execute(
+                    "DELETE FROM pasadas WHERE objetivo_id = ?",
+                    (objetivo_id,)
+                )
             cursor.execute(
                 "DELETE FROM objetivos WHERE id = ?",
                 (objetivo_id,)
             )
+            if cursor.rowcount != 1:
+                raise DatabaseError("DELETE", f"No se pudo eliminar el objetivo {objetivo_id}")
 
         # Notificar cambio
         notificar_cambio("objetivos", "DELETE", {
@@ -474,6 +488,9 @@ def eliminar_objetivo(objetivo_id: int) -> bool:
 
     except (ValidationError, ObjetivoError):
         raise
+    except sqlite3.IntegrityError as e:
+        logger.error(f"Violación de integridad al eliminar objetivo {objetivo_id}: {e}")
+        raise DatabaseError("DELETE", f"Violación de integridad: {e}")
     except Exception as e:
         logger.error(f"Error eliminando objetivo: {e}")
         raise DatabaseError("DELETE", str(e))
