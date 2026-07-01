@@ -19,12 +19,13 @@ from services.sesion import get_rol
 
 DIAS_MAP = {
     "1": "Lun", "2": "Mar", "3": "Mié",
-    "4": "Jue", "5": "Vie", "6": "Sáb", "7": "Dom"
+    "4": "Jue", "5": "Vie", "6": "Sáb", "7": "Dom", "8": "Feriados"
 }
 
 DIAS_NOMBRES = {
     "Lunes": "1", "Martes": "2", "Miércoles": "3",
-    "Jueves": "4", "Viernes": "5", "Sábado": "6", "Domingo": "7"
+    "Jueves": "4", "Viernes": "5", "Sábado": "6", "Domingo": "7",
+    "Feriados": "8"
 }
 
 

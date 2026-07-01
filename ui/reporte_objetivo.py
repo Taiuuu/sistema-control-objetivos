@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QColor
 from services.background_task import run_background_task
 from services.exportar import exportar_excel, exportar_pdf
+from services.reportes import objetivo_corresponde
 from database.db import DB_PATH
 
 
@@ -41,7 +42,6 @@ def calcular_reporte_objetivo(anio: int, mes: int, objetivo_id: int) -> dict:
         raise ValueError(f"No se encontró el objetivo con id {objetivo_id}")
 
     nombre, inicio, fin, dias_str = row
-    dias_semana = [int(d) for d in dias_str.split(",")]
     total_dias = calendar.monthrange(anio, mes)[1]
 
     NOMBRES_DIA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
@@ -60,7 +60,7 @@ def calcular_reporte_objetivo(anio: int, mes: int, objetivo_id: int) -> dict:
             continue
         if fin and fecha > fin:
             continue
-        if fecha_dt.isoweekday() not in dias_semana:
+        if not objetivo_corresponde(fecha, dias_str):
             continue
 
         dias_esperados += 1

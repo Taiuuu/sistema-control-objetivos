@@ -24,6 +24,7 @@ from typing import List, Dict, Optional, Tuple, Any
 
 from database.gestor_db import gestor_db
 from services.cache import cache_global
+from services.feriados import es_feriado
 from .exceptions import (
     ReporteError, FechaInvalidaReporte, DatosInsuficientesReporte
 )
@@ -75,6 +76,18 @@ def _parsear_dias_semana(dias_str: str) -> List[int]:
         return [int(d.strip()) for d in dias_str.split(",") if d.strip()]
     except ValueError:
         return []
+
+
+def _objetivo_corresponde_a_fecha(fecha: str, dias_semana_str: str) -> bool:
+    """Evalúa si un objetivo corresponde a una fecha considerando los feriados."""
+    try:
+        dias = _parsear_dias_semana(dias_semana_str)
+        if 8 in dias:
+            return es_feriado(fecha)
+
+        return _obtener_dia_semana(fecha) in dias
+    except Exception:
+        return False
 
 
 # =============================================================================
@@ -137,8 +150,7 @@ def obtener_objetivos_del_dia(fecha: str) -> List[Tuple[int, str, str]]:
                 continue
             
             # Verificar que sea un día válido para este objetivo
-            dias = _parsear_dias_semana(dias_semana_str)
-            if dia_semana not in dias:
+            if not _objetivo_corresponde_a_fecha(fecha, dias_semana_str):
                 continue
             
             resultado.append((obj_id, nombre, dias_semana_str))
@@ -166,10 +178,7 @@ def objetivo_corresponde(fecha: str, dias_semana_str: str) -> bool:
     try:
         _validar_fecha(fecha)
         
-        dia = _obtener_dia_semana(fecha)
-        dias = _parsear_dias_semana(dias_semana_str)
-        
-        return dia in dias
+        return _objetivo_corresponde_a_fecha(fecha, dias_semana_str)
         
     except Exception as e:
         logger.error(f"Error verificando correspondencia: {e}")
@@ -376,7 +385,7 @@ def generar_reporte_mensual(anio: int, mes: int) -> Dict[str, Any]:
                     continue
                 
                 # Verificar que sea un día válido
-                if fecha_dt.isoweekday() not in dias_semana:
+                if not _objetivo_corresponde_a_fecha(fecha, dias_str):
                     continue
                 
                 dias_esperados += 1

@@ -18,7 +18,7 @@ from PyQt6.QtCore import QTimer
 
 from ui.login import LoginWindow
 from ui.ventana_principal import VentanaPrincipal
-from database.db import crear_base_datos, migrar_supervisor3, migrar_supervisores_alta_baja, migrar_usuarios_activo
+from database.db import crear_base_datos, migrar_supervisor3, migrar_supervisores_alta_baja, migrar_usuarios_activo, migrar_feriados
 from services.backup import hacer_backup
 from services.actualizador import verificar_actualizacion
 from services.tema import obtener_tema_actual, establecer_tema_actual
@@ -224,7 +224,7 @@ def iniciar_app() -> None:
         sys.exit(1)
 
     # 2. Migraciones (IMPORTANTE - pero no crítica)
-    if inicializar_componente(logger, "Migraciones", lambda: (migrar_supervisor3(), migrar_supervisores_alta_baja(), migrar_usuarios_activo())):
+    if inicializar_componente(logger, "Migraciones", lambda: (migrar_supervisor3(), migrar_supervisores_alta_baja(), migrar_usuarios_activo(), migrar_feriados())):
         componentes_exitosos.append("Migraciones")
     else:
         componentes_fallidos.append("Migraciones")

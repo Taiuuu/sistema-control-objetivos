@@ -41,6 +41,14 @@ def crear_base_datos() -> None:
     """)
 
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS feriados (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha        TEXT NOT NULL UNIQUE,
+            descripcion  TEXT
+        )
+    """)
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS supervisores (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre       TEXT NOT NULL,
@@ -140,6 +148,7 @@ def crear_base_datos() -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_equipos_supervisor2_id ON equipos(supervisor2_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_usuario ON auditoria(fecha DESC, usuario_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_objetivos_fecha_fin ON objetivos(fecha_fin)")
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_feriados_fecha ON feriados(fecha)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_supervisores_nombre ON supervisores(nombre)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_usuario_id ON logs(usuario_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_fecha ON logs(fecha DESC)")
@@ -156,6 +165,34 @@ def crear_base_datos() -> None:
 # =============================================================================
 # MIGRACIONES
 # =============================================================================
+
+def migrar_feriados() -> None:
+    """Crea la tabla de feriados si no existe para bases de datos antiguas."""
+    conexion = conectar()
+    cursor = conexion.cursor()
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS feriados (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                fecha       TEXT NOT NULL UNIQUE,
+                descripcion TEXT
+            )
+        """)
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_feriados_fecha ON feriados(fecha)")
+        conexion.commit()
+        print("✅ Migración feriados completada")
+    except sqlite3.OperationalError as e:
+        if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
+            print("ℹ️ Tabla feriados ya existe")
+        else:
+            print(f"⚠️ Error en migración feriados: {e}")
+            conexion.rollback()
+    except Exception as e:
+        print(f"❌ Error inesperado en migrar_feriados: {e}")
+        conexion.rollback()
+    finally:
+        conexion.close()
+
 
 def migrar_supervisor3() -> None:
     """

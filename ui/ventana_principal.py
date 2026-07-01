@@ -39,6 +39,7 @@ from ui.transferir_datos import TransferirDatos
 from ui.importar_excel import ImportarExcel
 from ui.deshacer_importacion import DeshacerImportacion
 from ui.dashboard import Dashboard
+from ui.feriados import VistaFeriados
 from ui.vista_auditoria import VistaAuditoria
 from ui.vista_validaciones import VistaValidaciones
 from ui.vista_cache import VistaCache
@@ -367,6 +368,7 @@ class VentanaPrincipal(QWidget):
 
         add_btn("🔍", "Ver pasadas",         self.abrir_lista_pasadas)
         add_btn("📝", "Notas del día",       self.abrir_notas,              "(Ctrl+N)")
+        add_btn("🏖️", "Feriados",            self.abrir_feriados)
         add_btn("📅", "Reporte mensual",     self.abrir_reporte_mensual,    "(Ctrl+R)")
         add_btn("📅", "Reporte objetivo",    self.abrir_reporte_mensual_objetivo, "(Ctrl+Ñ)")
         add_btn("💾", "Transferir datos",    self.abrir_transferir_datos)
@@ -1615,6 +1617,10 @@ class VentanaPrincipal(QWidget):
 
     def abrir_notas(self) -> None:
         self._abrir_ventana('notas', NotasDiarias)
+
+
+    def abrir_feriados(self) -> None:
+        self._abrir_ventana('feriados', VistaFeriados)
 
 
     def abrir_dashboard(self) -> None:

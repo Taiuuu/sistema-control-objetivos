@@ -18,7 +18,8 @@ from services.validaciones import validar_objetivo, ErrorValidacion
 # Mapeo de días de la semana a su número (formato ISO: 1=lunes, 7=domingo)
 DIAS_MAP = {
     "Lunes": "1", "Martes": "2", "Miércoles": "3",
-    "Jueves": "4", "Viernes": "5", "Sábado": "6", "Domingo": "7"
+    "Jueves": "4", "Viernes": "5", "Sábado": "6", "Domingo": "7",
+    "Feriados": "8"
 }
 
 
