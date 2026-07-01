@@ -57,7 +57,7 @@ copy .env.example .env     # Windows
 # cp .env.example .env     # macOS/Linux
 ```
 
-Ajustar `JWT_SECRET_KEY` y `ENCRYPTION_KEY` en `.env` antes de usar en producción.
+Ajustar `VESP_JWT_SECRET` y `VESP_ENCRYPTION_KEY` en `.env` antes de usar en producción.
 
 ## Ejecución
 
@@ -96,8 +96,8 @@ python -m pytest
 
 ## Variables de entorno (`.env.example`)
 
-- `VESP_JWT_SECRET` - Secreto JWT para la API
-- `VESP_ENCRYPTION_KEY` - Clave de cifrado
+- `VESP_JWT_SECRET` - Secreto JWT obligatorio para la API
+- `VESP_ENCRYPTION_KEY` - Clave de cifrado obligatoria para la app
 - `VESP_DB_PATH` - Ruta opcional a la base de datos SQLite
 - `VESP_API_HOST` - Host de la API
 - `VESP_API_PORT` - Puerto de la API

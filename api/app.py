@@ -14,12 +14,13 @@ import os
 
 app = Flask(__name__)
 
-# Configuración JWT (VESP_JWT_SECRET tiene prioridad; sin valor, solo desarrollo local)
-app.config['JWT_SECRET_KEY'] = (
-    os.environ.get('VESP_JWT_SECRET')
-    or os.environ.get('JWT_SECRET_KEY')
-    or 'vesp-api-secret-key-dev-only'
-)
+# Configuración JWT
+jwt_secret = os.environ.get('VESP_JWT_SECRET')
+if not jwt_secret:
+    raise RuntimeError(
+        'Falta la variable de entorno VESP_JWT_SECRET. Definila en .env antes de iniciar la API.'
+    )
+app.config["JWT_SECRET_KEY"] = jwt_secret
 jwt = JWTManager(app)
 
 # Rate limiting

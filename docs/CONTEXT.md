@@ -111,6 +111,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - Mandatory password change on first login (default: 0000)
 - Auto-logout on inactivity with pre-logout backup
 - Admin can reset any user password
+- API JWT config uses `VESP_JWT_SECRET`; the Flask API raises a clear error and does not use a hardcoded fallback if the variable is missing
 
 **Permisos por rol:**
 
@@ -303,14 +304,15 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 ## 9. Config de entorno (.env, opcional)
 
 ```env
-DATABASE_PATH=seguridad.db
-API_HOST=127.0.0.1
-API_PORT=5000
-LOG_LEVEL=INFO
-LOG_FILE=logs/app.log
-SESSION_TIMEOUT=7200
-BACKUP_INTERVAL=3600
-BACKUP_DIR=backups/
-SYNC_ENABLED=False
-SYNC_SERVER=http://localhost:5000
+VESP_JWT_SECRET=REEMPLAZAR_CON_SECRETO_JWT_LARGO_Y_ALEATORIO
+VESP_ENCRYPTION_KEY=REEMPLAZAR_CON_CLAVE_DE_CIFRADO_LARGA_Y_ALEATORIA
+VESP_API_HOST=127.0.0.1
+VESP_API_PORT=5000
+VESP_API_DEBUG=false
+VESP_DB_PATH=seguridad.db
+VESP_LOG_LEVEL=INFO
 ```
+
+- `VESP_JWT_SECRET` is required by the Flask API at startup; the app fails fast if it is missing.
+- `VESP_API_DEBUG` defaults to `false` and does not enable debug mode unless explicitly set.
+- The legacy JWT secret configuration name is not used anywhere in the project.
