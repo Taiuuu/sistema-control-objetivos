@@ -72,6 +72,28 @@ def test_parsear_con_encabezados_control_respecta_turno_del_excel():
     assert registros[0].turno == "nocturno"
 
 
+def test_normalizar_hora_y_fecha_acepta_separadores_repetidos():
+    importador = ImportadorUniversal()
+
+    fecha, hora = importador._normalizar_hora_y_fecha(
+        "16::14",
+        date(2026, 5, 28),
+    )
+
+    assert fecha == date(2026, 5, 28)
+    assert hora == "16:14"
+
+
+def test_normalizar_hora_y_fecha_rechaza_cerrado_como_hora_invalida():
+    importador = ImportadorUniversal()
+
+    try:
+        importador._normalizar_hora_y_fecha("Cerrado ", date(2026, 5, 28))
+        assert False, "Se esperaba ValueError para hora inválida"
+    except ValueError as exc:
+        assert "Hora vacía o inválida" in str(exc)
+
+
 def test_parsear_control_recorridos_legacy_ignora_fila_global_y_detecta_datos_en_fila_dos():
     importador = ImportadorUniversal()
     wb = Workbook()

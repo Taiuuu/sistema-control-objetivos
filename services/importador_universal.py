@@ -1323,13 +1323,14 @@ class ImportadorUniversal:
                 .replace(" ", "")
         )
 
-        # Unificar separadores raros
+        # Unificar separadores raros y secuencias de separadores
         texto = texto.replace(";", ":").replace(".", ":")
+        texto = re.sub(r":{2,}", ":", texto)
 
         # =========================
         # 5. Casos vacíos
         # =========================
-        if texto in ("", "none", "n/a", "na", "null", "-", "--"):
+        if texto in ("", "none", "n/a", "na", "null", "-", "--", "cerrado", "closed"):
             raise ValueError("Hora vacía o inválida")
 
         # =========================
