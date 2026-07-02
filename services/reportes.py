@@ -400,6 +400,8 @@ def generar_reporte_mensual(anio: int, mes: int) -> Dict[str, Any]:
                 cumplimiento = (dias_con_pasada / dias_esperados) * 100
                 total_cumplimiento_ponderado += cumplimiento
                 total_objetivos_esperados += 1
+            if dias_esperados == 0:
+                continue
             
             reporte['objetivos'].append({
                 'id': obj_id,
