@@ -10,7 +10,12 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QDate
 
-from services.feriados import eliminar_feriado, listar_feriados, registrar_feriado
+from services.feriados import (
+    eliminar_feriado,
+    registrar_feriado,
+    obtener_feriados_mes,
+    es_feriado,
+)
 from services.tema import obtener_tema
 
 
