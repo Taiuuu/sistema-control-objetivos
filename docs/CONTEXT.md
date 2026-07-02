@@ -6,11 +6,6 @@
 
 ## ⚠️ Notas de consolidación (leer antes de tocar código)
 
-Este archivo reemplaza como fuente única a: ARQUITECTURA.md, ARQUITECTURA_MULTIUSUARIO.md,
-ANALISIS_ESTABILIDAD.md, FUNCIONALIDADES.md, GUIA_INSTALACION.md, MANUAL_USUARIO.md,
-ROADMAP.md, TESTING_CI_CD.md, readme.md. Esos archivos tenían versiones distintas entre sí
-(0.9.0 / 1.0.0 / 1.1.0 / 1.5.2) y datos contradictorios. Se resolvió así:
-
 - **Versión real: 1.5.2** (según `version.txt`, la fuente más confiable).
 - **ANALISIS_ESTABILIDAD.md estaba obsoleto**: describía como "pendientes" 9 de 12 problemas
   que la sección 6 de este mismo CONTEXT ya marcaba como resueltos en v1.1.0-v1.5.2. Se descartó.
@@ -63,7 +58,7 @@ mypy, bandit, safety, pre-commit
 
 ## 3. Folder Structure (active only)
 
-```
+
 sistema-control-objetivos/
 ├── scripts/
 │   └── main.py              # Entry point
@@ -96,7 +91,7 @@ sistema-control-objetivos/
 ├── requirements.txt
 ├── requirements-dev.txt
 └── CONTEXT.md                 # This file
-```
+
 
 Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 
