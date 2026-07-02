@@ -82,10 +82,14 @@ def _objetivo_corresponde_a_fecha(fecha: str, dias_semana_str: str) -> bool:
     """Evalúa si un objetivo corresponde a una fecha considerando los feriados."""
     try:
         dias = _parsear_dias_semana(dias_semana_str)
-        if 8 in dias:
-            return es_feriado(fecha)
 
+        # Si es feriado y el objetivo cubre feriados, corresponde.
+        if es_feriado(fecha) and 8 in dias:
+            return True
+
+        # En cualquier otro caso se evalúan normalmente los días de semana.
         return _obtener_dia_semana(fecha) in dias
+
     except Exception:
         return False
 
