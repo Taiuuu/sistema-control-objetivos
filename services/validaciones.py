@@ -47,17 +47,16 @@ def validar_formato_hora(hora: str) -> None:
 
 
 def validar_dias_semana(dias_semana: str) -> None:
-    """Valida que los días de la semana sean válidos (1-7 separados por comas)."""
+    """Valida que los días de la semana sean válidos (1-7 separados por comas, 8=Feriados)."""
     if not dias_semana:
         raise ErrorValidacion("Debe seleccionar al menos un día de la semana")
     
     try:
         dias = [int(d.strip()) for d in str(dias_semana).split(',')]
-        if not all(1 <= d <= 7 for d in dias):
+        if not all(1 <= d <= 8 for d in dias):
             raise ValueError
     except (ValueError, AttributeError):
-        raise ErrorValidacion("Días de la semana inválidos. Usar números 1-7 separados por comas")
-
+        raise ErrorValidacion("Días de la semana inválidos. Usar números 1-7 (u 8 para Feriados) separados por comas")
 
 # =============================================================================
 # VALIDACIONES DE INTEGRIDAD REFERENCIAL
