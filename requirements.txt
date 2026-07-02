@@ -34,6 +34,7 @@ PyJWT==2.12.1
 PyQt6==6.11.0
 PyQt6-Qt6==6.11.0
 PyQt6_sip==13.11.1
+psutil==7.1.0
 pytest==9.0.2
 python-dotenv==1.2.2
 PyYAML==6.0.3
