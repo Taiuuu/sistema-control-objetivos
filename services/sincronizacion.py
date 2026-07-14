@@ -1,6 +1,6 @@
 # =============================================================================
 # VESP Organizations - Sistema de Control de Objetivos
-# Módulo de Sincronización de Datos - VERSIÓN PROFESIONAL
+# Módulo de Sincronización de Datos
 # =============================================================================
 """
 Sistema central de sincronización de datos entre módulos.

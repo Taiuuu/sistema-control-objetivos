@@ -1,6 +1,6 @@
 # =============================================================================
 # VESP Organizations - Sistema de Control de Objetivos
-# Módulo de reportes - VERSIÓN PROFESIONAL
+# Módulo de reportes
 # =============================================================================
 """
 Módulo para la generación de reportes del sistema.

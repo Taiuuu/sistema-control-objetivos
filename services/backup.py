@@ -1,6 +1,6 @@
 # =============================================================================
 # VESP Organizations - Sistema de Control de Objetivos
-# Módulo de backup automático de la base de datos - VERSIÓN PROFESIONAL
+# Módulo de backup automático de la base de datos
 # =============================================================================
 """
 Módulo para la gestión de copias de seguridad de la base de datos.

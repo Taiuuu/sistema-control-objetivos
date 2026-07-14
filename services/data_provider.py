@@ -1,6 +1,6 @@
 # =============================================================================
 # VESP Organizations - Sistema de Control de Objetivos
-# Capa de Abstracción de Datos - VERSIÓN PROFESIONAL
+# Capa de Abstracción de Datos
 # =============================================================================
 """
 Módulo que proporciona abstracción de datos con patrón Repository.

@@ -58,7 +58,6 @@ mypy, bandit, safety, pre-commit
 
 ## 3. Folder Structure (active only)
 
-
 sistema-control-objetivos/
 ├── scripts/
 │   └── main.py              # Entry point
@@ -92,7 +91,6 @@ sistema-control-objetivos/
 ├── requirements-dev.txt
 └── CONTEXT.md                 # This file
 
-
 Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 
 ---
@@ -100,6 +98,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 ## 4. Features by Module
 
 ### Auth & security
+
 - Login with bcrypt-hashed passwords
 - Strong password validation with real-time visual indicator
 - Roles: admin, supervisor, operador, auditor, gerente
@@ -108,17 +107,18 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - Admin can reset any user password
 - API JWT config uses `VESP_JWT_SECRET`; the Flask API raises a clear error and does not use a hardcoded fallback if the variable is missing
 
-**Permisos por rol:**
+## Permisos por rol
 
-| Rol | Permisos |
-|-----|----------|
-| Admin | Control total, gestión de usuarios, hard delete, backups |
-| Supervisor | Crear/editar objetivos, equipos, pasadas |
-| Operador | Ver y registrar pasadas básicas |
-| Auditor | Solo lectura de todo |
-| Gerente | Vista ejecutiva y reportes |
+| Rol        | Permisos                                                       |
+| ---------- | -------------------------------------------------------------- |
+| Admin      | Control total, gestión de usuarios, hard delete y backups.     |
+| Supervisor | Crear y editar objetivos, equipos y pasadas.                   |
+| Operador   | Ver y registrar pasadas básicas.                               |
+| Auditor    | Solo lectura de toda la información.                           |
+| Gerente    | Vista ejecutiva y acceso a reportes.                           |
 
 ### Objectives (objetivos)
+
 - Create with name, start date, weekly coverage days
 - Soft-delete with recorded end date
 - Hard delete (admin only): requires typing exact name, logged in audit trail
@@ -128,11 +128,13 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - The objectives list UI no longer uses direct SQL for objective updates; it reads and writes through the objective model layer so the UI stays aligned with persistence and cache/sync invalidation
 
 ### Supervisors
+
 - Create and delete supervisors (deletion requires reassignment flow)
 - Shift teams: two supervisors per shift per day
 - Auto-filter by team when logging a pasada
 
 ### Pasadas (patrol passes)
+
 - Log with date, time, shift, objetivo, supervisor
 - Edit and delete existing pasadas
 - Main table shows daily status per objetivo and shift:
@@ -140,23 +142,28 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
   - Color coding: green / yellow / red
 
 ### Reports
+
 - Monthly compliance report per objetivo
 - % calculated over configured coverage days only
 - Export to Excel and PDF with corporate logo
 
 ### Notes
+
 - Daily notes per objective, deletable
 
 ### Users (admin only)
+
 - Create, delete, reset password
 - Admin account protected from deletion
 - New users created with password 0000, mandatory change on first login
 
 ### Audit log
+
 - All actions logged with user, date, time
 - Filterable by date, admin-only view
 
 ### Backup
+
 - Auto daily backup on startup
 - Auto backup before inactivity logout
 - 30-day retention with auto-cleanup
@@ -164,6 +171,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - Stored as file copies of `seguridad.db` in `backups/`
 
 ### Import (ui/importar_excel.py + services/importador_universal.py)
+
 - Import CONTROL_RECORRIDOS Excel files
 - Sheets named by date and shift; three horizontal column blocks per sheet (legacy format),
   también soporta formato tabular con encabezados
@@ -183,6 +191,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
   (escribir "ELIMINAR") para borrado masivo
 
 ### UI
+
 - Dark corporate theme (toggleable)
 - Side menu organized by section
 - Keyboard shortcuts (Ctrl+E export, Ctrl+Q quit, Esc close dialog)
@@ -190,6 +199,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - Corporate icon in taskbar
 
 ### System
+
 - Auto-update notification from GitHub releases
 - Factory reset script
 - Version shown on login screen
@@ -214,6 +224,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 ## 6. Stability Status
 
 ### Resolved (v1.1.0 - v1.5.2)
+
 - scripts/main.py: try-except on all init components; graceful degradation
 - ui/login.py::verificar_login(): bcrypt errors differentiated; failed attempts logged
 - ui/login.py::_login_post_cambio(): None check on fetchone() before indexing
@@ -226,6 +237,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - ui/importar_excel.py: "Deshacer importación" feature added with filters + double confirmation
 
 ### Pending (high priority)
+
 - database/db.py: foreign key enforcement is enabled consistently through the shared SQLite configuration used by the database manager and objective-related flows
 - ui/login.py: input validation (max length, character whitelist) — **verificar estado real, ver nota de conflicto arriba**
 - services/permisos.py: decorators lack try-except and logging on failure
@@ -233,6 +245,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
   con el turno de la hoja en vez de forzar el turno de la hoja (bug activo, corregir)
 
 ### Known risks
+
 - No input length limits confirmados en login fields (SQL injection mitigado por parametrización)
 - Theme switching may not propagate to all widgets consistently
 - Log files have no rotation limit
@@ -242,6 +255,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 ## 7. Roadmap (confirmed next steps only)
 
 ### Immediate
+
 1. Add input validation to ui/login.py (max 50 chars, alphanumeric + underscore) — confirmar si ya está hecho
 2. Add error handling + logging to permisos.py decorators
 3. Fix theme propagation in ventana_principal.py
@@ -249,11 +263,13 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 5. Write basic stability tests: login validation, permission decorators, graceful BD failure
 
 ### v2.0 (planned, not started)
+
 - Modular refactor: move code into desktop/, shared/, mobile/android/ (Kivy app para tablets)
 - Offline sync with JSON persistence, reintento automático, resolución de conflictos
 - Esquema de BD compatible con PostgreSQL (migración futura), migraciones con Alembic
 
 ### v3.0 (future, one line)
+
 - Centralized Flask + SQLAlchemy backend + PostgreSQL + web client (React) + iOS (Flutter)
 
 ---
@@ -261,22 +277,26 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 ## 8. Working Conventions
 
 ### Code style
+
 - Google-style docstrings on all public functions
 - Type hints on all function signatures
 - Specific exceptions only (never bare `except Exception: pass`)
 - Log with logging module: INFO for actions, ERROR with exc_info=True on failures
 
 ### Naming
+
 - Spanish for all domain terms: objetivo, pasada, supervisor, turno, equipo
 - snake_case for functions and variables
 - PascalCase for classes
 - Files named by responsibility: gestor_turnos.py, importador_universal.py
 
 ### Commits
+
 - Atomic commits: one concern per commit
 - Format: `fix(archivo): descripcion` / `feat(archivo): descripcion` / `refactor(archivo): descripcion`
 
 ### UI patterns
+
 - Forms check for existing instance before opening (no duplicate windows)
 - All destructive actions require confirmation dialog
 - Hard delete confirmation: double dialog + type exact name (objetivos) or "ELIMINAR" (bulk pasadas)
@@ -284,6 +304,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - Import resolution: separate dialogs for objetivos and supervisores; both support create-inline
 
 ### Testing
+
 - pytest, fixtures in conftest.py (`test_db`, `db_initialized`, `admin_user`, `operador_user`,
   `test_objetivo`, `test_supervisor`, `api_client`, `auth_token`)
 - Coverage targets: services 80%, database 85%, api 75%, mínimo global 60%
@@ -293,6 +314,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - Releases: tag `v*` dispara `release.yml` (build PyInstaller + Inno Setup + publish)
 
 ### DB access
+
 - Always close connections explicitly or use context managers
 - Always commit or rollback, never leave transactions open
 - Migrations are additive only; never drop columns
