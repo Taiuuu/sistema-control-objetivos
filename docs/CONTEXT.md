@@ -187,6 +187,9 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - **Regla de negocio clave: el turno de la hoja (sheet) es la única fuente de verdad para el turno
   de cada pasada. Nunca se descarta ni reclasifica una fila por diferencias entre el turno de la
   celda y el turno de la hoja — la hoja siempre gana.**
+- El parser de CONTROL_RECORRIDOS ahora usa un único flujo compartido para normalizar objetivo,
+  supervisor, turno, hora, fecha, notas y descartes, independientemente de si la hoja usa el
+  formato legacy o el formato con encabezados. Ambos parsers producen el mismo registro final.
 - "Deshacer importación": filtro por fecha, supervisor, objetivo; multi-select; doble confirmación
   (escribir "ELIMINAR") para borrado masivo
 

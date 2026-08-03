@@ -447,10 +447,20 @@ def obtener_usuarios_cache(generar_si_falta: bool = True) -> List[tuple]:
 
 def invalidar_objetivos() -> None:
     cache_global.invalidar_patron("objetivo")
+    try:
+        from services.importador_universal import ImportadorUniversal
+        ImportadorUniversal.invalidar_cache_global()
+    except Exception as exc:
+        logger.warning("No se pudo invalidar cache del importador al invalidar objetivos: %s", exc)
 
 
 def invalidar_supervisores() -> None:
     cache_global.invalidar_patron("supervisor")
+    try:
+        from services.importador_universal import ImportadorUniversal
+        ImportadorUniversal.invalidar_cache_global()
+    except Exception as exc:
+        logger.warning("No se pudo invalidar cache del importador al invalidar supervisores: %s", exc)
 
 
 def invalidar_pasadas() -> None:
