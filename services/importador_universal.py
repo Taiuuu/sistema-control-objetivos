@@ -115,6 +115,7 @@ class ExtractionMetrics:
     registros_creados: int = 0
     registros_descartados: int = 0
     excepciones_parseo: int = 0
+    anotaciones_descartadas: int = 0
     motivos_descarte: Dict[str, int] = None
 
     def __post_init__(self):
@@ -124,6 +125,7 @@ class ExtractionMetrics:
     def registrar_descartado(self, motivo: str) -> None:
         self.registros_descartados += 1
         self.motivos_descarte[motivo] = self.motivos_descarte.get(motivo, 0) + 1
+        self._metrics.extraccion.anotaciones_descartadas += 1
 
 
 @dataclass
@@ -238,6 +240,19 @@ class ImportadorUniversal:
         'veces': ('veces', 'cantidad', 'cantidades', 'cant'),
         'notas': ('nota', 'notas', 'observacion', 'observaciones'),
     }
+    _PATRONES_ANOTACION = (
+        "ingreso a obra",
+        "ingresa a obra",
+        "se deja garita",
+        "garita nro",
+        "garita n°",
+        "sale movil",
+        "sale móvil",
+        "llama supervisor",
+        "se retira",
+        "se entrega",
+        "se recibe",
+    )
 
     def __init__(self):
         self.sync_manager = get_sync_manager()
@@ -955,10 +970,13 @@ class ImportadorUniversal:
                         "%Y-%m-%d"
                     ).date()
 
-                    hora = datetime.strptime(
-                        registro.hora,
-                        "%H:%M"
-                    ).time()
+                    if registro.hora:
+                        hora = datetime.strptime(
+                            registro.hora,
+                            "%H:%M"
+                        ).time()
+                    else:
+                        hora = None
 
                     es_control_recorridos = bool(registro.sheet_title)
 
@@ -1296,6 +1314,21 @@ class ImportadorUniversal:
 
         return turno_fallback
 
+
+    def _es_anotacion_supervisor(self, texto: str) -> bool:
+        """Determina si el texto corresponde a una anotación del supervisor
+        y no a un objetivo válido.
+        """
+        if not texto:
+            return False
+
+        texto = self._normalizar_texto(texto)
+
+        return any(
+            patron in texto
+            for patron in self._PATRONES_ANOTACION
+        )
+
     def _crear_registros_control_recorridos(
         self,
         objetivo_raw: Any,
@@ -1318,12 +1351,21 @@ class ImportadorUniversal:
             self._metrics.extraccion.registrar_descartado('objetivo_vacio')
             return []
 
+        if self._es_anotacion_supervisor(objetivo):
+            logger.info(
+                "Anotación descartada: %s | sheet=%s | row=%s",
+                objetivo,
+                ws_title,
+                row_idx,
+            )
+            self._metrics.extraccion.registrar_descartado("anotacion_supervisor")
+            return []
+
         if self._es_encabezado(objetivo):
             self._metrics.filas.filas_encabezado += 1
             self._metrics.filas.registrar_descartada('encabezado')
             self._metrics.extraccion.registrar_descartado('encabezado')
             return []
-
         supervisor = self._limpiar_valor(supervisor_raw) or ''
         if not supervisor:
             self._metrics.extraccion.supervisores_vacios += 1
