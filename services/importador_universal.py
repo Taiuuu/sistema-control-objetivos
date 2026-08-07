@@ -227,11 +227,17 @@ class ImportadorUniversal:
     # horizontales, cada uno representando una pasada independiente con
     # columnas NO | OBJETIVO | TURNO | MOVIL | HORA | SUPERVISOR.
     # Cada tupla es (col_objetivo, col_turno, col_hora, col_supervisor),
-    # 1-indexed (como usa openpyxl). Único lugar donde se define este mapeo.
+    # 1-indexed (como usa openpyxl).
+    #
+    # ¡OJO! Estas columnas son solo un RESPALDO para cuando no se puede
+    # detectar el encabezado real de la hoja (ver _detectar_bloques_hoja).
+    # El ancho de separación entre bloques no es constante entre archivos
+    # (a veces 2 columnas vacías, a veces 1), así que confiar ciegamente
+    # en columnas fijas rompe el parseo si cambia el layout.
     CONTROL_RECORRIDOS_BLOCKS: Tuple[Tuple[int, int, int, int], ...] = (
-        (2, 3, 5, 6),     # bloque 1: cols 1-6
-        (9, 10, 12, 13),  # bloque 2: cols 8-13
-        (16, 17, 19, 20), # bloque 3: cols 15-20
+        (2, 3, 5, 6),      # bloque 1: NO=1 OBJETIVO=2 TURNO=3 MOVIL=4 HORA=5 SUPERVISOR=6
+        (10, 11, 13, 14),  # bloque 2: NO=9 OBJETIVO=10 TURNO=11 MOVIL=12 HORA=13 SUPERVISOR=14
+        (17, 18, 20, 21),  # bloque 3: NO=16 OBJETIVO=17 TURNO=18 MOVIL=19 HORA=20 SUPERVISOR=21
     )
 
     def __init__(self):
@@ -1051,6 +1057,8 @@ class ImportadorUniversal:
         errores: List[str] = []
         filas_procesadas = 0
 
+        bloques = self._detectar_bloques_hoja(ws)
+
         for row_idx, fila in enumerate(
             ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=True), start=1,
         ):
@@ -1067,7 +1075,7 @@ class ImportadorUniversal:
                 continue
 
             fila_tuvo_datos = False
-            for bloque_idx, (c_obj, c_turno, c_hora, c_sup) in enumerate(self.CONTROL_RECORRIDOS_BLOCKS, start=1):
+            for bloque_idx, (c_obj, c_turno, c_hora, c_sup) in enumerate(bloques, start=1):
                 idx_obj, idx_turno, idx_hora, idx_sup = c_obj - 1, c_turno - 1, c_hora - 1, c_sup - 1
                 if len(fila) <= idx_obj:
                     continue
@@ -1117,6 +1125,50 @@ class ImportadorUniversal:
         )
         return registros, errores
 
+    def _detectar_bloques_hoja(self, ws) -> Tuple[Tuple[int, int, int, int], ...]:
+        """Detecta la posición real de cada bloque (OBJETIVO | TURNO | MOVIL | HORA | SUPERVISOR)
+        leyendo la fila de encabezados de la hoja.
+
+        El ancho de separación entre bloques no siempre es el mismo (a veces
+        2 columnas vacías, a veces 1), así que en vez de asumir columnas fijas
+        se busca cada celda de encabezado "OBJETIVO" y se calculan las demás
+        columnas del bloque como offsets fijos relativos a ella (esos offsets
+        sí son constantes dentro de un bloque): TURNO=+1, HORA=+3, SUPERVISOR=+4.
+
+        Si no se detecta ningún encabezado "OBJETIVO" reconocible, cae a
+        CONTROL_RECORRIDOS_BLOCKS como respaldo.
+        """
+        max_row_buscar = min(ws.max_row, 15)
+        columnas_objetivo: List[int] = []
+
+        try:
+            for row in ws.iter_rows(min_row=1, max_row=max_row_buscar, values_only=False):
+                for celda in row:
+                    valor = celda.value
+                    if valor is None:
+                        continue
+                    if self._identificar_tipo_encabezado(valor) == 'objetivo':
+                        columnas_objetivo.append(celda.column)
+        except Exception as e:
+            logger.debug(
+                "Error detectando bloques por encabezado en %s: %s", ws.title, e,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
+            columnas_objetivo = []
+
+        columnas_objetivo = sorted(set(columnas_objetivo))
+
+        if not columnas_objetivo:
+            logger.info(
+                "[BLOQUES] %s: no se detectaron encabezados 'OBJETIVO', usando columnas fijas de respaldo: %s",
+                ws.title, self.CONTROL_RECORRIDOS_BLOCKS,
+            )
+            return self.CONTROL_RECORRIDOS_BLOCKS
+
+        bloques = tuple((col, col + 1, col + 3, col + 4) for col in columnas_objetivo)
+        logger.info("[BLOQUES] %s: bloques detectados por encabezado: %s", ws.title, bloques)
+        return bloques
+    
     def _crear_registro_bloque(
         self,
         objetivo_raw: Any,
@@ -1316,6 +1368,51 @@ class ImportadorUniversal:
             return {'es_valido': False, 'razon': 'sin turno en el nombre', 'fecha': fecha, 'turno': None}
 
         return {'es_valido': True, 'razon': 'nombre con fecha y turno', 'fecha': fecha, 'turno': turno}
+
+
+    def _detectar_bloques_hoja(self, ws) -> Tuple[Tuple[int, int, int, int], ...]:
+        """Detecta la posición real de cada bloque (OBJETIVO | TURNO | MOVIL | HORA | SUPERVISOR)
+        leyendo la fila de encabezados de la hoja.
+
+        El ancho de separación entre bloques no siempre es el mismo (a veces
+        2 columnas vacías, a veces 1), así que en vez de asumir columnas fijas
+        se busca cada celda de encabezado "OBJETIVO" y se calculan las demás
+        columnas del bloque como offsets fijos relativos a ella (esos offsets
+        sí son constantes dentro de un bloque): TURNO=+1, HORA=+3, SUPERVISOR=+4.
+
+        Si no se detecta ningún encabezado "OBJETIVO" reconocible, cae a
+        CONTROL_RECORRIDOS_BLOCKS como respaldo.
+        """
+        max_row_buscar = min(ws.max_row, 15)
+        columnas_objetivo: List[int] = []
+
+        try:
+            for row in ws.iter_rows(min_row=1, max_row=max_row_buscar, values_only=False):
+                for celda in row:
+                    valor = celda.value
+                    if valor is None:
+                        continue
+                    if self._identificar_tipo_encabezado(valor) == 'objetivo':
+                        columnas_objetivo.append(celda.column)
+        except Exception as e:
+            logger.debug(
+                "Error detectando bloques por encabezado en %s: %s", ws.title, e,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
+            columnas_objetivo = []
+
+        columnas_objetivo = sorted(set(columnas_objetivo))
+
+        if not columnas_objetivo:
+            logger.info(
+                "[BLOQUES] %s: no se detectaron encabezados 'OBJETIVO', usando columnas fijas de respaldo: %s",
+                ws.title, self.CONTROL_RECORRIDOS_BLOCKS,
+            )
+            return self.CONTROL_RECORRIDOS_BLOCKS
+
+        bloques = tuple((col, col + 1, col + 3, col + 4) for col in columnas_objetivo)
+        logger.info("[BLOQUES] %s: bloques detectados por encabezado: %s", ws.title, bloques)
+        return bloques
 
     def _evaluar_hoja_control_recorridos(
         self,
