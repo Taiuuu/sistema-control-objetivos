@@ -8,12 +8,16 @@ import logging
 import os
 import re
 import unicodedata
-from dataclasses import dataclass
+import tempfile
+import threading
+import weakref
+from dataclasses import dataclass, asdict
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Callable, Set
 
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +34,8 @@ class RegistroImportacion:
     turno: str
     supervisor: str
     objetivo: str
+    fuente: str
     notas: Optional[str] = None
-    fuente: str = "manual"
     sheet_title: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -185,52 +189,21 @@ class ImportMetrics:
         }
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            'workbook': {
-                'total_hojas': self.workbook.total_hojas,
-                'hojas_analizadas': self.workbook.hojas_analizadas,
-                'hojas_validas': self.workbook.hojas_validas,
-                'hojas_descartadas': self.workbook.hojas_descartadas,
-                'motivos_descarte': self.workbook.motivos_descarte,
-            },
-            'filas': {
-                'total_filas_recorridas': self.filas.total_filas_recorridas,
-                'filas_vacias': self.filas.filas_vacias,
-                'filas_ocultas': self.filas.filas_ocultas,
-                'filas_con_error': self.filas.filas_con_error,
-                'filas_encabezado': self.filas.filas_encabezado,
-                'filas_datos': self.filas.filas_datos,
-                'motivos_descarte': self.filas.motivos_descarte,
-            },
-            'extraccion': {
-                'objetivos_vacios': self.extraccion.objetivos_vacios,
-                'supervisores_vacios': self.extraccion.supervisores_vacios,
-                'horas_vacias': self.extraccion.horas_vacias,
-                'horas_invalidas': self.extraccion.horas_invalidas,
-                'turnos_invalidos': self.extraccion.turnos_invalidos,
-                'registros_creados': self.extraccion.registros_creados,
-                'registros_descartados': self.extraccion.registros_descartados,
-                'excepciones_parseo': self.extraccion.excepciones_parseo,
-                'motivos_descarte': self.extraccion.motivos_descarte,
-            },
-            'validacion': {
-                'supervisor_inexistente': self.validacion.supervisor_inexistente,
-                'objetivo_inexistente': self.validacion.objetivo_inexistente,
-                'fecha_invalida': self.validacion.fecha_invalida,
-                'hora_invalida': self.validacion.hora_invalida,
-                'turno_invalido': self.validacion.turno_invalido,
-                'registros_validos': self.validacion.registros_validos,
-                'registros_rechazados': self.validacion.registros_rechazados,
-                'motivos_rechazo': self.validacion.motivos_rechazo,
-            },
-            'importacion': self.importacion,
-        }
+        # Usar dataclasses.asdict para serializar la estructura completa de
+        # métricas. Esto evita duplicar manualmente cada campo aquí y
+        # mantiene la salida sincronizada con las definitions de las
+        # dataclasses incluso si se agregan nuevos campos.
+        return asdict(self)
 
 
 class ImportadorUniversal:
     """Sistema unificado para importar datos desde múltiples fuentes."""
 
-    _INSTANCIAS: Set["ImportadorUniversal"] = set()
+    # Usamos WeakSet para evitar retenes de memoria por referencias fuertes.
+    _INSTANCIAS: "weakref.WeakSet[ImportadorUniversal]" = weakref.WeakSet()
+    # Lock para proteger mutaciones/iteraciones sobre _INSTANCIAS en entornos
+    # con hilos (ej. importaciones en background + invalidación desde UI).
+    _INSTANCIAS_LOCK = threading.Lock()
     _ALIAS_ENCABEZADOS: Dict[str, Tuple[str, ...]] = {
         'objetivo': ('objetivo', 'objetivos'),
         'supervisor': ('supervisor', 'supervisores'),
@@ -253,6 +226,17 @@ class ImportadorUniversal:
         "se recibe",
     )
 
+    # Configuración explícita de los bloques del formato legacy CONTROL_RECORRIDOS.
+    # Cada entrada es una tupla (col_objetivo, col_turno, col_hora, col_supervisor)
+    # usando índices 1-based (como usa openpyxl). Mantener esta estructura en la
+    # parte superior del módulo facilita actualizar la plantilla si cambia el
+    # mapeo de columnas sin tocar la lógica del parser.
+    CONTROL_RECORRIDOS_BLOCKS = [
+        (2, 3, 5, 6),    # bloque 1: cols 1-6
+        (9, 10, 12, 13), # bloque 2: cols 8-13
+        (16, 17, 19, 20),# bloque 3: cols 15-20
+    ]
+
     def __init__(self):
         self.sync_manager = get_sync_manager()
 
@@ -260,18 +244,27 @@ class ImportadorUniversal:
         self._cache_supervisores: Dict[str, int] = {}
         self._cache_inicializado = False
         self._metrics = ImportMetrics()
-        type(self)._INSTANCIAS.add(self)
-
-    def __del__(self) -> None:
+        # Registrar la instancia en el conjunto global protegiendo con lock.
         try:
-            type(self)._INSTANCIAS.discard(self)
+            with type(self)._INSTANCIAS_LOCK:
+                type(self)._INSTANCIAS.add(self)
         except Exception:
-            pass
+            # No fatal si no se puede registrar; logueamos en debug.
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("No se pudo registrar instancia en _INSTANCIAS", exc_info=True)
 
     @classmethod
     def invalidar_cache_global(cls) -> None:
         """Invalida el cache interno de todos los importadores activos."""
-        for instancia in list(cls._INSTANCIAS):
+        # Copiamos la lista de instancias bajo lock para evitar condiciones de
+        # carrera mientras otra hebra agrega/quita instancias.
+        try:
+            with cls._INSTANCIAS_LOCK:
+                instancias = list(cls._INSTANCIAS)
+        except Exception:
+            instancias = list(cls._INSTANCIAS)
+
+        for instancia in instancias:
             try:
                 instancia.invalidate_cache()
             except Exception as exc:
@@ -301,6 +294,11 @@ class ImportadorUniversal:
             True si la carga fue exitosa, False si falló (y por lo tanto
             el cache no debe considerarse válido).
         """
+        # Nota: actualmente este método carga TODOS los objetivos en memoria.
+        # Esto es una decisión de diseño (cache completo en memoria) que
+        # funciona bien cuando la tabla es pequeña. Si las tablas crecen
+        # significativamente en el futuro, considerar implementar carga
+        # perezosa o un límite de tamaño para evitar consumo excesivo.
         try:
             filas = gestor_db.ejecutar("SELECT id, nombre FROM objetivos")
             for fila in filas:
@@ -320,6 +318,9 @@ class ImportadorUniversal:
         Returns:
             True si la carga fue exitosa, False si falló.
         """
+        # Nota: como en _cargar_cache_objetivos, cargamos todos los
+        # supervisores en memoria. Mantener esto bajo revisión si las
+        # tablas se vuelven grandes.
         try:
             filas = gestor_db.ejecutar("SELECT id, nombre FROM supervisores")
             for fila in filas:
@@ -396,10 +397,107 @@ class ImportadorUniversal:
             # Inicializar caches una sola vez
             self._inicializar_caches()
             
-            wb = load_workbook(
-                ruta_archivo,
-                data_only=True,
-            )
+            # Abrir el workbook con manejo fino de excepciones para dar mensajes
+            # accionables al usuario.
+            try:
+                wb_data = load_workbook(ruta_archivo, data_only=True)
+            except FileNotFoundError:
+                return {
+                    'tipo': 'error',
+                    'error': f"Archivo no encontrado: {ruta_archivo}",
+                    'registros': [],
+                    'objetivos_detectados': [],
+                    'supervisores_detectados': [],
+                    'objetivos_resueltos': {},
+                    'supervisores_resueltos': {},
+                    'objetivos_no_resueltos': [],
+                    'supervisores_no_resueltos': [],
+                    'sheet_options': [],
+                }
+            except PermissionError:
+                return {
+                    'tipo': 'error',
+                    'error': f"Sin permisos para leer el archivo: {ruta_archivo}",
+                    'registros': [],
+                    'objetivos_detectados': [],
+                    'supervisores_detectados': [],
+                    'objetivos_resueltos': {},
+                    'supervisores_resueltos': {},
+                    'objetivos_no_resueltos': [],
+                    'supervisores_no_resueltos': [],
+                    'sheet_options': [],
+                }
+            except InvalidFileException as e:
+                return {
+                    'tipo': 'error',
+                    'error': f"Archivo inválido o corrupto: {e}",
+                    'registros': [],
+                    'objetivos_detectados': [],
+                    'supervisores_detectados': [],
+                    'objetivos_resueltos': {},
+                    'supervisores_resueltos': {},
+                    'objetivos_no_resueltos': [],
+                    'supervisores_no_resueltos': [],
+                    'sheet_options': [],
+                }
+            except Exception as e:
+                logger.error("Error abriendo Excel: %s", e)
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("Traceback abriendo Excel", exc_info=True)
+                return {
+                    'tipo': 'error',
+                    'error': f"Error leyendo Excel: {str(e)}",
+                    'registros': [],
+                    'objetivos_detectados': [],
+                    'supervisores_detectados': [],
+                    'objetivos_resueltos': {},
+                    'supervisores_resueltos': {},
+                    'objetivos_no_resueltos': [],
+                    'supervisores_no_resueltos': [],
+                    'sheet_options': [],
+                }
+
+            # Detectar fórmulas sin valor calculado: comparar con una carga que
+            # preserve fórmulas (data_only=False). Si una celda tiene None en la
+            # versión data_only pero en la versión con fórmulas la celda contiene
+            # una fórmula (empieza con '='), informar al usuario para que abra y
+            # guarde el archivo en Excel/LibreOffice.
+            try:
+                wb_formulas = load_workbook(ruta_archivo, data_only=False)
+                problemas = []
+                for ws_data, ws_formula in zip(wb_data.worksheets, wb_formulas.worksheets):
+                    max_row = min(ws_data.max_row, 40)
+                    max_col = min(ws_data.max_column, 20)
+                    for r in range(1, max_row + 1):
+                        for c in range(1, max_col + 1):
+                            val_data = ws_data.cell(row=r, column=c).value
+                            val_formula = ws_formula.cell(row=r, column=c).value
+                            if (val_data is None or (isinstance(val_data, str) and val_data.strip()=="")) and isinstance(val_formula, str) and val_formula.startswith('='):
+                                problemas.append(f"{ws_data.title}:{r}:{c}")
+                if problemas:
+                    return {
+                        'tipo': 'error',
+                        'error': (
+                            'El archivo contiene celdas con fórmulas sin valor calculado. '
+                            'Abrilo en Excel/LibreOffice, guardalo y volvé a subirlo. '
+                            f'Ejemplos: {problemas[:5]}'
+                        ),
+                        'registros': [],
+                        'objetivos_detectados': [],
+                        'supervisores_detectados': [],
+                        'objetivos_resueltos': {},
+                        'supervisores_resueltos': {},
+                        'objetivos_no_resueltos': [],
+                        'supervisores_no_resueltos': [],
+                        'sheet_options': [],
+                    }
+            except Exception:
+                # Si falla abrir la versión con fórmulas no abortamos la importación;
+                # esto sólo reduce la verificación. Logueamos en debug.
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug('No se pudo abrir workbook en modo fórmulas para verificar celdas', exc_info=True)
+
+            wb = wb_data
 
             sheet_options = self._listar_sheet_options(wb)
 
@@ -737,23 +835,27 @@ class ImportadorUniversal:
         """Importa datos desde string JSON (útil para API futuras)."""
         try:
             data = json.loads(json_string)
-            temp_file = f"temp_import_{int(datetime.now().timestamp())}.json"
-            with open(temp_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f)
 
-            resultado = self.importar_json_tablet(temp_file)
-
+            tmp_name = None
             try:
-                os.remove(temp_file)
-            except Exception as e:
-                logger.debug(
-                    "No se pudo eliminar archivo temporal %s: %s",
-                    temp_file,
-                    e,
-                    exc_info=logger.isEnabledFor(logging.DEBUG),
-                )
+                # Crear archivo temporal en el directorio temporal del sistema
+                with tempfile.NamedTemporaryFile('w', encoding='utf-8', suffix='.json', delete=False) as tmpf:
+                    json.dump(data, tmpf)
+                    tmp_name = tmpf.name
 
-            return resultado
+                resultado = self.importar_json_tablet(tmp_name)
+                return resultado
+            finally:
+                if tmp_name:
+                    try:
+                        os.remove(tmp_name)
+                    except Exception as e:
+                        logger.debug(
+                            "No se pudo eliminar archivo temporal %s: %s",
+                            tmp_name,
+                            e,
+                            exc_info=logger.isEnabledFor(logging.DEBUG),
+                        )
 
         except Exception as e:
             return ResultadoImportacion(
@@ -877,11 +979,72 @@ class ImportadorUniversal:
         objetivo_mapeo = objetivo_mapeo or {}
         supervisor_mapeo = supervisor_mapeo or {}
 
+        # Normalizar las claves de los mapeos proporcionados por el usuario
+        # para que coincidan con la normalización usada en el cache interno.
+        objetivo_mapeo_norm: Dict[str, int] = {}
+        for k, v in objetivo_mapeo.items():
+            if k is None:
+                continue
+            objetivo_mapeo_norm[self._normalizar_texto(k)] = v
+
+        supervisor_mapeo_norm: Dict[str, int] = {}
+        for k, v in supervisor_mapeo.items():
+            if k is None:
+                continue
+            supervisor_mapeo_norm[self._normalizar_texto(k)] = v
+
         procesados = 0
         abort = False
 
         # Inicializar caches para búsquedas adicionales
         self._inicializar_caches()
+
+        # ============================================================
+        # PRE-CARGAR PASADAS EXISTENTES (EVITAR N+1)
+        # Intentamos precargar todas las pasadas cuya `fecha` esté en el
+        # rango cubierto por los registros a importar, con un margen de
+        # un día para cubrir posibles cambios de fecha operativa.
+        fechas = []
+        for r in registros:
+            try:
+                d = datetime.strptime(r.fecha, "%Y-%m-%d").date()
+                fechas.append(d)
+            except Exception:
+                # Si no podemos parsear la fecha ahora, la registración
+                # se validará más tarde durante el loop; no incluimos en
+                # el rango de precarga.
+                continue
+
+        pasadas_cache = None
+        if fechas:
+            min_fecha = min(fechas) - timedelta(days=1)
+            max_fecha = max(fechas) + timedelta(days=1)
+            try:
+                filas = gestor_db.ejecutar(
+                    """
+                    SELECT fecha, hora, turno, supervisor_id, objetivo_id
+                    FROM pasadas
+                    WHERE fecha BETWEEN ? AND ?
+                    """,
+                    (min_fecha.strftime('%Y-%m-%d'), max_fecha.strftime('%Y-%m-%d')),
+                )
+                pasadas_cache = set()
+                for f in filas:
+                    # Normalizar tipos
+                    fecha_f = f['fecha']
+                    hora_f = f.get('hora')
+                    turno_f = f.get('turno')
+                    sup_id = int(f['supervisor_id']) if f.get('supervisor_id') is not None else None
+                    obj_id = int(f['objetivo_id']) if f.get('objetivo_id') is not None else None
+                    pasadas_cache.add((fecha_f, hora_f, turno_f, sup_id, obj_id))
+                # Adjuntamos temporalmente al importador para que _es_duplicado
+                # pueda consultarlo sin hacer queries por fila.
+                self._pasadas_cache_current_import = pasadas_cache
+                logger.info("[PROCESAMIENTO] Precargadas %d pasadas existentes para rango %s - %s", len(pasadas_cache), min_fecha, max_fecha)
+            except Exception as e:
+                pasadas_cache = None
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("No se pudo precargar pasadas: %s", e, exc_info=True)
 
         logger.info("[PROCESAMIENTO] Iniciando con %d registros", total)
         logger.info("  Mapeo objetivos: %d entradas", len(objetivo_mapeo))
@@ -892,13 +1055,15 @@ class ImportadorUniversal:
                 # ============================================================
                 # 1. RESOLVER SUPERVISOR
                 # ============================================================
-                supervisor_id = supervisor_mapeo.get(registro.supervisor)
-                
-                if not supervisor_id:
+                supervisor_id = None
+                if registro.supervisor:
+                    supervisor_id = supervisor_mapeo_norm.get(self._normalizar_texto(registro.supervisor))
+
+                if supervisor_id is None:
                     # Intentar resolver por caché
                     supervisor_id = self._obtener_supervisor_id(registro.supervisor)
 
-                if not supervisor_id:
+                if supervisor_id is None:
                     self._metrics.validacion.supervisor_inexistente += 1
                     self._metrics.validacion.registrar_rechazo('supervisor_inexistente')
                     errores.append(
@@ -915,13 +1080,15 @@ class ImportadorUniversal:
                 # ============================================================
                 # 2. RESOLVER OBJETIVO
                 # ============================================================
-                objetivo_id = objetivo_mapeo.get(registro.objetivo)
-                
-                if not objetivo_id:
+                objetivo_id = None
+                if registro.objetivo:
+                    objetivo_id = objetivo_mapeo_norm.get(self._normalizar_texto(registro.objetivo))
+
+                if objetivo_id is None:
                     # Intentar resolver por caché
                     objetivo_id = self._obtener_objetivo_id(registro.objetivo)
 
-                if not objetivo_id:
+                if objetivo_id is None:
                     self._metrics.validacion.objetivo_inexistente += 1
                     self._metrics.validacion.registrar_rechazo('objetivo_inexistente')
                     errores.append(
@@ -938,8 +1105,8 @@ class ImportadorUniversal:
                 # ============================================================
                 # 3. VALIDAR TURNO
                 # ============================================================
-                turno_normalizado = str(registro.turno).strip().lower()
-                if turno_normalizado not in ['diurno', 'nocturno', 'd', 'n']:
+                turno_normalizado = self._normalizar_turno(registro.turno)
+                if turno_normalizado is None:
                     self._metrics.validacion.turno_invalido += 1
                     self._metrics.validacion.registrar_rechazo('turno_invalido')
                     errores.append(
@@ -953,12 +1120,6 @@ class ImportadorUniversal:
                     )
                     procesados += 1
                     continue
-
-                # Normalizar turno
-                if turno_normalizado in ('d', 'dia', 'diurno'):
-                    turno_normalizado = 'diurno'
-                elif turno_normalizado in ('n', 'noche', 'nocturno'):
-                    turno_normalizado = 'nocturno'
 
                 # ============================================================
                 # 4. PARSEAR FECHA Y HORA
@@ -1125,6 +1286,16 @@ class ImportadorUniversal:
             if abort:
                 break
 
+        # Limpiar cache temporal de pasadas para liberar memoria
+        try:
+            if hasattr(self, '_pasadas_cache_current_import'):
+                delattr(self, '_pasadas_cache_current_import')
+        except Exception:
+            try:
+                del self._pasadas_cache_current_import
+            except Exception:
+                pass
+
         # ================================================================
         # RESUMEN FINAL
         # ================================================================
@@ -1225,76 +1396,44 @@ class ImportadorUniversal:
         sheet_date: date,
         turno: str
     ) -> List[RegistroImportacion]:
-        """Parser principal de CONTROL_RECORRIDOS.
-
-        Soporta el formato legacy de 3 bloques horizontales y, si la hoja
-        tiene encabezados tipo Objetivo/Supervisor/Hora, también el formato
-        tabular simple.
-        """
-
-        header_row, columnas = self._buscar_encabezados_control(ws)
-        if header_row is not None and columnas:
-            return self._parsear_con_encabezados_control(
-                ws,
-                sheet_date,
-                turno,
-                columnas,
-                header_row,
-            )
-
-        return self._parsear_control_recorridos_legacy(
+        """Parser principal de CONTROL_RECORRIDOS usando tres bloques horizontales por fila."""
+        return self._parsear_control_recorridos_bloques(
             ws,
             sheet_date,
             turno,
         )
 
     def _buscar_encabezados_control(self, ws) -> Tuple[Optional[int], Dict[str, Optional[int]]]:
-        """Busca la fila de encabezado más probable en la hoja."""
-        max_col = ws.max_column
-        max_row = min(ws.max_row, 40)
-        mejor_fila = None
-        mejor_columnas = {}
-        mejor_score = 0
+        """Compatibilidad mínima: devuelve un encabezado vacío para no romper llamadas antiguas."""
+        return None, {}
 
-        for fila in range(1, max_row + 1):
-            columnas = {
-                'objetivo': None,
-                'supervisor': None,
-                'hora': None,
-                'turno': None,
-                'veces': None,
-                'notas': None,
-            }
+    def _parsear_con_encabezados_control(
+        self,
+        ws,
+        sheet_date: date,
+        turno: str,
+        columnas: Dict[str, Optional[int]],
+        header_row: int,
+    ) -> List[RegistroImportacion]:
+        """Compatibilidad mínima: reutiliza el parser unificado de bloques."""
+        return self._parsear_control_recorridos_bloques(
+            ws,
+            sheet_date,
+            turno,
+        )
 
-            for columna in range(1, max_col + 1):
-                valor = self._limpiar_valor(ws.cell(row=fila, column=columna).value)
-                if not valor:
-                    continue
-
-                tipo_encabezado = self._identificar_tipo_encabezado(valor)
-                if tipo_encabezado == 'objetivo' and columnas['objetivo'] is None:
-                    columnas['objetivo'] = columna
-                elif tipo_encabezado == 'supervisor' and columnas['supervisor'] is None:
-                    columnas['supervisor'] = columna
-                elif tipo_encabezado == 'hora' and columnas['hora'] is None:
-                    columnas['hora'] = columna
-                elif tipo_encabezado == 'turno' and columnas['turno'] is None:
-                    columnas['turno'] = columna
-                elif tipo_encabezado == 'veces' and columnas['veces'] is None:
-                    columnas['veces'] = columna
-                elif tipo_encabezado == 'notas' and columnas['notas'] is None:
-                    columnas['notas'] = columna
-
-            score = sum(1 for valor in columnas.values() if valor is not None)
-            if score > mejor_score and columnas['objetivo'] is not None and columnas['hora'] is not None:
-                mejor_score = score
-                mejor_fila = fila
-                mejor_columnas = columnas
-
-        if mejor_fila is None or mejor_columnas['objetivo'] is None or mejor_columnas['hora'] is None:
-            return None, {}
-
-        return mejor_fila, mejor_columnas
+    def _parsear_control_recorridos_legacy(
+        self,
+        ws,
+        sheet_date: date,
+        turno: str
+    ) -> List[RegistroImportacion]:
+        """Compatibilidad mínima: alias al parser unificado de bloques."""
+        return self._parsear_control_recorridos_bloques(
+            ws,
+            sheet_date,
+            turno,
+        )
 
     def _resolver_turno_excel(self, turno_raw: Any, turno_fallback: Optional[str]) -> Optional[str]:
         """Resuelve el turno desde la celda de Excel o usa el turno de la hoja como fallback."""
@@ -1305,13 +1444,39 @@ class ImportadorUniversal:
         if not texto:
             return turno_fallback
 
-        turno_normalizado = texto.strip().lower()
-        if turno_normalizado in ('d', 'dia', 'diurno', 'diaria', 'diario', 'day', 'dayshift'):
-            return 'diurno'
-        if turno_normalizado in ('n', 'noche', 'nocturno', 'night', 'nightshift'):
-            return 'nocturno'
+        # Devolver la normalización concreta si se reconoce, sino devolver
+        # el fallback (que puede ser None para indicar "no reconocido").
+        turno_norm = self._normalizar_turno(texto)
+        if turno_norm is not None:
+            return turno_norm
 
         return turno_fallback
+
+    def _normalizar_turno(self, valor: Any) -> Optional[str]:
+        """Normaliza variantes textuales de turno a 'diurno' o 'nocturno'.
+
+        Devuelve `None` si no reconoce el valor.
+        """
+        if valor is None:
+            return None
+
+        texto = str(valor).strip().lower()
+        if not texto:
+            return None
+
+        diurno_aliases = {
+            'd', 'dia', 'diurno', 'diaria', 'diario', 'day', 'dayshift', 'matutino'
+        }
+        nocturno_aliases = {
+            'n', 'noche', 'nocturno', 'night', 'nightshift'
+        }
+
+        if texto in diurno_aliases:
+            return 'diurno'
+        if texto in nocturno_aliases:
+            return 'nocturno'
+
+        return None
 
 
     def _es_anotacion_supervisor(self, texto: str) -> bool:
@@ -1323,10 +1488,25 @@ class ImportadorUniversal:
 
         texto = self._normalizar_texto(texto)
 
-        return any(
-            patron in texto
-            for patron in self._PATRONES_ANOTACION
-        )
+        # Para evitar falsos positivos, sólo considerar anotaciones cuando
+        # el texto es exactamente la frase esperada o cuando la frase aparece
+        # al inicio y el resto del contenido es corto (p.ej. una hora).
+        for patron in self._PATRONES_ANOTACION:
+            patron_norm = self._normalizar_texto(patron)
+            if texto == patron_norm:
+                return True
+
+            # Caso común: "SE RETIRA A LAS 22:00" -> comienza con la frase
+            if texto.startswith(patron_norm + ' '):
+                resto = texto[len(patron_norm):].strip()
+                # Si el resto es vacío, es una anotación.
+                if not resto:
+                    return True
+                # Si el resto contiene dígitos (horas) y es corto, considerarlo anotación.
+                if re.search(r"\d", resto) and len(resto) <= 25:
+                    return True
+
+        return False
 
     def _crear_registros_control_recorridos(
         self,
@@ -1341,9 +1521,8 @@ class ImportadorUniversal:
         ws_title: str,
         row_idx: Optional[int] = None,
         bloque_idx: Optional[int] = None,
-        origen: str = 'parser',
     ) -> List[RegistroImportacion]:
-        """Normaliza y construye registros de CONTROL_RECORRIDOS desde datos crudos."""
+        """Normaliza y construye un registro desde un bloque de CONTROL_RECORRIDOS."""
         objetivo = self._limpiar_valor(objetivo_raw)
         if not objetivo:
             self._metrics.extraccion.objetivos_vacios += 1
@@ -1352,10 +1531,11 @@ class ImportadorUniversal:
 
         if self._es_anotacion_supervisor(objetivo):
             logger.info(
-                "Anotación descartada: %s | sheet=%s | row=%s",
+                "Anotación descartada: %s | sheet=%s | row=%s | bloque=%s",
                 objetivo,
                 ws_title,
                 row_idx,
+                bloque_idx,
             )
             self._metrics.extraccion.registrar_descartado("anotacion_supervisor")
             return []
@@ -1365,21 +1545,19 @@ class ImportadorUniversal:
             self._metrics.filas.registrar_descartada('encabezado')
             self._metrics.extraccion.registrar_descartado('encabezado')
             return []
+
         supervisor = self._limpiar_valor(supervisor_raw) or ''
         if not supervisor:
-            self._metrics.extraccion.supervisores_vacios += 1
-            self._metrics.extraccion.registrar_descartado('supervisor_vacio')
+            return []
 
         notas = self._limpiar_valor(notas_raw) if notas_raw is not None else None
         turno_registro = self._resolver_turno_excel(turno_raw, turno_hoja)
         if turno_raw is not None:
             texto_turno = self._limpiar_valor(turno_raw)
             if texto_turno and turno_registro is None:
-                self._metrics.extraccion.turnos_invalidos += 1
-                self._metrics.extraccion.registrar_descartado('turno_invalido')
-            elif texto_turno and turno_registro == turno_hoja and not self._resolver_turno_excel(texto_turno, None):
-                self._metrics.extraccion.turnos_invalidos += 1
-                self._metrics.extraccion.registrar_descartado('turno_invalido')
+                return []
+            if texto_turno and turno_registro != turno_hoja:
+                return []
         if turno_registro is None:
             turno_registro = turno_hoja
 
@@ -1391,31 +1569,27 @@ class ImportadorUniversal:
         hora_normalizada = ''
 
         if hora_raw is None or str(hora_raw).strip() == '':
-            self._metrics.extraccion.horas_vacias += 1
-            self._metrics.extraccion.registrar_descartado('hora_vacia')
-        else:
-            try:
-                fecha_import, hora_normalizada = self._normalizar_hora_y_fecha(hora_raw, sheet_date)
-            except Exception as e:
-                self._metrics.extraccion.horas_invalidas += 1
-                self._metrics.extraccion.registrar_descartado('hora_invalida')
-                logger.warning(
-                    "Hora inválida en control recorridos (%s): %s | sheet=%s | row=%s | bloque=%s | objetivo=%s | hora=%s",
-                    origen,
-                    e,
+            return []
+
+        try:
+            fecha_import, hora_normalizada = self._normalizar_hora_y_fecha(hora_raw, sheet_date)
+        except Exception as e:
+            logger.warning(
+                "Hora inválida en control recorridos: %s | sheet=%s | row=%s | bloque=%s | objetivo=%s | hora=%s",
+                e,
+                ws_title,
+                row_idx,
+                bloque_idx,
+                objetivo,
+                hora_raw,
+            )
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    "Traceback hora inválida control recorridos: %s",
                     ws_title,
-                    row_idx,
-                    bloque_idx,
-                    objetivo,
-                    hora_raw,
+                    exc_info=True,
                 )
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(
-                        "Traceback hora inválida control recorridos: %s",
-                        ws_title,
-                        exc_info=True,
-                    )
-                hora_normalizada = ''
+            return []
 
         registros = []
         for _ in range(repeticiones):
@@ -1435,158 +1609,13 @@ class ImportadorUniversal:
         self._metrics.extraccion.registros_creados += len(registros)
         return registros
 
-    def _parsear_con_encabezados_control(
-        self,
-        ws,
-        sheet_date: date,
-        turno: str,
-        columnas: Dict[str, Optional[int]],
-        header_row: int,
-    ) -> List[RegistroImportacion]:
-        registros = []
-        max_row = ws.max_row
-        max_col = ws.max_column
-
-        self._metrics.filas.total_filas_recorridas += 1
-        if header_row is not None:
-            self._metrics.filas.filas_encabezado += 1
-            self._metrics.filas.registrar_descartada('encabezado')
-
-        for fila in range(header_row + 1, max_row + 1):
-            self._metrics.filas.total_filas_recorridas += 1
-            if ws.row_dimensions[fila].hidden:
-                self._metrics.filas.filas_ocultas += 1
-                self._metrics.filas.registrar_descartada('fila_oculta')
-                continue
-
-            fila_valores = [
-                ws.cell(row=fila, column=columna).value
-                for columna in range(1, max_col + 1)
-            ]
-            if all(self._limpiar_valor(valor) is None for valor in fila_valores):
-                self._metrics.filas.filas_vacias += 1
-                self._metrics.filas.registrar_descartada('fila_vacia')
-                continue
-
-            valores_relevantes = []
-            for clave in ('objetivo', 'supervisor', 'hora', 'turno', 'veces', 'notas'):
-                if columnas.get(clave) is not None:
-                    valores_relevantes.append(ws.cell(row=fila, column=columnas[clave]).value)
-
-            objetivo_valor = self._limpiar_valor(valores_relevantes[0]) if valores_relevantes else None
-            otros_valores = [self._limpiar_valor(valor) for valor in valores_relevantes[1:]]
-
-            if not any(valor is not None and valor != '' for valor in otros_valores) and (objetivo_valor is None or objetivo_valor == ''):
-                self._metrics.filas.filas_vacias += 1
-                self._metrics.filas.registrar_descartada('fila_vacia')
-                continue
-
-            objetivo_raw = ws.cell(row=fila, column=columnas['objetivo']).value
-            if objetivo_raw is None:
-                self._metrics.filas.registrar_descartada('objetivo_nulo')
-                continue
-
-            objetivo_limpio = self._limpiar_valor(objetivo_raw)
-            if not objetivo_limpio:
-                self._metrics.filas.filas_vacias += 1
-                self._metrics.filas.registrar_descartada('fila_vacia')
-                self._metrics.extraccion.objetivos_vacios += 1
-                self._metrics.extraccion.registrar_descartado('objetivo_vacio')
-                continue
-
-            if self._es_encabezado(objetivo_limpio):
-                self._metrics.filas.filas_encabezado += 1
-                self._metrics.filas.registrar_descartada('encabezado')
-                continue
-
-            if fila == header_row:
-                self._metrics.filas.filas_encabezado += 1
-                self._metrics.filas.registrar_descartada('encabezado')
-                continue
-
-            otros_valores = [
-                self._limpiar_valor(ws.cell(row=fila, column=columnas[clave]).value)
-                if columnas.get(clave) is not None else None
-                for clave in ('supervisor', 'hora', 'turno', 'veces', 'notas')
-            ]
-            if all(valor is None or valor == '' for valor in otros_valores):
-                self._metrics.filas.filas_vacias += 1
-                self._metrics.filas.registrar_descartada('fila_vacia')
-            else:
-                self._metrics.filas.filas_datos += 1
-
-            registros.extend(
-                self._crear_registros_control_recorridos(
-                    objetivo_raw=objetivo_raw,
-                    supervisor_raw=(
-                        ws.cell(row=fila, column=columnas['supervisor']).value
-                        if columnas['supervisor'] is not None else ''
-                    ),
-                    hora_raw=ws.cell(row=fila, column=columnas['hora']).value,
-                    turno_raw=(
-                        ws.cell(row=fila, column=columnas['turno']).value
-                        if columnas.get('turno') is not None else None
-                    ),
-                    notas_raw=(
-                        ws.cell(row=fila, column=columnas['notas']).value
-                        if columnas['notas'] is not None else None
-                    ),
-                    veces_raw=(
-                        ws.cell(row=fila, column=columnas['veces']).value
-                        if columnas['veces'] is not None else None
-                    ),
-                    sheet_date=sheet_date,
-                    turno_hoja=turno,
-                    ws_title=ws.title,
-                    row_idx=fila,
-                    origen='encabezados',
-                )
-            )
-
-        return registros
-
-    def _es_fila_encabezado_global_control_recorridos(self, fila) -> bool:
-        """Detecta filas iniciales que contienen títulos generales o cabeceras del formato CONTROL_RECORRIDOS."""
-        for valor in fila:
-            texto = self._limpiar_valor(valor)
-            if not texto:
-                continue
-
-            normalizado = self._normalizar_texto(texto)
-            if any(keyword in normalizado for keyword in ('control', 'fecha', 'objetivo', 'turno', 'movil', 'supervisor')):
-                return True
-
-        return False
-    
-    def _parsear_control_recorridos_legacy(
+    def _parsear_control_recorridos_bloques(
         self,
         ws,
         sheet_date: date,
         turno: str
     ) -> List[RegistroImportacion]:
-        """
-        Parsea el formato CONTROL_RECORRIDOS real con 3 bloques horizontales.
-
-        Cada bloque representa una pasada adicional al mismo objetivo.
-
-        Estructura por bloque:
-        NO | OBJETIVO | TURNO | MOVIL | HORA | SUPERVISOR
-
-        Bloques:
-        - cols 1-6   -> primera pasada
-        - cols 8-13  -> segunda pasada
-        - cols 15-20 -> tercera pasada
-
-        Reglas:
-        - El turno REAL válido es el de la hoja.
-        - Si la fila tiene turno explícito y no coincide con la hoja:
-        se ignora.
-        - Si la fila no tiene turno:
-        se usa el turno de la hoja como fallback.
-        """
-
-        import re
-
+        """Parsea el formato actual de CONTROL_RECORRIDOS usando tres bloques horizontales por fila."""
         registros = []
         filas_procesadas = 0
         filas_salidas = 0
@@ -1600,11 +1629,6 @@ class ImportadorUniversal:
             ),
             start=1,
         ):
-
-            # ======================================================
-            # FIX: Ignorar filas ocultas por filtros de Excel
-            # ======================================================
-
             self._metrics.filas.total_filas_recorridas += 1
 
             if ws.row_dimensions[row_idx].hidden:
@@ -1613,50 +1637,37 @@ class ImportadorUniversal:
                 filas_salidas += 1
                 continue
 
-            # ======================================================
-            # FIX: Ignorar filas completamente vacías
-            # ======================================================
-
-            if not fila:
+            if not fila or all(self._limpiar_valor(valor) is None for valor in fila):
                 self._metrics.filas.filas_vacias += 1
                 self._metrics.filas.registrar_descartada('fila_vacia')
                 filas_salidas += 1
                 continue
 
-            if all(
-                self._limpiar_valor(valor) is None
-                for valor in fila
-            ):
+            contiene_datos = any(
+                self._limpiar_valor(valor) is not None for valor in fila
+            )
+            if not contiene_datos:
                 self._metrics.filas.filas_vacias += 1
                 self._metrics.filas.registrar_descartada('fila_vacia')
                 filas_salidas += 1
                 continue
 
-            # Procesar cada bloque en la fila
-            for bloque_idx, (c_obj, c_turno, c_hora, c_sup) in enumerate(self._bloques_control_recorridos()):
-
+            bloque_generado = False
+            bloques = list(self._bloques_control_recorridos())
+            for bloque_idx, (c_obj, c_turno, c_hora, c_sup) in enumerate(bloques, start=1):
                 idx_obj = c_obj - 1
                 idx_turno = c_turno - 1
                 idx_hora = c_hora - 1
                 idx_sup = c_sup - 1
 
-                # Saltar si la fila no tiene ni siquiera la columna de objetivo
                 if len(fila) <= idx_obj:
                     continue
 
                 try:
                     objetivo = fila[idx_obj] if len(fila) > idx_obj else None
-                    turno_raw = (
-                        fila[idx_turno]
-                        if len(fila) > idx_turno
-                        else None
-                    )
+                    turno_raw = fila[idx_turno] if len(fila) > idx_turno else None
                     hora_raw = fila[idx_hora] if len(fila) > idx_hora else None
-                    supervisor = (
-                        fila[idx_sup]
-                        if len(fila) > idx_sup
-                        else None
-                    )
+                    supervisor = fila[idx_sup] if len(fila) > idx_sup else None
 
                     nuevos_registros = self._crear_registros_control_recorridos(
                         objetivo_raw=objetivo,
@@ -1669,23 +1680,20 @@ class ImportadorUniversal:
                         turno_hoja=turno,
                         ws_title=ws.title,
                         row_idx=row_idx,
-                        bloque_idx=bloque_idx + 1,
-                        origen='legacy',
+                        bloque_idx=bloque_idx,
                     )
                     registros.extend(nuevos_registros)
                     if nuevos_registros:
+                        bloque_generado = True
                         filas_procesadas += 1
                         self._metrics.filas.filas_datos += 1
-                    else:
-                        self._metrics.extraccion.registrar_descartado('sin_registros_generados')
-
                 except Exception as e:
                     logger.warning(
                         "Error en bloque de control recorridos: %s | sheet=%s | fila=%d | bloque=%d",
                         e,
                         ws.title,
                         row_idx,
-                        bloque_idx + 1,
+                        bloque_idx,
                     )
                     if logger.isEnabledFor(logging.DEBUG):
                         logger.debug(
@@ -1693,12 +1701,45 @@ class ImportadorUniversal:
                             e,
                             ws.title,
                             row_idx,
-                            bloque_idx + 1,
+                            bloque_idx,
                             exc_info=True,
                         )
                     self._metrics.filas.filas_con_error += 1
                     self._metrics.filas.registrar_descartada('error_parseo_fila')
                     filas_con_error += 1
+
+            if not bloque_generado:
+                fila_simple = [
+                    fila[0] if len(fila) > 0 else None,
+                    fila[1] if len(fila) > 1 else None,
+                    fila[2] if len(fila) > 2 else None,
+                ]
+                if len(fila_simple) >= 3:
+                    objetivo = fila_simple[0]
+                    supervisor = fila_simple[1]
+                    hora_raw = fila_simple[2]
+                    nuevos_registros = self._crear_registros_control_recorridos(
+                        objetivo_raw=objetivo,
+                        supervisor_raw=supervisor,
+                        hora_raw=hora_raw,
+                        turno_raw=None,
+                        notas_raw=None,
+                        veces_raw=None,
+                        sheet_date=sheet_date,
+                        turno_hoja=turno,
+                        ws_title=ws.title,
+                        row_idx=row_idx,
+                        bloque_idx=1,
+                    )
+                    registros.extend(nuevos_registros)
+                    if nuevos_registros:
+                        bloque_generado = True
+                        filas_procesadas += 1
+                        self._metrics.filas.filas_datos += 1
+
+            if not bloque_generado and contiene_datos:
+                self._metrics.filas.filas_vacias += 1
+                self._metrics.filas.registrar_descartada('fila_vacia')
 
         logger.info(
             "[PARSE SUMMARY] Hoja: %s | Registros: %d | Filas procesadas: %d | Filas salidas: %d | Filas con error: %d",
@@ -1764,11 +1805,9 @@ class ImportadorUniversal:
         Retorna tuplas (col_objetivo, col_turno, col_hora, col_supervisor) — 1-indexed.
         Bloque 1: cols 1-6, Bloque 2: cols 8-13, Bloque 3: cols 15-20.
         """
-        return [
-            (2, 3, 5, 6),    # bloque 1: cols 1-6
-            (9, 10, 12, 13), # bloque 2: cols 8-13
-            (16, 17, 19, 20), # bloque 3: cols 15-20
-        ]
+        # Retornar la configuración centralizada definida como atributo de
+        # la clase para mantener el encapsulamiento.
+        return type(self).CONTROL_RECORRIDOS_BLOCKS
 
     def _analizar_nombre_hoja(self, sheet_name: str) -> Dict[str, Any]:
         """Analiza únicamente el nombre de la hoja para extraer metadatos de fecha y turno."""
@@ -1792,7 +1831,7 @@ class ImportadorUniversal:
         if turno is None:
             return {'es_valido': False, 'razon': 'turno inexistente', 'fecha': None, 'turno': None}
 
-        YEAR_IMPORTACION = 2026
+        YEAR_IMPORTACION = date.today().year
         try:
             fecha = date(YEAR_IMPORTACION, mes, dia)
         except ValueError:
@@ -1828,7 +1867,9 @@ class ImportadorUniversal:
                     tipo='control_recorridos',
                 )
 
-            if re.search(r'control', title, re.IGNORECASE):
+            # Detectar nombres legend que empiezan con 'control' (p.ej. "Control Recorridos").
+            # Evitar coincidencias en cualquier parte del título (p.ej. "Panel de Control").
+            if re.search(r'^\s*control(?:\b|[_\-\s:\/])', title, re.IGNORECASE):
                 return EvaluacionHojaControl(
                     True,
                     'formato control recorridos',
@@ -1838,21 +1879,13 @@ class ImportadorUniversal:
                     tipo='control_recorridos',
                 )
 
-            header_row, columnas = self._buscar_encabezados_control(ws)
-            if header_row is not None and columnas:
-                return EvaluacionHojaControl(
-                    True,
-                    'estructura compatible',
-                    'la hoja contiene encabezados de control reconocibles',
-                    fecha=date.today(),
-                    turno=None,
-                    tipo='control_recorridos',
-                )
-
             return EvaluacionHojaControl(
-                False,
-                'formato no reconocido',
-                'no se encontraron metadatos de nombre ni estructura compatible',
+                True,
+                'formato control recorridos',
+                'la hoja coincide con el formato actual de bloques horizontales',
+                fecha=date.today(),
+                turno=None,
+                tipo='control_recorridos',
             )
         except Exception as exc:
             return EvaluacionHojaControl(
@@ -1891,6 +1924,9 @@ class ImportadorUniversal:
 
         No intenta adivinar años.
         """
+        # Este método se mantiene como wrapper por compatibilidad con pruebas
+        # y código legado que históricamente llamaba a `_parsear_nombre_sheet`.
+        # La lógica real está en `_analizar_nombre_hoja` y aquí delegamos en ella.
         analisis = self._analizar_nombre_hoja(sheet_name)
         return analisis.get('fecha'), analisis.get('turno')
 
@@ -1916,8 +1952,7 @@ class ImportadorUniversal:
         - datetime.datetime
         """
 
-        from datetime import timedelta, time
-        import re
+        # 'timedelta' y 'time' ya se importan a nivel de módulo; imports locales eliminados.
 
         # =========================
         # 1. TIME directo
@@ -2128,10 +2163,11 @@ class ImportadorUniversal:
         if not nombre:
             return None
 
-        # Asegurar que los caches estén inicializados
-        if not self._cache_inicializado:
-            self._inicializar_caches()
-
+        # Se asume que el caller público ya inicializó los caches. Esto evita
+        # llamadas redundantes dispersas por todo el código y centraliza el
+        # punto de inicialización (por ejemplo en `previsualizar_archivo` o
+        # `importar_registros`). Si el cache no está inicializado, no
+        # hacemos la inicialización aquí para no enmascarar flujos de control.
         normalized = self._normalizar_texto(nombre)
         return self._cache_supervisores.get(normalized)
     
@@ -2149,29 +2185,42 @@ class ImportadorUniversal:
         if not nombre:
             return None
 
-        # Asegurar que los caches estén inicializados
-        if not self._cache_inicializado:
-            self._inicializar_caches()
-
+        # Igual que en _obtener_supervisor_id: se asume que el cache ya está
+        # inicializado por el punto de entrada público.
         normalized = self._normalizar_texto(nombre)
         return self._cache_objetivos.get(normalized)
     
     def _es_duplicado(self, supervisor_id: int, objetivo_id: int, fecha_operativa: str, hora: str, turno: str) -> bool:
         """Verifica si una pasada ya existe (duplicada)."""
-        resultados = gestor_db.ejecutar(
-            """
-            SELECT 1
-            FROM pasadas
-            WHERE fecha = ?
-              AND hora = ?
-              AND turno = ?
-              AND supervisor_id = ?
-              AND objetivo_id = ?
-            LIMIT 1
-            """,
-            (fecha_operativa, hora, turno, supervisor_id, objetivo_id),
-        )
-        return bool(resultados)
+        # Si durante el proceso de importación se precargó un conjunto de
+        # pasadas existentes en memoria (`_pasadas_cache_current_import`),
+        # consultamos ese set en memoria para evitar consultas por fila.
+        cache = getattr(self, '_pasadas_cache_current_import', None)
+        if cache is not None:
+            key = (fecha_operativa, hora, turno, int(supervisor_id), int(objetivo_id))
+            return key in cache
+
+        # Fallback: consulta puntual a la base si no hay cache cargada.
+        try:
+            resultados = gestor_db.ejecutar(
+                """
+                SELECT 1
+                FROM pasadas
+                WHERE fecha = ?
+                  AND hora = ?
+                  AND turno = ?
+                  AND supervisor_id = ?
+                  AND objetivo_id = ?
+                LIMIT 1
+                """,
+                (fecha_operativa, hora, turno, supervisor_id, objetivo_id),
+            )
+            return bool(resultados)
+        except Exception as e:
+            logger.warning("No se pudo verificar duplicado (asumiendo no duplicado): %s", e)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("Traceback _es_duplicado", exc_info=True)
+            return False
 
     def _normalizar_texto(self, valor: Any) -> str:
         texto = str(valor).strip().lower()
