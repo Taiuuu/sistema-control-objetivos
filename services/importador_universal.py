@@ -9,6 +9,8 @@ import os
 import re
 import unicodedata
 import tempfile
+import threading
+import weakref
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Callable, Set
@@ -232,7 +234,11 @@ class ImportMetrics:
 class ImportadorUniversal:
     """Sistema unificado para importar datos desde múltiples fuentes."""
 
-    _INSTANCIAS: Set["ImportadorUniversal"] = set()
+    # Usamos WeakSet para evitar retenes de memoria por referencias fuertes.
+    _INSTANCIAS: "weakref.WeakSet[ImportadorUniversal]" = weakref.WeakSet()
+    # Lock para proteger mutaciones/iteraciones sobre _INSTANCIAS en entornos
+    # con hilos (ej. importaciones en background + invalidación desde UI).
+    _INSTANCIAS_LOCK = threading.Lock()
     _ALIAS_ENCABEZADOS: Dict[str, Tuple[str, ...]] = {
         'objetivo': ('objetivo', 'objetivos'),
         'supervisor': ('supervisor', 'supervisores'),
@@ -262,18 +268,27 @@ class ImportadorUniversal:
         self._cache_supervisores: Dict[str, int] = {}
         self._cache_inicializado = False
         self._metrics = ImportMetrics()
-        type(self)._INSTANCIAS.add(self)
-
-    def __del__(self) -> None:
+        # Registrar la instancia en el conjunto global protegiendo con lock.
         try:
-            type(self)._INSTANCIAS.discard(self)
+            with type(self)._INSTANCIAS_LOCK:
+                type(self)._INSTANCIAS.add(self)
         except Exception:
-            pass
+            # No fatal si no se puede registrar; logueamos en debug.
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("No se pudo registrar instancia en _INSTANCIAS", exc_info=True)
 
     @classmethod
     def invalidar_cache_global(cls) -> None:
         """Invalida el cache interno de todos los importadores activos."""
-        for instancia in list(cls._INSTANCIAS):
+        # Copiamos la lista de instancias bajo lock para evitar condiciones de
+        # carrera mientras otra hebra agrega/quita instancias.
+        try:
+            with cls._INSTANCIAS_LOCK:
+                instancias = list(cls._INSTANCIAS)
+        except Exception:
+            instancias = list(cls._INSTANCIAS)
+
+        for instancia in instancias:
             try:
                 instancia.invalidate_cache()
             except Exception as exc:
