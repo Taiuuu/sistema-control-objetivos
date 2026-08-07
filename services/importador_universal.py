@@ -11,7 +11,7 @@ import unicodedata
 import tempfile
 import threading
 import weakref
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Callable, Set
 
@@ -189,46 +189,11 @@ class ImportMetrics:
         }
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            'workbook': {
-                'total_hojas': self.workbook.total_hojas,
-                'hojas_analizadas': self.workbook.hojas_analizadas,
-                'hojas_validas': self.workbook.hojas_validas,
-                'hojas_descartadas': self.workbook.hojas_descartadas,
-                'motivos_descarte': self.workbook.motivos_descarte,
-            },
-            'filas': {
-                'total_filas_recorridas': self.filas.total_filas_recorridas,
-                'filas_vacias': self.filas.filas_vacias,
-                'filas_ocultas': self.filas.filas_ocultas,
-                'filas_con_error': self.filas.filas_con_error,
-                'filas_encabezado': self.filas.filas_encabezado,
-                'filas_datos': self.filas.filas_datos,
-                'motivos_descarte': self.filas.motivos_descarte,
-            },
-            'extraccion': {
-                'objetivos_vacios': self.extraccion.objetivos_vacios,
-                'supervisores_vacios': self.extraccion.supervisores_vacios,
-                'horas_vacias': self.extraccion.horas_vacias,
-                'horas_invalidas': self.extraccion.horas_invalidas,
-                'turnos_invalidos': self.extraccion.turnos_invalidos,
-                'registros_creados': self.extraccion.registros_creados,
-                'registros_descartados': self.extraccion.registros_descartados,
-                'excepciones_parseo': self.extraccion.excepciones_parseo,
-                'motivos_descarte': self.extraccion.motivos_descarte,
-            },
-            'validacion': {
-                'supervisor_inexistente': self.validacion.supervisor_inexistente,
-                'objetivo_inexistente': self.validacion.objetivo_inexistente,
-                'fecha_invalida': self.validacion.fecha_invalida,
-                'hora_invalida': self.validacion.hora_invalida,
-                'turno_invalido': self.validacion.turno_invalido,
-                'registros_validos': self.validacion.registros_validos,
-                'registros_rechazados': self.validacion.registros_rechazados,
-                'motivos_rechazo': self.validacion.motivos_rechazo,
-            },
-            'importacion': self.importacion,
-        }
+        # Usar dataclasses.asdict para serializar la estructura completa de
+        # métricas. Esto evita duplicar manualmente cada campo aquí y
+        # mantiene la salida sincronizada con las definitions de las
+        # dataclasses incluso si se agregan nuevos campos.
+        return asdict(self)
 
 
 class ImportadorUniversal:
@@ -260,6 +225,17 @@ class ImportadorUniversal:
         "se entrega",
         "se recibe",
     )
+
+    # Configuración explícita de los bloques del formato legacy CONTROL_RECORRIDOS.
+    # Cada entrada es una tupla (col_objetivo, col_turno, col_hora, col_supervisor)
+    # usando índices 1-based (como usa openpyxl). Mantener esta estructura en la
+    # parte superior del módulo facilita actualizar la plantilla si cambia el
+    # mapeo de columnas sin tocar la lógica del parser.
+    CONTROL_RECORRIDOS_BLOCKS = [
+        (2, 3, 5, 6),    # bloque 1: cols 1-6
+        (9, 10, 12, 13), # bloque 2: cols 8-13
+        (16, 17, 19, 20),# bloque 3: cols 15-20
+    ]
 
     def __init__(self):
         self.sync_manager = get_sync_manager()
@@ -318,6 +294,11 @@ class ImportadorUniversal:
             True si la carga fue exitosa, False si falló (y por lo tanto
             el cache no debe considerarse válido).
         """
+        # Nota: actualmente este método carga TODOS los objetivos en memoria.
+        # Esto es una decisión de diseño (cache completo en memoria) que
+        # funciona bien cuando la tabla es pequeña. Si las tablas crecen
+        # significativamente en el futuro, considerar implementar carga
+        # perezosa o un límite de tamaño para evitar consumo excesivo.
         try:
             filas = gestor_db.ejecutar("SELECT id, nombre FROM objetivos")
             for fila in filas:
@@ -337,6 +318,9 @@ class ImportadorUniversal:
         Returns:
             True si la carga fue exitosa, False si falló.
         """
+        # Nota: como en _cargar_cache_objetivos, cargamos todos los
+        # supervisores en memoria. Mantener esto bajo revisión si las
+        # tablas se vuelven grandes.
         try:
             filas = gestor_db.ejecutar("SELECT id, nombre FROM supervisores")
             for fila in filas:
@@ -1015,6 +999,53 @@ class ImportadorUniversal:
         # Inicializar caches para búsquedas adicionales
         self._inicializar_caches()
 
+        # ============================================================
+        # PRE-CARGAR PASADAS EXISTENTES (EVITAR N+1)
+        # Intentamos precargar todas las pasadas cuya `fecha` esté en el
+        # rango cubierto por los registros a importar, con un margen de
+        # un día para cubrir posibles cambios de fecha operativa.
+        fechas = []
+        for r in registros:
+            try:
+                d = datetime.strptime(r.fecha, "%Y-%m-%d").date()
+                fechas.append(d)
+            except Exception:
+                # Si no podemos parsear la fecha ahora, la registración
+                # se validará más tarde durante el loop; no incluimos en
+                # el rango de precarga.
+                continue
+
+        pasadas_cache = None
+        if fechas:
+            min_fecha = min(fechas) - timedelta(days=1)
+            max_fecha = max(fechas) + timedelta(days=1)
+            try:
+                filas = gestor_db.ejecutar(
+                    """
+                    SELECT fecha, hora, turno, supervisor_id, objetivo_id
+                    FROM pasadas
+                    WHERE fecha BETWEEN ? AND ?
+                    """,
+                    (min_fecha.strftime('%Y-%m-%d'), max_fecha.strftime('%Y-%m-%d')),
+                )
+                pasadas_cache = set()
+                for f in filas:
+                    # Normalizar tipos
+                    fecha_f = f['fecha']
+                    hora_f = f.get('hora')
+                    turno_f = f.get('turno')
+                    sup_id = int(f['supervisor_id']) if f.get('supervisor_id') is not None else None
+                    obj_id = int(f['objetivo_id']) if f.get('objetivo_id') is not None else None
+                    pasadas_cache.add((fecha_f, hora_f, turno_f, sup_id, obj_id))
+                # Adjuntamos temporalmente al importador para que _es_duplicado
+                # pueda consultarlo sin hacer queries por fila.
+                self._pasadas_cache_current_import = pasadas_cache
+                logger.info("[PROCESAMIENTO] Precargadas %d pasadas existentes para rango %s - %s", len(pasadas_cache), min_fecha, max_fecha)
+            except Exception as e:
+                pasadas_cache = None
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("No se pudo precargar pasadas: %s", e, exc_info=True)
+
         logger.info("[PROCESAMIENTO] Iniciando con %d registros", total)
         logger.info("  Mapeo objetivos: %d entradas", len(objetivo_mapeo))
         logger.info("  Mapeo supervisores: %d entradas", len(supervisor_mapeo))
@@ -1254,6 +1285,16 @@ class ImportadorUniversal:
 
             if abort:
                 break
+
+        # Limpiar cache temporal de pasadas para liberar memoria
+        try:
+            if hasattr(self, '_pasadas_cache_current_import'):
+                delattr(self, '_pasadas_cache_current_import')
+        except Exception:
+            try:
+                del self._pasadas_cache_current_import
+            except Exception:
+                pass
 
         # ================================================================
         # RESUMEN FINAL
@@ -1935,11 +1976,9 @@ class ImportadorUniversal:
         Retorna tuplas (col_objetivo, col_turno, col_hora, col_supervisor) — 1-indexed.
         Bloque 1: cols 1-6, Bloque 2: cols 8-13, Bloque 3: cols 15-20.
         """
-        return [
-            (2, 3, 5, 6),    # bloque 1: cols 1-6
-            (9, 10, 12, 13), # bloque 2: cols 8-13
-            (16, 17, 19, 20), # bloque 3: cols 15-20
-        ]
+        # Retornar la configuración centralizada definida como atributo de
+        # la clase para mantener el encapsulamiento.
+        return type(self).CONTROL_RECORRIDOS_BLOCKS
 
     def _analizar_nombre_hoja(self, sheet_name: str) -> Dict[str, Any]:
         """Analiza únicamente el nombre de la hoja para extraer metadatos de fecha y turno."""
@@ -2303,10 +2342,11 @@ class ImportadorUniversal:
         if not nombre:
             return None
 
-        # Asegurar que los caches estén inicializados
-        if not self._cache_inicializado:
-            self._inicializar_caches()
-
+        # Se asume que el caller público ya inicializó los caches. Esto evita
+        # llamadas redundantes dispersas por todo el código y centraliza el
+        # punto de inicialización (por ejemplo en `previsualizar_archivo` o
+        # `importar_registros`). Si el cache no está inicializado, no
+        # hacemos la inicialización aquí para no enmascarar flujos de control.
         normalized = self._normalizar_texto(nombre)
         return self._cache_supervisores.get(normalized)
     
@@ -2324,15 +2364,22 @@ class ImportadorUniversal:
         if not nombre:
             return None
 
-        # Asegurar que los caches estén inicializados
-        if not self._cache_inicializado:
-            self._inicializar_caches()
-
+        # Igual que en _obtener_supervisor_id: se asume que el cache ya está
+        # inicializado por el punto de entrada público.
         normalized = self._normalizar_texto(nombre)
         return self._cache_objetivos.get(normalized)
     
     def _es_duplicado(self, supervisor_id: int, objetivo_id: int, fecha_operativa: str, hora: str, turno: str) -> bool:
         """Verifica si una pasada ya existe (duplicada)."""
+        # Si durante el proceso de importación se precargó un conjunto de
+        # pasadas existentes en memoria (`_pasadas_cache_current_import`),
+        # consultamos ese set en memoria para evitar consultas por fila.
+        cache = getattr(self, '_pasadas_cache_current_import', None)
+        if cache is not None:
+            key = (fecha_operativa, hora, turno, int(supervisor_id), int(objetivo_id))
+            return key in cache
+
+        # Fallback: consulta puntual a la base si no hay cache cargada.
         try:
             resultados = gestor_db.ejecutar(
                 """
