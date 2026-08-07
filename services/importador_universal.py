@@ -31,8 +31,8 @@ class RegistroImportacion:
     turno: str
     supervisor: str
     objetivo: str
+    fuente: str
     notas: Optional[str] = None
-    fuente: str = "manual"
     sheet_title: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -961,8 +961,8 @@ class ImportadorUniversal:
                 # ============================================================
                 # 3. VALIDAR TURNO
                 # ============================================================
-                turno_normalizado = str(registro.turno).strip().lower()
-                if turno_normalizado not in ['diurno', 'nocturno', 'd', 'n']:
+                turno_normalizado = self._normalizar_turno(registro.turno)
+                if turno_normalizado is None:
                     self._metrics.validacion.turno_invalido += 1
                     self._metrics.validacion.registrar_rechazo('turno_invalido')
                     errores.append(
@@ -976,12 +976,6 @@ class ImportadorUniversal:
                     )
                     procesados += 1
                     continue
-
-                # Normalizar turno
-                if turno_normalizado in ('d', 'dia', 'diurno'):
-                    turno_normalizado = 'diurno'
-                elif turno_normalizado in ('n', 'noche', 'nocturno'):
-                    turno_normalizado = 'nocturno'
 
                 # ============================================================
                 # 4. PARSEAR FECHA Y HORA
@@ -1328,13 +1322,39 @@ class ImportadorUniversal:
         if not texto:
             return turno_fallback
 
-        turno_normalizado = texto.strip().lower()
-        if turno_normalizado in ('d', 'dia', 'diurno', 'diaria', 'diario', 'day', 'dayshift'):
-            return 'diurno'
-        if turno_normalizado in ('n', 'noche', 'nocturno', 'night', 'nightshift'):
-            return 'nocturno'
+        # Devolver la normalización concreta si se reconoce, sino devolver
+        # el fallback (que puede ser None para indicar "no reconocido").
+        turno_norm = self._normalizar_turno(texto)
+        if turno_norm is not None:
+            return turno_norm
 
         return turno_fallback
+
+    def _normalizar_turno(self, valor: Any) -> Optional[str]:
+        """Normaliza variantes textuales de turno a 'diurno' o 'nocturno'.
+
+        Devuelve `None` si no reconoce el valor.
+        """
+        if valor is None:
+            return None
+
+        texto = str(valor).strip().lower()
+        if not texto:
+            return None
+
+        diurno_aliases = {
+            'd', 'dia', 'diurno', 'diaria', 'diario', 'day', 'dayshift', 'matutino'
+        }
+        nocturno_aliases = {
+            'n', 'noche', 'nocturno', 'night', 'nightshift'
+        }
+
+        if texto in diurno_aliases:
+            return 'diurno'
+        if texto in nocturno_aliases:
+            return 'nocturno'
+
+        return None
 
 
     def _es_anotacion_supervisor(self, texto: str) -> bool:
@@ -1623,7 +1643,7 @@ class ImportadorUniversal:
         se usa el turno de la hoja como fallback.
         """
 
-        import re
+        # 're' ya se importa a nivel de módulo; import local eliminado.
 
         registros = []
         filas_procesadas = 0
@@ -1931,6 +1951,9 @@ class ImportadorUniversal:
 
         No intenta adivinar años.
         """
+        # Este método se mantiene como wrapper por compatibilidad con pruebas
+        # y código legado que históricamente llamaba a `_parsear_nombre_sheet`.
+        # La lógica real está en `_analizar_nombre_hoja` y aquí delegamos en ella.
         analisis = self._analizar_nombre_hoja(sheet_name)
         return analisis.get('fecha'), analisis.get('turno')
 
@@ -1956,8 +1979,7 @@ class ImportadorUniversal:
         - datetime.datetime
         """
 
-        from datetime import timedelta, time
-        import re
+        # 'timedelta' y 'time' ya se importan a nivel de módulo; imports locales eliminados.
 
         # =========================
         # 1. TIME directo
@@ -2198,20 +2220,26 @@ class ImportadorUniversal:
     
     def _es_duplicado(self, supervisor_id: int, objetivo_id: int, fecha_operativa: str, hora: str, turno: str) -> bool:
         """Verifica si una pasada ya existe (duplicada)."""
-        resultados = gestor_db.ejecutar(
-            """
-            SELECT 1
-            FROM pasadas
-            WHERE fecha = ?
-              AND hora = ?
-              AND turno = ?
-              AND supervisor_id = ?
-              AND objetivo_id = ?
-            LIMIT 1
-            """,
-            (fecha_operativa, hora, turno, supervisor_id, objetivo_id),
-        )
-        return bool(resultados)
+        try:
+            resultados = gestor_db.ejecutar(
+                """
+                SELECT 1
+                FROM pasadas
+                WHERE fecha = ?
+                  AND hora = ?
+                  AND turno = ?
+                  AND supervisor_id = ?
+                  AND objetivo_id = ?
+                LIMIT 1
+                """,
+                (fecha_operativa, hora, turno, supervisor_id, objetivo_id),
+            )
+            return bool(resultados)
+        except Exception as e:
+            logger.warning("No se pudo verificar duplicado (asumiendo no duplicado): %s", e)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("Traceback _es_duplicado", exc_info=True)
+            return False
 
     def _normalizar_texto(self, valor: Any) -> str:
         texto = str(valor).strip().lower()
