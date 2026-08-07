@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import unicodedata
+import tempfile
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Callable, Set
@@ -737,23 +738,27 @@ class ImportadorUniversal:
         """Importa datos desde string JSON (útil para API futuras)."""
         try:
             data = json.loads(json_string)
-            temp_file = f"temp_import_{int(datetime.now().timestamp())}.json"
-            with open(temp_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f)
 
-            resultado = self.importar_json_tablet(temp_file)
-
+            tmp_name = None
             try:
-                os.remove(temp_file)
-            except Exception as e:
-                logger.debug(
-                    "No se pudo eliminar archivo temporal %s: %s",
-                    temp_file,
-                    e,
-                    exc_info=logger.isEnabledFor(logging.DEBUG),
-                )
+                # Crear archivo temporal en el directorio temporal del sistema
+                with tempfile.NamedTemporaryFile('w', encoding='utf-8', suffix='.json', delete=False) as tmpf:
+                    json.dump(data, tmpf)
+                    tmp_name = tmpf.name
 
-            return resultado
+                resultado = self.importar_json_tablet(tmp_name)
+                return resultado
+            finally:
+                if tmp_name:
+                    try:
+                        os.remove(tmp_name)
+                    except Exception as e:
+                        logger.debug(
+                            "No se pudo eliminar archivo temporal %s: %s",
+                            tmp_name,
+                            e,
+                            exc_info=logger.isEnabledFor(logging.DEBUG),
+                        )
 
         except Exception as e:
             return ResultadoImportacion(
