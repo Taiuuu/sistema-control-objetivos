@@ -877,6 +877,20 @@ class ImportadorUniversal:
         objetivo_mapeo = objetivo_mapeo or {}
         supervisor_mapeo = supervisor_mapeo or {}
 
+        # Normalizar las claves de los mapeos proporcionados por el usuario
+        # para que coincidan con la normalización usada en el cache interno.
+        objetivo_mapeo_norm: Dict[str, int] = {}
+        for k, v in objetivo_mapeo.items():
+            if k is None:
+                continue
+            objetivo_mapeo_norm[self._normalizar_texto(k)] = v
+
+        supervisor_mapeo_norm: Dict[str, int] = {}
+        for k, v in supervisor_mapeo.items():
+            if k is None:
+                continue
+            supervisor_mapeo_norm[self._normalizar_texto(k)] = v
+
         procesados = 0
         abort = False
 
@@ -892,13 +906,15 @@ class ImportadorUniversal:
                 # ============================================================
                 # 1. RESOLVER SUPERVISOR
                 # ============================================================
-                supervisor_id = supervisor_mapeo.get(registro.supervisor)
-                
-                if not supervisor_id:
+                supervisor_id = None
+                if registro.supervisor:
+                    supervisor_id = supervisor_mapeo_norm.get(self._normalizar_texto(registro.supervisor))
+
+                if supervisor_id is None:
                     # Intentar resolver por caché
                     supervisor_id = self._obtener_supervisor_id(registro.supervisor)
 
-                if not supervisor_id:
+                if supervisor_id is None:
                     self._metrics.validacion.supervisor_inexistente += 1
                     self._metrics.validacion.registrar_rechazo('supervisor_inexistente')
                     errores.append(
@@ -915,13 +931,15 @@ class ImportadorUniversal:
                 # ============================================================
                 # 2. RESOLVER OBJETIVO
                 # ============================================================
-                objetivo_id = objetivo_mapeo.get(registro.objetivo)
-                
-                if not objetivo_id:
+                objetivo_id = None
+                if registro.objetivo:
+                    objetivo_id = objetivo_mapeo_norm.get(self._normalizar_texto(registro.objetivo))
+
+                if objetivo_id is None:
                     # Intentar resolver por caché
                     objetivo_id = self._obtener_objetivo_id(registro.objetivo)
 
-                if not objetivo_id:
+                if objetivo_id is None:
                     self._metrics.validacion.objetivo_inexistente += 1
                     self._metrics.validacion.registrar_rechazo('objetivo_inexistente')
                     errores.append(
@@ -1323,10 +1341,25 @@ class ImportadorUniversal:
 
         texto = self._normalizar_texto(texto)
 
-        return any(
-            patron in texto
-            for patron in self._PATRONES_ANOTACION
-        )
+        # Para evitar falsos positivos, sólo considerar anotaciones cuando
+        # el texto es exactamente la frase esperada o cuando la frase aparece
+        # al inicio y el resto del contenido es corto (p.ej. una hora).
+        for patron in self._PATRONES_ANOTACION:
+            patron_norm = self._normalizar_texto(patron)
+            if texto == patron_norm:
+                return True
+
+            # Caso común: "SE RETIRA A LAS 22:00" -> comienza con la frase
+            if texto.startswith(patron_norm + ' '):
+                resto = texto[len(patron_norm):].strip()
+                # Si el resto es vacío, es una anotación.
+                if not resto:
+                    return True
+                # Si el resto contiene dígitos (horas) y es corto, considerarlo anotación.
+                if re.search(r"\d", resto) and len(resto) <= 25:
+                    return True
+
+        return False
 
     def _crear_registros_control_recorridos(
         self,
@@ -1792,7 +1825,7 @@ class ImportadorUniversal:
         if turno is None:
             return {'es_valido': False, 'razon': 'turno inexistente', 'fecha': None, 'turno': None}
 
-        YEAR_IMPORTACION = 2026
+        YEAR_IMPORTACION = date.today().year
         try:
             fecha = date(YEAR_IMPORTACION, mes, dia)
         except ValueError:
@@ -1828,7 +1861,9 @@ class ImportadorUniversal:
                     tipo='control_recorridos',
                 )
 
-            if re.search(r'control', title, re.IGNORECASE):
+            # Detectar nombres legend que empiezan con 'control' (p.ej. "Control Recorridos").
+            # Evitar coincidencias en cualquier parte del título (p.ej. "Panel de Control").
+            if re.search(r'^\s*control(?:\b|[_\-\s:\/])', title, re.IGNORECASE):
                 return EvaluacionHojaControl(
                     True,
                     'formato control recorridos',
