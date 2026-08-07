@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple, Callable, Set
 
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 
 logger = logging.getLogger(__name__)
 
@@ -397,10 +398,107 @@ class ImportadorUniversal:
             # Inicializar caches una sola vez
             self._inicializar_caches()
             
-            wb = load_workbook(
-                ruta_archivo,
-                data_only=True,
-            )
+            # Abrir el workbook con manejo fino de excepciones para dar mensajes
+            # accionables al usuario.
+            try:
+                wb_data = load_workbook(ruta_archivo, data_only=True)
+            except FileNotFoundError:
+                return {
+                    'tipo': 'error',
+                    'error': f"Archivo no encontrado: {ruta_archivo}",
+                    'registros': [],
+                    'objetivos_detectados': [],
+                    'supervisores_detectados': [],
+                    'objetivos_resueltos': {},
+                    'supervisores_resueltos': {},
+                    'objetivos_no_resueltos': [],
+                    'supervisores_no_resueltos': [],
+                    'sheet_options': [],
+                }
+            except PermissionError:
+                return {
+                    'tipo': 'error',
+                    'error': f"Sin permisos para leer el archivo: {ruta_archivo}",
+                    'registros': [],
+                    'objetivos_detectados': [],
+                    'supervisores_detectados': [],
+                    'objetivos_resueltos': {},
+                    'supervisores_resueltos': {},
+                    'objetivos_no_resueltos': [],
+                    'supervisores_no_resueltos': [],
+                    'sheet_options': [],
+                }
+            except InvalidFileException as e:
+                return {
+                    'tipo': 'error',
+                    'error': f"Archivo inválido o corrupto: {e}",
+                    'registros': [],
+                    'objetivos_detectados': [],
+                    'supervisores_detectados': [],
+                    'objetivos_resueltos': {},
+                    'supervisores_resueltos': {},
+                    'objetivos_no_resueltos': [],
+                    'supervisores_no_resueltos': [],
+                    'sheet_options': [],
+                }
+            except Exception as e:
+                logger.error("Error abriendo Excel: %s", e)
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("Traceback abriendo Excel", exc_info=True)
+                return {
+                    'tipo': 'error',
+                    'error': f"Error leyendo Excel: {str(e)}",
+                    'registros': [],
+                    'objetivos_detectados': [],
+                    'supervisores_detectados': [],
+                    'objetivos_resueltos': {},
+                    'supervisores_resueltos': {},
+                    'objetivos_no_resueltos': [],
+                    'supervisores_no_resueltos': [],
+                    'sheet_options': [],
+                }
+
+            # Detectar fórmulas sin valor calculado: comparar con una carga que
+            # preserve fórmulas (data_only=False). Si una celda tiene None en la
+            # versión data_only pero en la versión con fórmulas la celda contiene
+            # una fórmula (empieza con '='), informar al usuario para que abra y
+            # guarde el archivo en Excel/LibreOffice.
+            try:
+                wb_formulas = load_workbook(ruta_archivo, data_only=False)
+                problemas = []
+                for ws_data, ws_formula in zip(wb_data.worksheets, wb_formulas.worksheets):
+                    max_row = min(ws_data.max_row, 40)
+                    max_col = min(ws_data.max_column, 20)
+                    for r in range(1, max_row + 1):
+                        for c in range(1, max_col + 1):
+                            val_data = ws_data.cell(row=r, column=c).value
+                            val_formula = ws_formula.cell(row=r, column=c).value
+                            if (val_data is None or (isinstance(val_data, str) and val_data.strip()=="")) and isinstance(val_formula, str) and val_formula.startswith('='):
+                                problemas.append(f"{ws_data.title}:{r}:{c}")
+                if problemas:
+                    return {
+                        'tipo': 'error',
+                        'error': (
+                            'El archivo contiene celdas con fórmulas sin valor calculado. '
+                            'Abrilo en Excel/LibreOffice, guardalo y volvé a subirlo. '
+                            f'Ejemplos: {problemas[:5]}'
+                        ),
+                        'registros': [],
+                        'objetivos_detectados': [],
+                        'supervisores_detectados': [],
+                        'objetivos_resueltos': {},
+                        'supervisores_resueltos': {},
+                        'objetivos_no_resueltos': [],
+                        'supervisores_no_resueltos': [],
+                        'sheet_options': [],
+                    }
+            except Exception:
+                # Si falla abrir la versión con fórmulas no abortamos la importación;
+                # esto sólo reduce la verificación. Logueamos en debug.
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug('No se pudo abrir workbook en modo fórmulas para verificar celdas', exc_info=True)
+
+            wb = wb_data
 
             sheet_options = self._listar_sheet_options(wb)
 
