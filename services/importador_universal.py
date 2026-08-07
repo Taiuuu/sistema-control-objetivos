@@ -125,8 +125,7 @@ class ExtractionMetrics:
     def registrar_descartado(self, motivo: str) -> None:
         self.registros_descartados += 1
         self.motivos_descarte[motivo] = self.motivos_descarte.get(motivo, 0) + 1
-        self._metrics.extraccion.anotaciones_descartadas += 1
-
+        self.anotaciones_descartadas += 1
 
 @dataclass
 class ValidationMetrics:
@@ -1201,7 +1200,7 @@ class ImportadorUniversal:
                 self._metrics.workbook.registrar_descartada('error_analisis_hoja')
                 self._metrics.extraccion.excepciones_parseo += 1
                 logger.warning(
-                    "Error durante el análisis de hoja: %s | sheet=%s | error=%s",
+                    "Error durante el análisis de hoja: sheet=%s | error=%s",
                     ws.title,
                     e,
                 )
