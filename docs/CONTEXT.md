@@ -1,6 +1,6 @@
 # CONTEXT.md - VESP Control de Objetivos
 
-## Last updated: Julio 2026 | Version: 1.5.2
+## Last updated: Agosto 2026 | Version: 1.5.2
 
 ---
 
@@ -13,13 +13,8 @@
   - `GUIA_INSTALACION.md` y `readme.md` mencionan **SQLAlchemy** como dependencia de BD.
     `requirements.txt` real NO tiene SQLAlchemy (usa sqlite3 stdlib). Documentación vieja, ignorar.
   - `readme.md` dice entry point `python main.py`; el real es `python scripts/main.py`. Usar el real.
-  - `MANUAL_USUARIO.md` presenta la validación de inputs de login (3-50 caracteres, alfanumérico+_)
-    como si ya existiera, pero este CONTEXT la lista como "Pending". **Verificar en código cuál es cierto
-    antes de asumir.**
-  - `pasadas.py` (Flask blueprint subido suelto) usa `flask_jwt_extended` y `models.turnos`
-    (`registrar_turno`, `listar_turnos_del_dia`), lo cual no coincide con la estructura de `models/`
-    descrita abajo (`models/pasada.py`). Puede ser código legacy/experimental de `api/`. **No asumir
-    que representa el estado actual de `api/` sin confirmar.**
+  - `ui/login.py`: la validación de inputs de login (3-50 caracteres, alfanumérico + `_`, rate-limiting de 5 intentos/15 min) está completamente implementada en `_validar_entrada_login()`.
+    - `api/`: cuenta con una arquitectura de Flask madura y modular en `api/routes/` (`auth`, `pasadas`, `objetivos`, `supervisores`, `usuarios`, `reportes`, `logs`, `salud`, `sincronizacion`, `exportacion`) y Swagger en `docs.py`.
   - `requirements.txt` y `requirements-dev.txt` tienen versiones de pytest distintas (9.0.2 vs 7.4.3).
     Usar la de `requirements.txt` como real.
 - MANUAL_USUARIO.md y GUIA_INSTALACION.md se resumen abajo solo en lo operativo que no estaba ya cubierto.
@@ -66,22 +61,32 @@ sistema-control-objetivos/
 │   ├── ventana_principal.py
 │   ├── dashboard.py
 │   ├── importar_excel.py    # Import UI + DialogoResolverObjetivos/Supervisores
-│   └── reporte_*.py
+│   ├── tabla_diaria.py
+│   ├── vista_*.py            # Auditoría, logs, caché, sincronización, validaciones, indexación
+│   └── widgets/              # Componentes UI reusables (sidebar, badges, tabla_cobertura, estilos)
 ├── services/
 │   ├── sesion.py
 │   ├── permisos.py
 │   ├── importador_universal.py
 │   ├── gestor_turnos.py
 │   ├── sync_manager.py
-│   └── (18 services total)
+│   └── (33 services total)
 ├── database/
-│   └── db.py                # SQLite init, migrations, backup
+│   ├── db.py                # SQLite init, migrations, backup
+│   └── gestor_db.py         # Conexiones y transacciones thread-safe
 ├── models/
 │   ├── usuario.py
-│   ├── objetivo.py
-│   ├── pasada.py
-│   └── supervisor.py
-├── api/                      # Flask REST, optional
+│   ├── objetivos.py
+│   ├── supervisores.py
+│   ├── equipos.py
+│   ├── turnos.py
+│   ├── types.py
+│   ├── validators.py
+│   └── exceptions.py
+├── api/                      # Flask REST API
+│   ├── app.py                # App Flask init
+│   ├── docs.py               # Integración Swagger / OpenAPI
+│   └── routes/               # Blueprints modulares (auth, pasadas, objetivos, supervisores, usuarios, etc.)
 ├── assets/                   # vesp.png, icono.ico
 ├── backups/                  # Auto-generated
 ├── tests/
@@ -229,7 +234,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 ### Resolved (v1.1.0 - v1.5.2)
 
 - scripts/main.py: try-except on all init components; graceful degradation
-- ui/login.py::verificar_login(): bcrypt errors differentiated; failed attempts logged
+- ui/login.py::verificar_login(): bcrypt errors differentiated; failed attempts logged; input validation (`_validar_entrada_login`) and rate limiting (`_verificar_rate_limit`) fully implemented
 - ui/login.py::_login_post_cambio(): None check on fetchone() before indexing
 - services/sesion.py: obtener_sesion_valida() added as central session validator
 - database/db.py: explicit rollback on migration failure; duplicate column treated as no-op
@@ -242,7 +247,6 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 ### Pending (high priority)
 
 - database/db.py: foreign key enforcement is enabled consistently through the shared SQLite configuration used by the database manager and objective-related flows
-- ui/login.py: input validation (max length, character whitelist) — **verificar estado real, ver nota de conflicto arriba**
 - services/permisos.py: decorators lack try-except and logging on failure
 - importador_universal.py legacy parser: descarta filas cuando el turno de la celda no coincide
   con el turno de la hoja en vez de forzar el turno de la hoja (bug activo, corregir)
