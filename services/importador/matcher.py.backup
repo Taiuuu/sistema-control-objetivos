@@ -1,0 +1,10 @@
+# Backup - file will be recreated
+
+if dedenting:
+    # Dedentar: quitar 4 espacios del inicio
+    if line.startswith('    '):
+        line = line[4:]
+    elif line.startswith('\t'):
+        line = line[1:]
+
+result_lines.append(line)
