@@ -1,3 +1,4 @@
+'''
 # =============================================================================
 # VESP Organizations - Sistema de Control de Objetivos
 # Pantalla para importar datos desde Excel existente
@@ -1483,3 +1484,5 @@ class ImportarExcel(QWidget):
 
         # Re-renderizar la misma previsualización (simular carga)
         self._on_preview_cargado(self._preview_token, self._last_preview)
+
+'''
