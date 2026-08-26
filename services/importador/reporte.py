@@ -1,712 +1,327 @@
 """
-Orquestación del análisis completo (resumen numérico) y generación del
-reporte detallado descargable.
+reporte.py
 
-Fase 10:
-    - análisis completo del Excel
-    - resumen numérico
-    - pipeline read-only
+Fase 10: motor de análisis completo.
 
-Fase 17:
-    - reporte detallado descargable en XLSX
+`analizar_excel()` orquesta todo el pipeline de importación en modo
+SOLO LECTURA (no escribe nada en la base):
+
+    parser (Fase 1-3)
+        -> normalizador (Fase 4-5)
+        -> matcher (Fase 6-7)
+        -> duplicados (Fase 8)
+        -> validador (Fase 9)
+        -> ResultadoAnalisis (resumen)
+
+`generar_reporte_detallado()` vuelca cada Problema detectado a un Excel
+(.xlsx) para el botón "Descargar análisis detallado". Se eligió Excel en
+vez de PDF: el contenido es tabular (una fila por Problema, con columnas
+tipo/hoja/fila/objetivo/valor/descripción) que alguien va a querer
+filtrar y ordenar, y el pipeline ya depende de openpyxl para todo lo
+demás, así que no se suma ninguna dependencia nueva.
 """
 
 from __future__ import annotations
 
-from io import BytesIO
-from typing import Any
+import io
+from typing import Optional
 
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
-
-from .modelos import ResultadoAnalisis
-from .parser import leer_excel
-from .normalizador import normalizar_pasadas
-from .matcher import matchear_objetivo, matchear_supervisor
-from .duplicados import (
-    detectar_duplicados_internos,
-    detectar_pasadas_existentes,
+from . import duplicados, matcher, parser
+from .modelos import PasadaNormalizada, Problema, ResultadoAnalisis
+from .normalizador import (
+    determinar_fecha_operativa_y_calendario,
+    normalizar_hora,
+    normalizar_turno,
+    resolver_turno_con_prioridad,
 )
 from .validador import validar
 
-
-# ============================================================================
-# Helpers internos
-# ============================================================================
+import openpyxl
+from openpyxl.styles import Font
 
 
-def _obtener_catalogos(conexion_bd):
+# ---------------------------------------------------------------------------
+# Fase 1-5: de PasadaCruda a PasadaNormalizada, generando los Problema que
+# faltaba cerrar (hora inválida / hora normalizada), señalados en el
+# análisis previo de validador.py.
+# ---------------------------------------------------------------------------
+
+
+def _construir_pasadas_normalizadas(
+    path: str, anio: int
+) -> tuple[list[PasadaNormalizada], list[Problema], int, int]:
+    """Devuelve (pasadas_normalizadas, problemas, hojas_encontradas,
+    pasadas_detectadas).
+
+    `pasadas_detectadas` cuenta todos los bloques NO VACÍOS leídos del
+    Excel, incluso los que después no pudieron normalizarse (ej. hora
+    inválida) y por lo tanto no generan PasadaNormalizada.
     """
-    Lee los catálogos de objetivos y supervisores.
+    hojas = parser.leer_hojas_de_datos(path)
+    problemas: list[Problema] = []
+    pasadas_normalizadas: list[PasadaNormalizada] = []
+    pasadas_detectadas = 0
 
-    IMPORTANTE:
-        Esta función solamente ejecuta SELECT.
-        No hace INSERT, UPDATE, DELETE ni COMMIT.
-    """
-    cursor = conexion_bd.cursor()
+    for hoja in hojas:
+        fecha_hoja, turno_hoja, problema_hoja = parser.parsear_nombre_hoja(hoja, anio)
+        if problema_hoja is not None:
+            # No se puede fechar/turnar ninguna pasada de esta hoja: se
+            # reporta el error y se saltea la hoja entera.
+            problemas.append(problema_hoja)
+            continue
 
-    cursor.execute(
-        """
-        SELECT id, nombre
-        FROM objetivos
-        WHERE COALESCE(activo, 1) = 1
-        ORDER BY nombre
-        """
-    )
-    objetivos = cursor.fetchall()
+        crudas = parser.leer_pasadas_crudas(path, hoja)
+        crudas_no_vacias = [c for c in crudas if not c.esta_vacia()]
+        pasadas_detectadas += len(crudas_no_vacias)
 
-    cursor.execute(
-        """
-        SELECT id, nombre
-        FROM supervisores
-        WHERE fecha_baja IS NULL OR fecha_baja = ''
-        ORDER BY nombre
-        """
-    )
-    supervisores = cursor.fetchall()
+        for cruda in crudas_no_vacias:
+            # --- Fase 4: hora ---------------------------------------------
+            resultado_hora = normalizar_hora(cruda.hora)
 
-    return objetivos, supervisores
+            if resultado_hora.error is not None:
+                problemas.append(
+                    Problema(
+                        tipo="error_critico",
+                        descripcion=f"Hora inválida: {resultado_hora.error}.",
+                        hoja=hoja,
+                        objetivo=cruda.objetivo,
+                        valor_problema=cruda.hora,
+                        fila_excel=cruda.fila_excel,
+                    )
+                )
+                # Sin hora válida no se puede construir PasadaNormalizada
+                # (hora es un campo obligatorio del modelo).
+                continue
 
+            if resultado_hora.hora is None:
+                # Celda de hora vacía, pero la fila no está vacía en su
+                # conjunto (tiene movil/turno/supervisor cargado). No es
+                # el mismo caso que "hora inválida" (normalizar_hora no
+                # marca esto como error porque una celda vacía es válida
+                # cuando toda la fila está vacía) — acá sí importa,
+                # porque hora es obligatoria en PasadaNormalizada.
+                problemas.append(
+                    Problema(
+                        tipo="error_critico",
+                        descripcion=(
+                            "Pasada con datos (móvil/turno/supervisor) pero "
+                            "sin hora cargada."
+                        ),
+                        hoja=hoja,
+                        objetivo=cruda.objetivo,
+                        fila_excel=cruda.fila_excel,
+                    )
+                )
+                continue
 
-def _desempaquetar_lectura(resultado):
-    """
-    Normaliza el resultado de leer_excel().
+            if resultado_hora.fue_normalizada:
+                problemas.append(
+                    Problema(
+                        tipo="advertencia",
+                        descripcion=(
+                            f"Hora normalizada automáticamente desde "
+                            f"'{cruda.hora}' a {resultado_hora.hora.strftime('%H:%M')}."
+                        ),
+                        hoja=hoja,
+                        objetivo=cruda.objetivo,
+                        valor_problema=cruda.hora,
+                        fila_excel=cruda.fila_excel,
+                    )
+                )
 
-    Se soportan estas formas:
+            # --- Fase 5: turno ----------------------------------------------
+            if cruda.turno is not None and str(cruda.turno).strip() != "":
+                resultado_turno = normalizar_turno(
+                    cruda.turno, hoja=hoja, objetivo=cruda.objetivo, fila_excel=cruda.fila_excel
+                )
+                if resultado_turno.problema is not None:
+                    problemas.append(resultado_turno.problema)
+                turno_celda = resultado_turno.turno
+            else:
+                turno_celda = None
 
-        (hojas, pasadas)
-        (hojas, pasadas, problemas)
+            turno_final, problema_prioridad = resolver_turno_con_prioridad(
+                turno_celda,
+                turno_hoja,
+                hoja=hoja,
+                objetivo=cruda.objetivo,
+                fila_excel=cruda.fila_excel,
+            )
+            if problema_prioridad is not None:
+                problemas.append(problema_prioridad)
 
-    o un objeto/dict con atributos equivalentes.
-    """
-    if isinstance(resultado, tuple):
-        if len(resultado) == 3:
-            return resultado[0], resultado[1], list(resultado[2] or [])
+            if turno_final is None:
+                # Turno de celda inválido Y sin turno de hoja como
+                # respaldo (no debería pasar, ya que parsear_nombre_hoja
+                # ya garantizó turno_hoja válido, pero se cubre el caso
+                # límite igual en vez de asumir).
+                continue
 
-        if len(resultado) == 2:
-            return resultado[0], resultado[1], []
-
-        raise ValueError(
-            "leer_excel() devolvió una tupla con cantidad de elementos "
-            f"inesperada: {len(resultado)}"
-        )
-
-    if isinstance(resultado, dict):
-        hojas = resultado.get(
-            "hojas",
-            resultado.get("hojas_encontradas", []),
-        )
-        pasadas = resultado.get(
-            "pasadas",
-            resultado.get("pasadas_detectadas", []),
-        )
-        problemas = resultado.get("problemas", [])
-
-        return hojas, pasadas, list(problemas or [])
-
-    hojas = getattr(
-        resultado,
-        "hojas",
-        getattr(resultado, "hojas_encontradas", []),
-    )
-    pasadas = getattr(
-        resultado,
-        "pasadas",
-        getattr(resultado, "pasadas_detectadas", []),
-    )
-    problemas = getattr(resultado, "problemas", [])
-
-    return hojas, pasadas, list(problemas or [])
-
-
-def _desempaquetar_normalizacion(resultado):
-    """
-    Normaliza el resultado de normalizar_pasadas().
-
-    Se soportan:
-
-        pasadas
-        (pasadas, problemas)
-
-    o un objeto/dict equivalente.
-    """
-    if isinstance(resultado, tuple):
-        if len(resultado) == 2:
-            return list(resultado[0] or []), list(resultado[1] or [])
-
-        if len(resultado) == 1:
-            return list(resultado[0] or []), []
-
-        raise ValueError(
-            "normalizar_pasadas() devolvió una tupla inesperada"
-        )
-
-    if isinstance(resultado, dict):
-        pasadas = resultado.get(
-            "pasadas_normalizadas",
-            resultado.get("pasadas", []),
-        )
-        problemas = resultado.get("problemas", [])
-        return list(pasadas or []), list(problemas or [])
-
-    if hasattr(resultado, "pasadas_normalizadas"):
-        return (
-            list(resultado.pasadas_normalizadas or []),
-            list(getattr(resultado, "problemas", []) or []),
-        )
-
-    return list(resultado or []), []
-
-
-def _resolver_matching(
-    pasadas,
-    objetivos_bd,
-    supervisores_bd,
-):
-    """
-    Ejecuta Fase 6-7 sobre cada pasada.
-
-    Solamente un match de tipo "exacto" asigna el ID.
-
-    Las sugerencias y los no reconocidos quedan con ID=None para que
-    Fase 9 los pueda clasificar como pendientes/no reconocidos.
-
-    Esto respeta el contrato del matcher: la decisión sobre una sugerencia
-    no la toma automáticamente el pipeline. 
-    """
-    for pasada in pasadas:
-        nombre_objetivo = (pasada.objetivo_nombre or "").strip()
-
-        if nombre_objetivo:
-            resultado_objetivo = matchear_objetivo(
-                nombre_objetivo,
-                objetivos_bd,
+            fecha_operativa, fecha_calendario = determinar_fecha_operativa_y_calendario(
+                fecha_hoja, turno_final, resultado_hora.hora
             )
 
-            if resultado_objetivo.tipo == "exacto":
-                pasada.objetivo_id = (
-                    resultado_objetivo.objetivo_exacto.id
+            pasadas_normalizadas.append(
+                PasadaNormalizada(
+                    hoja=hoja,
+                    fila_excel=cruda.fila_excel,
+                    bloque_tabla=cruda.bloque_tabla,
+                    fecha_operativa=fecha_operativa,
+                    fecha_calendario=fecha_calendario,
+                    turno=turno_final,
+                    turno_hoja=turno_hoja,
+                    hora=resultado_hora.hora,
+                    movil=cruda.movil,
+                    objetivo_nombre=(cruda.objetivo or "").strip() if cruda.objetivo else "",
+                    supervisor_nombre=cruda.supervisor,
                 )
-            else:
-                pasada.objetivo_id = None
-
-        nombre_supervisor = (
-            (pasada.supervisor_nombre or "").strip()
-            if pasada.supervisor_nombre is not None
-            else ""
-        )
-
-        if nombre_supervisor:
-            resultado_supervisor = matchear_supervisor(
-                nombre_supervisor,
-                supervisores_bd,
             )
 
-            if resultado_supervisor.tipo == "exacto":
-                pasada.supervisor_id = (
-                    resultado_supervisor.supervisor_exacto.id
-                )
-            else:
-                pasada.supervisor_id = None
-
-    return pasadas
+    return pasadas_normalizadas, problemas, len(hojas), pasadas_detectadas
 
 
-def _crear_resultado(
-    *,
-    hojas,
-    pasadas,
-    pasadas_nuevas,
-    pasadas_existentes,
-    duplicados,
-    problemas,
-    forzar_sobrescritura,
-):
-    """
-    Construye ResultadoAnalisis.
-
-    Se intenta primero la construcción normal de dataclass.
-    El fallback permite trabajar con una versión de ResultadoAnalisis
-    que tenga campos inicializados por defecto.
-    """
-    datos = {
-        "hojas": list(hojas),
-        "pasadas": list(pasadas),
-        "pasadas_nuevas": list(pasadas_nuevas),
-        "pasadas_ya_existentes": list(pasadas_existentes),
-        "duplicados_descartados": list(duplicados),
-        "problemas": list(problemas),
-        "forzar_sobrescritura": forzar_sobrescritura,
-    }
-
-    try:
-        return ResultadoAnalisis(**datos)
-    except TypeError:
-        resultado = ResultadoAnalisis()
-
-        for nombre, valor in datos.items():
-            if hasattr(resultado, nombre):
-                try:
-                    setattr(resultado, nombre, valor)
-                except AttributeError:
-                    pass
-
-        return resultado
-
-
-def _es_error_critico(problema) -> bool:
-    return getattr(problema, "tipo", None) == "error_critico"
-
-
-def _es_advertencia(problema) -> bool:
-    return getattr(problema, "tipo", None) == "advertencia"
-
-
-def _descripcion(problema) -> str:
-    return str(getattr(problema, "descripcion", "") or "")
-
-
-def _es_objetivo_no_reconocido(problema) -> bool:
-    texto = _descripcion(problema).lower()
-
-    return (
-        "objetivo" in texto
-        and "no reconocido" in texto
-    )
-
-
-def _es_supervisor_no_reconocido(problema) -> bool:
-    texto = _descripcion(problema).lower()
-
-    return (
-        "supervisor" in texto
-        and "no reconocido" in texto
-    )
-
-
-# ============================================================================
-# Fase 10 — Análisis completo
-# ============================================================================
-
-
-def analizar_excel_completo(
-    path,
-    anio: int,
-    conexion_bd,
-    forzar_sobrescritura: bool = False,
-) -> ResultadoAnalisis:
-    """
-    Orquesta el pipeline completo:
-
-        Fase 2-3 -> lectura
-        Fase 4-5 -> normalización
-        Fase 6-7 -> matching
-        Fase 8   -> duplicados + existencia
-        Fase 9   -> validación
-
-    La función es estrictamente de análisis.
-
-    NO:
-        - crea objetivos
-        - crea supervisores
-        - inserta pasadas
-        - actualiza pasadas
-        - elimina registros
-        - hace commit
-
-    La única operación sobre la BD es lectura de catálogos y existencia
-    de pasadas.
-    """
-
-    # ------------------------------------------------------------------
-    # FASE 2-3 — Lectura
-    # ------------------------------------------------------------------
-
-    resultado_lectura = leer_excel(
-        path,
-        anio,
-    )
-
-    hojas, pasadas_crudas, problemas_lectura = (
-        _desempaquetar_lectura(resultado_lectura)
-    )
-
-    problemas = list(problemas_lectura)
-
-    # ------------------------------------------------------------------
-    # FASE 4-5 — Normalización
-    # ------------------------------------------------------------------
-
-    resultado_normalizacion = normalizar_pasadas(
-        pasadas_crudas,
-        anio,
-    )
-
-    pasadas_normalizadas, problemas_normalizacion = (
-        _desempaquetar_normalizacion(resultado_normalizacion)
-    )
-
-    problemas.extend(problemas_normalizacion)
-
-    # ------------------------------------------------------------------
-    # FASE 6-7 — Matching
-    # ------------------------------------------------------------------
-
-    objetivos_bd, supervisores_bd = _obtener_catalogos(
-        conexion_bd
-    )
-
-    pasadas_normalizadas = _resolver_matching(
-        pasadas_normalizadas,
-        objetivos_bd,
-        supervisores_bd,
-    )
-
-    # ------------------------------------------------------------------
-    # FASE 8 — Duplicados internos
-    # ------------------------------------------------------------------
-
-    pasadas_sin_duplicados, duplicados_descartados = (
-        detectar_duplicados_internos(
-            pasadas_normalizadas
-        )
-    )
-
-    # ------------------------------------------------------------------
-    # FASE 8 — Existencia en BD
-    # ------------------------------------------------------------------
-
-    pasadas_nuevas, pasadas_existentes = (
-        detectar_pasadas_existentes(
-            pasadas_sin_duplicados,
-            conexion_bd,
-            forzar_sobrescritura=forzar_sobrescritura,
-        )
-    )
-
-    # ------------------------------------------------------------------
-    # FASE 9 — Validación
-    # ------------------------------------------------------------------
-
-    contexto = {
-        "anio": anio,
-        "hojas": hojas,
-        "objetivos_bd": objetivos_bd,
-        "supervisores_bd": supervisores_bd,
-        "pasadas": pasadas_sin_duplicados,
-        "pasadas_nuevas": pasadas_nuevas,
-        "pasadas_existentes": pasadas_existentes,
-        "duplicados_descartados": duplicados_descartados,
-        "conexion_bd": conexion_bd,
-        "forzar_sobrescritura": forzar_sobrescritura,
-    }
-
-    problemas_validacion = validar(
-        pasadas_sin_duplicados,
-        contexto,
-    )
-
-    problemas.extend(problemas_validacion)
-
-    # ------------------------------------------------------------------
-    # Resultado final
-    # ------------------------------------------------------------------
-
-    return _crear_resultado(
-        hojas=hojas,
-        pasadas=pasadas_normalizadas,
-        pasadas_nuevas=pasadas_nuevas,
-        pasadas_existentes=pasadas_existentes,
-        duplicados=duplicados_descartados,
-        problemas=problemas,
-        forzar_sobrescritura=forzar_sobrescritura,
-    )
+# ---------------------------------------------------------------------------
+# Orquestador principal
+# ---------------------------------------------------------------------------
 
 
 def analizar_excel(
-    path,
+    path: str,
     anio: int,
     conexion_bd,
     forzar_sobrescritura: bool = False,
 ) -> ResultadoAnalisis:
-    """
-    API pública del análisis.
+    """Analiza un Excel de Control de Recorridos de punta a punta, SIN
+    escribir nada en la base. Devuelve un ResultadoAnalisis listo para
+    mostrar en la pantalla de revisión."""
 
-    __init__.py puede exportar esta función directamente.
-    """
-    return analizar_excel_completo(
-        path,
-        anio,
-        conexion_bd,
-        forzar_sobrescritura=forzar_sobrescritura,
+    # --- Fase 1-5: lectura + normalización -----------------------------
+    pasadas, problemas, hojas_encontradas, pasadas_detectadas = _construir_pasadas_normalizadas(
+        path, anio
+    )
+
+    # --- Fase 6-7: matching ----------------------------------------------
+    objetivos_bd = matcher.obtener_objetivos_bd(conexion_bd)
+    supervisores_bd = matcher.obtener_supervisores_bd(conexion_bd)
+
+    resultados_match_objetivo = matcher.aplicar_matching_objetivos(pasadas, objetivos_bd)
+    resultados_match_supervisor = matcher.aplicar_matching_supervisores(pasadas, supervisores_bd)
+
+    objetivos_para_revisar = sum(
+        1 for r in resultados_match_objetivo if r.tipo != "exacto"
+    )
+    supervisores_para_revisar = sum(
+        1 for r in resultados_match_supervisor if r.tipo != "exacto"
+    )
+
+    # --- Fase 8: duplicados internos + existencia en base -----------------
+    pasadas_tras_dedupe, descartadas = duplicados.detectar_duplicados_internos(pasadas)
+    nuevas, existentes = duplicados.detectar_pasadas_existentes(
+        pasadas_tras_dedupe, conexion_bd, forzar_sobrescritura=forzar_sobrescritura
+    )
+
+    pasadas_actualizar = sum(1 for p in existentes if p.accion == "actualizar")
+    pasadas_omitir = sum(1 for p in existentes if p.accion == "omitir")
+    # Las de objetivo_id None también terminan en `nuevas` (ver
+    # duplicados.detectar_pasadas_existentes), con accion=None: no cuentan
+    # como "nueva" confirmada todavía porque su matching sigue pendiente,
+    # pero sí como pasada final del análisis.
+    pasadas_nuevas = sum(1 for p in nuevas if p.accion == "nueva")
+
+    # --- Fase 9: validación de negocio ------------------------------------
+    problemas += validar(pasadas_tras_dedupe, contexto=None)
+
+    errores_criticos = sum(1 for p in problemas if p.tipo == "error_critico")
+    advertencias = sum(1 for p in problemas if p.tipo == "advertencia")
+
+    return ResultadoAnalisis(
+        pasadas=pasadas_tras_dedupe,
+        problemas=problemas,
+        total_pasadas=len(pasadas_tras_dedupe),
+        pasadas_nuevas=pasadas_nuevas,
+        pasadas_actualizar=pasadas_actualizar,
+        pasadas_omitir=pasadas_omitir,
+        objetivos_para_revisar=objetivos_para_revisar,
+        supervisores_para_revisar=supervisores_para_revisar,
+        errores_criticos=errores_criticos,
+        advertencias=advertencias,
+        hojas_encontradas=hojas_encontradas,
+        pasadas_detectadas=pasadas_detectadas,
+        pasadas_duplicadas=len(descartadas),
     )
 
 
-# ============================================================================
-# Fase 17 — Reporte detallado
-# ============================================================================
+def generar_resumen_texto(resultado: ResultadoAnalisis) -> str:
+    """Arma el bloque de texto pedido para mostrar el resumen del análisis."""
+    return (
+        "ANÁLISIS DEL ARCHIVO\n"
+        f"Hojas encontradas: {resultado.hojas_encontradas}\n"
+        f"Pasadas detectadas: {resultado.pasadas_detectadas}\n"
+        f"Pasadas nuevas: {resultado.pasadas_nuevas}\n"
+        f"Pasadas ya existentes: {resultado.pasadas_omitir + resultado.pasadas_actualizar}\n"
+        f"Duplicados descartados: {resultado.pasadas_duplicadas}\n"
+        f"Objetivos no reconocidos: {resultado.objetivos_para_revisar}\n"
+        f"Supervisores no reconocidos: {resultado.supervisores_para_revisar}\n"
+        f"Errores críticos: {resultado.errores_criticos}\n"
+        f"Advertencias: {resultado.advertencias}\n"
+    )
 
 
-def _excel_value(valor: Any):
-    """
-    Convierte valores del modelo a valores aceptables por openpyxl.
-    """
-    if valor is None:
-        return ""
-
-    if isinstance(valor, (str, int, float, bool)):
-        return valor
-
-    return str(valor)
+# ---------------------------------------------------------------------------
+# Reporte detallado descargable
+# ---------------------------------------------------------------------------
 
 
-def _escribir_encabezado(ws, fila, columnas):
-    for indice, nombre in enumerate(columnas, start=1):
-        celda = ws.cell(fila, indice, nombre)
-        celda.font = Font(bold=True)
+def generar_reporte_detallado(resultado: ResultadoAnalisis) -> bytes:
+    """Genera un .xlsx con el detalle completo de cada Problema, más una
+    hoja de resumen con los mismos números de generar_resumen_texto()."""
+    wb = openpyxl.Workbook()
 
+    ws_resumen = wb.active
+    ws_resumen.title = "Resumen"
+    encabezado_font = Font(bold=True)
 
-def _ajustar_columnas(ws):
-    """
-    Ajusta anchos de columnas con un máximo razonable.
-    """
-    for columna in ws.columns:
-        if not columna:
-            continue
-
-        indice = columna[0].column
-        maximo = 0
-
-        for celda in columna:
-            if celda.value is None:
-                continue
-
-            largo = len(str(celda.value))
-            maximo = max(maximo, largo)
-
-        ws.column_dimensions[
-            get_column_letter(indice)
-        ].width = min(max(maximo + 2, 10), 60)
-
-
-def _escribir_problemas(wb, problemas):
-    ws = wb.create_sheet("Problemas")
-
-    columnas = [
-        "Tipo",
-        "Descripción",
-        "Hoja",
-        "Fila Excel",
-        "Objetivo",
-        "Valor problemático",
+    filas_resumen = [
+        ("Hojas encontradas", resultado.hojas_encontradas),
+        ("Pasadas detectadas", resultado.pasadas_detectadas),
+        ("Pasadas nuevas", resultado.pasadas_nuevas),
+        ("Pasadas ya existentes", resultado.pasadas_omitir + resultado.pasadas_actualizar),
+        ("Duplicados descartados", resultado.pasadas_duplicadas),
+        ("Objetivos no reconocidos", resultado.objetivos_para_revisar),
+        ("Supervisores no reconocidos", resultado.supervisores_para_revisar),
+        ("Errores críticos", resultado.errores_criticos),
+        ("Advertencias", resultado.advertencias),
     ]
+    ws_resumen.append(["Análisis del archivo", ""])
+    ws_resumen["A1"].font = Font(bold=True, size=13)
+    ws_resumen.append(["", ""])
+    for etiqueta, valor in filas_resumen:
+        ws_resumen.append([etiqueta, valor])
+    ws_resumen.column_dimensions["A"].width = 28
+    ws_resumen.column_dimensions["B"].width = 12
 
-    _escribir_encabezado(ws, 1, columnas)
+    ws_problemas = wb.create_sheet("Problemas")
+    columnas = ["Tipo", "Hoja", "Fila Excel", "Objetivo", "Valor", "Descripción"]
+    ws_problemas.append(columnas)
+    for celda in ws_problemas[1]:
+        celda.font = encabezado_font
 
-    for fila, problema in enumerate(problemas, start=2):
-        valores = [
-            getattr(problema, "tipo", None),
-            getattr(problema, "descripcion", None),
-            getattr(problema, "hoja", None),
-            getattr(problema, "fila_excel", None),
-            getattr(problema, "objetivo", None),
-            getattr(problema, "valor_problema", None),
-        ]
+    for p in resultado.problemas:
+        ws_problemas.append(
+            [
+                p.tipo,
+                p.hoja or "",
+                p.fila_excel if p.fila_excel is not None else "",
+                p.objetivo or "",
+                str(p.valor_problema) if p.valor_problema is not None else "",
+                p.descripcion,
+            ]
+        )
 
-        for columna, valor in enumerate(valores, start=1):
-            ws.cell(
-                fila,
-                columna,
-                _excel_value(valor),
-            )
+    anchos = [16, 14, 10, 24, 20, 70]
+    for col, ancho in zip("ABCDEF", anchos):
+        ws_problemas.column_dimensions[col].width = ancho
 
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = ws.dimensions
-
-    _ajustar_columnas(ws)
-
-
-def _escribir_pasadas(wb, nombre_hoja, pasadas):
-    ws = wb.create_sheet(nombre_hoja)
-
-    columnas = [
-        "Hoja",
-        "Fila Excel",
-        "Bloque",
-        "Fecha operativa",
-        "Fecha calendario",
-        "Turno",
-        "Hora",
-        "Móvil",
-        "Objetivo",
-        "Objetivo ID",
-        "Supervisor",
-        "Supervisor ID",
-        "Acción",
-    ]
-
-    _escribir_encabezado(ws, 1, columnas)
-
-    for fila, pasada in enumerate(pasadas, start=2):
-        valores = [
-            getattr(pasada, "hoja", None),
-            getattr(pasada, "fila_excel", None),
-            getattr(pasada, "bloque_tabla", None),
-            getattr(pasada, "fecha_operativa", None),
-            getattr(pasada, "fecha_calendario", None),
-            getattr(pasada, "turno", None),
-            getattr(pasada, "hora", None),
-            getattr(pasada, "movil", None),
-            getattr(pasada, "objetivo_nombre", None),
-            getattr(pasada, "objetivo_id", None),
-            getattr(pasada, "supervisor_nombre", None),
-            getattr(pasada, "supervisor_id", None),
-            getattr(pasada, "accion", None),
-        ]
-
-        for columna, valor in enumerate(valores, start=1):
-            ws.cell(
-                fila,
-                columna,
-                _excel_value(valor),
-            )
-
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = ws.dimensions
-
-    _ajustar_columnas(ws)
-
-
-def _escribir_resumen(wb, resultado):
-    ws = wb.active
-    ws.title = "Resumen"
-
-    hojas = getattr(resultado, "hojas", [])
-    pasadas = getattr(resultado, "pasadas", [])
-    nuevas = getattr(resultado, "pasadas_nuevas", [])
-    existentes = getattr(resultado, "pasadas_ya_existentes", [])
-    duplicados = getattr(resultado, "duplicados_descartados", [])
-    problemas = getattr(resultado, "problemas", [])
-
-    errores_criticos = sum(
-        1 for problema in problemas
-        if _es_error_critico(problema)
-    )
-
-    advertencias = sum(
-        1 for problema in problemas
-        if _es_advertencia(problema)
-    )
-
-    objetivos_no_reconocidos = sum(
-        1 for problema in problemas
-        if _es_objetivo_no_reconocido(problema)
-    )
-
-    supervisores_no_reconocidos = sum(
-        1 for problema in problemas
-        if _es_supervisor_no_reconocido(problema)
-    )
-
-    resumen = [
-        ("ANÁLISIS DEL ARCHIVO", ""),
-        ("Hojas encontradas", len(hojas)),
-        ("Pasadas detectadas", len(pasadas)),
-        ("Pasadas nuevas", len(nuevas)),
-        ("Pasadas ya existentes", len(existentes)),
-        ("Duplicados descartados", len(duplicados)),
-        ("Objetivos no reconocidos", objetivos_no_reconocidos),
-        ("Supervisores no reconocidos", supervisores_no_reconocidos),
-        ("Errores críticos", errores_criticos),
-        ("Advertencias", advertencias),
-    ]
-
-    for fila, (nombre, valor) in enumerate(resumen, start=1):
-        ws.cell(fila, 1, nombre)
-        ws.cell(fila, 2, valor)
-
-    ws["A1"].font = Font(
-        bold=True,
-        size=14,
-    )
-
-    ws["A1"].fill = PatternFill(
-        fill_type="solid",
-        fgColor="D9EAF7",
-    )
-
-    ws.freeze_panes = "A2"
-
-    _ajustar_columnas(ws)
-
-
-def generar_reporte_detallado(
-    resultado: ResultadoAnalisis,
-) -> bytes:
-    """
-    Genera el reporte XLSX descargable del análisis.
-
-    Contiene:
-
-        Resumen
-        Problemas
-        Pasadas nuevas
-        Ya existentes
-        Duplicados
-
-    No realiza ninguna consulta ni escritura en la BD.
-
-    Devuelve:
-        bytes del archivo XLSX.
-    """
-    wb = Workbook()
-
-    problemas = list(
-        getattr(resultado, "problemas", []) or []
-    )
-
-    pasadas_nuevas = list(
-        getattr(resultado, "pasadas_nuevas", []) or []
-    )
-
-    pasadas_existentes = list(
-        getattr(resultado, "pasadas_ya_existentes", []) or []
-    )
-
-    duplicados = list(
-        getattr(resultado, "duplicados_descartados", []) or []
-    )
-
-    _escribir_resumen(
-        wb,
-        resultado,
-    )
-
-    _escribir_problemas(
-        wb,
-        problemas,
-    )
-
-    _escribir_pasadas(
-        wb,
-        "Pasadas nuevas",
-        pasadas_nuevas,
-    )
-
-    _escribir_pasadas(
-        wb,
-        "Ya existentes",
-        pasadas_existentes,
-    )
-
-    _escribir_pasadas(
-        wb,
-        "Duplicados",
-        duplicados,
-    )
-
-    buffer = BytesIO()
+    buffer = io.BytesIO()
     wb.save(buffer)
-
     return buffer.getvalue()

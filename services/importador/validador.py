@@ -124,6 +124,7 @@ def _check_objetivo_sin_nombre(pasadas: Iterable[PasadaNormalizada]) -> list[Pro
                     ),
                     hoja=p.hoja,
                     valor_problema=getattr(p, "objetivo_nombre", None),
+                    fila_excel=p.fila_excel,
                 )
             )
     return problemas
@@ -149,6 +150,7 @@ def _check_datos_parciales_movil_supervisor(
                     ),
                     hoja=p.hoja,
                     valor_problema=movil,
+                    fila_excel=p.fila_excel,
                 )
             )
         elif tiene_supervisor and not tiene_movil:
@@ -161,9 +163,27 @@ def _check_datos_parciales_movil_supervisor(
                     ),
                     hoja=p.hoja,
                     valor_problema=supervisor,
+                    fila_excel=p.fila_excel,
                 )
             )
     return problemas
+
+
+def _turno_operativo_de(p: PasadaNormalizada) -> Optional[str]:
+    """Turno real que trabajó la cuadrilla, para efectos de plausibilidad
+    horaria: el de la HOJA, no el resuelto por prioridad de celda.
+
+    Una celda TURNO que contradice a la hoja ya se reporta como
+    advertencia aparte (normalizador.resolver_turno_con_prioridad, fase 5)
+    y gana en `p.turno` para fines de identidad/persistencia — pero eso
+    no significa que la cuadrilla haya cambiado de turno esa fila puntual;
+    lo más probable es un error de tipeo. Para saber si una hora es
+    plausible (ej. 06:40 en una hoja "12-7 (N)"), lo que importa es el
+    turno de la hoja. Si `turno_hoja` no está disponible (por compatibilidad
+    con datos viejos), se cae a `p.turno`.
+    """
+    turno_hoja = getattr(p, "turno_hoja", None)
+    return turno_hoja if turno_hoja is not None else p.turno
 
 
 def _check_hora_fuera_de_rango(
@@ -172,7 +192,8 @@ def _check_hora_fuera_de_rango(
     rangos = _rangos_horarios(contexto)
     problemas: list[Problema] = []
     for p in pasadas:
-        rango = rangos.get(p.turno)
+        turno_operativo = _turno_operativo_de(p)
+        rango = rangos.get(turno_operativo)
         if rango is None:
             # Turno no contemplado en la configuración de rangos; no debería
             # pasar (turno ya viene validado como "D"|"N" en fase 5), pero
@@ -185,12 +206,13 @@ def _check_hora_fuera_de_rango(
                     tipo="advertencia",
                     descripcion=(
                         f"Hora {p.hora.strftime('%H:%M')} fuera del rango esperado "
-                        f"para turno {p.turno} ({inicio.strftime('%H:%M')}-"
+                        f"para turno {turno_operativo} ({inicio.strftime('%H:%M')}-"
                         f"{fin.strftime('%H:%M')}), en la hoja '{p.hoja}' "
                         f"(bloque {p.bloque_tabla})."
                     ),
                     hoja=p.hoja,
                     valor_problema=p.hora.strftime("%H:%M"),
+                    fila_excel=p.fila_excel,
                 )
             )
     return problemas
@@ -245,6 +267,7 @@ def _check_bloque_tabla_incorrecto(
                         ),
                         hoja=hoja,
                         valor_problema=p.bloque_tabla,
+                        fila_excel=fila,
                     )
                 )
     return problemas

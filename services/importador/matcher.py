@@ -1,409 +1,254 @@
 """
 matcher.py
 
-Fase 6: matching de un nombre de objetivo tal como viene en el Excel
-contra el catálogo de objetivos ya existentes en la base.
+Fase 6-7: matching de nombres de objetivo y supervisor (tal como vienen
+escritos en el Excel) contra los registros ya existentes en la base.
 
-Esta etapa NO escribe nada en la base — solo arma la estructura de
-sugerencias que consume la pantalla de "Matching" (punto 19 de las reglas
-confirmadas). La decisión de qué objetivo usar, o si crear uno nuevo,
-siempre la toma el usuario. La escritura real (crear objetivo nuevo o
-asociar el existente) es de las fases 12/13.
+Este módulo NO EXISTÍA en el pipeline entregado hasta ahora; se crea acá
+para poder completar `analizar_excel()` (Fase 10). Documento cada decisión
+de diseño porque no había especificación previa de fase 6-7 en la
+conversación — son criterios propios, no confirmados por el usuario:
+
+  - Normalización de nombres: mayúsculas, sin tildes, espacios colapsados.
+  - Match "exacto": igualdad de nombres ya normalizados.
+  - Si no hay exacto: se calculan sugerencias con similitud de texto
+    (difflib.SequenceMatcher), con un pequeño bonus de orden si coincide
+    el último "token" del nombre (por apellidos compuestos o nombres
+    invertidos, ej. "PEREZ, JUAN" vs "JUAN PEREZ").
+  - Umbral de sugerencia: similitud >= 0.5. Por debajo de eso, se
+    considera "no_reconocido" directamente (no tiene sentido sugerir
+    algo con menos de la mitad de las letras en común).
+  - Máximo 5 sugerencias, ordenadas por (similitud + bonus) descendente.
+
+Contrato asumido de `conexion_bd` (definido acá, no venía dado):
+  Un `sqlite3.Connection` (o cualquier objeto DB-API compatible con
+  `.cursor()`), con dos tablas ya existentes:
+    - objetivos(id, nombre, ...)
+    - supervisores(id, nombre, ...)
+  Es consistente con duplicados.py, que ya asume esta misma API
+  (`conexion_bd.cursor()` + SQL crudo) para la tabla `pasadas`.
 """
 
 from __future__ import annotations
 
 import difflib
-import re
-from datetime import date
-from typing import Any, Iterable
+from typing import Optional
 
-try:
-    from .modelos import (
-        ObjetivoBD,
-        ResultadoMatchObjetivo,
-        SugerenciaObjetivo,
-        SupervisorBD,
-        ResultadoMatchSupervisor,
-        SugerenciaSupervisor,
-    )
-except ImportError:
-    from modelos import (
-        ObjetivoBD,
-        ResultadoMatchObjetivo,
-        SugerenciaObjetivo,
-        SupervisorBD,
-        ResultadoMatchSupervisor,
-        SugerenciaSupervisor,
-    )
+from .modelos import (
+    ObjetivoBD,
+    PasadaNormalizada,
+    ResultadoMatchObjetivo,
+    ResultadoMatchSupervisor,
+    SugerenciaObjetivo,
+    SugerenciaSupervisor,
+    SupervisorBD,
+)
 
-# Umbral mínimo de similitud de texto plano para que un candidato entre al
-# ranking de sugerencias (salvo que comparta sufijo, ver más abajo). Se
-# calibró contra el catálogo real: por debajo de esto empiezan a aparecer
-# "sugerencias" que en la práctica son ruido (objetivos sin relación real,
-# que solo comparten algunas letras sueltas).
-_UMBRAL_SIMILITUD = 0.5
+_TABLA_TILDES = str.maketrans("ÁÉÍÓÚáéíóú", "AEIOUaeiou")
 
-# Cuántos tokens finales se comparan para el bonus de "coincide sufijo".
-# 2 alcanza para distinguir casos como "OBRA R1003 (P1) MERLO" vs
-# "OBRA R1003 (P2) MERLO", donde el último token solo ("MERLO") es igual
-# en ambos y no alcanza para diferenciarlos.
-_TOKENS_SUFIJO = 2
-
-# Bonus que se suma al ratio de similitud cuando el candidato comparte el
-# sufijo con el nombre del Excel. Es deliberadamente alto: existe
-# justamente para que un candidato con sufijo compartido pero ratio de
-# texto plano algo menor le gane en el ranking a otro con ratio más alto
-# pero sufijo distinto (el caso "CORTIJO - RUTA 202" vs "CORTIJO - RUTA 8").
-_BONUS_SUFIJO = 0.30
-
-_TABLA_TILDES = str.maketrans("ÁÉÍÓÚáéíóúÑñ", "AEIOUaeiouNn")
-_RE_SEPARADORES = re.compile(r"[^A-Z0-9]+")
+_UMBRAL_SUGERENCIA = 0.5
+_MAX_SUGERENCIAS = 5
 
 
-def _normalizar_texto(texto: str) -> str:
-    texto = texto.translate(_TABLA_TILDES).strip().upper()
-    texto = re.sub(r"\s+", " ", texto)
-    return texto
+def _normalizar_nombre(nombre: str) -> str:
+    """Mayúsculas, sin tildes, espacios colapsados. Base de comparación
+    tanto para el match exacto como para calcular similitud."""
+    texto = (nombre or "").translate(_TABLA_TILDES).strip().upper()
+    return " ".join(texto.split())
 
 
-def _tokenizar(texto_normalizado: str) -> list[str]:
-    tokens = _RE_SEPARADORES.split(texto_normalizado)
-    return [t for t in tokens if t]
+def _similitud(a: str, b: str) -> float:
+    return difflib.SequenceMatcher(None, a, b).ratio()
 
 
-def _sufijo(tokens: list[str], n: int = _TOKENS_SUFIJO) -> tuple[str, ...]:
-    if not tokens:
-        return ()
-    largo = min(n, len(tokens))
-    return tuple(tokens[-largo:])
+def _coincide_sufijo(a: str, b: str) -> bool:
+    tokens_a = a.split()
+    tokens_b = b.split()
+    if not tokens_a or not tokens_b:
+        return False
+    return tokens_a[-1] == tokens_b[-1]
 
 
-def _normalizar_objetivos_bd(objetivos_bd: Iterable[Any]) -> list[ObjetivoBD]:
-    """Acepta el catálogo en varias formas cómodas para el llamador:
-    lista de ObjetivoBD, de dicts {"id":..., "nombre":...}, de tuplas
-    (id, nombre), o de strings sueltos (se les asigna id=None).
-    """
-    resultado: list[ObjetivoBD] = []
-    for item in objetivos_bd:
-        if isinstance(item, ObjetivoBD):
-            resultado.append(item)
-        elif isinstance(item, dict):
-            resultado.append(ObjetivoBD(id=item.get("id"), nombre=item["nombre"]))
-        elif isinstance(item, (tuple, list)) and len(item) == 2:
-            resultado.append(ObjetivoBD(id=item[0], nombre=item[1]))
-        elif isinstance(item, str):
-            resultado.append(ObjetivoBD(id=None, nombre=item))
-        else:
-            raise TypeError(
-                f"No se pudo interpretar el objetivo de catálogo {item!r}: "
-                "se espera ObjetivoBD, dict, tupla (id, nombre) o str."
-            )
-    return resultado
+# ---------------------------------------------------------------------------
+# Lectura de catálogos desde la base
+# ---------------------------------------------------------------------------
+
+
+def obtener_objetivos_bd(conexion_bd) -> list[ObjetivoBD]:
+    cursor = conexion_bd.cursor()
+    cursor.execute("SELECT id, nombre FROM objetivos")
+    return [ObjetivoBD(id=fila[0], nombre=fila[1]) for fila in cursor.fetchall()]
+
+
+def obtener_supervisores_bd(conexion_bd) -> list[SupervisorBD]:
+    cursor = conexion_bd.cursor()
+    cursor.execute("SELECT id, nombre FROM supervisores")
+    return [SupervisorBD(id=fila[0], nombre=fila[1]) for fila in cursor.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# Matching individual (una sola búsqueda)
+# ---------------------------------------------------------------------------
 
 
 def matchear_objetivo(
-    nombre_excel: str, objetivos_bd: Iterable[Any]
+    nombre_excel: str,
+    objetivos_bd: list[ObjetivoBD],
 ) -> ResultadoMatchObjetivo:
-    """Matchea `nombre_excel` contra el catálogo `objetivos_bd`.
+    nombre_norm = _normalizar_nombre(nombre_excel)
 
-    1. Match exacto (case-insensitive, ignorando espacios/tildes) -> tipo
-       "exacto", con `objetivo_exacto` resuelto y sin permitir crear
-       nuevo (ya existe).
-    2. Si no hay exacto, se buscan hasta 5 candidatos por similitud de
-       texto, priorizando en el ranking a los que además comparten el
-       sufijo (los últimos 1-2 tokens) con el nombre del Excel, para no
-       confundir objetivos que solo comparten un prefijo genérico (OBRA,
-       BARRIO, POLI, CAM) pero son lugares distintos.
-    3. Si ningún candidato alcanza un mínimo de similitud (y ninguno
-       comparte sufijo), tipo "no_reconocido": se ofrece crear un
-       objetivo nuevo con ese nombre y fecha_inicio = hoy.
-
-    En los tres casos `permite_crear_nuevo` indica si corresponde ofrecer
-    la opción de alta (False solo cuando ya hubo match exacto).
-    """
-    catalogo = _normalizar_objetivos_bd(objetivos_bd)
-    nombre_norm = _normalizar_texto(nombre_excel)
-    tokens_excel = _tokenizar(nombre_norm)
-    sufijo_excel = _sufijo(tokens_excel)
-
-    # --- 1. match exacto ---
-    for objetivo in catalogo:
-        if _normalizar_texto(objetivo.nombre) == nombre_norm:
+    for obj in objetivos_bd:
+        if _normalizar_nombre(obj.nombre) == nombre_norm:
             return ResultadoMatchObjetivo(
                 nombre_excel=nombre_excel,
                 tipo="exacto",
-                objetivo_exacto=objetivo,
-                permite_crear_nuevo=False,
+                objetivo_exacto=obj,
             )
 
-    # --- 2. candidatos por similitud, con bonus de sufijo compartido ---
-    candidatos: list[tuple[float, float, bool, ObjetivoBD]] = []
-    for objetivo in catalogo:
-        nombre_obj_norm = _normalizar_texto(objetivo.nombre)
-        ratio = difflib.SequenceMatcher(None, nombre_norm, nombre_obj_norm).ratio()
+    candidatos: list[SugerenciaObjetivo] = []
+    for obj in objetivos_bd:
+        obj_norm = _normalizar_nombre(obj.nombre)
+        sim = _similitud(nombre_norm, obj_norm)
+        if sim >= _UMBRAL_SUGERENCIA:
+            candidatos.append(
+                SugerenciaObjetivo(
+                    objetivo=obj,
+                    similitud=sim,
+                    coincide_sufijo=_coincide_sufijo(nombre_norm, obj_norm),
+                )
+            )
 
-        tokens_obj = _tokenizar(nombre_obj_norm)
-        sufijo_obj = _sufijo(tokens_obj)
-        coincide_sufijo = bool(sufijo_excel) and sufijo_excel == sufijo_obj
-
-        score = ratio + (_BONUS_SUFIJO if coincide_sufijo else 0.0)
-        candidatos.append((score, ratio, coincide_sufijo, objetivo))
-
-    # ordenar por score (con el bonus aplicado) y, a igualdad, por ratio puro
-    candidatos.sort(key=lambda c: (c[0], c[1]), reverse=True)
-
-    # se conserva un candidato si tiene similitud razonable de texto plano,
-    # o si comparte sufijo (aunque el texto completo difiera bastante, p.
-    # ej. nombres largos con un prefijo distinto pero mismo sufijo puntual)
-    relevantes = [c for c in candidatos if c[1] >= _UMBRAL_SIMILITUD or c[2]]
-    top5 = relevantes[:5]
-
-    if not top5:
+    if candidatos:
+        candidatos.sort(
+            key=lambda c: c.similitud + (0.1 if c.coincide_sufijo else 0.0),
+            reverse=True,
+        )
         return ResultadoMatchObjetivo(
             nombre_excel=nombre_excel,
-            tipo="no_reconocido",
-            permite_crear_nuevo=True,
+            tipo="sugerencias",
+            sugerencias=candidatos[:_MAX_SUGERENCIAS],
             nombre_sugerido_nuevo=nombre_excel.strip(),
-            fecha_inicio_sugerida=date.today(),
         )
-
-    sugerencias = [
-        SugerenciaObjetivo(
-            objetivo=objetivo,
-            similitud=round(ratio, 3),
-            coincide_sufijo=coincide_sufijo,
-        )
-        for _score, ratio, coincide_sufijo, objetivo in top5
-    ]
 
     return ResultadoMatchObjetivo(
-            nombre_excel=nombre_excel,
-            tipo="sugerencias",
-            sugerencias=sugerencias,
-            permite_crear_nuevo=True,
-            nombre_sugerido_nuevo=nombre_excel.strip(),
-            fecha_inicio_sugerida=date.today(),
-        )
+        nombre_excel=nombre_excel,
+        tipo="no_reconocido",
+        nombre_sugerido_nuevo=nombre_excel.strip(),
+    )
 
-    # ---------------------------------------------------------------------------
-    # Matching de SUPERVISORES
-    # ---------------------------------------------------------------------------
 
-    def _normalizar_supervisores_bd(supervisores_bd: Iterable[Any]) -> list[SupervisorBD]:
-        """Acepta el catálogo en varias formas cómodas para el llamador:
-        lista de SupervisorBD, de dicts {"id":..., "nombre":...}, de tuplas
-        (id, nombre), o de strings sueltos (se les asigna id=None).
-        """
-        resultado: list[SupervisorBD] = []
-        for item in supervisores_bd:
-            if isinstance(item, SupervisorBD):
-                resultado.append(item)
-            elif isinstance(item, dict):
-                resultado.append(SupervisorBD(id=item.get("id"), nombre=item["nombre"]))
-            elif isinstance(item, (tuple, list)) and len(item) == 2:
-                resultado.append(SupervisorBD(id=item[0], nombre=item[1]))
-            elif isinstance(item, str):
-                resultado.append(SupervisorBD(id=None, nombre=item))
-            else:
-                raise TypeError(
-                    f"No se pudo interpretar el supervisor de catálogo {item!r}: "
-                    "se espera SupervisorBD, dict, tupla (id, nombre) o str."
-                )
-        return resultado
+def matchear_supervisor(
+    nombre_excel: str,
+    supervisores_bd: list[SupervisorBD],
+) -> ResultadoMatchSupervisor:
+    nombre_norm = _normalizar_nombre(nombre_excel)
 
-    def matchear_supervisor(
-        nombre_excel: str, supervisores_bd: Iterable[Any]
-    ) -> ResultadoMatchSupervisor:
-        """Matchea `nombre_excel` contra el catálogo `supervisores_bd`.
-
-        Soporta el formato habitual "APELLIDO, NOMBRE" y variantes como
-        "NOMBRE APELLIDO": la comparación exacta se hace tanto por texto
-        normalizado como por conjunto de tokens, de modo que "GARCIA, JUAN"
-        matchea exacto con "JUAN GARCIA" (y viceversa).
-
-        1. Match exacto (case-insensitive, sin tildes, o mismo conjunto de
-           tokens) -> tipo "exacto", con `supervisor_exacto` resuelto y sin
-           permitir crear nuevo (ya existe).
-        2. Si no hay exacto, se buscan hasta 5 candidatos por similitud de
-           texto, con bonus por sufijo compartido y por tokens en común
-           (un apellido o nombre que coincida sube el score).
-        3. Si ningún candidato alcanza el umbral -> tipo "no_reconocido":
-           se ofrece crear un supervisor nuevo con ese nombre.
-
-        En los tres casos `permite_crear_nuevo` indica si corresponde ofrecer
-        la opción de alta (False solo cuando ya hubo match exacto).
-        """
-        catalogo = _normalizar_supervisores_bd(supervisores_bd)
-        nombre_norm = _normalizar_texto(nombre_excel)
-        tokens_excel = _tokenizar(nombre_norm)
-        set_tokens_excel = set(tokens_excel)
-        sufijo_excel = _sufijo(tokens_excel)
-
-        # --- 1. match exacto (texto idéntico O mismos tokens en cualquier orden) ---
-        for supervisor in catalogo:
-            nombre_sup_norm = _normalizar_texto(supervisor.nombre)
-            tokens_sup = _tokenizar(nombre_sup_norm)
-
-            if nombre_sup_norm == nombre_norm or (
-                set_tokens_excel and set_tokens_excel == set(tokens_sup)
-            ):
-                return ResultadoMatchSupervisor(
-                    nombre_excel=nombre_excel,
-                    tipo="exacto",
-                    supervisor_exacto=supervisor,
-                    permite_crear_nuevo=False,
-                )
-
-        # --- 2. candidatos por similitud, con bonus de sufijo y tokens comunes ---
-        candidatos: list[tuple[float, float, bool, SupervisorBD]] = []
-        for supervisor in catalogo:
-            nombre_sup_norm = _normalizar_texto(supervisor.nombre)
-            ratio = difflib.SequenceMatcher(
-                None, nombre_norm, nombre_sup_norm
-            ).ratio()
-
-            tokens_sup = _tokenizar(nombre_sup_norm)
-            sufijo_sup = _sufijo(tokens_sup)
-            coincide_sufijo = bool(sufijo_excel) and sufijo_excel == sufijo_sup
-
-            # bonus por tokens compartidos (apellido o nombre que coincida)
-            tokens_comunes = set_tokens_excel & set(tokens_sup)
-            bonus_tokens = 0.15 if tokens_comunes and tokens_excel else 0.0
-
-            score = ratio + (_BONUS_SUFIJO if coincide_sufijo else 0.0) + bonus_tokens
-            candidatos.append((score, ratio, coincide_sufijo, supervisor))
-
-        candidatos.sort(key=lambda c: (c[0], c[1]), reverse=True)
-
-        relevantes = [
-            c for c in candidatos
-            if c[1] >= _UMBRAL_SIMILITUD or c[2]
-        ]
-        top5 = relevantes[:5]
-
-        if not top5:
+    for sup in supervisores_bd:
+        if _normalizar_nombre(sup.nombre) == nombre_norm:
             return ResultadoMatchSupervisor(
                 nombre_excel=nombre_excel,
-                tipo="no_reconocido",
-                permite_crear_nuevo=True,
-                nombre_sugerido_nuevo=nombre_excel.strip(),
+                tipo="exacto",
+                supervisor_exacto=sup,
             )
 
-        sugerencias = [
-            SugerenciaSupervisor(
-                supervisor=supervisor,
-                similitud=round(ratio, 3),
-                coincide_sufijo=coincide_sufijo,
+    candidatos: list[SugerenciaSupervisor] = []
+    for sup in supervisores_bd:
+        sup_norm = _normalizar_nombre(sup.nombre)
+        sim = _similitud(nombre_norm, sup_norm)
+        if sim >= _UMBRAL_SUGERENCIA:
+            candidatos.append(
+                SugerenciaSupervisor(
+                    supervisor=sup,
+                    similitud=sim,
+                    coincide_sufijo=_coincide_sufijo(nombre_norm, sup_norm),
+                )
             )
-            for _score, ratio, coincide_sufijo, supervisor in top5
-        ]
 
+    if candidatos:
+        candidatos.sort(
+            key=lambda c: c.similitud + (0.1 if c.coincide_sufijo else 0.0),
+            reverse=True,
+        )
         return ResultadoMatchSupervisor(
             nombre_excel=nombre_excel,
             tipo="sugerencias",
-            sugerencias=sugerencias,
-            permite_crear_nuevo=True,
+            sugerencias=candidatos[:_MAX_SUGERENCIAS],
             nombre_sugerido_nuevo=nombre_excel.strip(),
         )
 
-    # ---------------------------------------------------------------------------
-    # Inferencia de supervisor faltante
-    # ---------------------------------------------------------------------------
+    return ResultadoMatchSupervisor(
+        nombre_excel=nombre_excel,
+        tipo="no_reconocido",
+        nombre_sugerido_nuevo=nombre_excel.strip(),
+    )
 
-    def inferir_supervisor_faltante(
-        pasadas_o_supervisor: Any,
-        supervisor_anterior: str | None = None,
-        supervisor_siguiente: str | None = None,
-    ) -> Any:
-        """Infiere el supervisor faltante en una pasada individual o en una
-        lista/secuencia de pasadas.
 
-        Formas de uso:
+# ---------------------------------------------------------------------------
+# Matching en lote sobre una lista de pasadas normalizadas
+# ---------------------------------------------------------------------------
+#
+# Se agrupa por nombre normalizado para no repetir el mismo matching una
+# vez por cada pasada que comparte el mismo objetivo/supervisor (una hoja
+# puede tener decenas de pasadas del mismo objetivo). El resultado se
+# aplica a todas las pasadas de ese grupo por igual.
 
-        1. **Lista de pasadas** (PasadaCruda, PasadaNormalizada, dicts, o
-           cualquier objeto con atributo/clave ``supervisor``):
 
-           ``inferir_supervisor_faltante(pasadas)``
+def aplicar_matching_objetivos(
+    pasadas: list[PasadaNormalizada],
+    objetivos_bd: list[ObjetivoBD],
+) -> list[ResultadoMatchObjetivo]:
+    """Corre matchear_objetivo() una vez por nombre distinto presente en
+    `pasadas`, y completa `objetivo_id` in-place en cada PasadaNormalizada
+    cuando el match es exacto.
 
-           Recorre la lista en dos pasadas:
+    Pasadas con objetivo_nombre vacío se excluyen (ya las reporta
+    validador.py como "objetivo sin nombre"; no tiene sentido matchear
+    una cadena vacía).
 
-           - *Forward pass*: propaga hacia adelante el último supervisor
-             no vacío observado, rellenando los huecos intermedios.
-           - *Backward pass*: si las primeras pasadas de la lista estaban
-             vacías (antes de encontrar el primer supervisor), las rellena
-             con el primer supervisor válido encontrado.
+    Devuelve la lista de ResultadoMatchObjetivo, uno por nombre distinto
+    (no uno por pasada), para poder contar `objetivos_para_revisar` como
+    cantidad de OBJETIVOS pendientes, no de pasadas afectadas.
+    """
+    por_nombre: dict[str, list[PasadaNormalizada]] = {}
+    for p in pasadas:
+        if not p.objetivo_nombre or not p.objetivo_nombre.strip():
+            continue
+        clave = _normalizar_nombre(p.objetivo_nombre)
+        por_nombre.setdefault(clave, []).append(p)
 
-           Devuelve la misma lista (mutada in-place).
+    resultados: list[ResultadoMatchObjetivo] = []
+    for grupo in por_nombre.values():
+        nombre_excel = grupo[0].objetivo_nombre
+        resultado = matchear_objetivo(nombre_excel, objetivos_bd)
+        resultados.append(resultado)
+        if resultado.tipo == "exacto":
+            for p in grupo:
+                p.objetivo_id = resultado.objetivo_exacto.id
 
-        2. **Valor puntual** (str o None):
+    return resultados
 
-           ``inferir_supervisor_faltante(sup_actual, supervisor_anterior, supervisor_siguiente)``
 
-           - Si ``sup_actual`` no está vacío, lo devuelve (strip).
-           - Si está vacío, devuelve ``supervisor_anterior`` si existe, o
-             ``supervisor_siguiente`` en su defecto.
-           - Si todo es None/vacío, devuelve None.
-        """
-        # --- Caso 1: lista/tupla de pasadas ---
-        if isinstance(pasadas_o_supervisor, (list, tuple)):
-            pasadas = list(pasadas_o_supervisor)
-            if not pasadas:
-                return pasadas
+def aplicar_matching_supervisores(
+    pasadas: list[PasadaNormalizada],
+    supervisores_bd: list[SupervisorBD],
+) -> list[ResultadoMatchSupervisor]:
+    """Análogo a aplicar_matching_objetivos(), pero para supervisor_nombre
+    -> supervisor_id. Pasadas sin supervisor (móvil sin supervisor cargado)
+    se excluyen; ya las reporta validador.py."""
+    por_nombre: dict[str, list[PasadaNormalizada]] = {}
+    for p in pasadas:
+        if not p.supervisor_nombre or not p.supervisor_nombre.strip():
+            continue
+        clave = _normalizar_nombre(p.supervisor_nombre)
+        por_nombre.setdefault(clave, []).append(p)
 
-            def _get_sup(item: Any) -> str | None:
-                if isinstance(item, dict):
-                    return item.get("supervisor")
-                return getattr(item, "supervisor", None)
+    resultados: list[ResultadoMatchSupervisor] = []
+    for grupo in por_nombre.values():
+        nombre_excel = grupo[0].supervisor_nombre
+        resultado = matchear_supervisor(nombre_excel, supervisores_bd)
+        resultados.append(resultado)
+        if resultado.tipo == "exacto":
+            for p in grupo:
+                p.supervisor_id = resultado.supervisor_exacto.id
 
-            def _set_sup(item: Any, val: str) -> None:
-                if isinstance(item, dict):
-                    item["supervisor"] = val
-                elif hasattr(item, "supervisor"):
-                    try:
-                        setattr(item, "supervisor", val)
-                    except AttributeError:
-                        pass  # frozen dataclass u objeto inmutable
-
-            def _es_vacio(val: Any) -> bool:
-                return val is None or str(val).strip() == ""
-
-            # Forward pass: propagar último supervisor conocido
-            ultimo_sup: str | None = None
-            for p in pasadas:
-                sup = _get_sup(p)
-                if not _es_vacio(sup):
-                    ultimo_sup = sup
-                elif ultimo_sup is not None:
-                    _set_sup(p, ultimo_sup)
-
-            # Backward pass: rellenar pasadas iniciales huérfanas
-            primer_sup: str | None = None
-            for p in pasadas:
-                sup = _get_sup(p)
-                if not _es_vacio(sup):
-                    primer_sup = sup
-                    break
-
-            if primer_sup is not None:
-                for p in pasadas:
-                    sup = _get_sup(p)
-                    if _es_vacio(sup):
-                        _set_sup(p, primer_sup)
-                    else:
-                        break  # ya llegamos al primer supervisor real
-
-            return pasadas
-
-        # --- Caso 2: valor puntual ---
-        supervisor_actual = pasadas_o_supervisor
-        if supervisor_actual is not None and str(supervisor_actual).strip() != "":
-            return str(supervisor_actual).strip()
-
-        if supervisor_anterior is not None and str(supervisor_anterior).strip() != "":
-            return str(supervisor_anterior).strip()
-
-        if supervisor_siguiente is not None and str(supervisor_siguiente).strip() != "":
-            return str(supervisor_siguiente).strip()
-
-        return None
+    return resultados

@@ -14,6 +14,12 @@ Es utilizado por:
     - validador.py
     - importacion.py
     - __init__.py
+
+NOTA (FASE 10): se agregaron 3 campos a ResultadoAnalisis
+(hojas_encontradas, pasadas_detectadas, pasadas_duplicadas) porque el
+resumen numérico pedido para reporte.py no tenía dónde guardarse en la
+versión anterior del dataclass. Todos tienen default, así que no rompen
+código existente que instancie ResultadoAnalisis sin pasarlos.
 """
 
 from __future__ import annotations
@@ -74,33 +80,7 @@ class Problema:
 
 @dataclass
 class PasadaNormalizada:
-    """Una pasada lista para ser evaluada y posteriormente persistida.
-
-    Es el resultado de combinar las distintas etapas del pipeline:
-
-    - Fases 1-3:
-        parser.py
-        hoja, fila_excel, bloque_tabla y móvil.
-
-    - Fase 4:
-        normalizador.py
-        hora normalizada a ``datetime.time``.
-
-    - Fase 5:
-        normalizador.py
-        turno, fecha_operativa y fecha_calendario.
-
-    - Fase 6:
-        matcher.py
-        objetivo_id y supervisor_id cuando existe un match confirmado.
-
-    - Fase 8:
-        duplicados.py
-        ``accion`` indicando qué hacer con la pasada.
-
-    ``accion`` permanece en ``None`` hasta que la etapa de detección
-    de duplicados/existencias la clasifique.
-    """
+    """Una pasada lista para ser evaluada y posteriormente persistida."""
 
     # ------------------------------------------------------------------
     # Trazabilidad
@@ -117,6 +97,10 @@ class PasadaNormalizada:
     fecha_operativa: date
     fecha_calendario: date
     turno: Turno
+    """Turno FINAL ya resuelto (fase 5): si la celda TURNO de la propia
+    fila contradice el turno de la hoja, gana la celda (regla ya
+    establecida). Se usa para identidad de la pasada (duplicados,
+    persistencia)."""
 
     # ------------------------------------------------------------------
     # Hora
@@ -129,6 +113,22 @@ class PasadaNormalizada:
     # ------------------------------------------------------------------
 
     movil: Optional[str] = None
+
+    # ------------------------------------------------------------------
+    # NUEVO (FASE 9, ajuste posterior) — turno operativo real
+    # ------------------------------------------------------------------
+
+    turno_hoja: Optional[Turno] = None
+    """Turno que indica el NOMBRE de la hoja (ej. "12-7 (N)" -> "N"),
+    independiente de lo que haya cargado la celda TURNO de esta fila
+    puntual. Representa el turno REAL que trabajó la cuadrilla (la
+    cuadrilla no cambia de turno fila por fila; una celda TURNO
+    contradictoria suele ser un error de tipeo, no un cambio real de
+    turno). Se agrega porque validador.py necesita este dato para
+    chequear que la hora sea plausible para el turno operativo, sin que
+    un typo en una celda (que ya gana en `turno` por regla de fase 5)
+    haga parecer "fuera de rango" una pasada nocturna legítima que cruza
+    la medianoche."""
 
     # ------------------------------------------------------------------
     # Objetivo
@@ -166,11 +166,7 @@ class ObjetivoBD:
 
 @dataclass
 class SugerenciaObjetivo:
-    """Candidato de matching de objetivo.
-
-    ``similitud`` representa la similitud textual antes de aplicar
-    cualquier bonus adicional por coincidencia de sufijo.
-    """
+    """Candidato de matching de objetivo."""
 
     objetivo: ObjetivoBD
     similitud: float
@@ -179,28 +175,14 @@ class SugerenciaObjetivo:
 
 @dataclass
 class ResultadoMatchObjetivo:
-    """Resultado de intentar matchear un objetivo del Excel.
-
-    Esta estructura no modifica la base de datos.
-
-    Puede representar:
-
-    - un match exacto;
-    - un nombre con sugerencias;
-    - un nombre no reconocido.
-
-    La pantalla de revisión puede utilizar este resultado para que
-    el usuario confirme una sugerencia o decida crear un objetivo nuevo.
-    """
+    """Resultado de intentar matchear un objetivo del Excel."""
 
     nombre_excel: str
     tipo: TipoMatch
 
     objetivo_exacto: Optional[ObjetivoBD] = None
 
-    sugerencias: list[SugerenciaObjetivo] = field(
-        default_factory=list
-    )
+    sugerencias: list[SugerenciaObjetivo] = field(default_factory=list)
 
     permite_crear_nuevo: bool = True
 
@@ -224,11 +206,7 @@ class SupervisorBD:
 
 @dataclass
 class SugerenciaSupervisor:
-    """Candidato de matching de supervisor.
-
-    ``similitud`` representa la similitud textual antes de aplicar
-    cualquier bonus adicional por coincidencia de sufijo.
-    """
+    """Candidato de matching de supervisor."""
 
     supervisor: SupervisorBD
     similitud: float
@@ -237,28 +215,14 @@ class SugerenciaSupervisor:
 
 @dataclass
 class ResultadoMatchSupervisor:
-    """Resultado de intentar matchear un supervisor del Excel.
-
-    Esta estructura no modifica la base de datos.
-
-    Puede representar:
-
-    - un match exacto;
-    - un nombre con sugerencias;
-    - un nombre no reconocido.
-
-    La pantalla de revisión puede utilizar este resultado para que
-    el usuario confirme una sugerencia o decida crear un supervisor nuevo.
-    """
+    """Resultado de intentar matchear un supervisor del Excel."""
 
     nombre_excel: str
     tipo: TipoMatch
 
     supervisor_exacto: Optional[SupervisorBD] = None
 
-    sugerencias: list[SugerenciaSupervisor] = field(
-        default_factory=list
-    )
+    sugerencias: list[SugerenciaSupervisor] = field(default_factory=list)
 
     permite_crear_nuevo: bool = True
 
@@ -272,42 +236,15 @@ class ResultadoMatchSupervisor:
 
 @dataclass
 class ResultadoAnalisis:
-    """Resultado completo del análisis de un archivo Excel.
-
-    Este objeto representa el estado del pipeline antes de confirmar
-    la importación.
-
-    IMPORTANTE:
-        ``ResultadoAnalisis`` no escribe ni modifica la base de datos.
-
-    Su objetivo es entregar a la pantalla de análisis toda la información
-    necesaria para mostrar:
-
-    - cantidad de pasadas;
-    - pasadas nuevas;
-    - pasadas que ya existen;
-    - pasadas a omitir;
-    - objetivos pendientes de matching;
-    - supervisores pendientes de matching;
-    - errores críticos;
-    - advertencias;
-    - y si la importación puede continuar.
-
-    La escritura efectiva en la base queda reservada para
-    ``confirmar_importacion()``.
-    """
+    """Resultado completo del análisis de un archivo Excel."""
 
     # ------------------------------------------------------------------
     # Datos resultantes del pipeline
     # ------------------------------------------------------------------
 
-    pasadas: list[PasadaNormalizada] = field(
-        default_factory=list
-    )
+    pasadas: list[PasadaNormalizada] = field(default_factory=list)
 
-    problemas: list[Problema] = field(
-        default_factory=list
-    )
+    problemas: list[Problema] = field(default_factory=list)
 
     # ------------------------------------------------------------------
     # Resumen de pasadas
@@ -338,22 +275,27 @@ class ResultadoAnalisis:
     advertencias: int = 0
 
     # ------------------------------------------------------------------
+    # NUEVO (FASE 10) — datos para el resumen impreso de analizar_excel()
+    # ------------------------------------------------------------------
+
+    hojas_encontradas: int = 0
+
+    pasadas_detectadas: int = 0
+    """Total de bloques NO VACÍOS leídos del Excel (Fase 2-3), antes de
+    cualquier normalización/matching/dedupe. Puede ser mayor a
+    total_pasadas si alguna pasada no pudo normalizarse (ej. hora
+    inválida) y por lo tanto nunca llegó a convertirse en
+    PasadaNormalizada."""
+
+    pasadas_duplicadas: int = 0
+    """Cantidad de pasadas descartadas por duplicados.detectar_duplicados_internos()."""
+
+    # ------------------------------------------------------------------
     # Estado derivado
     # ------------------------------------------------------------------
 
     @property
     def puede_continuar(self) -> bool:
-        """Indica si la importación puede ser confirmada.
-
-        La importación solamente puede continuar cuando:
-
-        1. no existen errores críticos;
-        2. no quedan objetivos pendientes de matching;
-        3. no quedan supervisores pendientes de matching.
-
-        Las advertencias no bloquean la importación.
-        """
-
         return (
             self.errores_criticos == 0
             and self.objetivos_para_revisar == 0
@@ -362,21 +304,12 @@ class ResultadoAnalisis:
 
     @property
     def matching_pendiente(self) -> bool:
-        """Indica si existe algún matching que todavía requiere revisión."""
-
-        return (
-            self.objetivos_para_revisar > 0
-            or self.supervisores_para_revisar > 0
-        )
+        return self.objetivos_para_revisar > 0 or self.supervisores_para_revisar > 0
 
     @property
     def tiene_errores_criticos(self) -> bool:
-        """Indica si existe al menos un error crítico."""
-
         return self.errores_criticos > 0
 
     @property
     def tiene_advertencias(self) -> bool:
-        """Indica si existe al menos una advertencia."""
-
         return self.advertencias > 0
