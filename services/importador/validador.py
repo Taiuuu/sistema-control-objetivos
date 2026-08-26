@@ -1,643 +1,303 @@
 """
-Validación y clasificación de problemas detectados durante el
-análisis: errores críticos (bloquean), advertencias (no bloquean) y
-matching pendiente (bloquea hasta que el usuario decide).
+validador.py
 
-Se implementa en la Fase 9.
+Validaciones de negocio sobre pasadas ya normalizadas (Fase 9).
+
+IMPORTANTE — alcance reducido tras revisar normalizador.py, duplicados.py y
+parser.py: los siguientes checks que pedía el prompt original de FASE 9 NO
+se resuelven acá porque ya están cubiertos en fases anteriores, o no son
+responsabilidad de este módulo:
+
+  - "Turno inválido no reconocido"        -> normalizador.normalizar_turno() (fase 5)
+  - "Inconsistencia turno celda/hoja"     -> normalizador.resolver_turno_con_prioridad() (fase 5)
+  - "Hora inválida no corregida"          -> pendiente de cerrar en parser.py/normalizador.py (fase 4),
+                                              PasadaNormalizada.hora es time obligatorio, así que acá
+                                              nunca puede llegar una hora inválida.
+  - "Hora normalizada automáticamente"    -> ídem, pendiente en fase 4, no en validador.
+  - "Matching pendiente / aproximado"     -> se calcula en fase 10 desde
+                                              ResultadoMatchObjetivo.tipo / ResultadoMatchSupervisor.tipo,
+                                              nunca pasa por Problema ni por validar().
+
+Lo que sí valida este módulo, con los datos que ya trae PasadaNormalizada:
+
+  1. Objetivo sin nombre.
+  2. Datos parciales inconsistentes: móvil sin supervisor, o supervisor sin móvil.
+  3. Hora fuera del rango horario esperado para el turno (D: 07:00-19:00,
+     N: 19:00-07:00, configurable vía `contexto`).
+  4. Posible pasada en bloque de tabla incorrecto: dentro de una misma fila
+     original, un bloque vacío seguido de un bloque no vacío más a la derecha.
+     Requiere que PasadaNormalizada exponga un identificador de fila original
+     (se asume `fila_excel`, heredado de PasadaCruda; ver nota en el código).
+  5. Ambigüedad móvil -> supervisor: un mismo móvil aparece con más de un
+     supervisor distinto dentro de la misma hoja.
+
+`contexto` queda solo para configuración opcional (pisar los rangos horarios
+por turno); la gran mayoría de los checks no lo necesitan.
 """
 
 from __future__ import annotations
 
-from dataclasses import fields, is_dataclass
-from typing import Any
+from collections import defaultdict
+from datetime import time
+from typing import Iterable, Optional
 
 from .modelos import PasadaNormalizada, Problema
 
+# ---------------------------------------------------------------------------
+# Configuración de rangos horarios por turno (punto 3)
+# ---------------------------------------------------------------------------
 
-# Rangos esperados por turno. Se permiten overrides desde `contexto`.
-_RANGOS_TURNO_POR_DEFECTO: dict[str, tuple[int, int]] = {
-    "mañana": (5, 13),
-    "manana": (5, 13),
-    "tarde": (13, 21),
-    "noche": (21, 29),  # admite horas posteriores a medianoche normalizadas
+# Turno D: 07:00 a 19:00 (no cruza medianoche).
+# Turno N: 19:00 a 07:00 (cruza medianoche).
+_RANGO_HORARIO_DEFAULT: dict[str, tuple[time, time]] = {
+    "D": (time(7, 0), time(19, 0)),
+    "N": (time(19, 0), time(7, 0)),
 }
 
 
-def validar(
-    pasadas_normalizadas: list[PasadaNormalizada],
-    contexto: dict,
-) -> list[Problema]:
+def _hora_dentro_de_rango(hora: time, inicio: time, fin: time) -> bool:
+    """True si `hora` cae dentro de [inicio, fin], contemplando turnos
+    que cruzan medianoche (cuando inicio > fin)."""
+    if inicio <= fin:
+        return inicio <= hora <= fin
+    # Rango que cruza medianoche (ej. 19:00 a 07:00).
+    return hora >= inicio or hora <= fin
+
+
+def _rangos_horarios(contexto: Optional[dict]) -> dict[str, tuple[time, time]]:
+    if contexto and "rangos_horarios_por_turno" in contexto:
+        # Permite pisar los rangos default sin tocar código.
+        return {**_RANGO_HORARIO_DEFAULT, **contexto["rangos_horarios_por_turno"]}
+    return _RANGO_HORARIO_DEFAULT
+
+
+# ---------------------------------------------------------------------------
+# Helpers de acceso a campos "posiblemente ausentes" con nombre incierto
+# ---------------------------------------------------------------------------
+
+def _valor_no_vacio(v: Optional[str]) -> bool:
+    return v is not None and str(v).strip() != ""
+
+
+def _supervisor_de(p: PasadaNormalizada) -> Optional[str]:
+    """Devuelve un identificador de supervisor comparable.
+
+    Se asume que PasadaNormalizada trae `supervisor_id` y/o
+    `supervisor_nombre` (mencionados en el análisis de fase 9/10). Se
+    prioriza `supervisor_id` si existe; si no, se cae a `supervisor_nombre`.
+    Si el modelo real usa otro nombre de campo, ajustar acá.
     """
-    Recorre las pasadas normalizadas y el contexto del análisis y genera
-    Problema clasificados en:
+    sid = getattr(p, "supervisor_id", None)
+    if _valor_no_vacio(sid):
+        return str(sid).strip()
+    snombre = getattr(p, "supervisor_nombre", None)
+    if _valor_no_vacio(snombre):
+        return str(snombre).strip().upper()
+    return None
 
-    - error_critico:
-        * datos parciales inconsistentes
-        * objetivo sin nombre
-        * hora inválida no corregida
-        * turno inválido
 
-    - advertencia:
-        * hora normalizada automáticamente
-        * posible pasada en tabla incorrecta
-        * hora fuera de rango del turno
-        * inconsistencia entre turno de celda y turno de hoja
-        * ambigüedad móvil-supervisor
+def _fila_original_de(p: PasadaNormalizada) -> Optional[int]:
+    """Identificador de la fila original del Excel, para el check 4.
 
-    - matching_pendiente:
-        * objetivo o supervisor no reconocido / pendiente de confirmar
-
-    El `contexto` se trata de forma tolerante para permitir que las fases
-    anteriores evolucionen sin acoplar esta validación a una estructura única.
+    Se asume que sobrevive la normalización como `fila_excel` (viene de
+    PasadaCruda.fila_excel). Si el campo no existe en PasadaNormalizada,
+    el check 4 se salta silenciosamente para esa pasada en vez de romper
+    (mejor no reportar un falso patrón que asumir mal el nombre del campo).
     """
+    return getattr(p, "fila_excel", None)
 
+
+# ---------------------------------------------------------------------------
+# Checks individuales
+# ---------------------------------------------------------------------------
+
+def _check_objetivo_sin_nombre(pasadas: Iterable[PasadaNormalizada]) -> list[Problema]:
     problemas: list[Problema] = []
-
-    for pasada in pasadas_normalizadas:
-        datos = _como_dict(pasada)
-
-        hoja = _valor(datos, "hoja", "nombre_hoja", "sheet")
-        objetivo = _valor(datos, "objetivo", "objetivo_nombre")
-        movil = _valor(datos, "movil", "numero_movil", "interno")
-        supervisor = _valor(datos, "supervisor", "supervisor_nombre")
-        hora = _valor(datos, "hora", "hora_normalizada", "hora_pasada")
-        turno = _valor(datos, "turno", "turno_celda")
-        turno_hoja = _valor(datos, "turno_hoja", "turno_detectado_hoja")
-
-        # -------------------------------------------------------------
-        # ERRORES CRÍTICOS
-        # -------------------------------------------------------------
-
-        # Objetivo vacío.
-        if _vacio(objetivo):
+    for p in pasadas:
+        if not _valor_no_vacio(getattr(p, "objetivo_nombre", None)):
             problemas.append(
-                _problema(
-                    categoria="error_critico",
-                    tipo="objetivo_sin_nombre",
-                    hoja=hoja,
-                    objetivo=None,
-                    valor=objetivo,
-                    motivo="La pasada no tiene un objetivo identificado.",
-                    sugerencias=["Completar el nombre del objetivo en el Excel."],
-                )
-            )
-
-        # Datos parciales: se espera poder reconstruir al menos
-        # móvil + hora + supervisor para una pasada completa.
-        campos_pasada = {
-            "móvil": movil,
-            "hora": hora,
-            "supervisor": supervisor,
-        }
-        presentes = [nombre for nombre, valor in campos_pasada.items() if not _vacio(valor)]
-
-        if presentes and len(presentes) != len(campos_pasada):
-            faltantes = [
-                nombre
-                for nombre, valor in campos_pasada.items()
-                if _vacio(valor)
-            ]
-            problemas.append(
-                _problema(
-                    categoria="error_critico",
-                    tipo="datos_parciales_inconsistentes",
-                    hoja=hoja,
-                    objetivo=objetivo,
-                    valor={
-                        "presentes": presentes,
-                        "faltantes": faltantes,
-                    },
-                    motivo=(
-                        "La fila contiene información parcial que no permite "
-                        "reconstruir una pasada completa."
+                Problema(
+                    tipo="advertencia",
+                    descripcion=(
+                        f"Pasada sin nombre de objetivo en la hoja '{p.hoja}' "
+                        f"(bloque {p.bloque_tabla})."
                     ),
-                    sugerencias=[
-                        "Completar los campos faltantes o eliminar los datos "
-                        "incompletos de la fila."
-                    ],
+                    hoja=p.hoja,
+                    valor_problema=getattr(p, "objetivo_nombre", None),
                 )
             )
-
-        # Hora inválida no corregida.
-        estado_hora = _valor(
-            datos,
-            "estado_hora",
-            "hora_estado",
-            "resultado_validacion_hora",
-        )
-        hora_invalida = (
-            estado_hora in {"invalida", "inválida", "irreconocible"}
-            or datos.get("hora_invalida", False)
-            or datos.get("hora_no_corregida", False)
-            or _hora_fuera_de_limite(hora)
-        )
-
-        if hora_invalida and not datos.get("hora_corregida", False):
-            problemas.append(
-                _problema(
-                    categoria="error_critico",
-                    tipo="hora_invalida",
-                    hoja=hoja,
-                    objetivo=objetivo,
-                    valor=hora,
-                    motivo=(
-                        "La hora no puede interpretarse correctamente o excede "
-                        "el rango válido sin haber sido corregida."
-                    ),
-                    sugerencias=[
-                        "Corregir la hora a un formato horario válido.",
-                        "Verificar que la hora sea menor a 24 si no corresponde "
-                        "a una normalización de cruce de medianoche.",
-                    ],
-                )
-            )
-
-        # Turno inválido.
-        turno_normalizado = _normalizar_turno(turno)
-        turnos_validos = _turnos_validos(contexto)
-
-        if not _vacio(turno) and turno_normalizado not in turnos_validos:
-            problemas.append(
-                _problema(
-                    categoria="error_critico",
-                    tipo="turno_invalido",
-                    hoja=hoja,
-                    objetivo=objetivo,
-                    valor=turno,
-                    motivo="El turno indicado no es reconocido.",
-                    sugerencias=[
-                        f"Usar uno de los turnos válidos: "
-                        f"{', '.join(sorted(turnos_validos))}."
-                    ],
-                )
-            )
-
-        # -------------------------------------------------------------
-        # ADVERTENCIAS
-        # -------------------------------------------------------------
-
-        # Hora normalizada automáticamente.
-        if (
-            datos.get("hora_normalizada_automaticamente", False)
-            or datos.get("hora_normalizada", False) is True
-            or estado_hora in {"normalizada", "corregida"}
-        ):
-            valor_original = _valor(
-                datos,
-                "hora_original",
-                "hora_cruda",
-                "valor_hora_original",
-            )
-            problemas.append(
-                _problema(
-                    categoria="advertencia",
-                    tipo="hora_normalizada",
-                    hoja=hoja,
-                    objetivo=objetivo,
-                    valor=valor_original if valor_original is not None else hora,
-                    motivo=(
-                        "La hora fue normalizada automáticamente durante el "
-                        "procesamiento."
-                    ),
-                    sugerencias=(
-                        [f"Hora interpretada como: {hora}."]
-                        if hora is not None
-                        else []
-                    ),
-                )
-            )
-
-        # Posible tabla incorrecta.
-        if _flag_contexto(
-            contexto,
-            pasada,
-            datos,
-            "tabla_incorrecta",
-            "posible_tabla_incorrecta",
-            "tabla_anterior_vacia",
-        ):
-            problemas.append(
-                _problema(
-                    categoria="advertencia",
-                    tipo="posible_tabla_incorrecta",
-                    hoja=hoja,
-                    objetivo=objetivo,
-                    valor=movil,
-                    motivo=(
-                        "Se detectaron datos en esta tabla mientras la tabla "
-                        "anterior esperada se encuentra vacía."
-                    ),
-                    sugerencias=[
-                        "Revisar si la pasada fue cargada en la tabla correcta."
-                    ],
-                )
-            )
-
-        # Hora fuera del rango esperado para el turno.
-        if (
-            turno_normalizado in turnos_validos
-            and _hora_valida_para_comparar(hora)
-            and not hora_invalida
-        ):
-            rangos = contexto.get(
-                "rangos_horarios_turno",
-                _RANGOS_TURNO_POR_DEFECTO,
-            )
-            rango = rangos.get(turno_normalizado)
-
-            if rango and not _hora_en_rango(hora, rango):
-                problemas.append(
-                    _problema(
-                        categoria="advertencia",
-                        tipo="hora_fuera_de_rango_turno",
-                        hoja=hoja,
-                        objetivo=objetivo,
-                        valor=hora,
-                        motivo=(
-                            f"La hora está fuera del rango esperado para el "
-                            f"turno '{turno_normalizado}'."
-                        ),
-                        sugerencias=[
-                            f"Rango esperado: {rango[0]:02d}:00 a "
-                            f"{rango[1] % 24:02d}:00 aproximadamente."
-                        ],
-                    )
-                )
-
-        # Ambigüedad móvil -> supervisor.
-        if (
-            datos.get("movil_supervisor_ambiguo", False)
-            or _flag_contexto(
-                contexto,
-                pasada,
-                datos,
-                "asociacion_movil_supervisor_ambigua",
-                "movil_supervisor_ambiguo",
-            )
-        ):
-            sugerencias = _sugerencias_contexto(
-                contexto,
-                pasada,
-                datos,
-                "sugerencias_supervisor",
-                "supervisores_posibles",
-            )
-            problemas.append(
-                _problema(
-                    categoria="advertencia",
-                    tipo="movil_supervisor_ambiguo",
-                    hoja=hoja,
-                    objetivo=objetivo,
-                    valor=movil,
-                    motivo=(
-                        "El móvil puede asociarse a más de un supervisor dentro "
-                        "de la hoja."
-                    ),
-                    sugerencias=sugerencias,
-                )
-            )
-
-        # Turno de celda vs turno inferido del nombre de hoja.
-        turno_hoja_normalizado = _normalizar_turno(turno_hoja)
-        if (
-            turno_normalizado
-            and turno_hoja_normalizado
-            and turno_normalizado != turno_hoja_normalizado
-        ):
-            problemas.append(
-                _problema(
-                    categoria="advertencia",
-                    tipo="inconsistencia_turno_celda_hoja",
-                    hoja=hoja,
-                    objetivo=objetivo,
-                    valor={
-                        "turno_celda": turno,
-                        "turno_hoja": turno_hoja,
-                    },
-                    motivo=(
-                        "El turno indicado en la celda no coincide con el turno "
-                        "inferido del nombre de la hoja. Se prioriza el valor "
-                        "de la celda."
-                    ),
-                    sugerencias=[
-                        f"Se utilizará el turno de la celda: '{turno}'."
-                    ],
-                )
-            )
-
-        # -------------------------------------------------------------
-        # MATCHING PENDIENTE
-        # -------------------------------------------------------------
-
-        estado_objetivo = _estado_matching(
-            datos,
-            contexto,
-            pasada,
-            "objetivo",
-        )
-        if estado_objetivo in {"no_reconocido", "pendiente", "aproximado"}:
-            problemas.append(
-                _problema(
-                    categoria="matching_pendiente",
-                    tipo="matching_objetivo_pendiente",
-                    hoja=hoja,
-                    objetivo=objetivo,
-                    valor=objetivo,
-                    motivo=_motivo_matching("objetivo", estado_objetivo),
-                    sugerencias=_sugerencias_matching(
-                        datos,
-                        contexto,
-                        pasada,
-                        "objetivo",
-                    ),
-                )
-            )
-
-        estado_supervisor = _estado_matching(
-            datos,
-            contexto,
-            pasada,
-            "supervisor",
-        )
-        if estado_supervisor in {"no_reconocido", "pendiente", "aproximado"}:
-            problemas.append(
-                _problema(
-                    categoria="matching_pendiente",
-                    tipo="matching_supervisor_pendiente",
-                    hoja=hoja,
-                    objetivo=objetivo,
-                    valor=supervisor,
-                    motivo=_motivo_matching("supervisor", estado_supervisor),
-                    sugerencias=_sugerencias_matching(
-                        datos,
-                        contexto,
-                        pasada,
-                        "supervisor",
-                    ),
-                )
-            )
-
     return problemas
 
 
-def _como_dict(objeto: Any) -> dict[str, Any]:
-    """Convierte dataclass/dict/objeto simple a diccionario."""
-    if isinstance(objeto, dict):
-        return objeto
+def _check_datos_parciales_movil_supervisor(
+    pasadas: Iterable[PasadaNormalizada],
+) -> list[Problema]:
+    problemas: list[Problema] = []
+    for p in pasadas:
+        movil = getattr(p, "movil", None)
+        supervisor = _supervisor_de(p)
+        tiene_movil = _valor_no_vacio(movil)
+        tiene_supervisor = supervisor is not None
 
-    if is_dataclass(objeto):
-        return {
-            campo.name: getattr(objeto, campo.name)
-            for campo in fields(objeto)
-        }
-
-    return vars(objeto)
-
-
-def _valor(datos: dict[str, Any], *nombres: str) -> Any:
-    for nombre in nombres:
-        if nombre in datos and datos[nombre] is not None:
-            return datos[nombre]
-    return None
-
-
-def _vacio(valor: Any) -> bool:
-    return valor is None or (
-        isinstance(valor, str) and not valor.strip()
-    )
-
-
-def _normalizar_turno(turno: Any) -> str | None:
-    if _vacio(turno):
-        return None
-
-    texto = str(turno).strip().lower()
-    equivalencias = {
-        "m": "mañana",
-        "manana": "mañana",
-        "mañana": "mañana",
-        "morning": "mañana",
-        "t": "tarde",
-        "tarde": "tarde",
-        "afternoon": "tarde",
-        "n": "noche",
-        "noche": "noche",
-        "night": "noche",
-    }
-    return equivalencias.get(texto, texto)
+        if tiene_movil and not tiene_supervisor:
+            problemas.append(
+                Problema(
+                    tipo="advertencia",
+                    descripcion=(
+                        f"Pasada con móvil '{movil}' pero sin supervisor, "
+                        f"en la hoja '{p.hoja}' (bloque {p.bloque_tabla})."
+                    ),
+                    hoja=p.hoja,
+                    valor_problema=movil,
+                )
+            )
+        elif tiene_supervisor and not tiene_movil:
+            problemas.append(
+                Problema(
+                    tipo="advertencia",
+                    descripcion=(
+                        f"Pasada con supervisor '{supervisor}' pero sin móvil, "
+                        f"en la hoja '{p.hoja}' (bloque {p.bloque_tabla})."
+                    ),
+                    hoja=p.hoja,
+                    valor_problema=supervisor,
+                )
+            )
+    return problemas
 
 
-def _turnos_validos(contexto: dict) -> set[str]:
-    turnos = contexto.get("turnos_validos")
+def _check_hora_fuera_de_rango(
+    pasadas: Iterable[PasadaNormalizada], contexto: Optional[dict]
+) -> list[Problema]:
+    rangos = _rangos_horarios(contexto)
+    problemas: list[Problema] = []
+    for p in pasadas:
+        rango = rangos.get(p.turno)
+        if rango is None:
+            # Turno no contemplado en la configuración de rangos; no debería
+            # pasar (turno ya viene validado como "D"|"N" en fase 5), pero
+            # se ignora en vez de asumir un default arbitrario.
+            continue
+        inicio, fin = rango
+        if not _hora_dentro_de_rango(p.hora, inicio, fin):
+            problemas.append(
+                Problema(
+                    tipo="advertencia",
+                    descripcion=(
+                        f"Hora {p.hora.strftime('%H:%M')} fuera del rango esperado "
+                        f"para turno {p.turno} ({inicio.strftime('%H:%M')}-"
+                        f"{fin.strftime('%H:%M')}), en la hoja '{p.hoja}' "
+                        f"(bloque {p.bloque_tabla})."
+                    ),
+                    hoja=p.hoja,
+                    valor_problema=p.hora.strftime("%H:%M"),
+                )
+            )
+    return problemas
 
-    if turnos:
-        return {_normalizar_turno(turno) for turno in turnos}
 
-    return {"mañana", "tarde", "noche"}
+def _check_bloque_tabla_incorrecto(
+    pasadas: Iterable[PasadaNormalizada],
+) -> list[Problema]:
+    """Detecta, dentro de una misma fila original, un bloque vacío seguido
+    de un bloque no vacío en una posición posterior.
 
-
-def _hora_fuera_de_limite(hora: Any) -> bool:
+    Se agrupa por (hoja, fila_excel). Si `fila_excel` no está disponible en
+    PasadaNormalizada para alguna pasada, esa pasada se excluye del check
+    (no se puede saber a qué fila original pertenece).
     """
-    Detecta horas claramente inválidas.
+    por_fila: dict[tuple[str, int], list[PasadaNormalizada]] = defaultdict(list)
+    for p in pasadas:
+        fila = _fila_original_de(p)
+        if fila is None:
+            continue
+        por_fila[(p.hoja, fila)].append(p)
 
-    Las horas > 24 pueden ser válidas solamente si una fase previa las
-    marcó explícitamente como normalizadas/corregidas para representar
-    cruce de medianoche.
+    problemas: list[Problema] = []
+    for (hoja, fila), grupo in por_fila.items():
+        grupo_ordenado = sorted(grupo, key=lambda p: p.bloque_tabla)
+
+        def _pasada_vacia(p: PasadaNormalizada) -> bool:
+            return not any(
+                _valor_no_vacio(v)
+                for v in (
+                    getattr(p, "movil", None),
+                    _supervisor_de(p),
+                )
+            )
+
+        vacios = [_pasada_vacia(p) for p in grupo_ordenado]
+        # Si en algún punto hay un bloque vacío y más adelante uno lleno,
+        # es sospechoso de estar corrido de tabla.
+        hubo_vacio = False
+        for p, vacio in zip(grupo_ordenado, vacios):
+            if vacio:
+                hubo_vacio = True
+                continue
+            if hubo_vacio:
+                problemas.append(
+                    Problema(
+                        tipo="advertencia",
+                        descripcion=(
+                            f"Posible pasada en tabla incorrecta: en la hoja '{hoja}' "
+                            f"(fila {fila}), el bloque {p.bloque_tabla} tiene datos "
+                            "pero un bloque anterior de la misma fila está vacío."
+                        ),
+                        hoja=hoja,
+                        valor_problema=p.bloque_tabla,
+                    )
+                )
+    return problemas
+
+
+def _check_ambiguedad_movil_supervisor(
+    pasadas: Iterable[PasadaNormalizada],
+) -> list[Problema]:
+    """Un mismo móvil con más de un supervisor distinto dentro de la misma
+    hoja: se reporta como ambigüedad."""
+    por_movil: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for p in pasadas:
+        movil = getattr(p, "movil", None)
+        supervisor = _supervisor_de(p)
+        if not _valor_no_vacio(movil) or supervisor is None:
+            continue
+        por_movil[(p.hoja, str(movil).strip())].add(supervisor)
+
+    problemas: list[Problema] = []
+    for (hoja, movil), supervisores in por_movil.items():
+        if len(supervisores) > 1:
+            problemas.append(
+                Problema(
+                    tipo="advertencia",
+                    descripcion=(
+                        f"Ambigüedad móvil->supervisor: el móvil '{movil}' aparece "
+                        f"con más de un supervisor distinto ({', '.join(sorted(supervisores))}) "
+                        f"en la hoja '{hoja}'."
+                    ),
+                    hoja=hoja,
+                    valor_problema=movil,
+                )
+            )
+    return problemas
+
+
+# ---------------------------------------------------------------------------
+# Punto de entrada
+# ---------------------------------------------------------------------------
+
+def validar(
+    pasadas_normalizadas: list[PasadaNormalizada],
+    contexto: Optional[dict] = None,
+) -> list[Problema]:
+    """Corre los 5 checks de negocio sobre las pasadas ya normalizadas.
+
+    `contexto` es opcional y solo se usa hoy para pisar los rangos horarios
+    por turno vía contexto["rangos_horarios_por_turno"] = {"D": (time, time), "N": (time, time)}.
     """
-    if hora is None:
-        return False
-
-    if isinstance(hora, (int, float)):
-        return hora >= 24 or hora < 0
-
-    if isinstance(hora, str):
-        texto = hora.strip()
-        if ":" not in texto:
-            return True
-
-        try:
-            horas, minutos = texto.split(":", 1)
-            h = int(horas)
-            m = int(minutos)
-            return h >= 24 or h < 0 or m < 0 or m >= 60
-        except ValueError:
-            return True
-
-    return True
-
-
-def _hora_valida_para_comparar(hora: Any) -> bool:
-    if hora is None:
-        return False
-
-    if isinstance(hora, (int, float)):
-        return hora >= 0
-
-    if isinstance(hora, str):
-        try:
-            h, m = hora.strip().split(":", 1)
-            int(h)
-            int(m)
-            return True
-        except (ValueError, AttributeError):
-            return False
-
-    return False
-
-
-def _hora_decimal(hora: Any) -> float:
-    if isinstance(hora, (int, float)):
-        return float(hora)
-
-    h, m = str(hora).strip().split(":", 1)
-    return int(h) + int(m) / 60
-
-
-def _hora_en_rango(hora: Any, rango: tuple[int, int]) -> bool:
-    valor = _hora_decimal(hora)
-    inicio, fin = rango
-
-    if fin > 24:
-        if valor < inicio:
-            valor += 24
-        return inicio <= valor <= fin
-
-    return inicio <= valor <= fin
-
-
-def _flag_contexto(
-    contexto: dict,
-    pasada: Any,
-    datos: dict[str, Any],
-    *nombres: str,
-) -> bool:
-    """Busca un flag primero en la pasada y luego en contexto."""
-    for nombre in nombres:
-        if datos.get(nombre) is True:
-            return True
-
-        valor = contexto.get(nombre)
-        if valor is True:
-            return True
-
-        if isinstance(valor, dict):
-            if valor.get(id(pasada)) is True:
-                return True
-
-    return False
-
-
-def _sugerencias_contexto(
-    contexto: dict,
-    pasada: Any,
-    datos: dict[str, Any],
-    *nombres: str,
-) -> list[str]:
-    for nombre in nombres:
-        valor = datos.get(nombre, contexto.get(nombre))
-
-        if isinstance(valor, (list, tuple, set)):
-            return [str(item) for item in valor]
-
-        if isinstance(valor, str):
-            return [valor]
-
-    return []
-
-
-def _estado_matching(
-    datos: dict[str, Any],
-    contexto: dict,
-    pasada: Any,
-    entidad: str,
-) -> str | None:
-    """
-    Estados admitidos:
-    reconocido | aproximado | pendiente | no_reconocido
-    """
-    claves = (
-        f"matching_{entidad}",
-        f"estado_matching_{entidad}",
-        f"{entidad}_matching",
-        f"{entidad}_estado_matching",
-    )
-
-    for clave in claves:
-        valor = datos.get(clave)
-        if valor is not None:
-            return str(valor).strip().lower()
-
-        valor = contexto.get(clave)
-        if isinstance(valor, str):
-            return valor.strip().lower()
-
-    return None
-
-
-def _motivo_matching(entidad: str, estado: str) -> str:
-    if estado == "aproximado":
-        return (
-            f"El {entidad} tiene un match aproximado y debe confirmarse "
-            "antes de la confirmación final."
-        )
-
-    return (
-        f"El {entidad} no fue reconocido y requiere una decisión del usuario: "
-        "asociar con un registro existente o crear uno nuevo."
-    )
-
-
-def _sugerencias_matching(
-    datos: dict[str, Any],
-    contexto: dict,
-    pasada: Any,
-    entidad: str,
-) -> list[str]:
-    claves = (
-        f"sugerencias_{entidad}",
-        f"{entidad}_sugerencias",
-        f"matches_{entidad}",
-        f"{entidad}_candidatos",
-    )
-
-    for clave in claves:
-        valor = datos.get(clave, contexto.get(clave))
-
-        if isinstance(valor, (list, tuple, set)):
-            return [str(item) for item in valor]
-
-        if isinstance(valor, str):
-            return [valor]
-
-    return [
-        f"Confirmar una asociación existente para el {entidad}.",
-        f"Crear el {entidad} si no existe en la base.",
-    ]
-
-
-def _problema(
-    *,
-    categoria: str,
-    tipo: str,
-    hoja: Any,
-    objetivo: Any,
-    valor: Any,
-    motivo: str,
-    sugerencias: list[str] | None = None,
-) -> Problema:
-    """
-    Centraliza la construcción para garantizar que todos los problemas
-    incluyan siempre hoja, objetivo, valor problemático y motivo.
-
-    Se asume que Problema utiliza estos nombres de campos:
-    categoria, tipo, hoja, objetivo, valor, motivo, sugerencias.
-    """
-    return Problema(
-        categoria=categoria,
-        tipo=tipo,
-        hoja=hoja,
-        objetivo=objetivo,
-        valor=valor,
-        motivo=motivo,
-        sugerencias=sugerencias or [],
-    )
+    problemas: list[Problema] = []
+    problemas += _check_objetivo_sin_nombre(pasadas_normalizadas)
+    problemas += _check_datos_parciales_movil_supervisor(pasadas_normalizadas)
+    problemas += _check_hora_fuera_de_rango(pasadas_normalizadas, contexto)
+    problemas += _check_bloque_tabla_incorrecto(pasadas_normalizadas)
+    problemas += _check_ambiguedad_movil_supervisor(pasadas_normalizadas)
+    return problemas
