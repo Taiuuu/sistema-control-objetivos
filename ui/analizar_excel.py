@@ -20,6 +20,8 @@ pipeline).
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QUrl
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -44,16 +46,78 @@ _COLOR_TEXTO = "#d0d0d0"
 
 
 class DialogoAnalisisExcel(QDialog):
-    """Pantalla de resumen mostrada después de analizar_excel().
+    def mostrar_resultado_importacion(self, resumen: dict) -> None:
+        """
+        Fases 15/16:
+        muestra el resultado final de la importación y permite abrir
+        el reporte detallado generado.
+        """
 
-    Uso:
-        resultado = analizar_excel(path, anio, conexion_bd)
-        dialogo = DialogoAnalisisExcel(resultado, parent=self)
-        if dialogo.exec() == QDialog.DialogCode.Accepted:
-            # el usuario apretó "Continuar" -> pasar a confirmar_importacion()
-            ...
-        # si fue Rejected (Cancelar o X), no se tocó la base en ningún momento.
-    """
+        exitosa = bool(resumen.get("exitosa", False))
+
+        importadas = int(
+            resumen.get("pasadas_importadas", 0)
+        )
+
+        omitidas = int(
+            resumen.get("pasadas_omitidas", 0)
+        )
+
+        correcciones = int(
+            resumen.get("correcciones_aplicadas", 0)
+        )
+
+        reporte_path = resumen.get("reporte_path")
+
+        if not exitosa:
+            error = resumen.get(
+                "error",
+                "La importación fue cancelada.",
+            )
+
+            QMessageBox.critical(
+                self,
+                "Importación no completada",
+                (
+                    f"{error}\n\n"
+                    f"Pasadas importadas: {importadas}\n"
+                    f"Pasadas omitidas: {omitidas}\n"
+                    f"Correcciones aplicadas: {correcciones}"
+                ),
+            )
+            return
+
+        mensaje = (
+            "La importación finalizó correctamente.\n\n"
+            f"Pasadas importadas: {importadas}\n"
+            f"Pasadas omitidas: {omitidas}\n"
+            f"Correcciones aplicadas: {correcciones}"
+        )
+
+        caja = QMessageBox(self)
+        caja.setWindowTitle("Importación completada")
+        caja.setIcon(QMessageBox.Icon.Information)
+        caja.setText(mensaje)
+
+        if reporte_path:
+            boton_reporte = caja.addButton(
+                "Abrir reporte detallado",
+                QMessageBox.ButtonRole.ActionRole,
+            )
+        else:
+            boton_reporte = None
+
+        caja.addButton(
+            "Cerrar",
+            QMessageBox.ButtonRole.AcceptRole,
+        )
+
+        caja.exec()
+
+        if boton_reporte is not None and caja.clickedButton() == boton_reporte:
+            QDesktopServices.openUrl(
+                QUrl.fromLocalFile(str(reporte_path))
+            )
 
     def __init__(self, resultado: ResultadoAnalisis, parent=None):
         super().__init__(parent)
