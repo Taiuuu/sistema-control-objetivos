@@ -33,7 +33,7 @@ from typing import Any, Literal, Optional
 # TIPOS GENERALES
 # ============================================================================
 
-TipoProblema = Literal["error_critico", "advertencia"]
+TipoProblema = Literal["error_critico", "advertencia", "para_revisar"]
 
 TipoMatch = Literal["exacto", "sugerencias", "no_reconocido"]
 

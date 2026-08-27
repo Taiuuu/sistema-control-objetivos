@@ -220,6 +220,43 @@ def analizar_excel(
         pasadas_tras_dedupe, conexion_bd, forzar_sobrescritura=forzar_sobrescritura
     )
 
+        # --- Fase 6-7 (cont.): volcar matching no exacto como Problema -------
+    def _problemas_de_matching(resultados, atributo_nombre, nombre_candidato):
+        extra: list[Problema] = []
+        for resultado in resultados:
+            if resultado.tipo == "exacto":
+                continue
+            clave = matcher.normalizar_nombre(resultado.nombre_excel)
+            afectadas = [
+                p for p in pasadas_tras_dedupe
+                if getattr(p, atributo_nombre)
+                and matcher.normalizar_nombre(getattr(p, atributo_nombre)) == clave
+            ]
+            if resultado.tipo == "sugerencias":
+                nombres = ", ".join(nombre_candidato(s) for s in resultado.sugerencias[:3])
+                detalle = f"Sin match exacto. Sugerencias: {nombres}."
+            else:
+                detalle = "Sin match exacto ni sugerencias cercanas."
+            destinos = afectadas or [None]  # no perder el problema si no hay pasada asociada
+            for p in destinos:
+                extra.append(
+                    Problema(
+                        tipo="para_revisar",
+                        descripcion=f"'{resultado.nombre_excel}' no reconocido. {detalle}",
+                        hoja=p.hoja if p else None,
+                        objetivo=resultado.nombre_excel,
+                        fila_excel=p.fila_excel if p else None,
+                    )
+                )
+        return extra
+
+    problemas += _problemas_de_matching(
+        resultados_match_objetivo, "objetivo_nombre", lambda s: s.objetivo.nombre
+    )
+    problemas += _problemas_de_matching(
+        resultados_match_supervisor, "supervisor_nombre", lambda s: s.supervisor.nombre
+    )
+
     pasadas_actualizar = sum(1 for p in existentes if p.accion == "actualizar")
     pasadas_omitir = sum(1 for p in existentes if p.accion == "omitir")
     # Las de objetivo_id None también terminan en `nuevas` (ver

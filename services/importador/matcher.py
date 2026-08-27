@@ -56,6 +56,10 @@ def _normalizar_nombre(nombre: str) -> str:
     texto = (nombre or "").translate(_TABLA_TILDES).strip().upper()
     return " ".join(texto.split())
 
+def normalizar_nombre(nombre: str) -> str:
+    """Versión pública de _normalizar_nombre(), para que reporte.py pueda
+    mapear resultados de matching por nombre sin tocar un símbolo privado."""
+    return _normalizar_nombre(nombre)
 
 def _similitud(a: str, b: str) -> float:
     return difflib.SequenceMatcher(None, a, b).ratio()
