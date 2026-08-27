@@ -32,8 +32,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from importador_universal.modelos import Problema, ResultadoAnalisis
-from importador_universal.reporte import generar_reporte_detallado
+from importador.modelos import Problema, ResultadoAnalisis
+from importador.reporte import generar_reporte_detallado
 
 # Paleta reusada del importador viejo (mismo dark theme del resto de la app).
 _COLOR_OK = "#8affc1"

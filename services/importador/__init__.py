@@ -16,6 +16,7 @@ Uso típico:
     resumen = confirmar_importacion(resultado, resoluciones, usuario, conexion_bd)
 """
 
+from . import reporte
 from .modelos import (
     PasadaCruda,
     PasadaNormalizada,
@@ -54,7 +55,9 @@ def analizar_excel(path, anio, conexion_bd, forzar_sobrescritura: bool = False) 
         problemas detectados, listo para mostrar en la pantalla de
         análisis (Fase 11).
     """
-    pass
+    return reporte.analizar_excel(
+        path, anio, conexion_bd, forzar_sobrescritura=forzar_sobrescritura
+    )
 
 
 def confirmar_importacion(analisis: ResultadoAnalisis, resoluciones, usuario) -> dict:
