@@ -1,24 +1,32 @@
 """
-Confirmación e importación transaccional a la base de datos.
+Confirmación e importación transaccional a la base de datos,
+con registro de auditoría.
 
 FASE 13:
-    - valida que no queden bloqueantes;
-    - resuelve altas de objetivos/supervisores;
-    - inserta pasadas nuevas;
-    - actualiza pasadas cuando corresponde;
-    - omite las ya existentes;
-    - registra auditoría;
-    - ejecuta todo dentro de una única transacción;
-    - hace rollback completo ante cualquier error.
+    - validación de estado;
+    - creación de objetivos/supervisores;
+    - inserción de pasadas;
+    - actualización de pasadas;
+    - omisión de duplicados;
+    - transacción única;
+    - rollback completo.
 
-La capa de UI debe encargarse de pedir la confirmación al usuario
-antes de llamar a confirmar_importacion_completa().
+FASE 14:
+    - auditoría de correcciones;
+    - auditoría de altas;
+    - auditoría de sobrescrituras;
+    - auditoría del resumen de importación;
+    - retención de históricos durante 10 días;
+    - sin purga automática.
+
+IMPORTANTE:
+    Este módulo NO guarda una copia del Excel original.
 """
 
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from .modelos import (
@@ -31,15 +39,20 @@ from .modelos import (
 
 
 # ============================================================================
+# CONSTANTES
+# ============================================================================
+
+DIAS_RETENCION_HISTORICO = 10
+
+
+# ============================================================================
 # UTILIDADES
 # ============================================================================
 
 
 def _valor_sql(valor: Any) -> Any:
-    """
-    Convierte valores Python utilizados por los modelos a valores
-    compatibles con SQLite.
-    """
+    """Convierte tipos Python a valores compatibles con SQLite."""
+
     if valor is None:
         return None
 
@@ -55,17 +68,59 @@ def _valor_sql(valor: Any) -> Any:
     return valor
 
 
+def _serializar(valor: Any) -> str:
+    """
+    Serializa un valor para guardarlo en las columnas TEXT de auditoria.
+    """
+
+    if valor is None:
+        return ""
+
+    if isinstance(valor, (dict, list, tuple)):
+        try:
+            return json.dumps(
+                valor,
+                ensure_ascii=False,
+                default=str,
+            )
+        except Exception:
+            return str(valor)
+
+    return str(valor)
+
+
+def _nombre_usuario(usuario) -> str:
+    """Obtiene el nombre identificable del usuario."""
+
+    if usuario is None:
+        return ""
+
+    if isinstance(usuario, str):
+        return usuario
+
+    if hasattr(usuario, "username"):
+        return str(usuario.username)
+
+    if hasattr(usuario, "nombre"):
+        return str(usuario.nombre)
+
+    if hasattr(usuario, "id"):
+        return str(usuario.id)
+
+    return str(usuario)
+
+
 def _usuario_id(conexion_bd, usuario) -> int | None:
     """
-    Obtiene el ID del usuario a partir de su nombre.
+    Resuelve el ID del usuario de la tabla usuarios.
 
-    `usuario` puede ser:
-        - un string con el username;
-        - un objeto que tenga `.username`;
-        - un objeto que tenga `.id`.
-
-    Si no puede resolverse, devuelve None.
+    Acepta:
+        - ID entero;
+        - objeto con .id;
+        - string username;
+        - objeto con .username.
     """
+
     if usuario is None:
         return None
 
@@ -85,52 +140,174 @@ def _usuario_id(conexion_bd, usuario) -> int | None:
         return None
 
     fila = conexion_bd.execute(
-        "SELECT id FROM usuarios WHERE username = ?",
+        """
+        SELECT id
+        FROM usuarios
+        WHERE username = ?
+        LIMIT 1
+        """,
         (username,),
     ).fetchone()
 
     return fila[0] if fila else None
 
 
-def _nombre_usuario(usuario) -> str:
-    """Obtiene una representación estable del usuario para auditoría."""
-    if usuario is None:
-        return ""
-
-    if isinstance(usuario, str):
-        return usuario
-
-    if hasattr(usuario, "username"):
-        return str(usuario.username)
-
-    if hasattr(usuario, "nombre"):
-        return str(usuario.nombre)
-
-    if hasattr(usuario, "id"):
-        return str(usuario.id)
-
-    return str(usuario)
-
-
 def _fecha_hora_actual() -> tuple[str, str]:
     ahora = datetime.now()
-    return ahora.date().isoformat(), ahora.strftime("%H:%M:%S")
+
+    return (
+        ahora.date().isoformat(),
+        ahora.strftime("%H:%M:%S"),
+    )
 
 
-def _serializar(valor: Any) -> str:
+# ============================================================================
+# AUDITORÍA — FASE 14
+# ============================================================================
+
+
+def registrar_auditoria(
+    evento: dict,
+    conexion_bd,
+) -> None:
     """
-    Serializa valores para almacenarlos en las columnas TEXT de auditoria.
+    Registra un evento en la tabla `auditoria`.
+
+    IMPORTANTE:
+        Esta función NO hace commit.
+
+    Si la importación está dentro de una transacción y este INSERT
+    falla, la excepción sube a confirmar_importacion_completa(),
+    que ejecutará rollback de toda la operación.
+
+    Eventos soportados:
+
+        - CORRECCION_DURANTE_IMPORTACION
+        - ALTA_DESDE_IMPORTACION
+        - SOBRESCRITURA_DURANTE_IMPORTACION
+        - IMPORTACION_COMPLETA
     """
-    if valor is None:
-        return ""
 
-    if isinstance(valor, (dict, list, tuple)):
-        try:
-            return json.dumps(valor, ensure_ascii=False, default=str)
-        except Exception:
-            return str(valor)
+    if conexion_bd is None:
+        raise ValueError(
+            "No se puede registrar auditoría sin conexión a BD."
+        )
 
-    return str(valor)
+    fecha, hora = _fecha_hora_actual()
+
+    usuario = evento.get("usuario")
+
+    usuario_id = evento.get("usuario_id")
+
+    if usuario_id is None:
+        usuario_id = _usuario_id(
+            conexion_bd,
+            usuario,
+        )
+
+    tipo_operacion = evento.get(
+        "tipo_operacion",
+        "IMPORTACION",
+    )
+
+    tabla = evento.get("tabla")
+
+    registro_id = evento.get("registro_id")
+
+    valores_anteriores = evento.get(
+        "valores_anteriores",
+        {},
+    )
+
+    valores_nuevos = evento.get(
+        "valores_nuevos",
+        {},
+    )
+
+    detalles = evento.get(
+        "detalles",
+        "",
+    )
+
+    estado = evento.get(
+        "estado",
+        "EXITOSO",
+    )
+
+    conexion_bd.execute(
+        """
+        INSERT INTO auditoria (
+            fecha,
+            hora,
+            usuario_id,
+            tipo_operacion,
+            tabla,
+            registro_id,
+            valores_anteriores,
+            valores_nuevos,
+            detalles,
+            estado
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            fecha,
+            hora,
+            usuario_id,
+            tipo_operacion,
+            tabla,
+            registro_id,
+            _serializar(valores_anteriores),
+            _serializar(valores_nuevos),
+            _serializar(detalles),
+            estado,
+        ),
+    )
+
+
+# ============================================================================
+# RETENCIÓN DE HISTÓRICOS
+# ============================================================================
+
+
+def _fecha_purga_historico() -> str:
+    """
+    Devuelve la fecha a partir de la cual un histórico de sobrescritura
+    puede ser purgado.
+
+    Fase 14 NO realiza la purga.
+    """
+
+    fecha = datetime.now() + timedelta(
+        days=DIAS_RETENCION_HISTORICO
+    )
+
+    return fecha.isoformat(
+        sep=" ",
+        timespec="seconds",
+    )
+
+
+def _detalles_historico(
+    detalles: str | None = None,
+) -> dict:
+    """
+    Construye metadatos de retención.
+
+    La tabla auditoria no tiene una columna `fecha_purga`, por lo que
+    se almacena dentro de `detalles`.
+
+    Esto permite que una futura Fase de purga consulte ese valor.
+    """
+
+    return {
+        "retencion": {
+            "dias": DIAS_RETENCION_HISTORICO,
+            "fecha_purga_disponible": _fecha_purga_historico(),
+            "purga_automatica": False,
+        },
+        "detalle": detalles or "",
+    }
 
 
 # ============================================================================
@@ -138,19 +315,23 @@ def _serializar(valor: Any) -> str:
 # ============================================================================
 
 
-def _validar_analisis(analisis: ResultadoAnalisis, resoluciones) -> None:
+def _validar_analisis(
+    analisis: ResultadoAnalisis,
+    resoluciones,
+) -> None:
     """
-    Defensa contra estados inconsistentes.
-
-    No alcanza con confiar en ResultadoAnalisis.puede_continuar:
-    también verificamos directamente los problemas y el EstadoResolucion.
+    Defensa contra estados inconsistentes antes de escribir.
     """
 
     if analisis is None:
-        raise ValueError("No se recibió un ResultadoAnalisis.")
+        raise ValueError(
+            "No se recibió un ResultadoAnalisis."
+        )
 
     if resoluciones is None:
-        raise ValueError("No se recibió el estado de resoluciones.")
+        raise ValueError(
+            "No se recibió el estado de resoluciones."
+        )
 
     problemas = analisis.problemas or []
 
@@ -165,9 +346,6 @@ def _validar_analisis(analisis: ResultadoAnalisis, resoluciones) -> None:
             f"[{i}] {p.descripcion}"
             for i, p in errores_criticos[:5]
         )
-
-        if len(errores_criticos) > 5:
-            detalles += f"; ... y {len(errores_criticos) - 5} más"
 
         raise ValueError(
             "No se puede importar porque quedan errores críticos "
@@ -190,9 +368,6 @@ def _validar_analisis(analisis: ResultadoAnalisis, resoluciones) -> None:
             for i in pendientes[:5]
         )
 
-        if len(pendientes) > 5:
-            detalles += f"; ... y {len(pendientes) - 5} más"
-
         raise ValueError(
             "No se puede importar porque quedan problemas de "
             f"matching sin resolver: {detalles}"
@@ -200,26 +375,15 @@ def _validar_analisis(analisis: ResultadoAnalisis, resoluciones) -> None:
 
 
 # ============================================================================
-# RESOLUCIÓN DE ENTIDADES
+# BÚSQUEDA DE OBJETIVOS
 # ============================================================================
 
 
-def _es_matching_objetivo(problema: Problema) -> bool:
-    return isinstance(
-        problema.valor_problema,
-        ResultadoMatchObjetivo,
-    )
-
-
-def _es_matching_supervisor(problema: Problema) -> bool:
-    return isinstance(
-        problema.valor_problema,
-        ResultadoMatchSupervisor,
-    )
-
-
-def _buscar_objetivo_por_nombre(conexion_bd, nombre: str):
-    fila = conexion_bd.execute(
+def _buscar_objetivo_por_nombre(
+    conexion_bd,
+    nombre: str,
+):
+    return conexion_bd.execute(
         """
         SELECT id, nombre
         FROM objetivos
@@ -230,11 +394,12 @@ def _buscar_objetivo_por_nombre(conexion_bd, nombre: str):
         (nombre,),
     ).fetchone()
 
-    return fila
 
-
-def _buscar_supervisor_por_nombre(conexion_bd, nombre: str):
-    fila = conexion_bd.execute(
+def _buscar_supervisor_por_nombre(
+    conexion_bd,
+    nombre: str,
+):
+    return conexion_bd.execute(
         """
         SELECT id, nombre
         FROM supervisores
@@ -245,23 +410,25 @@ def _buscar_supervisor_por_nombre(conexion_bd, nombre: str):
         (nombre,),
     ).fetchone()
 
-    return fila
+
+# ============================================================================
+# CREACIÓN DE OBJETIVO
+# ============================================================================
 
 
 def _crear_objetivo(
     conexion_bd,
     nombre: str,
+    usuario,
     fecha_inicio: date | None = None,
 ) -> int:
-    """
-    Crea un objetivo y devuelve su ID.
 
-    El esquema actual solamente exige nombre.
-    """
-    if not nombre or not nombre.strip():
-        raise ValueError("No se puede crear un objetivo sin nombre.")
+    nombre = (nombre or "").strip()
 
-    nombre = nombre.strip()
+    if not nombre:
+        raise ValueError(
+            "No se puede crear un objetivo sin nombre."
+        )
 
     existente = _buscar_objetivo_por_nombre(
         conexion_bd,
@@ -299,15 +466,56 @@ def _crear_objetivo(
         ),
     )
 
-    return cursor.lastrowid
+    objetivo_id = cursor.lastrowid
+
+    # --------------------------------------------------------------
+    # FASE 14 — Alta desde importación
+    # --------------------------------------------------------------
+
+    registrar_auditoria(
+        {
+            "usuario": usuario,
+            "tipo_operacion": "ALTA_DESDE_IMPORTACION",
+            "tabla": "objetivos",
+            "registro_id": objetivo_id,
+            "valores_anteriores": None,
+            "valores_nuevos": {
+                "id": objetivo_id,
+                "nombre": nombre,
+                "descripcion": "",
+                "fecha_inicio": fecha_inicio_sql,
+                "fecha_fin": None,
+                "dias_semana": None,
+                "activo": 1,
+            },
+            "detalles": {
+                "accion": "Alta desde importación",
+                "entidad": "objetivo",
+            },
+        },
+        conexion_bd,
+    )
+
+    return objetivo_id
 
 
-def _crear_supervisor(conexion_bd, nombre: str) -> int:
-    """Crea un supervisor y devuelve su ID."""
-    if not nombre or not nombre.strip():
-        raise ValueError("No se puede crear un supervisor sin nombre.")
+# ============================================================================
+# CREACIÓN DE SUPERVISOR
+# ============================================================================
 
-    nombre = nombre.strip()
+
+def _crear_supervisor(
+    conexion_bd,
+    nombre: str,
+    usuario,
+) -> int:
+
+    nombre = (nombre or "").strip()
+
+    if not nombre:
+        raise ValueError(
+            "No se puede crear un supervisor sin nombre."
+        )
 
     existente = _buscar_supervisor_por_nombre(
         conexion_bd,
@@ -335,46 +543,104 @@ def _crear_supervisor(conexion_bd, nombre: str) -> int:
         ),
     )
 
-    return cursor.lastrowid
+    supervisor_id = cursor.lastrowid
+
+    # --------------------------------------------------------------
+    # FASE 14 — Alta desde importación
+    # --------------------------------------------------------------
+
+    registrar_auditoria(
+        {
+            "usuario": usuario,
+            "tipo_operacion": "ALTA_DESDE_IMPORTACION",
+            "tabla": "supervisores",
+            "registro_id": supervisor_id,
+            "valores_anteriores": None,
+            "valores_nuevos": {
+                "id": supervisor_id,
+                "nombre": nombre,
+                "fecha_alta": fecha_alta,
+                "fecha_baja": None,
+            },
+            "detalles": {
+                "accion": "Alta desde importación",
+                "entidad": "supervisor",
+            },
+        },
+        conexion_bd,
+    )
+
+    return supervisor_id
+
+
+# ============================================================================
+# MATCHING
+# ============================================================================
+
+
+def _es_matching_objetivo(
+    problema: Problema,
+) -> bool:
+
+    return isinstance(
+        problema.valor_problema,
+        ResultadoMatchObjetivo,
+    )
+
+
+def _es_matching_supervisor(
+    problema: Problema,
+) -> bool:
+
+    return isinstance(
+        problema.valor_problema,
+        ResultadoMatchSupervisor,
+    )
 
 
 def _resolver_nombre_match(
     conexion_bd,
     problema: Problema,
     registro,
+    usuario,
 ) -> tuple[str, int]:
-    """
-    Convierte una resolución de matching en (nombre, id).
 
-    Para:
-        match_existente -> busca el nombre elegido en BD.
+    nombre_elegido = (
+        registro.valor_despues or ""
+    ).strip()
 
-        crear_nuevo -> crea la entidad si todavía no existe.
-    """
-
-    nombre_elegido = registro.valor_despues.strip()
-
-    if registro.tipo == "crear_nuevo":
-        if nombre_elegido.startswith("(nuevo)"):
-            nombre_elegido = nombre_elegido[len("(nuevo)") :].strip()
+    if nombre_elegido.startswith("(nuevo)"):
+        nombre_elegido = (
+            nombre_elegido[len("(nuevo)"):]
+            .strip()
+        )
 
     if not nombre_elegido:
         raise ValueError(
-            "La resolución de matching no contiene un nombre válido."
+            "La resolución de matching no contiene "
+            "un nombre válido."
         )
 
+    # --------------------------------------------------------------
+    # OBJETIVO
+    # --------------------------------------------------------------
+
     if _es_matching_objetivo(problema):
+
         existente = _buscar_objetivo_por_nombre(
             conexion_bd,
             nombre_elegido,
         )
 
         if existente:
-            return existente[1], existente[0]
+            return (
+                existente[1],
+                existente[0],
+            )
 
         if registro.tipo != "crear_nuevo":
             raise ValueError(
-                f"El objetivo '{nombre_elegido}' elegido para matching "
+                f"El objetivo '{nombre_elegido}' "
                 "ya no existe en la base de datos."
             )
 
@@ -383,42 +649,59 @@ def _resolver_nombre_match(
         objetivo_id = _crear_objetivo(
             conexion_bd,
             nombre_elegido,
-            fecha_inicio=resultado.fecha_inicio_sugerida,
+            usuario,
+            fecha_inicio=(
+                resultado.fecha_inicio_sugerida
+            ),
         )
 
-        return nombre_elegido, objetivo_id
+        return (
+            nombre_elegido,
+            objetivo_id,
+        )
+
+    # --------------------------------------------------------------
+    # SUPERVISOR
+    # --------------------------------------------------------------
 
     if _es_matching_supervisor(problema):
+
         existente = _buscar_supervisor_por_nombre(
             conexion_bd,
             nombre_elegido,
         )
 
         if existente:
-            return existente[1], existente[0]
+            return (
+                existente[1],
+                existente[0],
+            )
 
         if registro.tipo != "crear_nuevo":
             raise ValueError(
-                f"El supervisor '{nombre_elegido}' elegido para matching "
+                f"El supervisor '{nombre_elegido}' "
                 "ya no existe en la base de datos."
             )
 
         supervisor_id = _crear_supervisor(
             conexion_bd,
             nombre_elegido,
+            usuario,
         )
 
-        return nombre_elegido, supervisor_id
+        return (
+            nombre_elegido,
+            supervisor_id,
+        )
 
     raise ValueError(
-        "Se recibió una resolución de matching para un problema "
-        "que no contiene ResultadoMatchObjetivo ni "
-        "ResultadoMatchSupervisor."
+        "La resolución de matching no corresponde "
+        "a un objetivo ni a un supervisor."
     )
 
 
 # ============================================================================
-# APLICACIÓN DE RESOLUCIONES
+# APLICAR RESOLUCIONES
 # ============================================================================
 
 
@@ -426,39 +709,40 @@ def _aplicar_resoluciones(
     analisis: ResultadoAnalisis,
     resoluciones,
     conexion_bd,
+    usuario,
 ) -> dict[int, dict[str, Any]]:
-    """
-    Traduce las decisiones de EstadoResolucion a información que luego
-    utilizará la persistencia de pasadas.
 
-    Devuelve:
+    resultado = {}
 
-        {
-            indice_problema: {
-                "tipo": ...,
-                "valor": ...,
-                "id": ...
-            }
-        }
-    """
+    for id_problema, registro in (
+        resoluciones._resoluciones.items()
+    ):
 
-    resultado: dict[int, dict[str, Any]] = {}
-
-    for id_problema, registro in resoluciones._resoluciones.items():
-
-        if id_problema < 0 or id_problema >= len(analisis.problemas):
+        if (
+            id_problema < 0
+            or id_problema >= len(analisis.problemas)
+        ):
             raise ValueError(
-                f"Resolución inválida: el problema {id_problema} "
-                "no existe en ResultadoAnalisis."
+                f"Resolución inválida: problema "
+                f"{id_problema} inexistente."
             )
 
-        problema = analisis.problemas[id_problema]
+        problema = analisis.problemas[
+            id_problema
+        ]
 
-        if registro.tipo in ("match_existente", "crear_nuevo"):
-            nombre, entidad_id = _resolver_nombre_match(
-                conexion_bd,
-                problema,
-                registro,
+        if registro.tipo in (
+            "match_existente",
+            "crear_nuevo",
+        ):
+
+            nombre, entidad_id = (
+                _resolver_nombre_match(
+                    conexion_bd,
+                    problema,
+                    registro,
+                    usuario,
+                )
             )
 
             resultado[id_problema] = {
@@ -469,6 +753,7 @@ def _aplicar_resoluciones(
             }
 
         elif registro.tipo == "correccion":
+
             resultado[id_problema] = {
                 "tipo": "correccion",
                 "campo": registro.campo,
@@ -477,6 +762,7 @@ def _aplicar_resoluciones(
             }
 
         elif registro.tipo == "aceptado":
+
             resultado[id_problema] = {
                 "tipo": "aceptado",
                 "campo": registro.campo,
@@ -486,14 +772,15 @@ def _aplicar_resoluciones(
 
         else:
             raise ValueError(
-                f"Tipo de resolución desconocido: {registro.tipo!r}"
+                f"Tipo de resolución desconocido: "
+                f"{registro.tipo!r}"
             )
 
     return resultado
 
 
 # ============================================================================
-# IDENTIFICACIÓN DE PASADAS AFECTADAS
+# TRAZABILIDAD PROBLEMA -> PASADA
 # ============================================================================
 
 
@@ -501,25 +788,22 @@ def _buscar_indice_pasada_por_problema(
     analisis: ResultadoAnalisis,
     problema: Problema,
 ) -> int | None:
-    """
-    Busca la pasada normalizada correspondiente al problema.
-
-    La trazabilidad disponible en los modelos es:
-        hoja + fila_excel.
-
-    Si el problema no tiene fila, intenta usar objetivo + hoja.
-    """
 
     candidatos = []
 
-    for indice, pasada in enumerate(analisis.pasadas):
+    for indice, pasada in enumerate(
+        analisis.pasadas
+    ):
 
         if problema.hoja is not None:
             if pasada.hoja != problema.hoja:
                 continue
 
         if problema.fila_excel is not None:
-            if pasada.fila_excel != problema.fila_excel:
+            if (
+                pasada.fila_excel
+                != problema.fila_excel
+            ):
                 continue
 
         candidatos.append(indice)
@@ -527,43 +811,55 @@ def _buscar_indice_pasada_por_problema(
     if len(candidatos) == 1:
         return candidatos[0]
 
-    if len(candidatos) > 1 and problema.objetivo:
+    if (
+        len(candidatos) > 1
+        and problema.objetivo
+    ):
         for indice in candidatos:
-            pasada = analisis.pasadas[indice]
+
+            pasada = analisis.pasadas[
+                indice
+            ]
 
             if (
                 pasada.objetivo_nombre
-                and pasada.objetivo_nombre == problema.objetivo
+                == problema.objetivo
             ):
                 return indice
 
-    return candidatos[0] if candidatos else None
-
-
-def _parsear_hora(valor: str) -> time:
-    """
-    Convierte una corrección de hora a datetime.time.
-
-    Acepta:
-        HH:MM
-        HH:MM:SS
-    """
-    valor = valor.strip()
-
-    formatos = (
-        "%H:%M",
-        "%H:%M:%S",
+    return (
+        candidatos[0]
+        if candidatos
+        else None
     )
 
-    for formato in formatos:
+
+# ============================================================================
+# CORRECCIONES
+# ============================================================================
+
+
+def _parsear_hora(
+    valor: str,
+) -> time:
+
+    valor = valor.strip()
+
+    for formato in (
+        "%H:%M",
+        "%H:%M:%S",
+    ):
         try:
-            return datetime.strptime(valor, formato).time()
+            return datetime.strptime(
+                valor,
+                formato,
+            ).time()
         except ValueError:
             continue
 
     raise ValueError(
-        f"La hora corregida '{valor}' no tiene un formato válido. "
-        "Usá HH:MM o HH:MM:SS."
+        f"La hora '{valor}' no tiene un "
+        "formato válido. Usá HH:MM o HH:MM:SS."
     )
 
 
@@ -572,58 +868,47 @@ def _aplicar_correccion_a_pasada(
     campo: str,
     valor: str,
 ) -> None:
-    """
-    Aplica una corrección manual a la pasada en memoria.
-
-    Actualmente la resolución de la UI utiliza:
-        campo="valor_corregido"
-
-    En ese caso se intenta determinar qué valor corresponde corregir
-    utilizando el valor original del problema.
-    """
 
     valor = valor.strip()
 
     if not valor:
         raise ValueError(
-            "No se puede aplicar una corrección vacía."
+            "No se puede aplicar una "
+            "corrección vacía."
         )
 
-    campo_normalizado = campo.strip().lower()
+    campo = campo.strip().lower()
 
-    if campo_normalizado in {
+    if campo in {
         "hora",
         "hora_corregida",
     }:
-        pasada.hora = _parsear_hora(valor)
+        pasada.hora = _parsear_hora(
+            valor
+        )
         return
 
-    if campo_normalizado in {
+    if campo in {
         "movil",
         "móvil",
     }:
         pasada.movil = valor
         return
 
-    if campo_normalizado == "objetivo":
+    if campo == "objetivo":
         pasada.objetivo_nombre = valor
         return
 
-    if campo_normalizado == "supervisor":
+    if campo == "supervisor":
         pasada.supervisor_nombre = valor
         return
 
-    if campo_normalizado == "valor_corregido":
-        """
-        La UI actual utiliza este campo genérico.
+    if campo == "valor_corregido":
 
-        Primero intentamos interpretar el valor como una hora. Si no
-        es una hora válida, lo tratamos como móvil. Esto mantiene
-        compatibilidad con la Fase 12 sin agregar todavía `categoria`
-        a Problema.
-        """
         try:
-            pasada.hora = _parsear_hora(valor)
+            pasada.hora = _parsear_hora(
+                valor
+            )
             return
         except ValueError:
             pass
@@ -632,52 +917,68 @@ def _aplicar_correccion_a_pasada(
         return
 
     raise ValueError(
-        f"Campo de corrección no soportado: {campo!r}"
+        f"Campo de corrección no soportado: "
+        f"{campo!r}"
     )
 
 
 def _aplicar_resoluciones_a_pasadas(
     analisis: ResultadoAnalisis,
-    resoluciones,
     resoluciones_aplicadas: dict[int, dict[str, Any]],
 ) -> None:
-    """
-    Aplica las correcciones/matches sobre las PasadaNormalizada antes
-    de persistirlas.
-    """
 
-    for id_problema, resolucion in resoluciones_aplicadas.items():
+    for (
+        id_problema,
+        resolucion,
+    ) in resoluciones_aplicadas.items():
 
-        problema = analisis.problemas[id_problema]
+        problema = analisis.problemas[
+            id_problema
+        ]
 
-        indice_pasada = _buscar_indice_pasada_por_problema(
-            analisis,
-            problema,
+        indice_pasada = (
+            _buscar_indice_pasada_por_problema(
+                analisis,
+                problema,
+            )
         )
 
         if indice_pasada is None:
-            # Una resolución puede corresponder a un problema que no
-            # tenga una pasada persistible, por ejemplo un problema
-            # global del archivo. En ese caso la resolución queda
-            # auditada pero no modifica una pasada.
             continue
 
-        pasada = analisis.pasadas[indice_pasada]
+        pasada = analisis.pasadas[
+            indice_pasada
+        ]
 
         tipo = resolucion["tipo"]
 
-        if tipo in ("match_existente", "crear_nuevo"):
+        if tipo in (
+            "match_existente",
+            "crear_nuevo",
+        ):
 
             entidad_id = resolucion["id"]
             nombre = resolucion["valor"]
 
-            if _es_matching_objetivo(problema):
-                pasada.objetivo_id = entidad_id
-                pasada.objetivo_nombre = nombre
+            if _es_matching_objetivo(
+                problema
+            ):
+                pasada.objetivo_id = (
+                    entidad_id
+                )
+                pasada.objetivo_nombre = (
+                    nombre
+                )
 
-            elif _es_matching_supervisor(problema):
-                pasada.supervisor_id = entidad_id
-                pasada.supervisor_nombre = nombre
+            elif _es_matching_supervisor(
+                problema
+            ):
+                pasada.supervisor_id = (
+                    entidad_id
+                )
+                pasada.supervisor_nombre = (
+                    nombre
+                )
 
         elif tipo == "correccion":
 
@@ -687,13 +988,9 @@ def _aplicar_resoluciones_a_pasadas(
                 str(resolucion["valor"]),
             )
 
-        elif tipo == "aceptado":
-            # No se modifica la pasada.
-            continue
-
 
 # ============================================================================
-# PERSISTENCIA DE PASADAS
+# BÚSQUEDA DE PASADA EXISTENTE
 # ============================================================================
 
 
@@ -701,12 +998,6 @@ def _obtener_pasada_existente(
     conexion_bd,
     pasada: PasadaNormalizada,
 ):
-    """
-    Busca una pasada existente utilizando la identidad lógica definida
-    por fecha + hora + turno + objetivo.
-
-    La tabla actual no tiene una columna de móvil ni de fila Excel.
-    """
 
     return conexion_bd.execute(
         """
@@ -728,26 +1019,34 @@ def _obtener_pasada_existente(
         LIMIT 1
         """,
         (
-            _valor_sql(pasada.fecha_calendario),
-            _valor_sql(pasada.hora),
+            _valor_sql(
+                pasada.fecha_calendario
+            ),
+            _valor_sql(
+                pasada.hora
+            ),
             pasada.turno,
             pasada.objetivo_id,
         ),
     ).fetchone()
 
 
+# ============================================================================
+# INSERTAR PASADA
+# ============================================================================
+
+
 def _insertar_pasada(
     conexion_bd,
     pasada: PasadaNormalizada,
 ) -> int:
-    """
-    Inserta una pasada nueva.
-    """
 
     if pasada.objetivo_id is None:
         raise ValueError(
-            f"La pasada de {pasada.fecha_calendario} "
-            f"{pasada.hora} no tiene objetivo_id."
+            f"La pasada de "
+            f"{pasada.fecha_calendario} "
+            f"{pasada.hora} no tiene "
+            "objetivo_id."
         )
 
     cursor = conexion_bd.execute(
@@ -764,17 +1063,28 @@ def _insertar_pasada(
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            _valor_sql(pasada.fecha_calendario),
-            _valor_sql(pasada.hora),
+            _valor_sql(
+                pasada.fecha_calendario
+            ),
+            _valor_sql(
+                pasada.hora
+            ),
             pasada.turno,
             pasada.objetivo_id,
             pasada.supervisor_id,
             "",
-            _valor_sql(pasada.fecha_operativa),
+            _valor_sql(
+                pasada.fecha_operativa
+            ),
         ),
     )
 
     return cursor.lastrowid
+
+
+# ============================================================================
+# ACTUALIZAR PASADA
+# ============================================================================
 
 
 def _actualizar_pasada(
@@ -782,9 +1092,6 @@ def _actualizar_pasada(
     id_pasada: int,
     pasada: PasadaNormalizada,
 ) -> None:
-    """
-    Actualiza una pasada existente.
-    """
 
     conexion_bd.execute(
         """
@@ -800,16 +1107,27 @@ def _actualizar_pasada(
         WHERE id = ?
         """,
         (
-            _valor_sql(pasada.fecha_calendario),
-            _valor_sql(pasada.hora),
+            _valor_sql(
+                pasada.fecha_calendario
+            ),
+            _valor_sql(
+                pasada.hora
+            ),
             pasada.turno,
             pasada.objetivo_id,
             pasada.supervisor_id,
             "",
-            _valor_sql(pasada.fecha_operativa),
+            _valor_sql(
+                pasada.fecha_operativa
+            ),
             id_pasada,
         ),
     )
+
+
+# ============================================================================
+# PERSISTENCIA DE PASADAS + AUDITORÍA
+# ============================================================================
 
 
 def _persistir_pasadas(
@@ -817,15 +1135,6 @@ def _persistir_pasadas(
     analisis: ResultadoAnalisis,
     usuario,
 ) -> tuple[int, int, int]:
-    """
-    Persiste las pasadas según su acción.
-
-    Devuelve:
-        (nuevas, actualizadas, omitidas)
-
-    La decisión `accion` viene del pipeline de fases anteriores.
-    Como defensa adicional se vuelve a comprobar la existencia en BD.
-    """
 
     nuevas = 0
     actualizadas = 0
@@ -835,21 +1144,29 @@ def _persistir_pasadas(
 
         accion = pasada.accion
 
+        # --------------------------------------------------------------
+        # OMITIR
+        # --------------------------------------------------------------
+
         if accion == "omitir":
+
             omitidas += 1
             continue
 
+        # --------------------------------------------------------------
+        # NUEVA
+        # --------------------------------------------------------------
+
         if accion == "nueva":
-            existente = _obtener_pasada_existente(
-                conexion_bd,
-                pasada,
+
+            existente = (
+                _obtener_pasada_existente(
+                    conexion_bd,
+                    pasada,
+                )
             )
 
             if existente:
-                """
-                Defensa contra que la BD haya cambiado entre análisis
-                y confirmación.
-                """
                 omitidas += 1
                 continue
 
@@ -862,52 +1179,74 @@ def _persistir_pasadas(
 
             registrar_auditoria(
                 {
-                    "usuario": _nombre_usuario(usuario),
+                    "usuario": usuario,
                     "tipo_operacion": "INSERT",
                     "tabla": "pasadas",
                     "registro_id": id_nueva,
-                    "valores_anteriores": {},
+                    "valores_anteriores": None,
                     "valores_nuevos": {
-                        "fecha": _valor_sql(pasada.fecha_calendario),
-                        "hora": _valor_sql(pasada.hora),
+                        "id": id_nueva,
+                        "fecha": _valor_sql(
+                            pasada.fecha_calendario
+                        ),
+                        "hora": _valor_sql(
+                            pasada.hora
+                        ),
                         "turno": pasada.turno,
-                        "objetivo_id": pasada.objetivo_id,
-                        "supervisor_id": pasada.supervisor_id,
-                        "fecha_operativa": _valor_sql(
-                            pasada.fecha_operativa
+                        "objetivo_id": (
+                            pasada.objetivo_id
+                        ),
+                        "supervisor_id": (
+                            pasada.supervisor_id
+                        ),
+                        "notas": "",
+                        "fecha_operativa": (
+                            _valor_sql(
+                                pasada.fecha_operativa
+                            )
                         ),
                     },
-                    "detalles": (
-                        f"Importación desde hoja '{pasada.hoja}', "
-                        f"fila {pasada.fila_excel}"
-                    ),
+                    "detalles": {
+                        "accion": (
+                            "Nueva pasada desde "
+                            "importación"
+                        ),
+                        "hoja": pasada.hoja,
+                        "fila_excel": (
+                            pasada.fila_excel
+                        ),
+                    },
                 },
                 conexion_bd,
             )
 
             continue
 
+        # --------------------------------------------------------------
+        # ACTUALIZAR / SOBRESCRITURA
+        # --------------------------------------------------------------
+
         if accion == "actualizar":
 
-            existente = _obtener_pasada_existente(
-                conexion_bd,
-                pasada,
+            existente = (
+                _obtener_pasada_existente(
+                    conexion_bd,
+                    pasada,
+                )
             )
 
             if not existente:
-                """
-                Si la pasada marcada como actualizar ya no existe,
-                es más seguro abortar que insertar silenciosamente.
-                """
                 raise ValueError(
-                    "Una pasada marcada para actualizar ya no existe "
-                    "en la base de datos. La importación fue cancelada "
-                    "para evitar un estado inconsistente."
+                    "Una pasada marcada para "
+                    "actualizar ya no existe "
+                    "en la base de datos. "
+                    "La importación fue cancelada."
                 )
 
             id_pasada = existente[0]
 
             valores_anteriores = {
+                "id": existente[0],
                 "fecha": existente[1],
                 "hora": existente[2],
                 "turno": existente[3],
@@ -917,6 +1256,61 @@ def _persistir_pasadas(
                 "fecha_operativa": existente[7],
             }
 
+            valores_nuevos = {
+                "id": id_pasada,
+                "fecha": _valor_sql(
+                    pasada.fecha_calendario
+                ),
+                "hora": _valor_sql(
+                    pasada.hora
+                ),
+                "turno": pasada.turno,
+                "objetivo_id": (
+                    pasada.objetivo_id
+                ),
+                "supervisor_id": (
+                    pasada.supervisor_id
+                ),
+                "notas": "",
+                "fecha_operativa": (
+                    _valor_sql(
+                        pasada.fecha_operativa
+                    )
+                ),
+            }
+
+            # ----------------------------------------------------------
+            # IMPORTANTE:
+            # El histórico se registra ANTES del UPDATE.
+            # ----------------------------------------------------------
+
+            registrar_auditoria(
+                {
+                    "usuario": usuario,
+                    "tipo_operacion": (
+                        "SOBRESCRITURA_DURANTE_IMPORTACION"
+                    ),
+                    "tabla": "pasadas",
+                    "registro_id": id_pasada,
+                    "valores_anteriores": (
+                        valores_anteriores
+                    ),
+                    "valores_nuevos": (
+                        valores_nuevos
+                    ),
+                    "detalles": _detalles_historico(
+                        "Sobrescritura de pasada "
+                        "por reimportación forzada."
+                    ),
+                },
+                conexion_bd,
+            )
+
+            # ----------------------------------------------------------
+            # Recién después de auditar el valor anterior,
+            # hacemos el UPDATE.
+            # ----------------------------------------------------------
+
             _actualizar_pasada(
                 conexion_bd,
                 id_pasada,
@@ -925,122 +1319,56 @@ def _persistir_pasadas(
 
             actualizadas += 1
 
-            registrar_auditoria(
-                {
-                    "usuario": _nombre_usuario(usuario),
-                    "tipo_operacion": "UPDATE",
-                    "tabla": "pasadas",
-                    "registro_id": id_pasada,
-                    "valores_anteriores": valores_anteriores,
-                    "valores_nuevos": {
-                        "fecha": _valor_sql(pasada.fecha_calendario),
-                        "hora": _valor_sql(pasada.hora),
-                        "turno": pasada.turno,
-                        "objetivo_id": pasada.objetivo_id,
-                        "supervisor_id": pasada.supervisor_id,
-                        "fecha_operativa": _valor_sql(
-                            pasada.fecha_operativa
-                        ),
-                    },
-                    "detalles": (
-                        f"Sobrescritura desde hoja '{pasada.hoja}', "
-                        f"fila {pasada.fila_excel}"
-                    ),
-                },
-                conexion_bd,
-            )
-
             continue
 
         raise ValueError(
-            f"Acción de pasada desconocida: {accion!r}. "
-            f"Hoja={pasada.hoja}, fila={pasada.fila_excel}"
+            f"Acción de pasada desconocida: "
+            f"{accion!r}. "
+            f"Hoja={pasada.hoja}, "
+            f"fila={pasada.fila_excel}"
         )
 
-    return nuevas, actualizadas, omitidas
-
-
-# ============================================================================
-# AUDITORÍA
-# ============================================================================
-
-
-def registrar_auditoria(evento: dict, conexion_bd) -> None:
-    """
-    Registra un evento en la tabla auditoria.
-
-    Esta función NO hace commit.
-
-    Es fundamental para la transacción: si la auditoría falla,
-    confirmar_importacion_completa() captura la excepción y hace
-    rollback de toda la importación.
-    """
-
-    fecha, hora = _fecha_hora_actual()
-
-    usuario = evento.get("usuario")
-    usuario_id = evento.get("usuario_id")
-
-    if usuario_id is None:
-        usuario_id = _usuario_id(
-            conexion_bd,
-            usuario,
-        )
-
-    conexion_bd.execute(
-        """
-        INSERT INTO auditoria (
-            fecha,
-            hora,
-            usuario_id,
-            tipo_operacion,
-            tabla,
-            registro_id,
-            valores_anteriores,
-            valores_nuevos,
-            detalles,
-            estado
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            fecha,
-            hora,
-            usuario_id,
-            str(evento.get("tipo_operacion", "IMPORTACION")),
-            evento.get("tabla"),
-            evento.get("registro_id"),
-            _serializar(evento.get("valores_anteriores")),
-            _serializar(evento.get("valores_nuevos")),
-            str(evento.get("detalles", "")),
-            str(evento.get("estado", "EXITOSO")),
-        ),
+    return (
+        nuevas,
+        actualizadas,
+        omitidas,
     )
+
+
+# ============================================================================
+# AUDITORÍA DE RESOLUCIONES
+# ============================================================================
 
 
 def _registrar_resoluciones_auditoria(
     resoluciones,
     conexion_bd,
-) -> None:
+) -> int:
     """
-    Registra las decisiones tomadas en la pantalla de revisión.
+    Registra las correcciones manuales realizadas durante la revisión.
 
-    Las resoluciones ya tienen toda la información necesaria:
-        usuario
-        hoja
-        objetivo
-        campo
-        valor_antes
-        valor_despues
-        tipo
+    Matching y altas tienen auditorías propias.
+
+    Devuelve cantidad de correcciones.
     """
 
-    for registro in resoluciones.todos_los_registros():
+    correcciones = 0
+
+    for registro in (
+        resoluciones.todos_los_registros()
+    ):
+
+        if registro.tipo != "correccion":
+            continue
+
+        correcciones += 1
 
         registrar_auditoria(
             {
                 "usuario": registro.usuario,
-                "tipo_operacion": registro.tipo,
+                "tipo_operacion": (
+                    "CORRECCION_DURANTE_IMPORTACION"
+                ),
                 "tabla": None,
                 "registro_id": None,
                 "valores_anteriores": {
@@ -1055,13 +1383,16 @@ def _registrar_resoluciones_auditoria(
                     "campo": registro.campo,
                     "valor": registro.valor_despues,
                 },
-                "detalles": (
-                    "Resolución tomada durante la revisión "
-                    "previa a la importación."
-                ),
+                "detalles": {
+                    "accion": (
+                        "Corrección durante importación"
+                    ),
+                },
             },
             conexion_bd,
         )
+
+    return correcciones
 
 
 # ============================================================================
@@ -1076,27 +1407,20 @@ def confirmar_importacion_completa(
     conexion_bd,
 ) -> dict:
     """
-    Ejecuta la importación real dentro de una única transacción.
+    Ejecuta la importación completa.
 
-    IMPORTANTE:
-        La confirmación visual del usuario debe realizarse en la UI
-        ANTES de llamar a esta función.
+    TODO se realiza dentro de una única transacción.
 
-    La función:
+    Si cualquier INSERT, UPDATE o auditoría falla:
 
-        1. valida errores críticos;
-        2. valida matching pendiente;
-        3. resuelve altas/matches;
-        4. aplica correcciones;
-        5. inserta pasadas nuevas;
-        6. actualiza pasadas a sobrescribir;
-        7. omite las existentes;
-        8. registra auditoría;
-        9. hace COMMIT;
-       10. hace ROLLBACK ante cualquier excepción.
+        rollback()
 
-    Devuelve un dict compatible con el resumen esperado por la UI.
+    y no queda ninguna parte de la importación persistida.
     """
+
+    # ------------------------------------------------------------------
+    # 1. Defensa contra estados inconsistentes
+    # ------------------------------------------------------------------
 
     _validar_analisis(
         analisis,
@@ -1105,29 +1429,23 @@ def confirmar_importacion_completa(
 
     if conexion_bd is None:
         raise ValueError(
-            "Se necesita una conexión a la base de datos."
+            "Se necesita una conexión a la "
+            "base de datos."
         )
 
-    # ------------------------------------------------------------------
-    # Defensa: no iniciar una transacción dentro de otra.
-    # ------------------------------------------------------------------
-
-    if getattr(conexion_bd, "in_transaction", False):
+    if getattr(
+        conexion_bd,
+        "in_transaction",
+        False,
+    ):
         raise RuntimeError(
-            "La conexión de base de datos ya tiene una transacción "
-            "activa. La importación debe ejecutarse sobre una conexión "
-            "sin una transacción previa."
+            "La conexión ya tiene una "
+            "transacción activa."
         )
 
     # ------------------------------------------------------------------
-    # Determinación previa de cantidades.
+    # 2. Cantidades iniciales
     # ------------------------------------------------------------------
-
-    cantidad_omitir = sum(
-        1
-        for pasada in analisis.pasadas
-        if pasada.accion == "omitir"
-    )
 
     cantidad_nuevas = sum(
         1
@@ -1141,14 +1459,21 @@ def confirmar_importacion_completa(
         if pasada.accion == "actualizar"
     )
 
+    cantidad_omitir = sum(
+        1
+        for pasada in analisis.pasadas
+        if pasada.accion == "omitir"
+    )
+
     # ------------------------------------------------------------------
-    # Archivo ya procesado.
-    #
-    # Si el análisis indica que todo está para omitir y no hay
-    # sobrescrituras, no hacemos ninguna escritura.
+    # 3. Archivo completamente procesado
     # ------------------------------------------------------------------
 
-    if cantidad_nuevas == 0 and cantidad_actualizar == 0:
+    if (
+        cantidad_nuevas == 0
+        and cantidad_actualizar == 0
+    ):
+
         return {
             "pasadas_importadas": 0,
             "pasadas_nuevas": 0,
@@ -1157,15 +1482,19 @@ def confirmar_importacion_completa(
             "objetivos_creados": 0,
             "supervisores_creados": 0,
             "correcciones": 0,
-            "total": len(analisis.pasadas),
+            "total": len(
+                analisis.pasadas
+            ),
             "mensaje": (
                 "Este archivo ya fue procesado. "
                 "No hay nuevas pasadas para importar."
             ),
         }
 
-    # Guardamos cantidad de entidades antes de la operación para poder
-    # calcular cuántas fueron creadas realmente.
+    # ------------------------------------------------------------------
+    # 4. Cantidad de entidades antes de la transacción
+    # ------------------------------------------------------------------
+
     objetivos_antes = conexion_bd.execute(
         "SELECT COUNT(*) FROM objetivos"
     ).fetchone()[0]
@@ -1175,6 +1504,7 @@ def confirmar_importacion_completa(
     ).fetchone()[0]
 
     try:
+
         # ==============================================================
         # UNA ÚNICA TRANSACCIÓN
         # ==============================================================
@@ -1182,46 +1512,54 @@ def confirmar_importacion_completa(
         conexion_bd.execute("BEGIN")
 
         # --------------------------------------------------------------
-        # 1. Resolver matching / crear entidades.
+        # 5. Matching / altas
         # --------------------------------------------------------------
 
-        resoluciones_aplicadas = _aplicar_resoluciones(
-            analisis,
-            resoluciones,
-            conexion_bd,
+        resoluciones_aplicadas = (
+            _aplicar_resoluciones(
+                analisis,
+                resoluciones,
+                conexion_bd,
+                usuario,
+            )
         )
 
         # --------------------------------------------------------------
-        # 2. Aplicar correcciones y matching a las pasadas en memoria.
+        # 6. Aplicar correcciones a las pasadas
         # --------------------------------------------------------------
 
         _aplicar_resoluciones_a_pasadas(
             analisis,
-            resoluciones,
             resoluciones_aplicadas,
         )
 
         # --------------------------------------------------------------
-        # 3. Persistir pasadas.
+        # 7. Persistir pasadas
         # --------------------------------------------------------------
 
-        nuevas, actualizadas, omitidas = _persistir_pasadas(
+        (
+            nuevas,
+            actualizadas,
+            omitidas,
+        ) = _persistir_pasadas(
             conexion_bd,
             analisis,
             usuario,
         )
 
         # --------------------------------------------------------------
-        # 4. Registrar todas las resoluciones tomadas.
+        # 8. Auditoría de correcciones
         # --------------------------------------------------------------
 
-        _registrar_resoluciones_auditoria(
-            resoluciones,
-            conexion_bd,
+        correcciones = (
+            _registrar_resoluciones_auditoria(
+                resoluciones,
+                conexion_bd,
+            )
         )
 
         # --------------------------------------------------------------
-        # 5. Cantidad de entidades creadas.
+        # 9. Cantidad de objetivos/supervisores creados
         # --------------------------------------------------------------
 
         objetivos_despues = conexion_bd.execute(
@@ -1234,22 +1572,18 @@ def confirmar_importacion_completa(
 
         objetivos_creados = max(
             0,
-            objetivos_despues - objetivos_antes,
+            objetivos_despues
+            - objetivos_antes,
         )
 
         supervisores_creados = max(
             0,
-            supervisores_despues - supervisores_antes,
-        )
-
-        correcciones = sum(
-            1
-            for registro in resoluciones.todos_los_registros()
-            if registro.tipo == "correccion"
+            supervisores_despues
+            - supervisores_antes,
         )
 
         # --------------------------------------------------------------
-        # 6. Auditoría del resumen completo.
+        # 10. Resumen
         # --------------------------------------------------------------
 
         resumen = {
@@ -1257,36 +1591,64 @@ def confirmar_importacion_completa(
             "pasadas_nuevas": nuevas,
             "pasadas_actualizadas": actualizadas,
             "pasadas_omitidas": omitidas,
-            "objetivos_creados": objetivos_creados,
-            "supervisores_creados": supervisores_creados,
+            "objetivos_creados": (
+                objetivos_creados
+            ),
+            "supervisores_creados": (
+                supervisores_creados
+            ),
             "correcciones": correcciones,
-            "total": len(analisis.pasadas),
+            "total": len(
+                analisis.pasadas
+            ),
         }
+
+        # --------------------------------------------------------------
+        # 11. UN registro por importación completa
+        # --------------------------------------------------------------
 
         registrar_auditoria(
             {
                 "usuario": usuario,
-                "tipo_operacion": "IMPORTACION_COMPLETA",
+                "tipo_operacion": (
+                    "IMPORTACION_COMPLETA"
+                ),
                 "tabla": None,
                 "registro_id": None,
                 "valores_anteriores": None,
                 "valores_nuevos": resumen,
-                "detalles": (
-                    "Importación transaccional completada "
-                    "antes del COMMIT."
-                ),
+                "detalles": {
+                    "accion": (
+                        "Importación completa"
+                    ),
+                    "cantidad_pasadas_importadas": (
+                        nuevas
+                    ),
+                    "cantidad_pasadas_omitidas": (
+                        omitidas
+                    ),
+                    "cantidad_correcciones": (
+                        correcciones
+                    ),
+                    "cantidad_pasadas_actualizadas": (
+                        actualizadas
+                    ),
+                    "archivo_original_guardado": (
+                        False
+                    ),
+                },
             },
             conexion_bd,
         )
 
         # --------------------------------------------------------------
-        # 7. COMMIT ÚNICO.
+        # 12. COMMIT
         # --------------------------------------------------------------
 
         conexion_bd.commit()
 
         # --------------------------------------------------------------
-        # 8. Resumen final.
+        # 13. Mensaje final
         # --------------------------------------------------------------
 
         resumen["mensaje"] = (
@@ -1298,21 +1660,21 @@ def confirmar_importacion_completa(
         return resumen
 
     except Exception:
+
         # ==============================================================
         # CUALQUIER ERROR => ROLLBACK COMPLETO
         # ==============================================================
+
         try:
             conexion_bd.rollback()
         except Exception:
-            # Si incluso rollback falla, mantenemos la excepción
-            # original porque es la que explica el fallo de importación.
             pass
 
         raise
 
 
 # ============================================================================
-# ALIAS PÚBLICO
+# API PÚBLICA INTERNA
 # ============================================================================
 
 
@@ -1323,8 +1685,9 @@ def confirmar_importacion(
     conexion_bd,
 ) -> dict:
     """
-    Alias interno para mantener una API clara dentro del módulo.
+    Alias de confirmar_importacion_completa().
     """
+
     return confirmar_importacion_completa(
         analisis=analisis,
         resoluciones=resoluciones,
