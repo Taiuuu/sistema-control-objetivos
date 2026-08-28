@@ -26,11 +26,7 @@ from database.db import DB_PATH
 from services.tema import obtener_tema
 from services.validaciones import validar_pasada, ErrorValidacion
 from services.validador_horas_limite import validar_hora_turno_nocturno
-from services.cache import (
-    obtener_objetivos_cache,
-    obtener_supervisores_cache
-)
-
+from services.modelos import ResultadoMatchObjetivo, ResultadoMatchSupervisor
 
 # =============================================================================
 # FUNCIONES AUXILIARES
@@ -38,7 +34,8 @@ from services.cache import (
 
 def _cargar_objetivos(fecha: str = None) -> list:
     """Retorna objetivos activos según fecha."""
-    objetivos = obtener_objetivos_cache(generar_si_falta=True)
+    objetivos = [ResultadoMatchObjetivo(id=None, nombre="Sin supervisor", tipo="no_asignado")]
+
 
     if not fecha:
         return objetivos
@@ -122,7 +119,7 @@ def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
     except Exception as e:
         print("Error cargando supervisores:", e)
 
-    return obtener_supervisores_cache(generar_si_falta=True)
+    return [ResultadoMatchSupervisor(id=None, nombre="Sin supervisor", tipo="no_asignado")]
 
 # =============================================================================
 # MEMORIA DEL ÚLTIMO TURNO
