@@ -8,7 +8,6 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 from database.gestor_db import gestor_db
-from services.cache import cache_global
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +19,6 @@ def _validar_fecha(fecha: str) -> str:
         raise ValueError(f"Fecha inválida: {fecha}") from exc
 
 
-@cache_global.auto_cache(ttl=300)
 def listar_feriados() -> List[Dict[str, Any]]:
     resultados = gestor_db.ejecutar(
         "SELECT id, fecha, descripcion FROM feriados ORDER BY fecha"
@@ -59,7 +57,6 @@ def registrar_feriado(fecha: str, descripcion: Optional[str] = None) -> Dict[str
             )
             feriado_id = cursor.lastrowid
 
-    cache_global.invalidar_patron("feriados")
     logger.info("Feriado registrado: %s", fecha)
     return {"id": feriado_id, "fecha": fecha, "descripcion": descripcion}
 
@@ -71,7 +68,6 @@ def eliminar_feriado(fecha: str) -> bool:
         cursor.execute("DELETE FROM feriados WHERE fecha = ?", (fecha,))
         eliminado = cursor.rowcount > 0
 
-    cache_global.invalidar_patron("feriados")
     return eliminado
 
 
@@ -84,7 +80,6 @@ def es_feriado(fecha: str) -> bool:
     return bool(resultado)
 
 
-@cache_global.auto_cache(ttl=300)
 def obtener_feriados_mes(anio: int, mes: int) -> List[Dict[str, Any]]:
     total_dias = calendar.monthrange(anio, mes)[1]
     fecha_inicio = f"{anio:04d}-{mes:02d}-01"
