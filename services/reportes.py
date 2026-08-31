@@ -23,7 +23,6 @@ from collections import defaultdict
 from typing import List, Dict, Optional, Tuple, Any
 
 from database.gestor_db import gestor_db
-from services.cache import cache_global
 from services.feriados import es_feriado
 from .exceptions import (
     ReporteError, FechaInvalidaReporte, DatosInsuficientesReporte
@@ -98,7 +97,6 @@ def _objetivo_corresponde_a_fecha(fecha: str, dias_semana_str: str) -> bool:
 # REPORTES DIARIOS
 # =============================================================================
 
-@cache_global.auto_cache(ttl=300)
 def obtener_objetivos_del_dia(fecha: str) -> List[Tuple[int, str, str]]:
     """Obtiene los objetivos que deben controlarse en una fecha específica.
     
@@ -111,9 +109,6 @@ def obtener_objetivos_del_dia(fecha: str) -> List[Tuple[int, str, str]]:
     Raises:
         FechaInvalidaReporte: Si la fecha no es válida.
         DatabaseError: Si hay error en la consulta.
-    
-    Note:
-        Resultado cacheado por 5 minutos.
     
     Example:
         >>> objetivos = obtener_objetivos_del_dia("2026-04-27")
@@ -189,7 +184,6 @@ def objetivo_corresponde(fecha: str, dias_semana_str: str) -> bool:
         return False
 
 
-@cache_global.auto_cache(ttl=600)
 def generar_reporte_diario(fecha: str) -> Dict[str, Any]:
     """Genera reporte detallado de pasadas de un día.
     
@@ -216,9 +210,6 @@ def generar_reporte_diario(fecha: str) -> Dict[str, Any]:
     Raises:
         FechaInvalidaReporte: Si la fecha no es válida.
         DatabaseError: Si hay error en la consulta.
-        
-    Note:
-        Resultado cacheado por 10 minutos.
     """
     try:
         _validar_fecha(fecha)
@@ -279,7 +270,6 @@ def generar_reporte_diario(fecha: str) -> Dict[str, Any]:
 # REPORTES MENSUALES
 # =============================================================================
 
-@cache_global.auto_cache(ttl=1800)
 def generar_reporte_mensual(anio: int, mes: int) -> Dict[str, Any]:
     """Genera reporte mensual detallado de cumplimiento.
     
@@ -310,9 +300,6 @@ def generar_reporte_mensual(anio: int, mes: int) -> Dict[str, Any]:
     Raises:
         ReporteError: Si hay error validando parámetros.
         DatabaseError: Si hay error en consultas.
-        
-    Note:
-        Resultado cacheado por 30 minutos.
     """
     try:
         _validar_ano_mes(anio, mes)
