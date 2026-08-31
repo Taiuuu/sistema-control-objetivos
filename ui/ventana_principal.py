@@ -42,7 +42,6 @@ from ui.dashboard import Dashboard
 from ui.feriados import VistaFeriados
 from ui.vista_auditoria import VistaAuditoria
 from ui.vista_validaciones import VistaValidaciones
-from ui.vista_cache import VistaCache
 from ui.vista_indexacion import VistaIndexacion
 from ui.vista_sincronizacion import VistaSincronizacion
 from models.objetivos import dar_de_baja_objetivo
@@ -389,7 +388,6 @@ class VentanaPrincipal(QWidget):
             self.layout_scroll.addWidget(self._lbl_admin)
             add_btn("⚙️",  "Gestionar usuarios", self.abrir_gestionar_usuarios)
             add_btn("📜",  "Historial",           self.abrir_logs)
-            add_btn("🗄️",  "Monitor de Caché",    self.abrir_cache)
             add_btn("🔧",  "Optimización de BD",  self.abrir_indexacion)
             add_btn("🛡️",  "Validaciones BD",     self.abrir_validaciones)
             add_btn("🔎",  "Auditoría detallada", self.abrir_auditoria)
@@ -1149,7 +1147,6 @@ class VentanaPrincipal(QWidget):
         self.sincronizador = obtener_sincronizador()
         self.sincronizador.datos_cambiados.connect(self._on_datos_cambiados)
         self.sincronizador.tabla_actualizar.connect(self._on_tabla_actualizar)
-        self.sincronizador.cache_invalidado.connect(self._on_cache_invalidado)
 
     def _on_datos_cambiados(self, tabla, operacion, datos):
         if tabla in ['objetivos', 'supervisores', 'pasadas', 'equipos']:
@@ -1158,9 +1155,6 @@ class VentanaPrincipal(QWidget):
     def _on_tabla_actualizar(self, nombre_tabla):
         if nombre_tabla == 'principal':
             self.cargar_tabla()
-
-    def _on_cache_invalidado(self, patron):
-        pass
 
     # =========================================================================
     # FECHA
@@ -1644,20 +1638,8 @@ class VentanaPrincipal(QWidget):
             GestionarUsuarios
         )
 
-
     def abrir_logs(self) -> None:
         self._abrir_ventana('logs', VistaLogs)
-
-
-    def abrir_cache(self) -> None:
-        ventana = self._abrir_ventana(
-            'cache_monitor',
-            VistaCache,
-            self.usuario_id
-        )
-        ventana.setWindowTitle("Monitor de Caché Inteligente")
-        ventana.setGeometry(100, 100, 1000, 600)
-
 
     def abrir_indexacion(self) -> None:
         ventana = self._abrir_ventana(
