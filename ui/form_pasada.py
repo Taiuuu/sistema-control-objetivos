@@ -26,7 +26,7 @@ from database.db import DB_PATH
 from services.tema import obtener_tema
 from services.validaciones import validar_pasada, ErrorValidacion
 from services.validador_horas_limite import validar_hora_turno_nocturno
-from services.modelos import ResultadoMatchObjetivo, ResultadoMatchSupervisor
+from services.importador.modelos import ResultadoMatchObjetivo, ResultadoMatchSupervisor
 
 # =============================================================================
 # FUNCIONES AUXILIARES
