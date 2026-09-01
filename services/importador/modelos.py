@@ -97,10 +97,10 @@ class PasadaNormalizada:
     fecha_operativa: date
     fecha_calendario: date
     turno: Turno
-    """Turno FINAL ya resuelto (fase 5): si la celda TURNO de la propia
-    fila contradice el turno de la hoja, gana la celda (regla ya
-    establecida). Se usa para identidad de la pasada (duplicados,
-    persistencia)."""
+    """Turno FINAL ya resuelto (fase 5): el turno de la hoja define la
+    identidad operativa de la pasada; la celda TURNO puede avisar una
+    discrepancia pero no reemplaza al turno de la hoja. Se usa para
+    identidad de la pasada (duplicados, persistencia)."""
 
     # ------------------------------------------------------------------
     # Hora
@@ -124,11 +124,9 @@ class PasadaNormalizada:
     puntual. Representa el turno REAL que trabajó la cuadrilla (la
     cuadrilla no cambia de turno fila por fila; una celda TURNO
     contradictoria suele ser un error de tipeo, no un cambio real de
-    turno). Se agrega porque validador.py necesita este dato para
-    chequear que la hora sea plausible para el turno operativo, sin que
-    un typo en una celda (que ya gana en `turno` por regla de fase 5)
-    haga parecer "fuera de rango" una pasada nocturna legítima que cruza
-    la medianoche."""
+    turno). Se conserva para validador.py y para auditoría, porque el
+    turno operativo real no siempre coincide con una celda mal cargada,
+    y la hoja sigue siendo la fuente de verdad para la lógica de negocio."""
 
     # ------------------------------------------------------------------
     # Objetivo

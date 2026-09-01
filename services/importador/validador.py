@@ -47,11 +47,13 @@ from .modelos import PasadaNormalizada, Problema
 # Configuración de rangos horarios por turno (punto 3)
 # ---------------------------------------------------------------------------
 
-# Turno D: 07:00 a 19:00 (no cruza medianoche).
-# Turno N: 19:00 a 07:00 (cruza medianoche).
+# Turno D: 06:30 a 20:30 (varía por supervisor; el check es de orden
+# "regla de dedo" para detectar errores groseros, no un horario rígido de
+# producción).
+# Turno N: 18:30 a 08:30 (cruza medianoche).
 _RANGO_HORARIO_DEFAULT: dict[str, tuple[time, time]] = {
-    "D": (time(7, 0), time(19, 0)),
-    "N": (time(19, 0), time(7, 0)),
+    "D": (time(6, 30), time(20, 30)),
+    "N": (time(18, 30), time(8, 30)),
 }
 
 

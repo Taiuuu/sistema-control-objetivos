@@ -1,6 +1,6 @@
 import datetime
 
-from normalizador import (
+from services.importador.normalizador import (
     normalizar_hora,
     normalizar_turno,
     determinar_fecha_operativa_y_calendario,
@@ -109,6 +109,21 @@ def test_texto_no_numerico_no_reconocido_es_error():
     assert "no reconocido" in error
 
 
+def test_hora_con_sufijo_textual_se_normaliza_y_advertencia():
+    for valor in ("17:09hs", "20:22hs ", "17:09 HS"):
+        hora, fue_normalizada, error = normalizar_hora(valor)
+        assert hora == datetime.time(17, 9) or hora == datetime.time(20, 22)
+        assert fue_normalizada is True
+        assert error is None
+
+
+def test_hora_incompleta_sigue_siendo_error_critico():
+    hora, fue_normalizada, error = normalizar_hora("01:")
+    assert hora is None
+    assert fue_normalizada is False
+    assert "no reconocido" in error
+
+
 # --- FASE 5: normalizar_turno ---
 
 def test_turno_variantes_diurno():
@@ -192,13 +207,14 @@ def test_prioridad_turno_coincide_sin_advertencia():
     assert problema is None
 
 
-def test_prioridad_turno_contradice_gana_celda_y_advierte():
+def test_prioridad_turno_contradice_gana_hoja_y_advierte():
     turno, problema = resolver_turno_con_prioridad(
         "D", "N", hoja="1-7 (N)", objetivo="BARRIO X", fila_excel=7
     )
-    assert turno == "D"
+    assert turno == "N"
     assert problema.tipo == "advertencia"
-    assert "D" in problema.descripcion and "N" in problema.descripcion
+    assert "hoja" in problema.descripcion.lower()
+    assert "N" in problema.descripcion and "D" in problema.descripcion
 
 
 if __name__ == "__main__":

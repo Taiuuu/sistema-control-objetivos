@@ -11,6 +11,7 @@ de celdas (lo que haya devuelto openpyxl) y los convierte a tipos válidos.
 from __future__ import annotations
 
 import datetime
+import re
 from datetime import date, time
 from typing import Any, NamedTuple, Optional
 
@@ -74,6 +75,7 @@ def normalizar_hora(valor_crudo: Any) -> ResultadoHora:
             return ResultadoHora(None, False, None)
 
         texto = texto.replace(";", ":")
+        texto = re.sub(r"(?i)(?<=\d)\s*[A-Za-z]+\s*$", "", texto)
 
         if ":" in texto:
             return _normalizar_desde_hhmm(texto, valor_crudo)
@@ -207,9 +209,10 @@ def normalizar_turno(
 # Prioridad de datos: turno de la celda vs. turno del nombre de hoja
 # ---------------------------------------------------------------------------
 #
-# Si hay contradicción entre el turno de la celda TURNO de la pasada y el
-# turno que indica el nombre de la hoja, gana el turno de la celda. La
-# discrepancia se informa como advertencia (no bloquea la importación).
+# El nombre de la hoja define el turno operativo real de la pasada. La celda
+# TURNO puede estar equivocada (typo), pero ese dato no redefine la identidad
+# de la pasada ni la fecha operativa asociada. La discrepancia se informa como
+# advertencia para que quede visible en revisión, pero no gana la celda.
 
 
 def resolver_turno_con_prioridad(
@@ -229,9 +232,10 @@ def resolver_turno_con_prioridad(
         de una hoja no repiten el turno en cada pasada).
       - Si la celda sí trae turno y coincide con el de la hoja, se usa ese
         valor, sin advertencia.
-      - Si la celda trae un turno que CONTRADICE al de la hoja, gana el
-        valor de la celda, y se genera un Problema de tipo "advertencia"
-        señalando la inconsistencia (no bloquea la importación).
+      - Si la celda trae un turno que CONTRADICE al de la hoja, se usa el
+        turno de la hoja y se genera un Problema de tipo "advertencia"
+        señalando la inconsistencia (no bloquea la importación, pero deja
+        visible que la celda estaba mal cargada).
 
     Devuelve (turno_final, problema_opcional).
     """
@@ -246,14 +250,15 @@ def resolver_turno_con_prioridad(
         descripcion=(
             f"El turno indicado en la celda de la pasada ('{turno_celda}') "
             f"no coincide con el turno del nombre de la hoja ('{turno_hoja}'). "
-            "Se utilizó el valor de la celda, por tener prioridad."
+            "Se utilizó el turno de la hoja, porque define la identidad "
+            "operativa de la pasada."
         ),
         hoja=hoja,
         objetivo=objetivo,
         valor_problema=turno_celda,
         fila_excel=fila_excel,
     )
-    return turno_celda, problema
+    return turno_hoja, problema
 
 
 # ---------------------------------------------------------------------------
