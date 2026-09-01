@@ -14,8 +14,7 @@ import datetime
 from datetime import date, time
 from typing import Any, NamedTuple, Optional
 
-from modelos import Problema
-
+from .modelos import Problema
 
 # ---------------------------------------------------------------------------
 # FASE 4 — Normalización de HORA

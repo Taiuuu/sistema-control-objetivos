@@ -1,7 +1,7 @@
 from . import reporte
 from .importacion import confirmar_importacion_completa
+from .parser import PasadaCruda
 from .modelos import (
-    PasadaCruda,
     PasadaNormalizada,
     Problema,
     ResultadoAnalisis,
