@@ -216,9 +216,6 @@ def leer_pasadas_crudas(path: str, nombre_hoja: str) -> list[PasadaCruda]:
     while filas_recorridas < _MAX_FILAS_DATOS:
         filas_recorridas += 1
 
-        no_bloque1 = ws.cell(row=fila, column=columnas_bloque[0]).value
-        if not _es_numerico(no_bloque1):
-            break
         if _fila_contiene_observaciones(ws, fila, max_col):
             break
 
@@ -241,6 +238,16 @@ def leer_pasadas_crudas(path: str, nombre_hoja: str) -> list[PasadaCruda]:
                     "supervisor": ws.cell(row=fila, column=col_supervisor).value,
                 }
             )
+
+        # El primer bloque puede estar vacío aunque otro bloque de la misma
+        # fila tenga una pasada. Solo se termina la lectura cuando no hay
+        # datos en ningún bloque, evitando perder pasadas de los bloques 2/3.
+        if not any(
+            _valor_no_vacio(d[campo])
+            for d in datos_bloques
+            for campo in ("no", "objetivo", "turno", "movil", "hora", "supervisor")
+        ):
+            break
 
         # --- rellenar objetivo faltante desde otro bloque de la misma fila ---
         objetivo_comun = None
