@@ -19,7 +19,7 @@ class TestGenerarReporteMensual:
         assert reporte['mes'] == 1
         assert reporte['objetivos'] is not None
     
-    def test_reporte_con_objetivos(self, db_initialized, test_objetivo, admin_user):
+    def test_reporte_con_objetivos(self, db_initialized, test_objetivo, admin_user, test_supervisor):
         """Debe incluir objetivos en el reporte."""
         # Insertar una pasada
         conexion = sqlite3.connect(db_initialized)
@@ -29,7 +29,7 @@ class TestGenerarReporteMensual:
         cursor.execute("""
             INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id)
             VALUES (?, ?, ?, ?, ?)
-        """, (today.isoformat(), "10:00", "diurno", test_objetivo['id'], 1))
+        """, (today.isoformat(), "10:00", "diurno", test_objetivo['id'], test_supervisor['id']))
         
         conexion.commit()
         conexion.close()

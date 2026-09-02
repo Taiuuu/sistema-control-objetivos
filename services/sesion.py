@@ -26,11 +26,14 @@ _sesiones_expiradas: Dict[str, float] = {}
 
 # Timer para limpieza automática
 _timer_limpieza: threading.Timer | None = None
+_en_cierre = False
 
 
 def _iniciar_limpieza_automatica():
     """Inicia el timer para limpieza automática de sesiones expiradas."""
     global _timer_limpieza
+    if _en_cierre:
+        return
     if _timer_limpieza:
         _timer_limpieza.cancel()
 
@@ -57,8 +60,14 @@ def _limpiar_sesiones_expiradas():
     _iniciar_limpieza_automatica()
 
 
+def _limpiar_al_salir():
+    global _en_cierre
+    _en_cierre = True
+    _limpiar_sesiones_expiradas()
+
+
 # Registrar limpieza al salir
-atexit.register(_limpiar_sesiones_expiradas)
+atexit.register(_limpiar_al_salir)
 
 
 # =============================================================================

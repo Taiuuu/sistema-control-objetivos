@@ -11,6 +11,8 @@ from pathlib import Path
 
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("VESP_JWT_SECRET", "test-secret-only-32-bytes-long!!")
+os.environ.setdefault("VESP_ENCRYPTION_KEY", "test-encryption-key-only")
 
 
 # Override database path for testing

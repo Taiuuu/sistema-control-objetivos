@@ -285,6 +285,9 @@ class ResultadoAnalisis:
     inválida) y por lo tanto nunca llegó a convertirse en
     PasadaNormalizada."""
 
+    pasadas_sin_hora: int = 0
+    """Pasadas detectadas con turno, móvil o supervisor, pero sin hora."""
+
     pasadas_duplicadas: int = 0
     """Cantidad de pasadas descartadas por duplicados.detectar_duplicados_internos()."""
 

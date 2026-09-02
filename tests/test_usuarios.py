@@ -4,7 +4,12 @@
 
 import pytest
 import sqlite3
-from services.usuarios import crear_usuario, cambiar_contrasena_usuario, listar_usuarios, obtener_usuario_por_id
+from services.usuarios import (
+    cambiar_contrasena_usuario,
+    crear_usuario,
+    listar_usuarios,
+    obtener_usuario_por_id,
+)
 
 
 class TestCrearUsuario:
@@ -67,7 +72,7 @@ class TestObtenerUsuarios:
     
     def test_obtener_todos_usuarios(self, db_initialized, admin_user, operador_user):
         """Debe obtener lista de todos los usuarios."""
-        usuarios = obtener_usuarios()
+        usuarios = listar_usuarios()
         
         assert len(usuarios) >= 2
         usernames = [u['username'] for u in usuarios]
@@ -94,7 +99,11 @@ class TestCambiarContrasena:
     
     def test_cambiar_contrasena_valida(self, db_initialized, admin_user):
         """Debe cambiar la contraseña correctamente."""
-        cambiar_contrasena(admin_user['id'], "NuevaContrasena123!")
+        cambiar_contrasena_usuario(
+            admin_user['id'],
+            admin_user['password'],
+            "NuevaContrasena123!",
+        )
         
         # Verificar que se actualizó
         conexion = sqlite3.connect(db_initialized)

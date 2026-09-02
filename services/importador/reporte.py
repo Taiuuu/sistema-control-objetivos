@@ -53,9 +53,9 @@ def _construir_pasadas_normalizadas(
     """Devuelve (pasadas_normalizadas, problemas, hojas_encontradas,
     pasadas_detectadas).
 
-    `pasadas_detectadas` cuenta solo los bloques que tienen una hora válida
-    y generan una PasadaNormalizada. Las filas sin hora o con hora inválida
-    quedan registradas como advertencias de pasadas omitidas.
+    `pasadas_detectadas` cuenta todos los bloques no vacíos. Las filas sin
+    hora o con hora inválida quedan registradas como advertencias y no se
+    convierten en PasadaNormalizada.
     """
     hojas = parser.leer_hojas_de_datos(path)
     problemas: list[Problema] = []
@@ -72,6 +72,7 @@ def _construir_pasadas_normalizadas(
 
         crudas = parser.leer_pasadas_crudas(path, hoja)
         crudas_no_vacias = [c for c in crudas if not c.esta_vacia()]
+        pasadas_detectadas += len(crudas_no_vacias)
         for cruda in crudas_no_vacias:
             # --- Fase 4: hora ---------------------------------------------
             resultado_hora = normalizar_hora(cruda.hora)
@@ -179,8 +180,6 @@ def _construir_pasadas_normalizadas(
                     supervisor_nombre=cruda.supervisor,
                 )
             )
-            pasadas_detectadas += 1
-
     return pasadas_normalizadas, problemas, len(hojas), pasadas_detectadas
 
 
@@ -275,6 +274,7 @@ def analizar_excel(
 
     errores_criticos = sum(1 for p in problemas if p.tipo == "error_critico")
     advertencias = sum(1 for p in problemas if p.tipo == "advertencia")
+    pasadas_sin_hora = sum("no cargó la hora" in p.descripcion for p in problemas)
 
     return ResultadoAnalisis(
         pasadas=pasadas_tras_dedupe,
@@ -289,6 +289,7 @@ def analizar_excel(
         advertencias=advertencias,
         hojas_encontradas=hojas_encontradas,
         pasadas_detectadas=pasadas_detectadas,
+        pasadas_sin_hora=pasadas_sin_hora,
         pasadas_duplicadas=len(descartadas),
     )
 
@@ -299,6 +300,7 @@ def generar_resumen_texto(resultado: ResultadoAnalisis) -> str:
         "ANÁLISIS DEL ARCHIVO\n"
         f"Hojas encontradas: {resultado.hojas_encontradas}\n"
         f"Pasadas detectadas: {resultado.pasadas_detectadas}\n"
+        f"Pasadas sin hora: {resultado.pasadas_sin_hora}\n"
         f"Pasadas nuevas: {resultado.pasadas_nuevas}\n"
         f"Pasadas ya existentes: {resultado.pasadas_omitir + resultado.pasadas_actualizar}\n"
         f"Duplicados descartados: {resultado.pasadas_duplicadas}\n"
@@ -326,6 +328,7 @@ def generar_reporte_detallado(resultado: ResultadoAnalisis) -> bytes:
     filas_resumen = [
         ("Hojas encontradas", resultado.hojas_encontradas),
         ("Pasadas detectadas", resultado.pasadas_detectadas),
+        ("Pasadas sin hora", resultado.pasadas_sin_hora),
         ("Pasadas nuevas", resultado.pasadas_nuevas),
         ("Pasadas ya existentes", resultado.pasadas_omitir + resultado.pasadas_actualizar),
         ("Duplicados descartados", resultado.pasadas_duplicadas),
