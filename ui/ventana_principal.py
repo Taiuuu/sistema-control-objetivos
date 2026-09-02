@@ -37,13 +37,11 @@ from ui.gestionar_usuarios import GestionarUsuarios
 from ui.ayuda import Ayuda
 from ui.transferir_datos import TransferirDatos
 from ui.importar_excel import ImportarExcel
-from ui.deshacer_importacion import DeshacerImportacion
 from ui.feriados import VistaFeriados
 from ui.vista_auditoria import VistaAuditoria
 from ui.vista_validaciones import VistaValidaciones
 from ui.vista_indexacion import VistaIndexacion
 from ui.vista_sincronizacion import VistaSincronizacion
-from models.objetivos import dar_de_baja_objetivo
 from services.tema import obtener_tema_actual
 from services.permisos import tiene_permiso
 from services.backup import hacer_backup
@@ -370,7 +368,6 @@ class VentanaPrincipal(QWidget):
         add_btn("📅", "Reporte objetivo",    self.abrir_reporte_mensual_objetivo, "(Ctrl+Ñ)")
         add_btn("💾", "Transferir datos",    self.abrir_transferir_datos)
         add_btn("📥", "Importar Excel",      self.abrir_importar_excel)
-        add_btn("🔄", "Deshacer import.",    self.abrir_deshacer_importacion)
         add_btn("❓", "Ayuda",               self.abrir_ayuda,              "(Ctrl+H)")
 
         if tiene_permiso('usuarios.ver'):
@@ -1217,6 +1214,7 @@ class VentanaPrincipal(QWidget):
             ("Ctrl+N",     self.abrir_notas),
             ("Ctrl+R",     self.abrir_reporte_mensual),
             ("Ctrl+B",     self.cargar_tabla),
+            ("Ctrl+F",     self.buscador.setFocus),
             ("Ctrl+H",     self.abrir_ayuda),
             ("Ctrl+=",     self._zoom_mas),
             ("Ctrl+-",     self._zoom_menos),
@@ -1525,36 +1523,6 @@ class VentanaPrincipal(QWidget):
         self.tabla.setCellWidget(i, 4, celda(BadgeNumero(pn, oscuro)))
         self.tabla.setCellWidget(i, 5, celda(BadgeEstado(estado, oscuro)))
 
-        boton_baja = QPushButton("Dar de baja")
-        boton_baja.setCursor(Qt.CursorShape.PointingHandCursor)
-        boton_baja.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {obtener_color('accent_red', oscuro)};
-                border: 1px solid {obtener_color('accent_red', oscuro)};
-                border-radius: 6px; padding: 4px 10px;
-                font-size: 11px; font-weight: 600;
-            }}
-            QPushButton:hover {{
-                background-color: {obtener_color('accent_red', oscuro)};
-                color: white;
-            }}
-        """)
-        boton_baja.clicked.connect(lambda checked, obj_id=o[0]: self.dar_de_baja(obj_id))
-        self.tabla.setCellWidget(i, 6, celda(boton_baja))
-
-    def dar_de_baja(self, objetivo_id: int):
-        confirmar = QMessageBox.question(
-            self, "Confirmar",
-            "¿Seguro que querés dar de baja este objetivo?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if confirmar == QMessageBox.StandardButton.Yes:
-            fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
-            dar_de_baja_objetivo(objetivo_id, fecha)
-            registrar_accion(self.usuario_id, f"Dio de baja objetivo id={objetivo_id}")
-            self.cargar_tabla()
-
     # =========================================================================
     # ABRIR VENTANAS
     # =========================================================================
@@ -1720,9 +1688,6 @@ class VentanaPrincipal(QWidget):
             ImportarExcel,
             on_close=self.cargar_tabla,
         )
-
-    def abrir_deshacer_importacion(self) -> None:
-        self._abrir_ventana('deshacer_importacion', DeshacerImportacion)
 
     def abrir_auditoria(self) -> None:
         self._abrir_ventana('auditoria', VistaAuditoria)

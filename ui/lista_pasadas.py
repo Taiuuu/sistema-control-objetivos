@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTableWidget, QTableWidgetItem, QPushButton,
     QDateEdit, QTimeEdit, QComboBox, QMessageBox, QDialog,
-    QSpinBox
+    QSpinBox, QLineEdit
 )
 from PyQt6.QtCore import QDate, QTime
 from PyQt6.QtGui import QColor
@@ -24,7 +24,12 @@ from services.validador_horas_limite import validar_hora_turno_nocturno
 # FUNCIONES DB
 # =============================================================================
 
-def _cargar_pasadas(fecha: str, supervisor_id: int | None = None, turno: str | None = None) -> list:
+def _cargar_pasadas(
+    fecha: str,
+    supervisor_id: int | None = None,
+    turno: str | None = None,
+    busqueda: str = "",
+) -> list:
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
 
@@ -51,6 +56,11 @@ def _cargar_pasadas(fecha: str, supervisor_id: int | None = None, turno: str | N
     if turno:
         query += " AND p.turno = ?"
         params.append(turno)
+
+    if busqueda:
+        query += " AND (LOWER(o.nombre) LIKE ? OR LOWER(s.nombre) LIKE ?)"
+        termino = f"%{busqueda.lower()}%"
+        params.extend([termino, termino])
 
     query += " ORDER BY p.hora"
 
@@ -374,7 +384,7 @@ class ListaPasadas(QWidget):
 
         layout = QVBoxLayout()
 
-        # Filtros
+        # Filtros principales
         fila = QHBoxLayout()
 
         fila.addWidget(QLabel("Fecha:"))
@@ -382,35 +392,51 @@ class ListaPasadas(QWidget):
         self.selector_fecha = QDateEdit()
         self.selector_fecha.setCalendarPopup(True)
         self.selector_fecha.setDate(QDate.currentDate())
+        self.selector_fecha.dateChanged.connect(self._cargar_tabla)
 
         fila.addWidget(self.selector_fecha)
 
-        fila.addWidget(QLabel("Supervisor:"))
-        self.selector_supervisor = QComboBox()
-        self.selector_supervisor.addItem("Todos", 0)
-        for sup_id, sup_nombre in _cargar_supervisores():
-            self.selector_supervisor.addItem(sup_nombre, sup_id)
-        self.selector_supervisor.currentIndexChanged.connect(self._cargar_tabla)
-        fila.addWidget(self.selector_supervisor)
+        self.buscador = QLineEdit()
+        self.buscador.setPlaceholderText("Buscar objetivo o supervisor...")
+        self.buscador.setClearButtonEnabled(True)
+        self.buscador.textChanged.connect(self._cargar_tabla)
+        fila.addWidget(self.buscador, 1)
 
-        fila.addWidget(QLabel("Turno:"))
-        self.selector_turno = QComboBox()
-        self.selector_turno.addItems(["Todos", "diurno", "nocturno"])
-        self.selector_turno.currentTextChanged.connect(self._cargar_tabla)
-        fila.addWidget(self.selector_turno)
-
-        btn_buscar = QPushButton("Buscar")
-        btn_buscar.clicked.connect(self._cargar_tabla)
+        self.btn_filtrar = QPushButton("Filtrar")
+        self.btn_filtrar.setCheckable(True)
+        self.btn_filtrar.toggled.connect(self._alternar_filtros)
+        fila.addWidget(self.btn_filtrar)
 
         self.btn_eliminar_dia = QPushButton("Eliminar día (Admin)")
         self.btn_eliminar_dia.clicked.connect(self._eliminar_dia_actual)
         self.btn_eliminar_dia.setVisible(False)
 
-        fila.addWidget(btn_buscar)
         fila.addWidget(self.btn_eliminar_dia)
         fila.addStretch()
 
         layout.addLayout(fila)
+
+        # Filtros avanzados colapsables
+        self.panel_filtros = QWidget()
+        panel_layout = QHBoxLayout(self.panel_filtros)
+        panel_layout.setContentsMargins(0, 8, 0, 8)
+        panel_layout.addWidget(QLabel("Supervisor:"))
+        self.selector_supervisor = QComboBox()
+        self.selector_supervisor.addItem("Todos", 0)
+        for sup_id, sup_nombre in _cargar_supervisores():
+            self.selector_supervisor.addItem(sup_nombre, sup_id)
+        self.selector_supervisor.currentIndexChanged.connect(self._cargar_tabla)
+        panel_layout.addWidget(self.selector_supervisor)
+
+        panel_layout.addWidget(QLabel("Turno:"))
+        self.selector_turno = QComboBox()
+        self.selector_turno.addItems(["Todos", "diurno", "nocturno"])
+        self.selector_turno.currentTextChanged.connect(self._cargar_tabla)
+        panel_layout.addWidget(self.selector_turno)
+        panel_layout.addStretch()
+        self.panel_filtros.setVisible(False)
+
+        layout.addWidget(self.panel_filtros)
 
         # Filtros para mes
         fila_mes = QHBoxLayout()
@@ -483,6 +509,10 @@ class ListaPasadas(QWidget):
         self.btn_eliminar_dia.setVisible(es_admin)
         self.btn_eliminar_mes.setVisible(es_admin)
 
+    def _alternar_filtros(self, visibles: bool) -> None:
+        self.panel_filtros.setVisible(visibles)
+        self.btn_filtrar.setText("Ocultar filtros" if visibles else "Filtrar")
+
     def _cargar_tabla(self):
 
         self._actualizar_permisos()
@@ -492,7 +522,7 @@ class ListaPasadas(QWidget):
         if turno == "Todos":
             turno = None
 
-        datos = _cargar_pasadas(fecha, supervisor_id, turno)
+        datos = _cargar_pasadas(fecha, supervisor_id, turno, self.buscador.text().strip())
 
         self.tabla.setRowCount(len(datos))
 

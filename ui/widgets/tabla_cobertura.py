@@ -69,7 +69,6 @@ class TablaCoberturaWidget(QWidget):
     
     # Señales
     objetivo_seleccionado = pyqtSignal(int)  # objetivo_id
-    objetivo_dar_de_baja = pyqtSignal(int)   # objetivo_id
     fecha_cambiada = pyqtSignal(str)         # fecha en formato yyyy-MM-dd
     filtros_cambiados = pyqtSignal()         # cuando cambian filtros
     
@@ -97,12 +96,12 @@ class TablaCoberturaWidget(QWidget):
         
         # Tabla
         self._tabla = QTableWidget()
-        self._tabla.setColumnCount(7)
+        self._tabla.setColumnCount(6)
         self._tabla.setHorizontalHeaderLabels([
             "Objetivo",
             "Equipo diurno", "Pasadas día",
             "Equipo nocturno", "Pasadas noche",
-            "Estado", "Acción"
+            "Estado"
         ])
         
         # Anchos de columna
@@ -112,7 +111,6 @@ class TablaCoberturaWidget(QWidget):
         self._tabla.setColumnWidth(3, 155)
         self._tabla.setColumnWidth(4, 95)
         self._tabla.setColumnWidth(5, 145)
-        self._tabla.setColumnWidth(6, 110)
         
         self._tabla.setAlternatingRowColors(False)
         self._tabla.setSortingEnabled(True)
@@ -560,27 +558,6 @@ class TablaCoberturaWidget(QWidget):
             badge = BadgeEstado(estado, oscuro)
             self._tabla.setCellWidget(i, 5, self._envolver_widget(badge, bg))
             
-            # Botón dar de baja
-            btn = QPushButton("Dar de baja")
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: transparent;
-                    color: {p('accent_red', oscuro)};
-                    border: 1px solid {p('accent_red', oscuro)};
-                    border-radius: 6px;
-                    padding: 4px 10px;
-                    font-size: 11px;
-                    font-weight: 600;
-                }}
-                QPushButton:hover {{
-                    background-color: {p('accent_red', oscuro)};
-                    color: white;
-                }}
-            """)
-            btn.clicked.connect(lambda checked, oid=o[0]: self.objetivo_dar_de_baja.emit(oid))
-            self._tabla.setCellWidget(i, 6, self._envolver_widget(btn, bg))
-        
         self._tabla.setSortingEnabled(sorting_enabled)
         self._tabla.setUpdatesEnabled(True)
         self._tabla.update()

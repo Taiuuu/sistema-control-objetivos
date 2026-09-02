@@ -7,7 +7,6 @@ from PyQt6.QtCore import QDate
 from PyQt6.QtGui import QColor
 from services.reportes import obtener_objetivos_del_dia
 from database.db import DB_PATH
-from models.objetivos import dar_de_baja_objetivo
 from ui.form_objetivo import FormObjetivo
 from ui.lista_objetivos import DialogoEditarObjetivo
 import sqlite3
@@ -85,7 +84,6 @@ class TablaDiaria(QWidget):
 
                     combo_accion = QComboBox()
                     combo_accion.addItem("Seleccionar acción")
-                    combo_accion.addItem("Dar de baja")
                     combo_accion.addItem("Editar")
 
                     combo_accion.currentIndexChanged.connect(
@@ -124,28 +122,9 @@ class TablaDiaria(QWidget):
         """Ejecuta la acción seleccionada para un objetivo."""
         if index == 0:  # "Seleccionar acción"
             return
-        elif index == 1:  # "Dar de baja"
-            self._dar_de_baja(objetivo_id, objetivo_nombre)
-            combo.setCurrentIndex(0)  # Reset combo
-        elif index == 2:  # "Editar"
+        elif index == 1:  # "Editar"
             self._editar_objetivo(objetivo_id)
             combo.setCurrentIndex(0)  # Reset combo
-
-    def _dar_de_baja(self, objetivo_id: int, objetivo_nombre: str) -> None:
-        """Da de baja un objetivo."""
-        from PyQt6.QtWidgets import QMessageBox
-        respuesta = QMessageBox.question(
-            self, "Confirmar",
-            f"¿Estás seguro de dar de baja el objetivo '{objetivo_nombre}'?\n\n"
-            "Esto lo ocultará del control diario a partir de hoy.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-
-        if respuesta == QMessageBox.StandardButton.Yes:
-            fecha_hoy = QDate.currentDate().toString("yyyy-MM-dd")
-            dar_de_baja_objetivo(objetivo_id, fecha_hoy)
-            QMessageBox.information(self, "Éxito", f"El objetivo '{objetivo_nombre}' ha sido dado de baja.")
-            self.cargar_tabla()  # Recargar la tabla
 
     def _editar_objetivo(self, objetivo_id: int) -> None:
         """Abre el formulario para editar un objetivo."""

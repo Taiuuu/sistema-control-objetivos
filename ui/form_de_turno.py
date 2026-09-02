@@ -14,7 +14,7 @@ from models.equipos import guardar_equipo_turno
 
 
 def _cargar_supervisores() -> list:
-    return obtener_supervisores_cache(generar_si_falta=True)
+    return obtener_supervisores_cache()
 
 
 class FormTurno(QWidget):
@@ -117,7 +117,10 @@ class FormTurno(QWidget):
     def _poblar_combo(self, combo: QComboBox) -> None:
         combo.clear()
         for s in self._supervisores:
-            combo.addItem(s[1], s[0])
+            if hasattr(s, "id") and hasattr(s, "nombre"):
+                combo.addItem(s.nombre, s.id)
+            else:
+                combo.addItem(s[1], s[0])
 
     def _mostrar_sup3(self) -> None:
         self._tiene_tercero = True
