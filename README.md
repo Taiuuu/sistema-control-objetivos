@@ -5,6 +5,9 @@ con PyQt6 y SQLite. Permite registrar y supervisar pasadas por turno, gestionar 
 supervisores, generar reportes de cumplimiento, mantener auditoría completa, y soporte de
 importación desde Excel y API REST local.
 
+> **Estado del proyecto:** la aplicación principal continúa siendo de escritorio. La migración
+> a una aplicación web queda cancelada; la API REST disponible es un servicio auxiliar local.
+
 ## ¿Qué hace este proyecto?
 
 - Registrar y administrar objetivos de seguridad.
@@ -22,7 +25,7 @@ importación desde Excel y API REST local.
 - `services/` - Lógica de negocio: validaciones, importadores, sincronización, backup, notificaciones.
 - `database/` - Acceso y migración de la base de datos SQLite (`db.py`, `gestor_db.py`).
 - `models/` - Definiciones de entidades y validaciones de dominio.
-- `api/` - API REST independiente y rutas Flask.
+- `api/` - API REST auxiliar con rutas Flask; no reemplaza la aplicación de escritorio.
 - `docs/` - Documentación técnica y guías internas.
 - `tests/` - Suite de pruebas automatizadas.
 
@@ -74,13 +77,13 @@ servidor API local de soporte, e interfaz de login.
 - Usuario: `admin`
 - Contraseña: `0000` (cambio obligatorio en el primer login)
 
-### API Flask independiente
+### API REST auxiliar (opcional)
 
 ```bash
 python api/app.py
 ```
 
-Levanta el servidor en `http://0.0.0.0:5000`. Rutas principales:
+Levanta el servicio auxiliar en `http://0.0.0.0:5000`. Rutas principales:
 
 - `POST /api/auth/login`
 - `GET /api/objetivos` · `POST /api/objetivos`
