@@ -39,8 +39,6 @@ PERMISOS_POR_ROL: Dict[str, Set[str]] = {
         'auditoria.ver',
         # Notas completas
         'notas.crear', 'notas.editar', 'notas.ver',
-        # Dashboard y estadísticas
-        'dashboard.ver', 'estadisticas.ver'
     },
     'supervisor': {
         # Gestión limitada de objetivos
@@ -54,8 +52,6 @@ PERMISOS_POR_ROL: Dict[str, Set[str]] = {
         'reportes.ver', 'reportes.exportar',
         # Notas
         'notas.crear', 'notas.editar', 'notas.ver',
-        # Dashboard básico
-        'dashboard.ver'
     },
     'auditor': {
         # Solo lectura de todo
@@ -67,7 +63,6 @@ PERMISOS_POR_ROL: Dict[str, Set[str]] = {
         'reportes.ver', 'reportes.exportar',
         'auditoria.ver',
         'notas.ver',
-        'dashboard.ver', 'estadisticas.ver',
         'config.logs'
     },
     'gerente': {
@@ -77,7 +72,6 @@ PERMISOS_POR_ROL: Dict[str, Set[str]] = {
         'pasadas.ver',
         'equipos.ver',
         'reportes.ver', 'reportes.exportar',
-        'dashboard.ver', 'estadisticas.ver',
         'notas.ver'
     },
     'operador': {

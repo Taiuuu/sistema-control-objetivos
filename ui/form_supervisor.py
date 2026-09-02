@@ -9,7 +9,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from models.supervisores import agregar_supervisor
-from services.tema import obtener_tema
 from services.validaciones import validar_supervisor, ErrorValidacion
 
 
@@ -21,10 +20,8 @@ class FormSupervisor(QWidget):
 
     def __init__(self):
         super().__init__()
-        self._tema = obtener_tema()
         self.setWindowTitle("Agregar supervisor")
         self.setMinimumSize(360, 180)
-        self.setStyleSheet(self._generar_estilos())
 
         self._titulo = QLabel("Agregar supervisor")
         self._titulo.setObjectName("TituloPrincipal")
@@ -64,49 +61,6 @@ class FormSupervisor(QWidget):
         layout.addWidget(card)
 
         self.setLayout(layout)
-
-    def _generar_estilos(self) -> str:
-        tema = self._tema
-        return f"""
-            QWidget {{
-                background-color: {tema['background']};
-                color: {tema['texto']};
-                font-family: Segoe UI, Arial, sans-serif;
-                font-size: 13px;
-            }}
-            QLabel#TituloPrincipal {{
-                color: {tema['texto']};
-                font-size: 18px;
-                font-weight: 700;
-            }}
-            QLabel#Subtitulo {{
-                color: {tema['texto_secundario']};
-                font-size: 12px;
-            }}
-            QFrame#CardContenedor {{
-                background-color: {tema['background_secundario']};
-                border: 1px solid {tema['border']};
-                border-radius: 14px;
-            }}
-            QLineEdit {{
-                background-color: {tema['input_background']};
-                color: {tema['texto']};
-                border: 1px solid {tema['border']};
-                border-radius: 8px;
-                padding: 6px 10px;
-            }}
-            QPushButton {{
-                background-color: {tema['primario']};
-                color: #ffffff;
-                border: none;
-                border-radius: 10px;
-                font-weight: 700;
-                padding: 10px 18px;
-            }}
-            QPushButton:hover {{
-                background-color: {tema['primario_hover']};
-            }}
-        """
 
     def _guardar(self) -> None:
         """Valida y registra el nuevo supervisor en la base de datos."""

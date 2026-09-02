@@ -38,7 +38,6 @@ from ui.ayuda import Ayuda
 from ui.transferir_datos import TransferirDatos
 from ui.importar_excel import ImportarExcel
 from ui.deshacer_importacion import DeshacerImportacion
-from ui.dashboard import Dashboard
 from ui.feriados import VistaFeriados
 from ui.vista_auditoria import VistaAuditoria
 from ui.vista_validaciones import VistaValidaciones
@@ -352,7 +351,6 @@ class VentanaPrincipal(QWidget):
             self.layout_scroll.addSpacing(2)
 
         self._btn_control   = add_btn("📋", "Control diario",     self.cargar_tabla,         "(Ctrl+B)")
-        self._btn_dashboard = add_btn("📊", "Dashboard",          self.abrir_dashboard,      "(Ctrl+D)")
         self._btn_pasada    = add_btn("✅", "Registrar pasada",   self.abrir_form_pasada,    "(Ctrl+P)")
         self._btn_turno     = add_btn("🕐", "Registrar turno",    self.abrir_form_turno,     "(Ctrl+T)")
 
@@ -1219,7 +1217,6 @@ class VentanaPrincipal(QWidget):
             ("Ctrl+N",     self.abrir_notas),
             ("Ctrl+R",     self.abrir_reporte_mensual),
             ("Ctrl+B",     self.cargar_tabla),
-            ("Ctrl+D",     self.abrir_dashboard),
             ("Ctrl+H",     self.abrir_ayuda),
             ("Ctrl+=",     self._zoom_mas),
             ("Ctrl+-",     self._zoom_menos),
@@ -1654,10 +1651,6 @@ class VentanaPrincipal(QWidget):
 
     def abrir_feriados(self) -> None:
         self._abrir_ventana('feriados', VistaFeriados)
-
-
-    def abrir_dashboard(self) -> None:
-        self._abrir_ventana('dashboard', Dashboard)
 
 
     def abrir_reporte_mensual(self) -> None:

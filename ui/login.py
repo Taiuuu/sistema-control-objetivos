@@ -18,7 +18,6 @@ from PyQt6.QtCore import Qt
 from database.db import DB_PATH
 from services.assets import ruta_asset
 from ui.animaciones import animar_entrada
-from services.tema import obtener_tema_actual
 
 
 # =============================================================================
@@ -225,9 +224,12 @@ class LoginWindow(QWidget):
         super().__init__()
         self.on_login_exitoso = on_login_exitoso
         self.setWindowTitle("V.E.S.P Organizations")
-        self.move(100, 100)
-        self.resize(400, 540)
-        self.setMinimumSize(360, 520)
+        self.setFixedSize(400, 540)
+        self.setWindowFlags(
+            Qt.WindowType.Window |
+            Qt.WindowType.WindowTitleHint |
+            Qt.WindowType.WindowCloseButtonHint
+        )
         self.setWindowIcon(QIcon(ruta_asset("assets/vespLogoDarkGreen.svg")))
 
         layout = QVBoxLayout()
@@ -247,15 +249,13 @@ class LoginWindow(QWidget):
 
         # Nombre y subtítulo
         nombre_label = QLabel("V.E.S.P Organizations")
+        nombre_label.setObjectName("LoginTitle")
         nombre_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        nombre_color = "#4CAF50" if obtener_tema_actual() == "oscuro" else "#2E7D32"
-        nombre_label.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {nombre_color};")
         layout.addWidget(nombre_label)
 
         subtitulo = QLabel("Seguridad Privada")
+        subtitulo.setObjectName("LoginSubtitle")
         subtitulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitulo_color = "#888" if obtener_tema_actual() == "oscuro" else "#666"
-        subtitulo.setStyleSheet(f"font-size: 12px; color: {subtitulo_color};")
         layout.addWidget(subtitulo)
 
         # Versión actual
@@ -264,9 +264,8 @@ class LoginWindow(QWidget):
         except Exception:
             version = ""
         version_label = QLabel(f"v{version}")
+        version_label.setObjectName("LoginVersion")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        version_color = "#555" if obtener_tema_actual() == "oscuro" else "#777"
-        version_label.setStyleSheet(f"font-size: 10px; color: {version_color};")
         layout.addWidget(version_label)
 
         layout.addSpacing(10)
@@ -282,23 +281,8 @@ class LoginWindow(QWidget):
 
         # Botón entrar
         boton_entrar = QPushButton("Entrar")
+        boton_entrar.setObjectName("PrimaryButton")
         boton_entrar.setFixedHeight(40)
-        if obtener_tema_actual() == "oscuro":
-            boton_bg = "#4CAF50"
-            boton_hover = "#45a049"
-        else:
-            boton_bg = "#2E7D32"
-            boton_hover = "#1B5E20"
-        boton_entrar.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {boton_bg};
-                color: white;
-                font-size: 14px;
-                font-weight: bold;
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{ background-color: {boton_hover}; }}
-        """)
         boton_entrar.clicked.connect(self.intentar_login)
         self.input_password.returnPressed.connect(self.intentar_login)
         layout.addWidget(boton_entrar)

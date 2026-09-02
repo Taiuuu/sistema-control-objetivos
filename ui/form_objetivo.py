@@ -11,7 +11,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QDate, Qt
 from ui.animaciones import animar_entrada
 from models.objetivos import agregar_objetivo
-from services.tema import obtener_tema
 from services.validaciones import validar_objetivo, ErrorValidacion
 
 
@@ -31,10 +30,8 @@ class FormObjetivo(QWidget):
 
     def __init__(self):
         super().__init__()
-        self._tema = obtener_tema()
         self.setWindowTitle("Agregar objetivo")
         self.setMinimumSize(440, 520)
-        self.setStyleSheet(self._generar_estilos())
 
         self._titulo = QLabel("Agregar objetivo")
         self._titulo.setObjectName("TituloPrincipal")
@@ -107,52 +104,6 @@ class FormObjetivo(QWidget):
 
         self.setLayout(layout_principal)
         animar_entrada(self)
-
-    def _generar_estilos(self) -> str:
-        tema = self._tema
-        return f"""
-            QWidget {{
-                background-color: {tema['background']};
-                color: {tema['texto']};
-                font-family: Segoe UI, Arial, sans-serif;
-                font-size: 13px;
-            }}
-            QLabel#TituloPrincipal {{
-                color: {tema['texto']};
-                font-size: 18px;
-                font-weight: 700;
-            }}
-            QLabel#Subtitulo {{
-                color: {tema['texto_secundario']};
-                font-size: 12px;
-            }}
-            QFrame#CardContenedor {{
-                background-color: {tema['background_secundario']};
-                border: 1px solid {tema['border']};
-                border-radius: 14px;
-            }}
-            QLineEdit, QDateEdit {{
-                background-color: {tema['input_background']};
-                color: {tema['texto']};
-                border: 1px solid {tema['border']};
-                border-radius: 8px;
-                padding: 6px 10px;
-            }}
-            QCheckBox {{
-                color: {tema['texto']};
-            }}
-            QPushButton {{
-                background-color: {tema['primario']};
-                color: #ffffff;
-                border: none;
-                border-radius: 10px;
-                font-weight: 700;
-                padding: 10px 18px;
-            }}
-            QPushButton:hover {{
-                background-color: {tema['primario_hover']};
-            }}
-        """
 
     def _guardar(self) -> None:
         """Valida los datos y registra el nuevo objetivo en la base de datos."""

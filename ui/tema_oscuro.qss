@@ -28,6 +28,9 @@ QLabel#MetricValue {
     font-size: 28px;
     font-weight: 700;
 }
+QLabel#LoginTitle { color: #63E6BE; font-size: 18px; font-weight: 700; }
+QLabel#LoginSubtitle { color: #9AA8C7; font-size: 12px; }
+QLabel#LoginVersion { color: #687592; font-size: 10px; }
 QLabel#StatusBadge {
     background-color: #173B35;
     color: #63E6BE;

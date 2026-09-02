@@ -4,7 +4,6 @@
 # =============================================================================
 
 from services.cache import obtener_supervisores_cache
-from services.tema import obtener_tema
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
     QPushButton, QComboBox, QDateEdit, QMessageBox, QFrame, QSizePolicy
@@ -22,13 +21,11 @@ class FormTurno(QWidget):
 
     def __init__(self):
         super().__init__()
-        self._tema = obtener_tema()
         self._supervisores = _cargar_supervisores()
         self._tiene_tercero = False
 
         self.setWindowTitle("Registrar turno")
         self.setMinimumSize(420, 420)
-        self.setStyleSheet(self._generar_estilos())
 
         self._titulo = QLabel("Registrar equipo de turno")
         self._titulo.setObjectName("TituloPrincipal")
@@ -121,53 +118,6 @@ class FormTurno(QWidget):
         combo.clear()
         for s in self._supervisores:
             combo.addItem(s[1], s[0])
-
-    def _generar_estilos(self) -> str:
-        tema = self._tema
-        return f"""
-            QWidget {{
-                background-color: {tema['background']};
-                color: {tema['texto']};
-                font-family: Segoe UI, Arial, sans-serif;
-                font-size: 13px;
-            }}
-            QLabel#TituloPrincipal {{
-                color: {tema['texto']};
-                font-size: 18px;
-                font-weight: 700;
-            }}
-            QLabel#Subtitulo {{
-                color: {tema['texto_secundario']};
-                font-size: 12px;
-            }}
-            QFrame#CardContenedor {{
-                background-color: {tema['background_secundario']};
-                border: 1px solid {tema['border']};
-                border-radius: 14px;
-            }}
-            QComboBox, QDateEdit {{
-                background-color: {tema['input_background']};
-                color: {tema['texto']};
-                border: 1px solid {tema['border']};
-                border-radius: 8px;
-                padding: 6px 10px;
-            }}
-            QPushButton {{
-                background-color: {tema['primario']};
-                color: #ffffff;
-                border: none;
-                border-radius: 10px;
-                font-weight: 700;
-                padding: 10px 18px;
-            }}
-            QPushButton:hover {{
-                background-color: {tema['primario_hover']};
-            }}
-            QPushButton:disabled {{
-                background-color: {tema['button_disabled']};
-                color: #ffffff;
-            }}
-        """
 
     def _mostrar_sup3(self) -> None:
         self._tiene_tercero = True
