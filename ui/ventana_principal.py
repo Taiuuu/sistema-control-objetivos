@@ -1300,9 +1300,9 @@ class VentanaPrincipal(QWidget):
         cursor = conexion.cursor()
         query = """
             SELECT objetivo_id, turno, COUNT(*)
-            FROM pasadas WHERE fecha = ?
+            FROM pasadas WHERE (fecha_operativa = ? OR fecha = ?)
         """
-        params = [fecha]
+        params = [fecha, fecha]
         if supervisor_id:
             query += " AND supervisor_id = ?"
             params.append(supervisor_id)
@@ -1313,10 +1313,10 @@ class VentanaPrincipal(QWidget):
         pasadas_dia   = {}
         pasadas_noche = {}
         for obj_id, turno, count in resultados:
-            if turno == "diurno":
-                pasadas_dia[obj_id] = count
-            elif turno == "nocturno":
-                pasadas_noche[obj_id] = count
+            if turno in ("D", "diurno"):
+                pasadas_dia[obj_id] = pasadas_dia.get(obj_id, 0) + count
+            elif turno in ("N", "nocturno"):
+                pasadas_noche[obj_id] = pasadas_noche.get(obj_id, 0) + count
         return pasadas_dia, pasadas_noche
 
     def _obtener_estado_detallado(self, pasadas_dia: int, pasadas_noche: int) -> tuple:
@@ -1683,7 +1683,11 @@ class VentanaPrincipal(QWidget):
 
 
     def abrir_importar_excel(self) -> None:
-        self._abrir_ventana('importar_excel', ImportarExcel)
+        self._abrir_ventana(
+            'importar_excel',
+            ImportarExcel,
+            on_close=self.cargar_tabla,
+        )
 
     def abrir_deshacer_importacion(self) -> None:
         self._abrir_ventana('deshacer_importacion', DeshacerImportacion)
