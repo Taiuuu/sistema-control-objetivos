@@ -360,6 +360,28 @@ def generar_reporte_detallado(resultado: ResultadoAnalisis) -> bytes:
             ]
         )
 
+    ws_horas = wb.create_sheet("Horas normalizadas")
+    ws_horas.append([
+        "Hoja", "Fila Excel", "Objetivo", "Hora original", "Hora normalizada"
+    ])
+    for celda in ws_horas[1]:
+        celda.font = encabezado_font
+    for p in resultado.problemas:
+        if "Hora normalizada automáticamente" not in p.descripcion:
+            continue
+        texto = p.descripcion
+        hora_original = texto.split("desde '", 1)[1].split("'", 1)[0]
+        hora_normalizada = texto.rsplit(" a ", 1)[-1].rstrip(".")
+        ws_horas.append([
+            p.hoja or "",
+            p.fila_excel if p.fila_excel is not None else "",
+            p.objetivo or "",
+            hora_original,
+            hora_normalizada,
+        ])
+    for col, ancho in zip("ABCDE", [18, 12, 28, 18, 20]):
+        ws_horas.column_dimensions[col].width = ancho
+
     anchos = [16, 14, 10, 24, 20, 70]
     for col, ancho in zip("ABCDEF", anchos):
         ws_problemas.column_dimensions[col].width = ancho

@@ -377,7 +377,11 @@ class ImportarExcel(QWidget):
         # Las pasadas sin una hora válida se muestran como advertencias y se
         # omiten de la importación, sin bloquear el resto del archivo.
         criticos = [p for p in resultado.problemas if p.tipo == "error_critico"]
-        advertencias = [p for p in resultado.problemas if p.tipo == "advertencia"]
+        advertencias = [
+            p for p in resultado.problemas
+            if p.tipo == "advertencia"
+            and "Hora normalizada automáticamente" not in p.descripcion
+        ]
         self.lista_errores.clear()
         for p in criticos + advertencias:
             self.lista_errores.addItem(

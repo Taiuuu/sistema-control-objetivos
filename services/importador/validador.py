@@ -324,5 +324,4 @@ def validar(
     problemas += _check_datos_parciales_movil_supervisor(pasadas_normalizadas)
     problemas += _check_hora_fuera_de_rango(pasadas_normalizadas, contexto)
     problemas += _check_bloque_tabla_incorrecto(pasadas_normalizadas)
-    problemas += _check_ambiguedad_movil_supervisor(pasadas_normalizadas)
     return problemas

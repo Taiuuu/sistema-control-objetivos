@@ -1153,6 +1153,12 @@ def _persistir_pasadas(
             omitidas += 1
             continue
 
+        # Una pasada sin objetivo resuelto queda sin acción y se omite sin
+        # interrumpir la importación del resto del archivo.
+        if accion is None:
+            omitidas += 1
+            continue
+
         # --------------------------------------------------------------
         # NUEVA
         # --------------------------------------------------------------
@@ -1462,7 +1468,7 @@ def confirmar_importacion_completa(
     cantidad_omitir = sum(
         1
         for pasada in analisis.pasadas
-        if pasada.accion == "omitir"
+        if pasada.accion in ("omitir", None)
     )
 
     # ------------------------------------------------------------------
