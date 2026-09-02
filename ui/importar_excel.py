@@ -44,6 +44,9 @@ from services.importador.modelos import (
     ResultadoMatchSupervisor,
 )
 from services.importador.resolucion import EstadoResolucion
+from ui.widgets.dialogos import confirmar_mensaje, mostrar_mensaje
+from ui.widgets.overlay_progreso import OverlayProgreso
+from ui.widgets.toggle_switch import ToggleSwitch
 
 
 # =============================================================================
@@ -208,6 +211,7 @@ class ImportarExcel(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.setObjectName("ImportarExcel")
         self.setWindowTitle("Importar desde Excel")
         self.setGeometry(200, 200, 900, 700)
 
@@ -243,7 +247,8 @@ class ImportarExcel(QWidget):
         self.spin_anio.setValue(date.today().year)
         fila_opciones.addWidget(self.spin_anio)
 
-        self.check_forzar = QCheckBox("Forzar sobrescritura de pasadas existentes")
+        self.check_forzar = ToggleSwitch("Forzar sobrescritura")
+        fila_opciones.addWidget(QLabel("Forzar sobrescritura"))
         fila_opciones.addWidget(self.check_forzar)
         fila_opciones.addStretch()
         layout.addLayout(fila_opciones)
@@ -291,6 +296,7 @@ class ImportarExcel(QWidget):
         layout.addWidget(self.boton_descargar_informe)
 
         self.boton_importar = QPushButton("Importar datos")
+        self.boton_importar.setObjectName("PrimaryButton")
         self.boton_importar.setFixedHeight(40)
         self.boton_importar.setEnabled(False)
         self.boton_importar.clicked.connect(self._importar)
@@ -300,6 +306,8 @@ class ImportarExcel(QWidget):
         self.log.setReadOnly(True)
         self.log.setMinimumHeight(140)
         layout.addWidget(self.log)
+
+        self.overlay_progreso = OverlayProgreso(self)
 
     # ------------------------------------------------------------------
     # Selección de archivo
@@ -340,6 +348,7 @@ class ImportarExcel(QWidget):
 
         self._resetear_resultado()
         self.progress_bar.setVisible(True)
+        self.overlay_progreso.mostrar("Analizando Excel...")
         self.boton_analizar.setEnabled(False)
 
         conexion = gestor_db.obtener_conexion()
@@ -363,6 +372,7 @@ class ImportarExcel(QWidget):
 
     def _on_analisis_listo(self, resultado: ResultadoAnalisis) -> None:
         self.progress_bar.setVisible(False)
+        self.overlay_progreso.ocultar()
         self.boton_analizar.setEnabled(True)
 
         self.analisis = resultado
@@ -403,8 +413,9 @@ class ImportarExcel(QWidget):
 
     def _on_analisis_error(self, mensaje: str) -> None:
         self.progress_bar.setVisible(False)
+        self.overlay_progreso.ocultar()
         self.boton_analizar.setEnabled(True)
-        QMessageBox.critical(self, "Error", f"No se pudo analizar el archivo: {mensaje}")
+        mostrar_mensaje(self, "Error", f"No se pudo analizar el archivo: {mensaje}", "error")
 
     # ------------------------------------------------------------------
     # Resolución de matching (Fase 11-12)
@@ -438,7 +449,7 @@ class ImportarExcel(QWidget):
         try:
             resoluciones_dialogo = dialogo.obtener_resoluciones()
         except ValueError as exc:
-            QMessageBox.warning(self, "Faltan datos", str(exc))
+            mostrar_mensaje(self, "Faltan datos", str(exc), "warning")
             return
 
         for grupo, tipo, nombre in resoluciones_dialogo:
@@ -494,9 +505,9 @@ class ImportarExcel(QWidget):
             contenido = importador_reporte.generar_reporte_detallado(self.analisis)
             with open(ruta, "wb") as f:
                 f.write(contenido)
-            QMessageBox.information(self, "Listo", "Informe descargado correctamente.")
+            mostrar_mensaje(self, "Listo", "Informe descargado correctamente.", "success")
         except Exception as exc:
-            QMessageBox.critical(self, "Error", f"No se pudo generar el informe: {exc}")
+            mostrar_mensaje(self, "Error", f"No se pudo generar el informe: {exc}", "error")
 
     # ------------------------------------------------------------------
     # Confirmación e importación (Fase 13-14) en segundo plano
@@ -506,15 +517,16 @@ class ImportarExcel(QWidget):
         if not self.analisis or not self.resoluciones:
             return
 
-        respuesta = QMessageBox.question(
-            self, "Confirmar importación",
+        if not confirmar_mensaje(
+            self,
+            "Confirmar importación",
             "¿Confirmás la importación de los datos analizados?",
-        )
-        if respuesta != QMessageBox.StandardButton.Yes:
+        ):
             return
 
         self.boton_importar.setEnabled(False)
         self.progress_bar.setVisible(True)
+        self.overlay_progreso.mostrar("Importando datos...")
 
         conexion = gestor_db.obtener_conexion()
         self._import_worker = ImportWorker(
@@ -534,6 +546,7 @@ class ImportarExcel(QWidget):
 
     def _on_importacion_lista(self, resultado: dict) -> None:
         self.progress_bar.setVisible(False)
+        self.overlay_progreso.ocultar()
 
         self.log.append(f"✓ Pasadas nuevas: {resultado.get('pasadas_nuevas', 0)}")
         self.log.append(f"✓ Pasadas actualizadas: {resultado.get('pasadas_actualizadas', 0)}")
@@ -548,7 +561,7 @@ class ImportarExcel(QWidget):
             f"{os.path.basename(self.ruta_archivo)}",
         )
 
-        QMessageBox.information(self, "Listo", resultado.get("mensaje", "Importación completada."))
+        mostrar_mensaje(self, "Listo", resultado.get("mensaje", "Importación completada."), "success")
 
         self._resetear_resultado()
         self.ruta_archivo = None
@@ -558,6 +571,7 @@ class ImportarExcel(QWidget):
 
     def _on_importacion_error(self, mensaje: str) -> None:
         self.progress_bar.setVisible(False)
+        self.overlay_progreso.ocultar()
         self.boton_importar.setEnabled(True)
         self.log.append(f"✗ Error: {mensaje}")
-        QMessageBox.critical(self, "Error", f"No se pudo completar la importación: {mensaje}")
+        mostrar_mensaje(self, "Error", f"No se pudo completar la importación: {mensaje}", "error")

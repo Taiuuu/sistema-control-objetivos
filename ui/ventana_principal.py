@@ -534,6 +534,9 @@ class VentanaPrincipal(QWidget):
         self._header = self._construir_header()
         layout_derecho.addWidget(self._header)
 
+        self._metricas = self._construir_metricas()
+        layout_derecho.addWidget(self._metricas)
+
         self._barra_filtros_widget = self._construir_barra_filtros()
         layout_derecho.addWidget(self._barra_filtros_widget)
 
@@ -545,6 +548,41 @@ class VentanaPrincipal(QWidget):
         self._construir_tabla(layout_derecho)
 
         layout_raiz.addWidget(self._panel_derecho, 1)
+
+    def _construir_metricas(self) -> QWidget:
+        contenedor = QWidget()
+        layout = QHBoxLayout(contenedor)
+        layout.setContentsMargins(18, 14, 18, 12)
+        layout.setSpacing(12)
+        self._metricas_valores = {}
+
+        for clave, titulo, valor in (
+            ("objetivos", "Objetivos activos", "0"),
+            ("pasadas", "Pasadas del día", "0"),
+            ("alertas", "Alertas pendientes", "0"),
+        ):
+            card = QFrame()
+            card.setObjectName("MetricCard")
+            card.setMinimumHeight(82)
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(14, 10, 14, 10)
+            caption = QLabel(titulo)
+            caption.setObjectName("MetricCaption")
+            value = QLabel(valor)
+            value.setObjectName("MetricValue")
+            card_layout.addWidget(caption)
+            card_layout.addWidget(value)
+            layout.addWidget(card, 1)
+            self._metricas_valores[clave] = value
+        return contenedor
+
+    def _actualizar_metricas(self, objetivos, pasadas_dia, pasadas_noche) -> None:
+        total_pasadas = sum(pasadas_dia.values()) + sum(pasadas_noche.values())
+        objetivos_con_pasada = set(pasadas_dia) | set(pasadas_noche)
+        alertas = sum(1 for objetivo in objetivos if objetivo[0] not in objetivos_con_pasada)
+        self._metricas_valores["objetivos"].setText(str(len(objetivos)))
+        self._metricas_valores["pasadas"].setText(str(total_pasadas))
+        self._metricas_valores["alertas"].setText(str(alertas))
 
     def _construir_header(self) -> QWidget:
         oscuro = self._oscuro
@@ -1356,6 +1394,7 @@ class VentanaPrincipal(QWidget):
         equipo_noche = obtener_equipo(fecha, "nocturno")
 
         pasadas_dia_tot, pasadas_noche_tot = self._obtener_todas_pasadas_por_turno(fecha)
+        self._actualizar_metricas(objetivos, pasadas_dia_tot, pasadas_noche_tot)
         pasadas_dia_fil, pasadas_noche_fil = self._aplicar_filtro_pasadas(
             fecha, turno, supervisor_id, pasadas_dia_tot, pasadas_noche_tot
         )

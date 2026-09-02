@@ -15,6 +15,7 @@ from services.reportes import obtener_objetivos_del_dia
 from database.db import DB_PATH
 from ui.animaciones import animar_entrada
 from services.sincronizacion import obtener_sincronizador
+from ui.widgets.sparkline import Sparkline
 
 
 class TarjetaMetrica(QWidget):
@@ -110,6 +111,7 @@ class Dashboard(QWidget):
         self.setWindowTitle("Dashboard - VESP Control")
         self.setGeometry(200, 200, 1000, 700)
         self.setMinimumSize(800, 600)
+        self._tendencia = []
 
         # Timer para actualización automática cada 30 segundos
         self.timer_actualizacion = QTimer()
@@ -270,6 +272,12 @@ class Dashboard(QWidget):
 
         layout_detalles.addWidget(self.estado_general)
         layout_detalles.addWidget(self.proximas_alertas)
+        tendencia_titulo = QLabel("Tendencia de cumplimiento")
+        tendencia_titulo.setObjectName("MetricCaption")
+        self.sparkline = Sparkline()
+        self.sparkline.setMinimumHeight(90)
+        layout_detalles.addWidget(tendencia_titulo)
+        layout_detalles.addWidget(self.sparkline)
         layout_detalles.addStretch()
 
         parent_layout.addWidget(grupo_detalles)
@@ -316,6 +324,9 @@ class Dashboard(QWidget):
 
             # Actualizar estado general
             self._actualizar_estado_general(total_objetivos, cumplidos, criticos)
+            porcentaje = int(cumplidos / total_objetivos * 100) if total_objetivos else 0
+            self._tendencia.append(porcentaje)
+            self.sparkline.set_values(self._tendencia[-12:])
 
         except Exception as e:
             print(f"Error actualizando dashboard: {e}")

@@ -1,0 +1,145 @@
+/* VESP Control de Objetivos - tema oscuro premium */
+QWidget {
+    color: #F4F7FB;
+    font-family: "Aptos", "Segoe UI", sans-serif;
+    font-size: 13px;
+}
+QMainWindow, QWidget#VentanaPrincipal, QWidget#ImportarExcel {
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
+        stop: 0 #0C1228, stop: 0.55 #151A3B, stop: 1 #291B48);
+    background-image: none;
+}
+QFrame#Card, QFrame#CardContenedor, QFrame#MetricCard, QFrame#PanelGlass {
+    background-color: rgba(29, 38, 72, 220);
+    border: 1px solid rgba(255, 255, 255, 28);
+    border-radius: 12px;
+}
+QLabel#TituloPrincipal, QLabel#DashboardTitle {
+    color: #FFFFFF;
+    font-size: 23px;
+    font-weight: 700;
+}
+QLabel#Subtitulo, QLabel#MutedText, QLabel#MetricCaption {
+    color: #9AA8C7;
+    font-size: 12px;
+}
+QLabel#MetricValue {
+    color: #FFFFFF;
+    font-size: 28px;
+    font-weight: 700;
+}
+QLabel#StatusBadge {
+    background-color: #173B35;
+    color: #63E6BE;
+    border: 1px solid #2A806B;
+    border-radius: 9px;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-weight: 700;
+}
+QPushButton {
+    min-height: 34px;
+    padding: 0 16px;
+    color: #EAF0FF;
+    background-color: rgba(255, 255, 255, 14);
+    border: 1px solid rgba(255, 255, 255, 36);
+    border-radius: 17px;
+    font-weight: 600;
+}
+QPushButton:hover {
+    background-color: rgba(255, 255, 255, 25);
+    border-color: #63E6BE;
+}
+QPushButton:pressed { background-color: #237A66; }
+QPushButton:disabled {
+    color: #687592;
+    background-color: rgba(255, 255, 255, 7);
+    border-color: rgba(255, 255, 255, 14);
+}
+QPushButton#PrimaryButton {
+    color: #0E1A1B;
+    background-color: #63E6BE;
+    border: none;
+}
+QPushButton#PrimaryButton:hover { background-color: #8AF2D1; }
+QPushButton#DangerButton {
+    color: #FFD8DE;
+    border-color: #A94659;
+}
+QToolButton#TabButton, QPushButton#TabButton {
+    min-height: 32px;
+    padding: 0 14px;
+    border: none;
+    background: transparent;
+    color: #9AA8C7;
+    border-radius: 16px;
+}
+QToolButton#TabButton:checked, QPushButton#TabButton:checked {
+    color: #071A18;
+    background-color: #63E6BE;
+}
+QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox {
+    min-height: 34px;
+    padding: 0 10px;
+    color: #F4F7FB;
+    background-color: rgba(8, 14, 35, 170);
+    border: 1px solid rgba(255, 255, 255, 32);
+    border-radius: 8px;
+    selection-background-color: #237A66;
+}
+QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus {
+    border-color: #63E6BE;
+}
+QComboBox QAbstractItemView {
+    color: #F4F7FB;
+    background-color: #1D2648;
+    border: 1px solid #3C4A70;
+    selection-background-color: #237A66;
+}
+QCheckBox { spacing: 8px; color: #B5C0D9; }
+QCheckBox::indicator { width: 18px; height: 18px; }
+QTableWidget, QListWidget {
+    color: #EAF0FF;
+    background-color: rgba(13, 20, 45, 175);
+    alternate-background-color: rgba(255, 255, 255, 7);
+    border: 1px solid rgba(255, 255, 255, 24);
+    border-radius: 10px;
+    gridline-color: rgba(255, 255, 255, 12);
+    outline: none;
+}
+QHeaderView::section {
+    color: #9AA8C7;
+    background-color: rgba(255, 255, 255, 10);
+    border: none;
+    padding: 9px 10px;
+    font-weight: 700;
+}
+QScrollBar:vertical { width: 8px; background: transparent; margin: 4px; }
+QScrollBar::handle:vertical { min-height: 28px; background: #3C4A70; border-radius: 4px; }
+QScrollBar::handle:vertical:hover { background: #63E6BE; }
+QProgressBar {
+    min-height: 8px;
+    max-height: 8px;
+    border: none;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 14);
+    text-align: center;
+}
+QProgressBar::chunk { border-radius: 4px; background-color: #63E6BE; }
+QToolTip {
+    color: #F4F7FB;
+    background-color: #202B50;
+    border: 1px solid #3C4A70;
+    padding: 5px;
+}
+#DialogoMensaje { background-color: #1D2648; border: 1px solid #3C4A70; border-radius: 12px; }
+#DialogIcon {
+    color: #63E6BE;
+    background-color: #173B35;
+    border: 1px solid #2A806B;
+    border-radius: 20px;
+    font-size: 15px;
+    font-weight: 700;
+}
+#DialogMessage { color: #F4F7FB; font-size: 14px; }
+#OverlayProgreso { background-color: rgba(8, 14, 35, 220); }

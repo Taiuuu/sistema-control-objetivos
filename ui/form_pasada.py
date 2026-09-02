@@ -27,6 +27,7 @@ from services.tema import obtener_tema
 from services.validaciones import validar_pasada, ErrorValidacion
 from services.validador_horas_limite import validar_hora_turno_nocturno
 from services.importador.modelos import ResultadoMatchObjetivo, ResultadoMatchSupervisor
+from ui.widgets.dialogos import confirmar_mensaje, mostrar_mensaje
 
 # =============================================================================
 # FUNCIONES AUXILIARES
@@ -145,7 +146,7 @@ class FormPasada(QWidget):
         self.setWindowTitle("Registrar pasada")
         self.setMinimumSize(420, 420)
         self.setWindowFlag(Qt.WindowType.Window)
-        self.setStyleSheet(self._generar_estilos())
+        self.setObjectName("FormPasada")
 
         if fecha_inicial:
             fecha = QDate.fromString(fecha_inicial, "yyyy-MM-dd")
@@ -174,6 +175,7 @@ class FormPasada(QWidget):
         self.input_supervisor.setFixedHeight(34)
 
         self.boton_guardar = QPushButton("Registrar pasada")
+        self.boton_guardar.setObjectName("PrimaryButton")
         self.boton_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.boton_guardar.setFixedHeight(40)
         self.boton_guardar.clicked.connect(self._guardar)
@@ -323,11 +325,7 @@ class FormPasada(QWidget):
         supervisor_nombre = self.input_supervisor.currentText()
 
         if not objetivo_id or not supervisor_id:
-            QMessageBox.warning(
-                self,
-                "Error",
-                "Seleccioná un objetivo y un supervisor."
-            )
+            mostrar_mensaje(self, "Error", "Seleccioná un objetivo y un supervisor.", "warning")
             return
 
         try:
@@ -340,41 +338,28 @@ class FormPasada(QWidget):
             )
 
         except ErrorValidacion as e:
-            QMessageBox.warning(
-                self,
-                "Error de validación",
-                str(e)
-            )
+            mostrar_mensaje(self, "Error de validación", str(e), "warning")
             return
 
         # Validar horas límite (07:00-07:59) para turnos nocturnos
         es_valida, sugerencia = validar_hora_turno_nocturno(fecha, hora, turno)
         
         if not es_valida and sugerencia and sugerencia.get('tipo') == 'hora_limite':
-            respuesta = QMessageBox.question(
+            respuesta = confirmar_mensaje(
                 self,
-                "⚠️ Hora límite de turno nocturno",
+                "Hora límite de turno nocturno",
                 f"{sugerencia['razon']}\n\n"
                 f"Hora actual: {hora}\n"
                 f"Fecha actual: {fecha}\n"
                 f"{sugerencia['pregunta']}",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
-            
-            if respuesta == QMessageBox.StandardButton.Yes:
+
+            if respuesta:
                 fecha = sugerencia['fecha_sugerida']
-                QMessageBox.information(
-                    self,
-                    "Fecha ajustada",
-                    f"La pasada se registrará con fecha: {fecha}\n"
-                    f"(Correspondiente al turno nocturno anterior)"
-                )
+                mostrar_mensaje(self, "Fecha ajustada", f"La pasada se registrará con fecha: {fecha}\n"
+                                "(Correspondiente al turno nocturno anterior)", "success")
             else:
-                QMessageBox.information(
-                    self,
-                    "Fecha mantenida",
-                    f"La pasada se registrará en la fecha: {fecha}"
-                )
+                mostrar_mensaje(self, "Fecha mantenida", f"La pasada se registrará en la fecha: {fecha}")
 
         try:
             registrar_turno(
@@ -386,11 +371,7 @@ class FormPasada(QWidget):
             )
 
         except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Error",
-                str(e)
-            )
+            mostrar_mensaje(self, "Error", str(e), "error")
             return
 
         _ultimo_turno = turno
@@ -415,11 +396,7 @@ class FormPasada(QWidget):
 
         self.pasada_registrada.emit()
 
-        QMessageBox.information(
-            self,
-            "Correcto",
-            f"Pasada registrada en {objetivo_nombre}"
-        )
+        mostrar_mensaje(self, "Correcto", f"Pasada registrada en {objetivo_nombre}", "success")
 
         # Reiniciar hora actual
         self.input_hora.setTime(QTime.currentTime())

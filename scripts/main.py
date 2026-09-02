@@ -7,6 +7,7 @@ import sys
 import os
 import logging
 import traceback
+from pathlib import Path
 from typing import Optional
 
 # Agregar el directorio raíz del proyecto al path
@@ -23,6 +24,15 @@ from services.backup import hacer_backup
 from services.actualizador import verificar_actualizacion
 from services.tema import obtener_tema_actual, establecer_tema_actual
 from services.api_rest import iniciar_api_rest
+
+
+def cargar_qss(nombre: str) -> str:
+    """Carga un stylesheet empaquetado junto con la aplicación."""
+    ruta = Path(__file__).resolve().parent.parent / "ui" / nombre
+    try:
+        return ruta.read_text(encoding="utf-8")
+    except OSError:
+        return ""
 
 
 # =============================================================================
@@ -128,6 +138,7 @@ def aplicar_tema_oscuro(app: QApplication) -> None:
         QScrollBar:horizontal { background: #2a2a2a; height: 8px; border-radius: 4px; }
         QScrollBar::handle:horizontal { background: #555; border-radius: 4px; }
     """)
+    app.setStyleSheet(cargar_qss("tema_oscuro.qss"))
 
 
 def aplicar_tema_claro(app: QApplication) -> None:
