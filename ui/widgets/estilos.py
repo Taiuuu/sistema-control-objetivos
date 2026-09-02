@@ -3,92 +3,10 @@
 # =============================================================================
 
 
-# =========================================================================
-# PALETAS
-# =========================================================================
+from services.tema import PALETAS_UI, obtener_color_ui
 
-PALETA_OSCURA = {
-    "bg_sidebar": "#111318",
-    "bg_sidebar_hover": "#1e2128",
-    "bg_main": "#16181e",
-    "bg_header": "#1a1d24",
-    "bg_tabla": "#1e2128",
-    "bg_tabla_alt": "#1a1d24",
-
-    "accent": "#4ade80",
-    "accent_dark": "#22c55e",
-    "accent_red": "#f87171",
-    "accent_yellow": "#fbbf24",
-
-    "text_primary": "#f1f5f9",
-    "text_secondary": "#94a3b8",
-    "text_muted": "#475569",
-
-    "border": "#2a2d36",
-    "border_light": "#1e2128",
-
-    "btn_menu_text": "#cbd5e1",
-    "btn_menu_hover": "#2a2d36",
-
-    "scrollbar": "#2a2d36",
-    "scrollbar_handle": "#4ade80",
-
-    # ✅ ARREGLO CLAVE (BADGES EN MODO OSCURO)
-    "badge_bg": "#2a2d36",
-
-    "estado_verde_bg": "#064e3b",
-    "estado_verde_fg": "#6ee7b7",
-
-    "estado_rojo_bg": "#7f1d1d",
-    "estado_rojo_fg": "#fca5a5",
-
-    "estado_amarillo_bg": "#78350f",
-    "estado_amarillo_fg": "#fcd34d",
-}
-
-
-PALETA_CLARA = {
-    "bg_sidebar": "#f8fafc",
-    "bg_sidebar_hover": "#f1f5f9",
-    "bg_main": "#ffffff",
-    "bg_header": "#f8fafc",
-    "bg_tabla": "#ffffff",
-    "bg_tabla_alt": "#f8fafc",
-
-    "accent": "#16a34a",
-    "accent_dark": "#15803d",
-    "accent_red": "#dc2626",
-    "accent_yellow": "#d97706",
-
-    "text_primary": "#0f172a",
-    "text_secondary": "#475569",
-    "text_muted": "#94a3b8",
-
-    "border": "#e2e8f0",
-    "border_light": "#f1f5f9",
-
-    "btn_menu_text": "#334155",
-    "btn_menu_hover": "#e2e8f0",
-
-    "scrollbar": "#e2e8f0",
-    "scrollbar_handle": "#94a3b8",
-
-    # badges
-    "badge_bg": "#f1f5f9",
-
-    "estado_verde_bg": "#dcfce7",
-    "estado_verde_fg": "#15803d",
-
-    "estado_rojo_bg": "#fee2e2",
-    "estado_rojo_fg": "#dc2626",
-
-    "estado_amarillo_bg": "#fef9c3",
-    "estado_amarillo_fg": "#b45309",
-}
-
-
-# compatibilidad
-PALETA_EMPRESA = PALETA_OSCURA
+PALETA_OSCURA = PALETAS_UI["oscuro"]
+PALETA_CLARA = PALETAS_UI["claro"]
 
 
 # =========================================================================
@@ -96,8 +14,7 @@ PALETA_EMPRESA = PALETA_OSCURA
 # =========================================================================
 
 def obtener_color(key: str, oscuro: bool) -> str:
-    paleta = PALETA_OSCURA if oscuro else PALETA_CLARA
-    return paleta.get(key, "#ffffff")
+    return obtener_color_ui(key, oscuro)
 
 
 # =========================================================================

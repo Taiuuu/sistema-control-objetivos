@@ -12,48 +12,12 @@ from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtGui import QPixmap, QIcon, QFont
 from services.permisos import tiene_permiso
 from services.assets import ruta_asset
-
-
-# =============================================================================
-# PALETAS DE COLOR
-# =============================================================================
-
-PALETA_OSCURA = {
-    "bg_sidebar":        "#111318",
-    "bg_sidebar_hover":  "#1e2128",
-    "accent":            "#4ade80",
-    "accent_dark":       "#22c55e",
-    "accent_red":        "#f87171",
-    "text_primary":      "#f1f5f9",
-    "text_secondary":    "#94a3b8",
-    "text_muted":        "#475569",
-    "border":            "#2a2d36",
-    "btn_menu_hover":    "#2a2d36",
-    "btn_menu_text":     "#cbd5e1",
-    "scrollbar":         "#2a2d36",
-    "scrollbar_handle":  "#3f4556",
-}
-
-PALETA_CLARA = {
-    "bg_sidebar":        "#f8fafc",
-    "bg_sidebar_hover":  "#f1f5f9",
-    "accent":            "#16a34a",
-    "accent_dark":       "#15803d",
-    "accent_red":        "#dc2626",
-    "text_primary":      "#0f172a",
-    "text_secondary":    "#475569",
-    "text_muted":        "#94a3b8",
-    "border":            "#e2e8f0",
-    "btn_menu_hover":    "#e2e8f0",
-    "btn_menu_text":     "#334155",
-    "scrollbar":         "#e2e8f0",
-    "scrollbar_handle":  "#94a3b8",
-}
+from services.tema import obtener_color_ui
 
 
 def p(key: str, oscuro: bool) -> str:
     """Acceso rápido a paleta."""
-    return (PALETA_OSCURA if oscuro else PALETA_CLARA)[key]
+    return obtener_color_ui(key, oscuro)
 
 
 # =============================================================================

@@ -1,0 +1,40 @@
+/* VESP Control de Objetivos - tema claro centralizado */
+QWidget {
+    color: #172033;
+    font-family: "Aptos", "Segoe UI", sans-serif;
+    font-size: 13px;
+}
+QMainWindow, QWidget#VentanaPrincipal, QWidget#ImportarExcel { background-color: #F5F7FB; }
+QFrame#Card, QFrame#CardContenedor, QFrame#MetricCard, QFrame#PanelGlass {
+    background-color: #FFFFFF; border: 1px solid #DCE3EE; border-radius: 12px;
+}
+QLabel#TituloPrincipal, QLabel#DashboardTitle { color: #172033; font-size: 23px; font-weight: 700; }
+QLabel#Subtitulo, QLabel#MutedText, QLabel#MetricCaption { color: #667085; font-size: 12px; }
+QLabel#MetricValue { color: #172033; font-size: 28px; font-weight: 700; }
+QLabel#StatusBadge { background-color: #DCFCE7; color: #15803D; border: 1px solid #86EFAC; border-radius: 9px; padding: 3px 9px; font-size: 11px; font-weight: 700; }
+QPushButton { min-height: 34px; padding: 0 16px; color: #344054; background-color: #FFFFFF; border: 1px solid #D0D5DD; border-radius: 17px; font-weight: 600; }
+QPushButton:hover { background-color: #F0FDF4; border-color: #16A34A; }
+QPushButton:pressed { background-color: #DCFCE7; }
+QPushButton:disabled { color: #98A2B3; background-color: #F2F4F7; border-color: #EAECF0; }
+QPushButton#PrimaryButton { color: #FFFFFF; background-color: #16A34A; border: none; }
+QPushButton#PrimaryButton:hover { background-color: #15803D; }
+QPushButton#DangerButton { color: #B42318; border-color: #FDA29B; }
+QToolButton#TabButton, QPushButton#TabButton { min-height: 32px; padding: 0 14px; border: none; background: transparent; color: #667085; border-radius: 16px; }
+QToolButton#TabButton:checked, QPushButton#TabButton:checked { color: #FFFFFF; background-color: #16A34A; }
+QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox { min-height: 34px; padding: 0 10px; color: #172033; background-color: #FFFFFF; border: 1px solid #D0D5DD; border-radius: 8px; selection-background-color: #BBF7D0; }
+QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus { border-color: #16A34A; }
+QComboBox QAbstractItemView { color: #172033; background-color: #FFFFFF; border: 1px solid #D0D5DD; selection-background-color: #DCFCE7; }
+QCheckBox { spacing: 8px; color: #344054; }
+QCheckBox::indicator { width: 18px; height: 18px; }
+QTableWidget, QListWidget { color: #172033; background-color: #FFFFFF; alternate-background-color: #F8FAFC; border: 1px solid #DCE3EE; border-radius: 10px; gridline-color: #EAECF0; outline: none; }
+QHeaderView::section { color: #475467; background-color: #F2F4F7; border: none; padding: 9px 10px; font-weight: 700; }
+QScrollBar:vertical { width: 8px; background: transparent; margin: 4px; }
+QScrollBar::handle:vertical { min-height: 28px; background: #98A2B3; border-radius: 4px; }
+QScrollBar::handle:vertical:hover { background: #16A34A; }
+QProgressBar { min-height: 8px; max-height: 8px; border: none; border-radius: 4px; background-color: #EAECF0; text-align: center; }
+QProgressBar::chunk { border-radius: 4px; background-color: #16A34A; }
+QToolTip { color: #FFFFFF; background-color: #172033; border: 1px solid #344054; padding: 5px; }
+#DialogoMensaje { background-color: #FFFFFF; border: 1px solid #DCE3EE; border-radius: 12px; }
+#DialogIcon { color: #15803D; background-color: #DCFCE7; border: 1px solid #86EFAC; border-radius: 20px; font-size: 15px; font-weight: 700; }
+#DialogMessage { color: #172033; font-size: 14px; }
+#OverlayProgreso { background-color: rgba(255, 255, 255, 220); }

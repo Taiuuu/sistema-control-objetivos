@@ -14,7 +14,6 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
-from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import QTimer
 
 from ui.login import LoginWindow
@@ -97,98 +96,25 @@ def inicializar_componente(logger: logging.Logger, nombre: str, funcion, *args, 
         return False
 
 
-def aplicar_tema_oscuro(app: QApplication) -> None:
+def aplicar_tema(app: QApplication, nombre_tema: str) -> None:
+    """Aplica el único stylesheet correspondiente al tema activo."""
+    if nombre_tema not in {"oscuro", "claro"}:
+        nombre_tema = "oscuro"
+
     app.setStyle("Fusion")
     app.setPalette(app.style().standardPalette())
-    palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window,          QColor(30, 30, 30))
-    palette.setColor(QPalette.ColorRole.WindowText,      QColor(220, 220, 220))
-    palette.setColor(QPalette.ColorRole.Base,            QColor(45, 45, 45))
-    palette.setColor(QPalette.ColorRole.AlternateBase,   QColor(55, 55, 55))
-    palette.setColor(QPalette.ColorRole.ToolTipBase,     QColor(30, 30, 30))
-    palette.setColor(QPalette.ColorRole.ToolTipText,     QColor(220, 220, 220))
-    palette.setColor(QPalette.ColorRole.Text,            QColor(220, 220, 220))
-    palette.setColor(QPalette.ColorRole.Button,          QColor(55, 55, 55))
-    palette.setColor(QPalette.ColorRole.ButtonText,      QColor(220, 220, 220))
-    palette.setColor(QPalette.ColorRole.BrightText,      QColor(255, 100, 100))
-    palette.setColor(QPalette.ColorRole.Highlight,       QColor(42, 130, 218))
-    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
-    app.setPalette(palette)
-    app.setStyleSheet("""
-        QWidget { font-family: Segoe UI; font-size: 13px; }
-        QPushButton {
-            background-color: #2a2a2a; color: #dcdcdc;
-            border: 1px solid #555; border-radius: 4px; padding: 5px 12px;
-        }
-        QPushButton:hover { background-color: #3a3a3a; border: 1px solid #2a82da; }
-        QPushButton:pressed { background-color: #2a82da; color: white; }
-        QTableWidget { gridline-color: #444; border: 1px solid #444; }
-        QHeaderView::section {
-            background-color: #2a2a2a; color: #dcdcdc;
-            padding: 5px; border: 1px solid #444; font-weight: bold;
-        }
-        QComboBox, QDateEdit, QLineEdit {
-            background-color: #2a2a2a; color: #dcdcdc;
-            border: 1px solid #555; border-radius: 4px; padding: 3px 8px;
-        }
-        QMessageBox { background-color: #1e1e1e; color: #dcdcdc; }
-        QScrollBar:vertical { background: #2a2a2a; width: 8px; border-radius: 4px; }
-        QScrollBar::handle:vertical { background: #555; border-radius: 4px; }
-        QScrollBar::handle:vertical:hover { background: #2a82da; }
-        QScrollBar:horizontal { background: #2a2a2a; height: 8px; border-radius: 4px; }
-        QScrollBar::handle:horizontal { background: #555; border-radius: 4px; }
-    """)
-    app.setStyleSheet(cargar_qss("tema_oscuro.qss"))
+    stylesheet = cargar_qss(f"tema_{nombre_tema}.qss")
+    if not stylesheet:
+        raise RuntimeError(f"No se pudo cargar el stylesheet del tema '{nombre_tema}'")
+    app.setStyleSheet(stylesheet)
+
+
+def aplicar_tema_oscuro(app: QApplication) -> None:
+    aplicar_tema(app, "oscuro")
 
 
 def aplicar_tema_claro(app: QApplication) -> None:
-    app.setStyle("Fusion")
-    app.setPalette(app.style().standardPalette())
-    palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window,          QColor(245, 245, 245))
-    palette.setColor(QPalette.ColorRole.WindowText,      QColor(30, 30, 30))
-    palette.setColor(QPalette.ColorRole.Base,            QColor(255, 255, 255))
-    palette.setColor(QPalette.ColorRole.AlternateBase,   QColor(235, 235, 235))
-    palette.setColor(QPalette.ColorRole.Text,            QColor(30, 30, 30))
-    palette.setColor(QPalette.ColorRole.Button,          QColor(225, 225, 225))
-    palette.setColor(QPalette.ColorRole.ButtonText,      QColor(30, 30, 30))
-    palette.setColor(QPalette.ColorRole.Highlight,       QColor(42, 130, 218))
-    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
-    palette.setColor(QPalette.ColorRole.ToolTipBase,     QColor(255, 255, 220))
-    palette.setColor(QPalette.ColorRole.ToolTipText,     QColor(30, 30, 30))
-    palette.setColor(QPalette.ColorRole.BrightText,      QColor(255, 0, 0))
-    app.setPalette(palette)
-    for widget in app.allWidgets():
-        widget.update()
-        widget.repaint()
-    app.setStyleSheet("""
-        QWidget { font-family: Segoe UI; font-size: 13px; }
-        QPushButton {
-            background-color: #e0e0e0; color: #1e1e1e;
-            border: 1px solid #bbb; border-radius: 4px; padding: 5px 12px;
-        }
-        QPushButton:hover { background-color: #d0d0d0; border: 1px solid #2a82da; }
-        QPushButton:pressed { background-color: #2a82da; color: white; }
-        QTableWidget {
-            gridline-color: #ccc; border: 1px solid #ccc;
-            background-color: white; alternate-background-color: #f9f9f9;
-        }
-        QHeaderView::section {
-            background-color: #e0e0e0; color: #1e1e1e;
-            padding: 5px; border: 1px solid #ccc; font-weight: bold;
-        }
-        QFrame { background-color: #f0f0f0; }
-        QScrollBar:vertical { background: #e0e0e0; width: 8px; border-radius: 4px; }
-        QScrollBar::handle:vertical { background: #aaa; border-radius: 4px; }
-        QScrollBar::handle:vertical:hover { background: #2a82da; }
-        QComboBox, QDateEdit, QLineEdit {
-            background-color: #f5f5f5; color: #1e1e1e;
-            border: 1px solid #ccc; border-radius: 4px; padding: 3px 8px;
-        }
-        QMessageBox { background-color: #f5f5f5; color: #1e1e1e; }
-        QScrollBar:horizontal { background: #e0e0e0; height: 8px; border-radius: 4px; }
-        QScrollBar::handle:horizontal { background: #aaa; border-radius: 4px; }
-    """)
+    aplicar_tema(app, "claro")
 
 
 def alternar_tema(app: QApplication, ventana) -> None:
