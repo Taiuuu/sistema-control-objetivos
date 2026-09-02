@@ -986,6 +986,7 @@ def _aplicar_resoluciones_a_pasadas(
         if tipo in (
             "match_existente",
             "crear_nuevo",
+            "crear_alias",
         ):
 
             entidad_id = resolucion["id"]

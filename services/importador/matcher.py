@@ -133,6 +133,27 @@ def _coincide_sufijo(a: str, b: str) -> bool:
     return tokens_a[-1] == tokens_b[-1]
 
 
+def _identificadores_nombre(nombre: str) -> set[str]:
+    """Extrae identificadores alfanuméricos que distinguen objetivos."""
+    tokens = nombre.split()
+    identificadores = set()
+    for indice, token in enumerate(tokens):
+        limpio = token.strip(".,()")
+        if not re.fullmatch(r"[A-Z]*\d+[A-Z]*", limpio):
+            continue
+        if limpio.isdigit() and indice > 0 and tokens[indice - 1].strip(".,()") == "RUTA":
+            continue
+        identificadores.add(limpio)
+    return identificadores
+
+
+def _identificadores_compatibles(a: str, b: str) -> bool:
+    """Evita sugerencias difusas que pierden números o sufijos Pn."""
+    identificadores_a = _identificadores_nombre(a)
+    identificadores_b = _identificadores_nombre(b)
+    return identificadores_a == identificadores_b
+
+
 def _normalizar_supervisor(nombre: str) -> str:
     """Normaliza supervisores sin depender del orden de nombre y apellido."""
     tokens = _normalizar_nombre(nombre).replace(",", "").split()
@@ -229,6 +250,8 @@ def matchear_objetivo(
     candidatos: list[SugerenciaObjetivo] = []
     for obj in objetivos_bd:
         obj_norm = _normalizar_nombre(obj.nombre)
+        if not _identificadores_compatibles(nombre_norm, obj_norm):
+            continue
         sim = _similitud(nombre_norm, obj_norm)
         if sim >= _UMBRAL_SUGERENCIA:
             candidatos.append(
