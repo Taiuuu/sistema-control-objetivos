@@ -26,6 +26,7 @@ IMPORTANTE:
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
@@ -43,6 +44,7 @@ from .modelos import (
 # ============================================================================
 
 DIAS_RETENCION_HISTORICO = 10
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -944,6 +946,10 @@ def _aplicar_resoluciones_a_pasadas(
         )
 
         if indice_pasada is None:
+            logger.warning(
+                "Resolución sin pasada asociada: hoja=%s fila=%s bloque=- motivo=no se encontró coincidencia única",
+                problema.hoja, problema.fila_excel,
+            )
             continue
 
         pasada = analisis.pasadas[
@@ -1151,12 +1157,20 @@ def _persistir_pasadas(
         if accion == "omitir":
 
             omitidas += 1
+            logger.info(
+                "Pasada omitida: hoja=%s fila=%d bloque=%d objetivo=%r motivo=acción omitir",
+                pasada.hoja, pasada.fila_excel, pasada.bloque_tabla, pasada.objetivo_nombre,
+            )
             continue
 
         # Una pasada sin objetivo resuelto queda sin acción y se omite sin
         # interrumpir la importación del resto del archivo.
         if accion is None:
             omitidas += 1
+            logger.warning(
+                "Pasada omitida: hoja=%s fila=%d bloque=%d objetivo=%r motivo=objetivo sin matching resuelto",
+                pasada.hoja, pasada.fila_excel, pasada.bloque_tabla, pasada.objetivo_nombre,
+            )
             continue
 
         # --------------------------------------------------------------
@@ -1174,6 +1188,10 @@ def _persistir_pasadas(
 
             if existente:
                 omitidas += 1
+                logger.info(
+                    "Pasada omitida: hoja=%s fila=%d bloque=%d objetivo=%r motivo=ya existe en BD",
+                    pasada.hoja, pasada.fila_excel, pasada.bloque_tabla, pasada.objetivo_nombre,
+                )
                 continue
 
             id_nueva = _insertar_pasada(

@@ -24,6 +24,7 @@ demás, así que no se suma ninguna dependencia nueva.
 from __future__ import annotations
 
 import io
+import logging
 from typing import Optional
 
 from . import duplicados, matcher, parser
@@ -38,6 +39,9 @@ from .validador import validar
 
 import openpyxl
 from openpyxl.styles import Font
+
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +72,11 @@ def _construir_pasadas_normalizadas(
             # No se puede fechar/turnar ninguna pasada de esta hoja: se
             # reporta el error y se saltea la hoja entera.
             problemas.append(problema_hoja)
+            logger.error(
+                "Hoja descartada: hoja=%s fila=- bloque=- motivo=%s",
+                hoja,
+                problema_hoja.descripcion,
+            )
             continue
 
         crudas = parser.leer_pasadas_crudas(path, hoja)
@@ -78,6 +87,11 @@ def _construir_pasadas_normalizadas(
             resultado_hora = normalizar_hora(cruda.hora)
 
             if resultado_hora.error is not None:
+                logger.warning(
+                    "Pasada descartada: hoja=%s fila=%d bloque=%d objetivo=%r motivo=hora inválida: %s",
+                    hoja, cruda.fila_excel, cruda.bloque_tabla, cruda.objetivo,
+                    resultado_hora.error,
+                )
                 problemas.append(
                     Problema(
                         tipo="advertencia",
@@ -97,6 +111,10 @@ def _construir_pasadas_normalizadas(
                 continue
 
             if resultado_hora.hora is None:
+                logger.warning(
+                    "Pasada retenida como incompleta: hoja=%s fila=%d bloque=%d objetivo=%r motivo=hora ausente",
+                    hoja, cruda.fila_excel, cruda.bloque_tabla, cruda.objetivo,
+                )
                 # Celda de hora vacía, pero la fila no está vacía en su
                 # conjunto (tiene movil/turno/supervisor cargado). No es
                 # el mismo caso que "hora inválida" (normalizar_hora no
@@ -159,6 +177,10 @@ def _construir_pasadas_normalizadas(
                 # respaldo (no debería pasar, ya que parsear_nombre_hoja
                 # ya garantizó turno_hoja válido, pero se cubre el caso
                 # límite igual en vez de asumir).
+                logger.warning(
+                    "Pasada descartada: hoja=%s fila=%d bloque=%d objetivo=%r motivo=turno no resoluble",
+                    hoja, cruda.fila_excel, cruda.bloque_tabla, cruda.objetivo,
+                )
                 continue
 
             fecha_operativa, fecha_calendario = determinar_fecha_operativa_y_calendario(
@@ -242,6 +264,14 @@ def analizar_excel(
                 detalle = "Sin match exacto ni sugerencias cercanas."
             destinos = afectadas or [None]  # no perder el problema si no hay pasada asociada
             for p in destinos:
+                logger.warning(
+                    "Matching pendiente: hoja=%s fila=%s bloque=%s objetivo=%r campo=%s motivo=sin coincidencia exacta",
+                    p.hoja if p else "-",
+                    p.fila_excel if p else "-",
+                    p.bloque_tabla if p else "-",
+                    resultado.nombre_excel,
+                    atributo_nombre,
+                )
                 extra.append(
                     Problema(
                         tipo="para_revisar",

@@ -32,6 +32,7 @@ Contrato asumido de `conexion_bd` (definido acá, no venía dado):
 from __future__ import annotations
 
 import difflib
+import logging
 from datetime import date
 from typing import Any, Optional
 
@@ -49,6 +50,7 @@ _TABLA_TILDES = str.maketrans("ÁÉÍÓÚáéíóú", "AEIOUaeiou")
 
 _UMBRAL_SUGERENCIA = 0.5
 _MAX_SUGERENCIAS = 5
+logger = logging.getLogger(__name__)
 
 
 def _normalizar_nombre(nombre: str) -> str:
@@ -304,6 +306,10 @@ def aplicar_matching_objetivos(
     por_nombre: dict[str, list[PasadaNormalizada]] = {}
     for p in pasadas:
         if not p.objetivo_nombre or not p.objetivo_nombre.strip():
+            logger.warning(
+                "Pasada fuera de matching: hoja=%s fila=%d bloque=%d motivo=objetivo vacío",
+                p.hoja, p.fila_excel, p.bloque_tabla,
+            )
             continue
         clave = _normalizar_nombre(p.objetivo_nombre)
         por_nombre.setdefault(clave, []).append(p)
@@ -330,6 +336,10 @@ def aplicar_matching_supervisores(
     por_nombre: dict[str, list[PasadaNormalizada]] = {}
     for p in pasadas:
         if not p.supervisor_nombre or not p.supervisor_nombre.strip():
+            logger.warning(
+                "Pasada fuera de matching: hoja=%s fila=%d bloque=%d motivo=supervisor vacío",
+                p.hoja, p.fila_excel, p.bloque_tabla,
+            )
             continue
         clave = _normalizar_nombre(p.supervisor_nombre)
         por_nombre.setdefault(clave, []).append(p)

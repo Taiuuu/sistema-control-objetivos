@@ -21,6 +21,7 @@ de etapas posteriores del pipeline de importación, NO de este módulo.
 from __future__ import annotations
 
 import re
+import logging
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Optional
@@ -47,6 +48,7 @@ _MAX_FILAS_DATOS = 500
 # puede ser de varios segundos en archivos grandes- en cada llamada a
 # leer_pasadas_crudas). Se cachea por path.
 _CACHE_WORKBOOKS: dict[str, "openpyxl.Workbook"] = {}
+logger = logging.getLogger(__name__)
 
 
 def _get_workbook(path: str) -> "openpyxl.Workbook":
@@ -184,6 +186,7 @@ def leer_hojas_de_datos(path: str) -> list[str]:
         hojas_datos = []
         for nombre in wb.sheetnames:
             if not _PATRON_HOJA_DATOS.fullmatch(nombre.strip()):
+                logger.info("Hoja excluida del importador: hoja=%s motivo=nombre fuera del patrón de día", nombre)
                 continue
             ws = wb[nombre]
             if _detectar_bloques(ws) is not None:
@@ -225,6 +228,11 @@ def leer_pasadas_crudas(path: str, nombre_hoja: str) -> list[PasadaCruda]:
     while fila <= max_fila:
 
         if _fila_contiene_observaciones(ws, fila, max_col):
+            logger.info(
+                "Fin de tabla: hoja=%s fila=%d motivo=OBSERVACIONES",
+                nombre_hoja,
+                fila,
+            )
             break
 
         # --- extraer los datos crudos de cada bloque presente en la fila ---
@@ -255,6 +263,11 @@ def leer_pasadas_crudas(path: str, nombre_hoja: str) -> list[PasadaCruda]:
             for d in datos_bloques
             for campo in ("no", "objetivo", "turno", "movil", "hora", "supervisor")
         ):
+            logger.info(
+                "Fin de tabla: hoja=%s fila=%d motivo=fila sin datos en ningún bloque",
+                nombre_hoja,
+                fila,
+            )
             break
 
         # --- rellenar objetivo faltante desde otro bloque de la misma fila ---

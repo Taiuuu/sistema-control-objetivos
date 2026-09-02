@@ -8,12 +8,16 @@ Fase 8 del pipeline de importación.
 from __future__ import annotations
 
 from itertools import groupby
+import logging
 from typing import Any
 
 try:
     from .modelos import PasadaNormalizada
 except ImportError:
     from modelos import PasadaNormalizada
+
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -30,10 +34,14 @@ def _clave_pasada(p: PasadaNormalizada) -> tuple:
     El supervisor NO forma parte de la identidad principal porque puede
     cambiar posteriormente y una pasada existente puede requerir actualización.
     """
+    objetivo = p.objetivo_id
+    if objetivo is None:
+        objetivo = " ".join((p.objetivo_nombre or "").strip().upper().split())
+
     return (
         p.fecha_operativa,
         p.turno,
-        p.objetivo_id,
+        objetivo,
         p.hora,
     )
 
@@ -156,6 +164,14 @@ def detectar_duplicados_internos(
 
             finales.append(grupo_ordenado[0])
             descartadas.extend(grupo_ordenado[1:])
+            for descartada in grupo_ordenado[1:]:
+                logger.warning(
+                    "Pasada descartada por duplicado: hoja=%s fila=%d bloque=%d objetivo=%r motivo=misma fecha, turno, objetivo, hora y supervisor",
+                    descartada.hoja,
+                    descartada.fila_excel,
+                    descartada.bloque_tabla,
+                    descartada.objetivo_nombre,
+                )
             continue
 
         # Supervisores distintos:
