@@ -38,6 +38,17 @@ def _clave_pasada(p: PasadaNormalizada) -> tuple:
     )
 
 
+def _clave_ordenamiento(p: PasadaNormalizada) -> tuple:
+    """Devuelve una clave total para ordenar pasadas con objetivo sin resolver."""
+    return (
+        p.fecha_operativa,
+        p.turno,
+        p.objetivo_id is None,
+        p.objetivo_id if p.objetivo_id is not None else 0,
+        p.hora,
+    )
+
+
 def _clave_pasada_sql(p: PasadaNormalizada) -> tuple:
     """
     Misma clave que _clave_pasada(), pero convertida a tipos compatibles
@@ -114,7 +125,7 @@ def detectar_duplicados_internos(
     ordenadas = sorted(
         pasadas,
         key=lambda p: (
-            _clave_pasada(p),
+            _clave_ordenamiento(p),
             p.fila_excel,
         ),
     )

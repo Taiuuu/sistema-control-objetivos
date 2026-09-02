@@ -17,8 +17,10 @@ def test_caches():
     print("TEST 1: Inicialización de caches")
     print("="*60)
     
+    from database.db import crear_base_datos
     from services.importador_universal import get_importador
     
+    crear_base_datos()
     importador = get_importador()
     
     # Verificar que tiene la flag
@@ -127,7 +129,7 @@ def test_mapeo_automatico():
 
 def main():
     """Ejecutar todos los tests"""
-    print("\n" + "🔍 ")*15)
+    print("\n" + "🔍 " * 15)
     print("VALIDACIÓN DEL IMPORTADOR UNIVERSAL")
     print("🔍 "*15)
     

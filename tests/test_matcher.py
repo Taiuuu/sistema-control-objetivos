@@ -1,4 +1,8 @@
-from matcher import matchear_objetivo, matchear_supervisor, inferir_supervisor_faltante
+from services.importador.matcher import (
+    matchear_objetivo,
+    matchear_supervisor,
+    inferir_supervisor_faltante,
+)
 
 CATALOGO = [
     "BARRIO EL FLORIDO",

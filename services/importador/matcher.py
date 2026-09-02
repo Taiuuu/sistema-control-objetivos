@@ -32,7 +32,8 @@ Contrato asumido de `conexion_bd` (definido acá, no venía dado):
 from __future__ import annotations
 
 import difflib
-from typing import Optional
+from datetime import date
+from typing import Any, Optional
 
 from .modelos import (
     ObjetivoBD,
@@ -61,6 +62,54 @@ def normalizar_nombre(nombre: str) -> str:
     mapear resultados de matching por nombre sin tocar un símbolo privado."""
     return _normalizar_nombre(nombre)
 
+
+def inferir_supervisor_faltante(
+    supervisor: Any,
+    supervisor_anterior: Optional[str] = None,
+    supervisor_siguiente: Optional[str] = None,
+) -> Any:
+    """Completa supervisores vacíos usando el contexto disponible."""
+    if isinstance(supervisor, list):
+        def obtener(item: Any) -> Optional[str]:
+            if isinstance(item, dict):
+                valor = item.get("supervisor")
+            else:
+                valor = getattr(item, "supervisor", None)
+            return valor if isinstance(valor, str) and valor.strip() else None
+
+        def establecer(item: Any, valor: str) -> None:
+            if isinstance(item, dict):
+                item["supervisor"] = valor
+            else:
+                setattr(item, "supervisor", valor)
+
+        conocido = None
+        for item in supervisor:
+            valor = obtener(item)
+            if valor is not None:
+                conocido = valor
+            elif conocido is not None:
+                establecer(item, conocido)
+
+        conocido = next(
+            (obtener(item) for item in supervisor if obtener(item) is not None),
+            None,
+        )
+        if conocido is not None:
+            for item in supervisor:
+                if obtener(item) is None:
+                    establecer(item, conocido)
+        return supervisor
+
+    if isinstance(supervisor, str) and supervisor.strip():
+        return supervisor.strip()
+    if supervisor_anterior and supervisor_anterior.strip():
+        return supervisor_anterior.strip()
+    if supervisor_siguiente and supervisor_siguiente.strip():
+        return supervisor_siguiente.strip()
+    return None
+
+
 def _similitud(a: str, b: str) -> float:
     return difflib.SequenceMatcher(None, a, b).ratio()
 
@@ -71,6 +120,40 @@ def _coincide_sufijo(a: str, b: str) -> bool:
     if not tokens_a or not tokens_b:
         return False
     return tokens_a[-1] == tokens_b[-1]
+
+
+def _normalizar_supervisor(nombre: str) -> str:
+    """Normaliza supervisores sin depender del orden de nombre y apellido."""
+    tokens = _normalizar_nombre(nombre).replace(",", "").split()
+    return " ".join(sorted(tokens))
+
+
+def _objetivos_como_modelos(objetivos: list[Any]) -> list[ObjetivoBD]:
+    modelos = []
+    for indice, objetivo in enumerate(objetivos):
+        if isinstance(objetivo, ObjetivoBD):
+            modelos.append(objetivo)
+        elif isinstance(objetivo, dict):
+            modelos.append(ObjetivoBD(objetivo.get("id", indice), objetivo["nombre"]))
+        elif isinstance(objetivo, (tuple, list)):
+            modelos.append(ObjetivoBD(objetivo[0], objetivo[1]))
+        else:
+            modelos.append(ObjetivoBD(indice, str(objetivo)))
+    return modelos
+
+
+def _supervisores_como_modelos(supervisores: list[Any]) -> list[SupervisorBD]:
+    modelos = []
+    for indice, supervisor in enumerate(supervisores):
+        if isinstance(supervisor, SupervisorBD):
+            modelos.append(supervisor)
+        elif isinstance(supervisor, dict):
+            modelos.append(SupervisorBD(supervisor.get("id", indice), supervisor["nombre"]))
+        elif isinstance(supervisor, (tuple, list)):
+            modelos.append(SupervisorBD(supervisor[0], supervisor[1]))
+        else:
+            modelos.append(SupervisorBD(indice, str(supervisor)))
+    return modelos
 
 
 # ---------------------------------------------------------------------------
@@ -97,8 +180,9 @@ def obtener_supervisores_bd(conexion_bd) -> list[SupervisorBD]:
 
 def matchear_objetivo(
     nombre_excel: str,
-    objetivos_bd: list[ObjetivoBD],
+    objetivos_bd: list[Any],
 ) -> ResultadoMatchObjetivo:
+    objetivos_bd = _objetivos_como_modelos(objetivos_bd)
     nombre_norm = _normalizar_nombre(nombre_excel)
 
     for obj in objetivos_bd:
@@ -107,6 +191,7 @@ def matchear_objetivo(
                 nombre_excel=nombre_excel,
                 tipo="exacto",
                 objetivo_exacto=obj,
+                permite_crear_nuevo=False,
             )
 
     candidatos: list[SugerenciaObjetivo] = []
@@ -138,21 +223,24 @@ def matchear_objetivo(
         nombre_excel=nombre_excel,
         tipo="no_reconocido",
         nombre_sugerido_nuevo=nombre_excel.strip(),
+        fecha_inicio_sugerida=date.today(),
     )
 
 
 def matchear_supervisor(
     nombre_excel: str,
-    supervisores_bd: list[SupervisorBD],
+    supervisores_bd: list[Any],
 ) -> ResultadoMatchSupervisor:
+    supervisores_bd = _supervisores_como_modelos(supervisores_bd)
     nombre_norm = _normalizar_nombre(nombre_excel)
 
     for sup in supervisores_bd:
-        if _normalizar_nombre(sup.nombre) == nombre_norm:
+        if _normalizar_supervisor(sup.nombre) == _normalizar_supervisor(nombre_excel):
             return ResultadoMatchSupervisor(
                 nombre_excel=nombre_excel,
                 tipo="exacto",
                 supervisor_exacto=sup,
+                permite_crear_nuevo=False,
             )
 
     candidatos: list[SugerenciaSupervisor] = []
