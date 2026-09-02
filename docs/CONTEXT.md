@@ -67,7 +67,7 @@ sistema-control-objetivos/
 ├── services/
 │   ├── sesion.py
 │   ├── permisos.py
-│   ├── importador_universal.py
+│   ├── importador/
 │   ├── gestor_turnos.py
 │   ├── sync_manager.py
 │   └── (33 services total)
@@ -175,11 +175,13 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - Manual backup: Menú → Configuración → Hacer Backup
 - Stored as file copies of `seguridad.db` in `backups/`
 
-### Import (ui/importar_excel.py + services/importador_universal.py)
+### Import (ui/importar_excel.py + services/importador/)
 
 - Import CONTROL_RECORRIDOS Excel files
-- Sheets named by date and shift; three horizontal column blocks per sheet (legacy format),
-  también soporta formato tabular con encabezados
+- Sheets named by date and shift; three horizontal column blocks per sheet
+- Detects each block from its complete header row, including shifted columns
+- Stops at the `OBSERVACIONES:` section and ignores its free text
+- Normalizes Excel time values, including text using `;` as separator
 - File is parsed once (preview cached); import reuses preview, never reparses
 - Auto-resolves objetivos and supervisores that already exist in DB
 - For unresolved ones: shows DialogoResolverObjetivos / DialogoResolverSupervisores
@@ -192,9 +194,8 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - **Regla de negocio clave: el turno de la hoja (sheet) es la única fuente de verdad para el turno
   de cada pasada. Nunca se descarta ni reclasifica una fila por diferencias entre el turno de la
   celda y el turno de la hoja — la hoja siempre gana.**
-- El parser de CONTROL_RECORRIDOS ahora usa un único flujo compartido para normalizar objetivo,
-  supervisor, turno, hora, fecha, notas y descartes, independientemente de si la hoja usa el
-  formato legacy o el formato con encabezados. Ambos parsers producen el mismo registro final.
+- El parser de CONTROL_RECORRIDOS usa un único flujo estructurado para normalizar objetivo,
+  supervisor, turno, hora, fecha y descartes.
 - "Deshacer importación": filtro por fecha, supervisor, objetivo; multi-select; doble confirmación
   (escribir "ELIMINAR") para borrado masivo
 
@@ -224,7 +225,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - Flask API is optional; app must start and run without it
 - All migrations must include explicit rollback on failure
 - Backups are file copies of seguridad.db, stored in backups/
-- importador_universal.py handles all Excel import logic; do not duplicate elsewhere
+- services/importador/ handles all Excel import logic; do not duplicate elsewhere
 - El turno de importación viene siempre de la hoja, nunca se infiere del horario puntual de la fila
 
 ---
@@ -238,9 +239,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - ui/login.py::_login_post_cambio(): None check on fetchone() before indexing
 - services/sesion.py: obtener_sesion_valida() added as central session validator
 - database/db.py: explicit rollback on migration failure; duplicate column treated as no-op
-- importador_universal.py: file parsed once, preview cached (_cache_inicializado flag)
-- importador_universal.py: auto-resolves existing objetivos/supervisores, manual dialog only for new ones
-- importador_universal.py: hora normalization supports datetime.datetime and out-of-range times
+- services/importador/: structured parser, normalization, matching, validation, and transactional import
 - ui/importar_excel.py: DialogoResolverSupervisores added (mirrors DialogoResolverObjetivos)
 - ui/importar_excel.py: "Deshacer importación" feature added with filters + double confirmation
 
@@ -248,8 +247,6 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 
 - database/db.py: foreign key enforcement is enabled consistently through the shared SQLite configuration used by the database manager and objective-related flows
 - services/permisos.py: decorators lack try-except and logging on failure
-- importador_universal.py legacy parser: descarta filas cuando el turno de la celda no coincide
-  con el turno de la hoja en vez de forzar el turno de la hoja (bug activo, corregir)
 
 ### Known risks
 
@@ -295,7 +292,7 @@ Not active yet (planned for v2.0+): `desktop/`, `mobile/`, `shared/`, `backend/`
 - Spanish for all domain terms: objetivo, pasada, supervisor, turno, equipo
 - snake_case for functions and variables
 - PascalCase for classes
-- Files named by responsibility: gestor_turnos.py, importador_universal.py
+- Files named by responsibility: gestor_turnos.py, importador/
 
 ### Commits
 

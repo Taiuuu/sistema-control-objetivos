@@ -10,6 +10,9 @@ import shutil
 from pathlib import Path
 
 
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
 # Override database path for testing
 @pytest.fixture
 def test_db():

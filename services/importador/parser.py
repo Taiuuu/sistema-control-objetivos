@@ -102,6 +102,13 @@ def _norm_texto(v: Any) -> str:
     return str(v).strip().upper()
 
 
+def _normalizar_objetivo(v: Any) -> Optional[str]:
+    if v is None:
+        return None
+    texto = re.sub(r"\s+", " ", str(v)).strip()
+    return texto or None
+
+
 def _es_numerico(v: Any) -> bool:
     """True si v representa un número (el NO de una fila de datos)."""
     if isinstance(v, bool):
@@ -176,6 +183,8 @@ def leer_hojas_de_datos(path: str) -> list[str]:
     try:
         hojas_datos = []
         for nombre in wb.sheetnames:
+            if not _PATRON_HOJA_DATOS.fullmatch(nombre.strip()):
+                continue
             ws = wb[nombre]
             if _detectar_bloques(ws) is not None:
                 hojas_datos.append(nombre)
@@ -211,10 +220,9 @@ def leer_pasadas_crudas(path: str, nombre_hoja: str) -> list[PasadaCruda]:
 
     pasadas: list[PasadaCruda] = []
     fila = fila_encabezado + 1
-    filas_recorridas = 0
+    max_fila = ws.max_row
 
-    while filas_recorridas < _MAX_FILAS_DATOS:
-        filas_recorridas += 1
+    while fila <= max_fila:
 
         if _fila_contiene_observaciones(ws, fila, max_col):
             break
@@ -253,11 +261,15 @@ def leer_pasadas_crudas(path: str, nombre_hoja: str) -> list[PasadaCruda]:
         objetivo_comun = None
         for d in datos_bloques:
             if _valor_no_vacio(d["objetivo"]):
-                objetivo_comun = d["objetivo"]
+                objetivo_comun = _normalizar_objetivo(d["objetivo"])
                 break
 
         for idx, d in enumerate(datos_bloques, start=1):
-            objetivo = d["objetivo"] if _valor_no_vacio(d["objetivo"]) else objetivo_comun
+            objetivo = (
+                _normalizar_objetivo(d["objetivo"])
+                if _valor_no_vacio(d["objetivo"])
+                else objetivo_comun
+            )
             pasadas.append(
                 PasadaCruda(
                     hoja=nombre_hoja,
@@ -287,6 +299,7 @@ def leer_pasadas_crudas(path: str, nombre_hoja: str) -> list[PasadaCruda]:
 _PATRON_NOMBRE_HOJA = re.compile(
     r"^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*\(?\s*([A-ZÁÉÍÓÚa-záéíóú]+)\s*\)?\s*$"
 )
+_PATRON_HOJA_DATOS = re.compile(r"^\d{1,2}-\d{1,2} \((D|N)\)$")
 
 # Variantes de turno aceptadas para el nombre de hoja (punto 4 de la
 # especificación). Se mantiene local a este módulo, sin depender todavía

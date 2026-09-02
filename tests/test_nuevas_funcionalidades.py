@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from services.data_provider import get_data_provider
 from services.sync_manager import get_sync_manager
-from services.importador_universal import get_importador
+from services.importador.normalizador import normalizar_hora
 from services.gestor_turnos import GestorTurnos
 
 
@@ -102,53 +102,12 @@ def test_gestor_turnos():
 
 
 def test_importador():
-    """Prueba el sistema de importación (con datos mock)."""
+    """Prueba la normalización del importador nuevo."""
     print("📊 Probando sistema de importación...")
-
-    importador = get_importador()
-
-    # Crear datos de prueba JSON (como vendría de una tablet)
-    datos_tablet = {
-        "meta": {
-            "dispositivo": "tablet_test",
-            "usuario": "Juan García",
-            "fecha_export": "2026-04-23T10:00:00",
-            "version": "1.0"
-        },
-        "pasadas": [
-            {
-                "timestamp": "2026-04-23T08:30:00",
-                "objetivo": "Centro Comercial A",
-                "turno": "diurno",
-                "notas": "Entrada norte OK"
-            },
-            {
-                "timestamp": "2026-04-23T14:15:00",
-                "objetivo": "Banco Central",
-                "turno": "diurno",
-                "notas": "Verificación de alarmas"
-            }
-        ]
-    }
-
-    # Probar importación desde JSON string
-    try:
-        resultado = importador.importar_json_string(json.dumps(datos_tablet))
-
-        print(f"📊 Resultados de importación:")
-        print(f"   Total de registros: {resultado.total_registros}")
-        print(f"   Registros válidos: {resultado.registros_validos}")
-        print(f"   Registros con error: {resultado.registros_errores}")
-        print(f"   Registros duplicados: {resultado.registros_duplicados}")
-        print(f"   Exitoso: {'✅' if resultado.exitoso else '❌'}")
-
-        if resultado.errores:
-            print("   Errores encontrados:")
-            for error in resultado.errores[:3]:  # Mostrar primeros 3
-                print(f"     - {error}")
-
-    except Exception as e:
-        print(f"⚠️ Error en importación (normal sin BD completa): {e}")
+    for valor in ("14:30", "09;11"):
+        resultado = normalizar_hora(valor)
+        assert resultado.hora is not None
+        print(f"✅ {valor} → {resultado.hora.strftime('%H:%M')}")
 
     print()
 
@@ -184,7 +143,7 @@ def main():
     print("✅ Arquitectura modular implementada")
     print("✅ Sistema de sincronización preparado")
     print("✅ Lógica de turnos nocturnos funcionando")
-    print("✅ Importador universal creado")
+    print("✅ Nuevo importador estructurado creado")
     print("✅ App móvil básica lista")
     print()
     print("📝 PRÓXIMOS PASOS CUANDO HAYAS SERVIDOR:")
