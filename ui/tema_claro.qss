@@ -11,6 +11,10 @@ QFrame#Card, QFrame#CardContenedor, QFrame#MetricCard, QFrame#PanelGlass {
 QLabel#TituloPrincipal, QLabel#DashboardTitle { color: #172033; font-size: 23px; font-weight: 700; }
 QLabel#Subtitulo, QLabel#MutedText, QLabel#MetricCaption { color: #667085; font-size: 12px; }
 QLabel#MetricValue { color: #172033; font-size: 28px; font-weight: 700; }
+QLabel#LandingTitle { color: #172033; font-size: 24px; font-weight: 700; }
+QLabel#LandingSubtitle { color: #667085; font-size: 13px; }
+QPushButton#LandingCard { min-height: 92px; padding: 14px; color: #344054; background-color: #FFFFFF; border: 1px solid #DCE3EE; border-radius: 10px; font-size: 14px; font-weight: 600; }
+QPushButton#LandingCard:hover { background-color: #F0FDF4; border-color: #16A34A; }
 QLabel#LoginTitle { color: #15803D; font-size: 18px; font-weight: 700; }
 QLabel#LoginSubtitle { color: #667085; font-size: 12px; }
 QLabel#LoginVersion { color: #98A2B3; font-size: 10px; }

@@ -69,10 +69,10 @@ def _obtener_dia_semana(fecha: str) -> int:
     return fecha_dt.isoweekday()
 
 
-def _parsear_dias_semana(dias_str: str) -> List[int]:
+def _parsear_dias_semana(dias_str: str | None) -> List[int]:
     """Parsea string de días en lista de enteros."""
     try:
-        return [int(d.strip()) for d in dias_str.split(",") if d.strip()]
+        return [int(d.strip()) for d in (dias_str or "").split(",") if d.strip()]
     except ValueError:
         return []
 
@@ -270,7 +270,13 @@ def generar_reporte_diario(fecha: str) -> Dict[str, Any]:
 # REPORTES MENSUALES
 # =============================================================================
 
-def generar_reporte_mensual(anio: int, mes: int) -> Dict[str, Any]:
+def generar_reporte_mensual(
+    anio: int,
+    mes: int,
+    supervisor_id: int | None = None,
+    turno: str | None = None,
+    estado: str = "Todos",
+) -> Dict[str, Any]:
     """Genera reporte mensual detallado de cumplimiento.
     
     Args:
@@ -332,9 +338,14 @@ def generar_reporte_mensual(anio: int, mes: int) -> Dict[str, Any]:
             SELECT fecha, objetivo_id, COUNT(*) as total
             FROM pasadas
             WHERE fecha BETWEEN ? AND ?
+              AND (? IS NULL OR supervisor_id = ?)
+              AND (? IS NULL OR turno = ?)
             GROUP BY fecha, objetivo_id
         """
-        pasadas_raw = gestor_db.ejecutar(query_pasadas, (fecha_inicio, fecha_fin))
+        pasadas_raw = gestor_db.ejecutar(
+            query_pasadas,
+            (fecha_inicio, fecha_fin, supervisor_id, supervisor_id, turno, turno),
+        )
         
         # Indexar pasadas por objetivo y fecha
         pasadas_por_objetivo = defaultdict(set)
@@ -392,6 +403,10 @@ def generar_reporte_mensual(anio: int, mes: int) -> Dict[str, Any]:
                 total_cumplimiento_ponderado += cumplimiento
                 total_objetivos_esperados += 1
             if dias_esperados == 0:
+                continue
+
+            estado_objetivo = "CUMPLE" if cumplimiento >= 80 else "NO CUMPLE"
+            if estado != "Todos" and estado_objetivo != estado:
                 continue
             
             reporte['objetivos'].append({

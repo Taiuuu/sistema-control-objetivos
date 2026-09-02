@@ -9,20 +9,33 @@ import calendar
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QTableWidget, QTableWidgetItem,
-    QComboBox, QFileDialog, QMessageBox
+    QComboBox, QFileDialog, QMessageBox, QScrollArea
 )
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QShortcut, QKeySequence
+from PyQt6.QtWidgets import QHeaderView
+from PyQt6.QtCore import Qt
 from services.background_task import run_background_task
 from services.exportar import exportar_excel, exportar_pdf
 from services.reportes import objetivo_corresponde
 from database.db import DB_PATH
+from services.queries_tabla import cargar_supervisores
+from services.tema import obtener_tema_actual
+from ui.animaciones import animar_aparecer
+from ui.widgets.estilos import obtener_color
 
 
 # =============================================================================
 # CÁLCULO DEL REPORTE POR OBJETIVO
 # =============================================================================
 
-def calcular_reporte_objetivo(anio: int, mes: int, objetivo_id: int) -> dict:
+def calcular_reporte_objetivo(
+    anio: int,
+    mes: int,
+    objetivo_id: int,
+    supervisor_id: int | None = None,
+    turno: str | None = None,
+    estado_filtro: str = "Todos",
+) -> dict:
     """
     Retorna un dict con:
       - nombre: str
@@ -69,8 +82,9 @@ def calcular_reporte_objetivo(anio: int, mes: int, objetivo_id: int) -> dict:
         cursor.execute("""
             SELECT s.nombre FROM pasadas p
             JOIN supervisores s ON p.supervisor_id = s.id
-            WHERE p.fecha = ? AND p.objetivo_id = ? AND p.turno = 'diurno'
-        """, (fecha, objetivo_id))
+                        WHERE p.fecha = ? AND p.objetivo_id = ? AND p.turno = 'diurno'
+                            AND (? IS NULL OR p.supervisor_id = ?)
+                """, (fecha, objetivo_id, supervisor_id, supervisor_id))
         supervisores_dia = cursor.fetchall()
         supervisores_dia_nombres = [s[0] for s in supervisores_dia]
         diurno_texto = "✔" if supervisores_dia_nombres else "✘"
@@ -80,8 +94,9 @@ def calcular_reporte_objetivo(anio: int, mes: int, objetivo_id: int) -> dict:
         cursor.execute("""
             SELECT s.nombre FROM pasadas p
             JOIN supervisores s ON p.supervisor_id = s.id
-            WHERE p.fecha = ? AND p.objetivo_id = ? AND p.turno = 'nocturno'
-        """, (fecha, objetivo_id))
+                        WHERE p.fecha = ? AND p.objetivo_id = ? AND p.turno = 'nocturno'
+                            AND (? IS NULL OR p.supervisor_id = ?)
+                """, (fecha, objetivo_id, supervisor_id, supervisor_id))
         supervisores_noche = cursor.fetchall()
         supervisores_noche_nombres = [s[0] for s in supervisores_noche]
         nocturno_texto = "✔" if supervisores_noche_nombres else "✘"
@@ -106,6 +121,13 @@ def calcular_reporte_objetivo(anio: int, mes: int, objetivo_id: int) -> dict:
             estado = "Solo nocturno"
         else:
             estado = "Sin control"
+
+        if turno == "diurno" and not tuvo_dia:
+            continue
+        if turno == "nocturno" and not tuvo_noche:
+            continue
+        if estado_filtro != "Todos" and estado != estado_filtro:
+            continue
 
         dias.append({
             "fecha": f"{dia:02d}/{mes:02d}/{anio}",
@@ -159,11 +181,12 @@ def cargar_objetivos_del_mes(anio: int, mes: int) -> list:
 # EXPORTACIÓN
 # =============================================================================
 
-def _exportar_excel_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str) -> None:
+def _exportar_excel_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str, datos: dict | None = None, filtros: dict | None = None) -> None:
     import openpyxl
     from openpyxl.styles import PatternFill, Font, Alignment
 
-    datos = calcular_reporte_objetivo(anio, mes, objetivo_id)
+    datos = datos or calcular_reporte_objetivo(anio, mes, objetivo_id)
+    filtros = filtros or {}
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Reporte"
@@ -173,12 +196,14 @@ def _exportar_excel_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str) -
     ws["A1"] = f"Reporte: {datos['nombre']} — {mes:02d}/{anio}"
     ws["A1"].font = Font(bold=True, size=13)
     ws["A1"].alignment = Alignment(horizontal="center")
+    ws.merge_cells("A2:E2")
+    ws["A2"] = "Filtros: " + " | ".join(f"{clave}: {valor or 'Todos'}" for clave, valor in filtros.items())
 
     # Encabezados
     encabezados = ["Fecha", "Día", "Diurno", "Nocturno", "Estado"]
     COLORES_HEADER = "2B4F8C"
     for col, enc in enumerate(encabezados, start=1):
-        cell = ws.cell(row=3, column=col, value=enc)
+        cell = ws.cell(row=4, column=col, value=enc)
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = PatternFill("solid", fgColor=COLORES_HEADER)
         cell.alignment = Alignment(horizontal="center")
@@ -196,7 +221,7 @@ def _exportar_excel_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str) -
         return COLOR_SIN
 
     # Filas
-    for fila_idx, d in enumerate(datos["dias"], start=4):
+    for fila_idx, d in enumerate(datos["dias"], start=5):
         valores = [d["fecha"], d["dia_semana"], d["diurno"], d["nocturno"], d["estado"]]
         fill = PatternFill("solid", fgColor=color_fila(d["estado"]))
         for col, val in enumerate(valores, start=1):
@@ -228,13 +253,14 @@ def _exportar_excel_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str) -
     wb.save(ruta)
 
 
-def _exportar_pdf_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str) -> None:
+def _exportar_pdf_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str, datos: dict | None = None, filtros: dict | None = None) -> None:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet
 
-    datos = calcular_reporte_objetivo(anio, mes, objetivo_id)
+    datos = datos or calcular_reporte_objetivo(anio, mes, objetivo_id)
+    filtros = filtros or {}
     doc = SimpleDocTemplate(ruta, pagesize=A4)
     styles = getSampleStyleSheet()
     elementos = []
@@ -246,6 +272,10 @@ def _exportar_pdf_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str) -> 
     ))
     elementos.append(Paragraph(
         f"Período: {mes:02d}/{anio}",
+        styles["Normal"]
+    ))
+    elementos.append(Paragraph(
+        "Filtros: " + " | ".join(f"{clave}: {valor or 'Todos'}" for clave, valor in filtros.items()),
         styles["Normal"]
     ))
     elementos.append(Spacer(1, 12))
@@ -310,7 +340,8 @@ class ReporteObjetivo(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Reporte por objetivo")
-        self.setGeometry(200, 200, 750, 500)
+        self.resize(1000, 600)
+        self.setMinimumSize(720, 440)
         self._objetivos = []   # lista de (id, nombre)
         self._datos = None     # último reporte generado
 
@@ -337,6 +368,15 @@ class ReporteObjetivo(QWidget):
         self.selector_objetivo = QComboBox()
         self.selector_objetivo.setMinimumWidth(200)
 
+        self.selector_supervisor = QComboBox()
+        self.selector_supervisor.addItem("Todos", None)
+        for supervisor_id, nombre in cargar_supervisores():
+            self.selector_supervisor.addItem(nombre, supervisor_id)
+        self.selector_turno = QComboBox()
+        self.selector_turno.addItems(["Todos", "diurno", "nocturno"])
+        self.selector_estado = QComboBox()
+        self.selector_estado.addItems(["Todos", "Completo", "Solo diurno", "Solo nocturno", "Sin control"])
+
         self.boton_generar = QPushButton("Generar reporte")
         self.boton_generar.clicked.connect(self._generar)
 
@@ -354,10 +394,24 @@ class ReporteObjetivo(QWidget):
         fila.addWidget(self.selector_anio)
         fila.addWidget(QLabel("Objetivo:"))
         fila.addWidget(self.selector_objetivo)
+        fila.addWidget(QLabel("Supervisor:"))
+        fila.addWidget(self.selector_supervisor)
+        fila.addWidget(QLabel("Turno:"))
+        fila.addWidget(self.selector_turno)
+        fila.addWidget(QLabel("Estado:"))
+        fila.addWidget(self.selector_estado)
         fila.addWidget(self.boton_generar)
         fila.addWidget(self.boton_excel)
         fila.addWidget(self.boton_pdf)
-        layout.addLayout(fila)
+        controles = QWidget()
+        controles.setLayout(fila)
+        scroll_controles = QScrollArea()
+        scroll_controles.setWidgetResizable(True)
+        scroll_controles.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_controles.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_controles.setFixedHeight(62)
+        scroll_controles.setWidget(controles)
+        layout.addWidget(scroll_controles)
 
         self.estado_label = QLabel("Seleccioná un objetivo y generá el reporte.")
         layout.addWidget(self.estado_label)
@@ -373,6 +427,7 @@ class ReporteObjetivo(QWidget):
         self.tabla.setColumnWidth(2, 150)  # Más ancho para nombres de supervisores
         self.tabla.setColumnWidth(3, 150)  # Más ancho para nombres de supervisores
         self.tabla.setColumnWidth(4, 120)
+        self.tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.tabla)
 
@@ -382,6 +437,8 @@ class ReporteObjetivo(QWidget):
 
         self.setLayout(layout)
         self._actualizar_objetivos()
+        QShortcut(QKeySequence("Ctrl+Enter"), self).activated.connect(self._generar)
+        QShortcut(QKeySequence("Ctrl+E"), self).activated.connect(self._exportar_excel)
 
     # ------------------------------------------------------------------
     def _get_mes_anio(self):
@@ -404,6 +461,9 @@ class ReporteObjetivo(QWidget):
         self.selector_mes.setEnabled(enabled)
         self.selector_anio.setEnabled(enabled)
         self.selector_objetivo.setEnabled(enabled)
+        self.selector_supervisor.setEnabled(enabled)
+        self.selector_turno.setEnabled(enabled)
+        self.selector_estado.setEnabled(enabled)
         self.boton_generar.setEnabled(enabled)
 
     def _get_objetivo_id(self) -> int | None:
@@ -425,7 +485,16 @@ class ReporteObjetivo(QWidget):
         self.boton_pdf.setEnabled(False)
         self.estado_label.setText("Generando reporte...")
 
-        task = run_background_task(calcular_reporte_objetivo, anio, mes, objetivo_id)
+        turno = self.selector_turno.currentText()
+        task = run_background_task(
+            calcular_reporte_objetivo,
+            anio,
+            mes,
+            objetivo_id,
+            self.selector_supervisor.currentData(),
+            None if turno == "Todos" else turno,
+            self.selector_estado.currentText(),
+        )
         task.signals.finished.connect(self._on_reporte_generado)
         task.signals.error.connect(self._on_error)
 
@@ -434,10 +503,11 @@ class ReporteObjetivo(QWidget):
         dias = datos["dias"]
         r = datos["resumen"]
 
-        COLOR_COMPLETO  = QColor("#90EE90")
-        COLOR_PARCIAL   = QColor("#FFD700")
-        COLOR_SIN       = QColor("#FF6B6B")
-        COLOR_TEXTO     = QColor("#000000")
+        oscuro = obtener_tema_actual() == "oscuro"
+        COLOR_COMPLETO = QColor(obtener_color("estado_verde_bg", oscuro))
+        COLOR_PARCIAL = QColor(obtener_color("estado_amarillo_bg", oscuro))
+        COLOR_SIN = QColor(obtener_color("estado_rojo_bg", oscuro))
+        COLOR_TEXTO = QColor(obtener_color("text_primary", oscuro))
 
         def color_estado(estado):
             if estado == "Completo":
@@ -472,11 +542,19 @@ class ReporteObjetivo(QWidget):
         self._set_controls_enabled(True)
         self.boton_excel.setEnabled(True)
         self.boton_pdf.setEnabled(True)
+        animar_aparecer(self.tabla, 180)
 
     def _on_error(self, mensaje: str) -> None:
         QMessageBox.critical(self, "Error", mensaje)
         self.estado_label.setText("Error al generar reporte")
         self._set_controls_enabled(True)
+
+    def _filtros_dict(self) -> dict:
+        return {
+            "supervisor": self.selector_supervisor.currentText(),
+            "turno": self.selector_turno.currentText(),
+            "estado": self.selector_estado.currentText(),
+        }
 
     # ------------------------------------------------------------------
     def _exportar_excel(self) -> None:
@@ -491,7 +569,7 @@ class ReporteObjetivo(QWidget):
         if ruta:
             self._set_controls_enabled(False)
             self.estado_label.setText("Exportando a Excel...")
-            task = run_background_task(_exportar_excel_objetivo, anio, mes, objetivo_id, ruta)
+            task = run_background_task(_exportar_excel_objetivo, anio, mes, objetivo_id, ruta, self._datos, self._filtros_dict())
             task.signals.finished.connect(lambda _: self._on_export_exitoso(ruta))
             task.signals.error.connect(self._on_error)
 
@@ -507,7 +585,7 @@ class ReporteObjetivo(QWidget):
         if ruta:
             self._set_controls_enabled(False)
             self.estado_label.setText("Exportando a PDF...")
-            task = run_background_task(_exportar_pdf_objetivo, anio, mes, objetivo_id, ruta)
+            task = run_background_task(_exportar_pdf_objetivo, anio, mes, objetivo_id, ruta, self._datos, self._filtros_dict())
             task.signals.finished.connect(lambda _: self._on_export_exitoso(ruta))
             task.signals.error.connect(self._on_error)
 

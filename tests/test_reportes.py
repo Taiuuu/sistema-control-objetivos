@@ -9,6 +9,17 @@ from services.reportes import generar_reporte_mensual, obtener_objetivos_del_dia
 
 class TestGenerarReporteMensual:
     """Tests para generación de reportes mensuales."""
+
+    def test_reporte_ignora_objetivo_sin_dias_configurados(self, db_initialized):
+        """Un objetivo con dias_semana NULL no debe romper el reporte."""
+        conexion = sqlite3.connect(db_initialized)
+        conexion.execute("INSERT INTO objetivos (nombre, dias_semana) VALUES (?, NULL)", ("Objetivo incompleto",))
+        conexion.commit()
+        conexion.close()
+
+        reporte = generar_reporte_mensual(2026, 8)
+
+        assert reporte['objetivos'] is not None
     
     def test_reporte_vacio(self, db_initialized):
         """Debe generar reporte although esté vacío."""

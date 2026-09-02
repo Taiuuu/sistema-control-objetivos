@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QDateEdit, QComboBox, QMessageBox,
     QFrame, QLineEdit, QHeaderView, QScrollArea,
     QToolButton, QSizePolicy
+    , QDialog, QDialogButtonBox, QCheckBox, QGridLayout
 )
 from PyQt6.QtCore import (
     QDate, QTimer, QEvent, Qt, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
@@ -22,6 +23,7 @@ from services.queries_tabla import (
     obtener_equipo, cargar_supervisores
 )
 from ui.animaciones import animar_entrada
+from ui.animaciones import animar_aparecer
 from ui.form_objetivo import FormObjetivo
 from ui.form_supervisor import FormSupervisor
 from ui.form_pasada import FormPasada
@@ -49,6 +51,7 @@ from services.logger import registrar_accion
 from services.assets import ruta_asset
 from services.sincronizacion import obtener_sincronizador
 from services.usuarios import get_username_by_id
+from services.menu_config import obtener_menu_usuario, guardar_menu_usuario
 from services.sesion import actualizar_actividad_sesion, cerrar_sesion, TIEMPO_INACTIVIDAD_MAXIMA
 from database.db import DB_PATH
 
@@ -171,6 +174,7 @@ class VentanaPrincipal(QWidget):
         self.zoom_nivel       = 13
         self._sidebar_expandido = True
         self._boton_activo      = None
+        self._menu_visible = obtener_menu_usuario(usuario_id)
 
         super().__init__()
         self.setWindowTitle("VESP · Control de Objetivos")
@@ -184,6 +188,7 @@ class VentanaPrincipal(QWidget):
 
         self._construir_ui()
         self.cargar_tabla()
+        self._mostrar_landing_inicial()
         animar_entrada(self)
         self._configurar_shortcuts()
         self._configurar_timers()
@@ -335,40 +340,43 @@ class VentanaPrincipal(QWidget):
     def _construir_botones_menu(self):
         oscuro = self._oscuro
 
-        def add_btn(icono, texto, accion, tooltip_extra=""):
+        def add_btn(icono, texto, accion, tooltip_extra="", clave=None):
             b = BotonMenu(icono, texto, oscuro)
+            b.setProperty("menu_key", clave or "")
             if tooltip_extra:
                 b.setToolTip(f"{texto}  {tooltip_extra}")
             b.clicked.connect(lambda: self._activar_boton(b, accion))
             self._botones_menu.append(b)
             self.layout_scroll.addWidget(b)
+            if clave and not self._menu_visible.get(clave, True):
+                b.hide()
             return b
 
         def add_sep():
             self.layout_scroll.addWidget(crear_separador(oscuro))
             self.layout_scroll.addSpacing(2)
 
-        self._btn_control   = add_btn("📋", "Control diario",     self.cargar_tabla,         "(Ctrl+B)")
-        self._btn_pasada    = add_btn("✅", "Registrar pasada",   self.abrir_form_pasada,    "(Ctrl+P)")
-        self._btn_turno     = add_btn("🕐", "Registrar turno",    self.abrir_form_turno,     "(Ctrl+T)")
+        self._btn_control   = add_btn("📋", "Control diario",     self._mostrar_dashboard,   "(Ctrl+B)", "control_diario")
+        self._btn_pasada    = add_btn("✅", "Registrar pasada",   self.abrir_form_pasada,    "(Ctrl+P)", "registrar_pasada")
+        self._btn_turno     = add_btn("🕐", "Registrar turno",    self.abrir_form_turno,     "(Ctrl+T)", "registrar_turno")
 
         add_sep()
 
-        self._btn_add_obj = add_btn("➕", "Agregar objetivo",    self.abrir_form_objetivo,  "(Ctrl+O)")
-        add_btn("📍", "Ver objetivos",       self.abrir_lista_objetivos)
-        self._btn_add_sup = add_btn("👤", "Agregar supervisor",  self.abrir_form_supervisor, "(Ctrl+S)")
-        add_btn("👥", "Ver supervisores",    self.abrir_lista_supervisores)
+        self._btn_add_obj = add_btn("➕", "Agregar objetivo",    self.abrir_form_objetivo,  "(Ctrl+O)", "agregar_objetivo")
+        add_btn("📍", "Ver objetivos",       self.abrir_lista_objetivos, clave="ver_objetivos")
+        self._btn_add_sup = add_btn("👤", "Agregar supervisor",  self.abrir_form_supervisor, "(Ctrl+S)", "agregar_supervisor")
+        add_btn("👥", "Ver supervisores",    self.abrir_lista_supervisores, clave="ver_supervisores")
 
         add_sep()
 
-        add_btn("🔍", "Ver pasadas",         self.abrir_lista_pasadas)
-        add_btn("📝", "Notas del día",       self.abrir_notas,              "(Ctrl+N)")
-        add_btn("🏖️", "Feriados",            self.abrir_feriados)
-        add_btn("📅", "Reporte mensual",     self.abrir_reporte_mensual,    "(Ctrl+R)")
-        add_btn("📅", "Reporte objetivo",    self.abrir_reporte_mensual_objetivo, "(Ctrl+Ñ)")
-        add_btn("💾", "Transferir datos",    self.abrir_transferir_datos)
-        add_btn("📥", "Importar Excel",      self.abrir_importar_excel)
-        add_btn("❓", "Ayuda",               self.abrir_ayuda,              "(Ctrl+H)")
+        add_btn("🔍", "Ver pasadas",         self.abrir_lista_pasadas, clave="ver_pasadas")
+        add_btn("📝", "Notas del día",       self.abrir_notas,              "(Ctrl+N)", "notas")
+        add_btn("🏖️", "Feriados",            self.abrir_feriados, clave="feriados")
+        add_btn("📅", "Reporte mensual",     self.abrir_reporte_mensual,    "(Ctrl+R)", "reporte_mensual")
+        add_btn("📅", "Reporte objetivo",    self.abrir_reporte_mensual_objetivo, "(Ctrl+Ñ)", "reporte_objetivo")
+        add_btn("💾", "Transferir datos",    self.abrir_transferir_datos, clave="transferir_datos")
+        add_btn("📥", "Importar Excel",      self.abrir_importar_excel, clave="importar_excel")
+        add_btn("❓", "Ayuda",               self.abrir_ayuda,              "(Ctrl+H)", "ayuda")
 
         if tiene_permiso('usuarios.ver'):
             add_sep()
@@ -381,12 +389,12 @@ class VentanaPrincipal(QWidget):
                 padding: 4px 0 2px 4px;
             """)
             self.layout_scroll.addWidget(self._lbl_admin)
-            add_btn("⚙️",  "Gestionar usuarios", self.abrir_gestionar_usuarios)
-            add_btn("📜",  "Historial",           self.abrir_logs)
-            add_btn("🔧",  "Optimización de BD",  self.abrir_indexacion)
-            add_btn("🛡️",  "Validaciones BD",     self.abrir_validaciones)
-            add_btn("🔎",  "Auditoría detallada", self.abrir_auditoria)
-            add_btn("🔄",  "Sincronización",      self.abrir_sincronizacion)
+            add_btn("⚙️",  "Gestionar usuarios", self.abrir_gestionar_usuarios, clave="gestionar_usuarios")
+            add_btn("📜",  "Historial",           self.abrir_logs, clave="logs")
+            add_btn("🔧",  "Optimización de BD",  self.abrir_indexacion, clave="optimizacion")
+            add_btn("🛡️",  "Validaciones BD",     self.abrir_validaciones, clave="validaciones")
+            add_btn("🔎",  "Auditoría detallada", self.abrir_auditoria, clave="auditoria")
+            add_btn("🔄",  "Sincronización",      self.abrir_sincronizacion, clave="sincronizacion")
 
     def _activar_boton(self, btn: BotonMenu, accion):
         if self._boton_activo and self._boton_activo is not btn:
@@ -468,6 +476,13 @@ class VentanaPrincipal(QWidget):
         self.usuario_label.setWordWrap(True)
         lay.addWidget(self.usuario_label)
 
+        self.btn_configurar_menu = QPushButton("⚙ Configurar menú")
+        self.btn_configurar_menu.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_configurar_menu.setFixedHeight(30)
+        self.btn_configurar_menu.setStyleSheet(self._estilo_btn_tema(oscuro))
+        self.btn_configurar_menu.clicked.connect(self._configurar_menu)
+        lay.addWidget(self.btn_configurar_menu)
+
         # Botón de cerrar sesión
         self.btn_logout = QPushButton("🚪 Cerrar sesión")
         self.btn_logout.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -477,6 +492,46 @@ class VentanaPrincipal(QWidget):
         lay.addWidget(self.btn_logout)
 
         return zona
+
+    def _configurar_menu(self) -> None:
+        dialogo = QDialog(self)
+        dialogo.setWindowTitle("Configurar menú")
+        layout = QVBoxLayout(dialogo)
+        checks = {}
+        etiquetas = {
+            "auditoria": "Auditoría detallada",
+            "validaciones": "Validaciones BD",
+            "sincronizacion": "Sincronización",
+            "optimizacion": "Optimización de BD",
+            "ver_pasadas": "Ver pasadas",
+            "reporte_mensual": "Reporte mensual",
+            "reporte_objetivo": "Reporte objetivo",
+            "notas": "Notas del día",
+        }
+        for clave, etiqueta in etiquetas.items():
+            check = QCheckBox(etiqueta)
+            check.setChecked(self._menu_visible.get(clave, True))
+            checks[clave] = check
+            layout.addWidget(check)
+
+        botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        botones.accepted.connect(dialogo.accept)
+        botones.rejected.connect(dialogo.reject)
+        layout.addWidget(botones)
+
+        if dialogo.exec() != QDialog.DialogCode.Accepted:
+            return
+        self._menu_visible.update({clave: check.isChecked() for clave, check in checks.items()})
+        guardar_menu_usuario(self.usuario_id, self._menu_visible)
+        for boton in self._botones_menu:
+            clave = boton.property("menu_key")
+            if clave:
+                boton.setVisible(self._menu_visible.get(clave, True))
+        for tarjeta in self._landing.findChildren(QPushButton, "LandingCard"):
+            clave = tarjeta.property("menu_key")
+            tarjeta.setVisible(self._menu_visible.get(clave, True))
 
     def _estilo_btn_tema(self, oscuro: bool) -> str:
         return f"""
@@ -542,7 +597,67 @@ class VentanaPrincipal(QWidget):
 
         self._construir_tabla(layout_derecho)
 
+        self._landing = self._construir_landing()
+        layout_derecho.insertWidget(1, self._landing, 1)
+
         layout_raiz.addWidget(self._panel_derecho, 1)
+
+    def _construir_landing(self) -> QWidget:
+        landing = QWidget()
+        layout = QVBoxLayout(landing)
+        layout.setContentsMargins(28, 28, 28, 28)
+        layout.setSpacing(18)
+
+        titulo = QLabel("¿A dónde querés ir?")
+        titulo.setObjectName("LandingTitle")
+        subtitulo = QLabel("Elegí un módulo para comenzar")
+        subtitulo.setObjectName("LandingSubtitle")
+        layout.addWidget(titulo)
+        layout.addWidget(subtitulo)
+
+        acciones = [
+            ("control_diario", "📋", "Control diario", self._mostrar_dashboard),
+            ("registrar_pasada", "✅", "Registrar pasada", self.abrir_form_pasada),
+            ("ver_pasadas", "🔍", "Ver pasadas", self.abrir_lista_pasadas),
+            ("reporte_mensual", "📅", "Reporte mensual", self.abrir_reporte_mensual),
+            ("reporte_objetivo", "🎯", "Reporte objetivo", self.abrir_reporte_mensual_objetivo),
+            ("notas", "📝", "Notas del día", self.abrir_notas),
+            ("agregar_objetivo", "➕", "Agregar objetivo", self.abrir_form_objetivo),
+            ("feriados", "🏖", "Feriados", self.abrir_feriados),
+        ]
+        grilla = QGridLayout()
+        grilla.setHorizontalSpacing(14)
+        grilla.setVerticalSpacing(14)
+        for indice, (clave, icono, texto, accion) in enumerate(acciones):
+            if not self._menu_visible.get(clave, True):
+                continue
+            tarjeta = QPushButton(f"{icono}\n{texto}")
+            tarjeta.setObjectName("LandingCard")
+            tarjeta.setProperty("menu_key", clave)
+            tarjeta.setMinimumHeight(92)
+            tarjeta.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            tarjeta.clicked.connect(accion)
+            grilla.addWidget(tarjeta, indice // 3, indice % 3)
+        layout.addLayout(grilla)
+        layout.addStretch()
+        return landing
+
+    def _mostrar_dashboard(self) -> None:
+        self._landing.hide()
+        self._metricas.show()
+        self._barra_filtros_widget.show()
+        self._sep_header.show()
+        self.tabla.show()
+        self.cargar_tabla()
+        animar_aparecer(self._panel_derecho, 220)
+
+    def _mostrar_landing_inicial(self) -> None:
+        self._metricas.hide()
+        self._barra_filtros_widget.hide()
+        self._sep_header.hide()
+        self.tabla.hide()
+        self._landing.show()
+        animar_aparecer(self._landing, 260)
 
     def _construir_metricas(self) -> QWidget:
         contenedor = QWidget()
@@ -1214,7 +1329,7 @@ class VentanaPrincipal(QWidget):
             ("Ctrl+N",     self.abrir_notas),
             ("Ctrl+R",     self.abrir_reporte_mensual),
             ("Ctrl+B",     self.cargar_tabla),
-            ("Ctrl+F",     self.buscador.setFocus),
+            ("Ctrl+F",     self._enfocar_buscador_activo),
             ("Ctrl+H",     self.abrir_ayuda),
             ("Ctrl+=",     self._zoom_mas),
             ("Ctrl+-",     self._zoom_menos),
@@ -1224,6 +1339,11 @@ class VentanaPrincipal(QWidget):
         ]
         for seq, fn in mapa:
             QShortcut(QKeySequence(seq), self).activated.connect(fn)
+
+    def _enfocar_buscador_activo(self) -> None:
+        ventana_activa = self.app.activeWindow() if self.app else self
+        buscador = ventana_activa.findChild(QLineEdit) if ventana_activa else None
+        (buscador or self.buscador).setFocus()
 
     def _configurar_timers(self):
         self.timer_inactividad = QTimer()
@@ -1556,6 +1676,8 @@ class VentanaPrincipal(QWidget):
         if ventana is None or not ventana.isVisible():
             ventana = cls(*args, **kwargs)
             setattr(self, attr, ventana)
+
+            QShortcut(QKeySequence("Esc"), ventana).activated.connect(ventana.close)
 
             if on_close:
                 ventana.destroyed.connect(on_close)

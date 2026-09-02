@@ -21,9 +21,81 @@ MESES = [
 ]
 
 
-def _obtener_datos_reporte(anio: int, mes: int) -> list:
+def _texto_filtro(valor: str | None) -> str:
+    return valor or "Todos"
+
+
+def exportar_pasadas_excel(datos: list, ruta: str, filtros: dict) -> None:
+    """Exporta exactamente las pasadas ya filtradas en pantalla."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Pasadas"
+
+    ws.merge_cells("A1:D1")
+    ws["A1"] = "V.E.S.P Organizations - Pasadas filtradas"
+    ws["A1"].font = Font(bold=True, size=14)
+    ws["A1"].alignment = Alignment(horizontal="center")
+    ws.merge_cells("A2:D2")
+    ws["A2"] = (
+        f"Fecha: {_texto_filtro(filtros.get('fecha'))} | "
+        f"Supervisor: {_texto_filtro(filtros.get('supervisor'))} | "
+        f"Turno: {_texto_filtro(filtros.get('turno'))} | "
+        f"Búsqueda: {_texto_filtro(filtros.get('busqueda'))}"
+    )
+    ws["A2"].alignment = Alignment(horizontal="left")
+
+    encabezados = ["Hora", "Turno", "Objetivo", "Supervisor"]
+    for col, encabezado in enumerate(encabezados, 1):
+        celda = ws.cell(row=4, column=col, value=encabezado)
+        celda.font = Font(bold=True, color="FFFFFF")
+        celda.fill = PatternFill(fill_type="solid", fgColor="1B5E20")
+        celda.alignment = Alignment(horizontal="center")
+
+    for fila, pasada in enumerate(datos, 5):
+        for col, valor in enumerate(pasada[1:5], 1):
+            ws.cell(row=fila, column=col, value=valor or "")
+
+    for columna, ancho in {"A": 14, "B": 14, "C": 34, "D": 28}.items():
+        ws.column_dimensions[columna].width = ancho
+    wb.save(ruta)
+
+
+def exportar_pasadas_pdf(datos: list, ruta: str, filtros: dict) -> None:
+    """Exporta exactamente las pasadas ya filtradas en pantalla."""
+    doc = SimpleDocTemplate(
+        ruta, pagesize=A4,
+        rightMargin=1.5 * cm, leftMargin=1.5 * cm,
+        topMargin=1.5 * cm, bottomMargin=1.5 * cm
+    )
+    estilos = getSampleStyleSheet()
+    elementos = [
+        Paragraph("<b>V.E.S.P Organizations - Pasadas filtradas</b>", estilos["Title"]),
+        Paragraph(
+            f"Fecha: {_texto_filtro(filtros.get('fecha'))} | "
+            f"Supervisor: {_texto_filtro(filtros.get('supervisor'))} | "
+            f"Turno: {_texto_filtro(filtros.get('turno'))} | "
+            f"Búsqueda: {_texto_filtro(filtros.get('busqueda'))}",
+            estilos["Normal"]
+        ),
+        Spacer(1, 0.4 * cm),
+    ]
+    filas = [["Hora", "Turno", "Objetivo", "Supervisor"]]
+    filas.extend([[str(valor or "") for valor in pasada[1:5]] for pasada in datos])
+    tabla = Table(filas, colWidths=[2.5 * cm, 3 * cm, 7.5 * cm, 5 * cm])
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1B5E20")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    elementos.append(tabla)
+    doc.build(elementos)
+
+
+def _obtener_datos_reporte(anio: int, mes: int, reporte: dict | None = None) -> list:
     """Obtiene el resumen de reporte mensual reutilizando la lógica central."""
-    reporte = generar_reporte_mensual(anio, mes)
+    reporte = reporte or generar_reporte_mensual(anio, mes)
     return [
         (
             objetivo['nombre'],
@@ -35,10 +107,11 @@ def _obtener_datos_reporte(anio: int, mes: int) -> list:
     ]
 
 
-def exportar_excel(anio: int, mes: int, ruta: str) -> None:
+def exportar_excel(anio: int, mes: int, ruta: str, reporte: dict | None = None, filtros: dict | None = None) -> None:
     """Genera Excel con reporte mensual."""
     # r = (nombre, dias_con_pasada, dias_sin_pasada, cumplimiento_porcentaje)
-    resultados = _obtener_datos_reporte(anio, mes)
+    resultados = _obtener_datos_reporte(anio, mes, reporte)
+    filtros = filtros or {}
 
     wb = Workbook()
     ws = wb.active
@@ -62,6 +135,8 @@ def exportar_excel(anio: int, mes: int, ruta: str) -> None:
     ws["A3"] = f"Reporte mensual - {MESES[mes-1]} {anio}"
     ws["A3"].font = Font(bold=True, size=12)
     ws["A3"].alignment = Alignment(horizontal="center")
+    ws.merge_cells("A5:F5")
+    ws["A5"] = "Filtros: " + " | ".join(f"{clave}: {valor or 'Todos'}" for clave, valor in filtros.items())
 
     ws.merge_cells("A4:F4")
     ws["A4"] = f"Generado el {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}"
@@ -70,12 +145,12 @@ def exportar_excel(anio: int, mes: int, ruta: str) -> None:
 
     encabezados = ["Objetivo", "Días con pasada", "Días sin pasada", "Cumplimiento", "Estado"]
     for col, enc in enumerate(encabezados, 1):
-        celda = ws.cell(row=6, column=col, value=enc)
+        celda = ws.cell(row=7, column=col, value=enc)
         celda.font = Font(bold=True, color="FFFFFF")
         celda.fill = PatternFill(fill_type="solid", fgColor="1B5E20")
         celda.alignment = Alignment(horizontal="center")
 
-    for fila, r in enumerate(resultados, 7):
+    for fila, r in enumerate(resultados, 8):
         estado = "CUMPLE" if r[3] >= 80 else "NO CUMPLE"
         valores = [r[0], r[1], r[2], f"{r[3]:.1f}%", estado]
         for col, val in enumerate(valores, 1):
@@ -95,10 +170,11 @@ def exportar_excel(anio: int, mes: int, ruta: str) -> None:
     wb.save(ruta)
 
 
-def exportar_pdf(anio: int, mes: int, ruta: str) -> None:
+def exportar_pdf(anio: int, mes: int, ruta: str, reporte: dict | None = None, filtros: dict | None = None) -> None:
     """Genera PDF con reporte mensual."""
     # r = (nombre, dias_con_pasada, dias_sin_pasada, cumplimiento_porcentaje)
-    resultados = _obtener_datos_reporte(anio, mes)
+    resultados = _obtener_datos_reporte(anio, mes, reporte)
+    filtros = filtros or {}
 
     doc = SimpleDocTemplate(
         ruta, pagesize=A4,
@@ -135,6 +211,10 @@ def exportar_pdf(anio: int, mes: int, ruta: str) -> None:
         elementos.append(Paragraph("<b>V.E.S.P Organizations</b>", estilos["Title"]))
 
     elementos.append(Spacer(1, 0.5*cm))
+    elementos.append(Paragraph(
+        "Filtros: " + " | ".join(f"{clave}: {valor or 'Todos'}" for clave, valor in filtros.items()),
+        estilos["Normal"]
+    ))
     elementos.append(Paragraph(
         f"<b>Reporte mensual - {MESES[mes-1]} {anio}</b>",
         estilos["Title"]

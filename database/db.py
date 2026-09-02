@@ -135,6 +135,16 @@ def crear_base_datos() -> None:
     """)
 
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS preferencias_usuario (
+            usuario_id INTEGER NOT NULL,
+            clave TEXT NOT NULL,
+            valor TEXT NOT NULL,
+            PRIMARY KEY (usuario_id, clave),
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+        )
+    """)
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS auditoria (
             id                   INTEGER PRIMARY KEY AUTOINCREMENT,
             fecha                TEXT        NOT NULL,
