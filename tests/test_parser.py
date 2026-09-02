@@ -85,10 +85,21 @@ def test_excel_agosto_conserva_todas_las_pasadas_reales():
     pasadas, problemas, hojas, detectadas = _construir_pasadas_normalizadas(
         str(ruta), 2026
     )
+    pasadas_del_dia = [pasada for pasada in pasadas if pasada.hoja == "1-8 (D)"]
+    villa_de_mayo = [
+        pasada
+        for pasada in pasadas_del_dia
+        if pasada.objetivo_nombre == "OBRA VILLA DE MAYO"
+    ]
 
     assert hojas == 62
     assert detectadas == 1430
     assert len(pasadas) == 1422
+    assert len(pasadas_del_dia) == 25
+    assert {(pasada.hora.strftime("%H:%M"), pasada.bloque_tabla) for pasada in villa_de_mayo} == {
+        ("08:20", 1),
+        ("13:26", 2),
+    }
     assert sum("no cargó la hora" in problema.descripcion for problema in problemas) == 8
 
 
@@ -133,10 +144,49 @@ def test_pasa_bloque_uno_y_dos(tmp_path: Path):
     _guardar_libro_con_bloques(
         ruta,
         "1-8 (D)",
-        {3: {1: [1, "OBJETIVO", "D", "M-1", "10:00", "SUP"] , 8: [1, "OBJETIVO", "D", "M-2", "11:00", "SUP"]}},
+        {
+            3: {
+                1: [1, "OBJETIVO", "D", "M-1", "10:00", "SUP"],
+                8: [1, "OBJETIVO", "D", "M-2", "11:00", "SUP"],
+            },
+            4: {1: ["OBSERVACIONES: se cubrió el objetivo"]},
+        },
     )
     pasadas = [p for p in leer_pasadas_crudas(str(ruta), "1-8 (D)" ) if not p.esta_vacia()]
     assert [p.bloque_tabla for p in pasadas] == [1, 2]
+    assert [p.objetivo for p in pasadas] == ["OBJETIVO", "OBJETIVO"]
+    assert [p.hora for p in pasadas] == ["10:00", "11:00"]
+
+
+def test_mismo_objetivo_en_bloques_distintos_conserva_dos_pasadas(tmp_path: Path):
+    ruta = tmp_path / "objetivo_repetido.xlsx"
+    _guardar_libro_con_bloques(
+        ruta,
+        "1-8 (D)",
+        {
+            3: {
+                1: [1, "OBRA VILLA DE MAYO", "D", "HILUX", "08:20", "URBANO CRISTIAN SEBASTIAN"],
+                8: [1, "OBRA VILLA DE MAYO", "D", "MOBI", "13:26", "SILVA, EZEQUIEL RAUL"],
+            },
+            4: {
+                1: [2, "OBRA VILLA DE MAYO", None, None, None, None],
+                8: [2, "OBRA VILLA DE MAYO", None, None, None, None],
+                15: [2, "OBRA VILLA DE MAYO", None, None, None, None],
+            },
+        },
+    )
+
+    pasadas = [
+        pasada
+        for pasada in leer_pasadas_crudas(str(ruta), "1-8 (D)")
+        if not pasada.esta_vacia()
+    ]
+
+    assert len(pasadas) == 2
+    assert {(pasada.objetivo, pasada.hora) for pasada in pasadas} == {
+        ("OBRA VILLA DE MAYO", "08:20"),
+        ("OBRA VILLA DE MAYO", "13:26"),
+    }
 
 
 def test_objetivo_sin_pasada_no_se_cuenta(tmp_path: Path):

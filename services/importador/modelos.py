@@ -71,6 +71,7 @@ class Problema:
     objetivo: Optional[str] = None
     valor_problema: Optional[Any] = None
     fila_excel: Optional[int] = None
+    bloque_tabla: Optional[int] = None
 
 
 # ============================================================================

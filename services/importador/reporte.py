@@ -290,6 +290,7 @@ def analizar_excel(
                         hoja=p.hoja if p else None,
                         objetivo=resultado.nombre_excel,
                         fila_excel=p.fila_excel if p else None,
+                        bloque_tabla=p.bloque_tabla if p else None,
                         valor_problema=resultado,  # <-- AGREGAR ESTA LÍNEA
                     )
                 )

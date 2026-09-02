@@ -37,6 +37,7 @@ def confirmar_importacion(
     resoluciones,
     usuario,
     conexion_bd,
+    forzar_sobrescritura: bool = False,
 ) -> dict:
     """
     Ejecuta la importación real.
@@ -58,4 +59,5 @@ def confirmar_importacion(
         resoluciones=resoluciones,
         usuario=usuario,
         conexion_bd=conexion_bd,
+        forzar_sobrescritura=forzar_sobrescritura,
     )

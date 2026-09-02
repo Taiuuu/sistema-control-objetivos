@@ -38,6 +38,7 @@ from .modelos import (
     ResultadoMatchSupervisor,
 )
 from .matcher import normalizar_nombre
+from .duplicados import detectar_pasadas_existentes
 
 
 # ============================================================================
@@ -833,6 +834,10 @@ def _buscar_indice_pasada_por_problema(
             ):
                 continue
 
+        if problema.bloque_tabla is not None:
+            if pasada.bloque_tabla != problema.bloque_tabla:
+                continue
+
         candidatos.append(indice)
 
     if len(candidatos) == 1:
@@ -1455,6 +1460,7 @@ def confirmar_importacion_completa(
     resoluciones,
     usuario,
     conexion_bd,
+    forzar_sobrescritura: bool = False,
 ) -> dict:
     """
     Ejecuta la importación completa.
@@ -1581,6 +1587,14 @@ def confirmar_importacion_completa(
         _aplicar_resoluciones_a_pasadas(
             analisis,
             resoluciones_aplicadas,
+        )
+
+        # Las resoluciones pueden completar el objetivo o modificar la
+        # identidad de una pasada; la clasificación previa ya no es fiable.
+        detectar_pasadas_existentes(
+            analisis.pasadas,
+            conexion_bd,
+            forzar_sobrescritura=forzar_sobrescritura,
         )
 
         # --------------------------------------------------------------
@@ -1733,6 +1747,7 @@ def confirmar_importacion(
     resoluciones,
     usuario,
     conexion_bd,
+    forzar_sobrescritura: bool = False,
 ) -> dict:
     """
     Alias de confirmar_importacion_completa().
@@ -1743,4 +1758,5 @@ def confirmar_importacion(
         resoluciones=resoluciones,
         usuario=usuario,
         conexion_bd=conexion_bd,
+        forzar_sobrescritura=forzar_sobrescritura,
     )
