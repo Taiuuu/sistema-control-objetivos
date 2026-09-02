@@ -87,28 +87,38 @@ def _construir_pasadas_normalizadas(
             resultado_hora = normalizar_hora(cruda.hora)
 
             if resultado_hora.error is not None:
-                logger.warning(
-                    "Pasada descartada: hoja=%s fila=%d bloque=%d objetivo=%r motivo=hora inválida: %s",
-                    hoja, cruda.fila_excel, cruda.bloque_tabla, cruda.objetivo,
-                    resultado_hora.error,
-                )
-                problemas.append(
-                    Problema(
-                        tipo="advertencia",
-                        descripcion=(
-                            f"Pasada omitida: {resultado_hora.error}. "
-                            "El supervisor no cargó una hora válida; la pasada "
-                            "queda visible en este informe, pero no se importa."
-                        ),
-                        hoja=hoja,
-                        objetivo=cruda.objetivo,
-                        valor_problema=cruda.hora,
-                        fila_excel=cruda.fila_excel,
+                if resultado_hora.hora is not None and "hora incompleta" in resultado_hora.error:
+                    problemas.append(
+                        Problema(
+                            tipo="advertencia",
+                            descripcion=resultado_hora.error,
+                            hoja=hoja,
+                            objetivo=cruda.objetivo,
+                            valor_problema=cruda.hora,
+                            fila_excel=cruda.fila_excel,
+                        )
                     )
-                )
-                # Sin hora válida no se puede construir PasadaNormalizada
-                # (hora es un campo obligatorio del modelo).
-                continue
+                else:
+                    logger.warning(
+                        "Pasada descartada: hoja=%s fila=%d bloque=%d objetivo=%r motivo=hora inválida: %s",
+                        hoja, cruda.fila_excel, cruda.bloque_tabla, cruda.objetivo,
+                        resultado_hora.error,
+                    )
+                    problemas.append(
+                        Problema(
+                            tipo="advertencia",
+                            descripcion=(
+                                f"Pasada omitida: {resultado_hora.error}. "
+                                "El supervisor no cargó una hora válida; la pasada "
+                                "queda visible en este informe, pero no se importa."
+                            ),
+                            hoja=hoja,
+                            objetivo=cruda.objetivo,
+                            valor_problema=cruda.hora,
+                            fila_excel=cruda.fila_excel,
+                        )
+                    )
+                    continue
 
             if resultado_hora.hora is None:
                 logger.warning(
@@ -150,6 +160,7 @@ def _construir_pasadas_normalizadas(
                         fila_excel=cruda.fila_excel,
                     )
                 )
+
 
             # --- Fase 5: turno ----------------------------------------------
             if cruda.turno is not None and str(cruda.turno).strip() != "":

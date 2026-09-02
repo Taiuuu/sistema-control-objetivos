@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 
-TipoResolucion = Literal["correccion", "aceptado", "match_existente", "crear_nuevo"]
+TipoResolucion = Literal["correccion", "aceptado", "match_existente", "crear_nuevo", "crear_alias"]
 
 
 @dataclass
@@ -75,6 +75,14 @@ class EstadoResolucion:
             usuario=self.usuario, hoja=hoja, objetivo=objetivo,
             campo="matching", valor_antes=objetivo, valor_despues=f"(nuevo) {nombre_nuevo}",
             tipo="crear_nuevo",
+        )
+
+    def registrar_alias(self, id_problema, hoja, objetivo, objetivo_existente) -> None:
+        """Asocia el nombre del Excel como alias de un objetivo existente."""
+        self._resoluciones[id_problema] = RegistroAuditoria(
+            usuario=self.usuario, hoja=hoja, objetivo=objetivo,
+            campo="alias", valor_antes=objetivo,
+            valor_despues=objetivo_existente, tipo="crear_alias",
         )
 
     def resuelto(self, id_problema: int) -> bool:

@@ -121,7 +121,17 @@ def test_hora_incompleta_se_interpreta_como_hora_en_punto():
     hora, fue_normalizada, error = normalizar_hora("01:")
     assert hora == datetime.time(1, 0)
     assert fue_normalizada is True
-    assert error is None
+    assert error == "hora incompleta; minutos asumidos como 00"
+
+
+def test_formatos_horarios_conservan_resultado_y_avisan_hora_incompleta():
+    assert normalizar_hora("01;00").hora == datetime.time(1, 0)
+    assert normalizar_hora("1:00").hora == datetime.time(1, 0)
+    assert normalizar_hora("01:00").hora == datetime.time(1, 0)
+    assert normalizar_hora("01 : 00").hora == datetime.time(1, 0)
+    resultado = normalizar_hora("01:")
+    assert resultado.hora == datetime.time(1, 0)
+    assert resultado.error == "hora incompleta; minutos asumidos como 00"
 
 
 # --- FASE 5: normalizar_turno ---

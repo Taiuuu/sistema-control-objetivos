@@ -122,9 +122,12 @@ class DialogoResolverCoincidencias(QDialog):
             fila = QHBoxLayout()
             fila.addWidget(combo)
             fila.addWidget(line_edit)
+            alias = QCheckBox("Guardar alias")
+            alias.setVisible(titulo.lower().find("objetivos") >= 0)
+            fila.addWidget(alias)
             form_layout.addRow(nombre_excel, fila)
 
-            self.controles.append((grupo, combo, line_edit))
+            self.controles.append((grupo, combo, line_edit, alias))
 
         scroll_widget.setLayout(form_layout)
         scroll_area.setWidget(scroll_widget)
@@ -140,7 +143,7 @@ class DialogoResolverCoincidencias(QDialog):
     def obtener_resoluciones(self):
         """Devuelve lista de (grupo, tipo, nombre_elegido)."""
         salida = []
-        for grupo, combo, line_edit in self.controles:
+        for grupo, combo, line_edit, alias in self.controles:
             seleccionado = combo.currentText().strip()
             if seleccionado == "-- Crear nuevo --":
                 nuevo = line_edit.text().strip()
@@ -150,7 +153,8 @@ class DialogoResolverCoincidencias(QDialog):
                     )
                 salida.append((grupo, "nuevo", nuevo))
             else:
-                salida.append((grupo, "existente", seleccionado))
+                tipo = "alias" if alias.isVisible() and alias.isChecked() else "existente"
+                salida.append((grupo, tipo, seleccionado))
         return salida
 
 
@@ -457,6 +461,8 @@ class ImportarExcel(QWidget):
                 p = self.analisis.problemas[id_problema]
                 if tipo == "existente":
                     self.resoluciones.registrar_match(id_problema, p.hoja, p.objetivo, nombre)
+                elif tipo == "alias":
+                    self.resoluciones.registrar_alias(id_problema, p.hoja, p.objetivo, nombre)
                 else:
                     self.resoluciones.registrar_creacion(id_problema, p.hoja, p.objetivo, nombre)
 

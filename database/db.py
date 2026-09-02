@@ -49,6 +49,16 @@ def crear_base_datos() -> None:
     """)
 
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS objetivos_aliases (
+            id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+            objetivo_id              INTEGER NOT NULL,
+            nombre_alias             TEXT NOT NULL,
+            nombre_alias_normalizado TEXT NOT NULL UNIQUE,
+            FOREIGN KEY (objetivo_id) REFERENCES objetivos(id)
+        )
+    """)
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS feriados (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             fecha        TEXT NOT NULL UNIQUE,
@@ -156,6 +166,7 @@ def crear_base_datos() -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_equipos_supervisor2_id ON equipos(supervisor2_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_usuario ON auditoria(fecha DESC, usuario_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_objetivos_fecha_fin ON objetivos(fecha_fin)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_objetivos_aliases_objetivo ON objetivos_aliases(objetivo_id)")
     cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_feriados_fecha ON feriados(fecha)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_supervisores_nombre ON supervisores(nombre)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_usuario_id ON logs(usuario_id)")

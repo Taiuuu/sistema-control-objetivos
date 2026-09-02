@@ -160,6 +160,17 @@ class ObjetivoBD:
 
     id: Any
     nombre: str
+    aliases: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ObjetivoAlias:
+    """Nombre alternativo explícitamente asociado a un objetivo."""
+
+    id: Any
+    objetivo_id: Any
+    nombre_alias: str
+    nombre_alias_normalizado: str
 
 
 @dataclass

@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import difflib
 import logging
+import re
 from datetime import date
 from typing import Any, Optional
 
@@ -57,7 +58,15 @@ def _normalizar_nombre(nombre: str) -> str:
     """Mayúsculas, sin tildes, espacios colapsados. Base de comparación
     tanto para el match exacto como para calcular similitud."""
     texto = (nombre or "").translate(_TABLA_TILDES).strip().upper()
-    return " ".join(texto.split())
+    texto = " ".join(texto.split())
+    # Solo elimina puntos de grupos compuestos por letras individuales:
+    # C.A.M. -> CAM. Los puntos de otras partes del nombre se conservan.
+    texto = re.sub(
+        r"\b(?:[A-Z]\.){2,}[A-Z]?\.?",
+        lambda coincidencia: coincidencia.group(0).replace(".", ""),
+        texto,
+    )
+    return texto
 
 def normalizar_nombre(nombre: str) -> str:
     """Versión pública de _normalizar_nombre(), para que reporte.py pueda
@@ -136,7 +145,7 @@ def _objetivos_como_modelos(objetivos: list[Any]) -> list[ObjetivoBD]:
         if isinstance(objetivo, ObjetivoBD):
             modelos.append(objetivo)
         elif isinstance(objetivo, dict):
-            modelos.append(ObjetivoBD(objetivo.get("id", indice), objetivo["nombre"]))
+            modelos.append(ObjetivoBD(objetivo.get("id", indice), objetivo["nombre"], objetivo.get("aliases", [])))
         elif isinstance(objetivo, (tuple, list)):
             modelos.append(ObjetivoBD(objetivo[0], objetivo[1]))
         else:
@@ -166,7 +175,16 @@ def _supervisores_como_modelos(supervisores: list[Any]) -> list[SupervisorBD]:
 def obtener_objetivos_bd(conexion_bd) -> list[ObjetivoBD]:
     cursor = conexion_bd.cursor()
     cursor.execute("SELECT id, nombre FROM objetivos")
-    return [ObjetivoBD(id=fila[0], nombre=fila[1]) for fila in cursor.fetchall()]
+    objetivos = [ObjetivoBD(id=fila[0], nombre=fila[1]) for fila in cursor.fetchall()]
+    try:
+        cursor.execute("SELECT objetivo_id, nombre_alias FROM objetivos_aliases")
+    except Exception:
+        return objetivos
+    por_id = {objetivo.id: objetivo for objetivo in objetivos}
+    for objetivo_id, alias in cursor.fetchall():
+        if objetivo_id in por_id:
+            por_id[objetivo_id].aliases.append(alias)
+    return objetivos
 
 
 def obtener_supervisores_bd(conexion_bd) -> list[SupervisorBD]:
@@ -187,14 +205,26 @@ def matchear_objetivo(
     objetivos_bd = _objetivos_como_modelos(objetivos_bd)
     nombre_norm = _normalizar_nombre(nombre_excel)
 
+    coincidencias_exactas = []
     for obj in objetivos_bd:
         if _normalizar_nombre(obj.nombre) == nombre_norm:
-            return ResultadoMatchObjetivo(
-                nombre_excel=nombre_excel,
-                tipo="exacto",
-                objetivo_exacto=obj,
-                permite_crear_nuevo=False,
-            )
+            coincidencias_exactas.append(obj)
+        elif any(_normalizar_nombre(alias) == nombre_norm for alias in obj.aliases):
+            coincidencias_exactas.append(obj)
+
+    if len(coincidencias_exactas) == 1:
+        return ResultadoMatchObjetivo(
+            nombre_excel=nombre_excel,
+            tipo="exacto",
+            objetivo_exacto=coincidencias_exactas[0],
+            permite_crear_nuevo=False,
+        )
+    if len(coincidencias_exactas) > 1:
+        logger.warning(
+            "Matching ambiguo: nombre=%r motivo=colisión de clave normalizada objetivos=%s",
+            nombre_excel,
+            [obj.id for obj in coincidencias_exactas],
+        )
 
     candidatos: list[SugerenciaObjetivo] = []
     for obj in objetivos_bd:

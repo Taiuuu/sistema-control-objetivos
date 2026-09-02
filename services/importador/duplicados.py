@@ -68,7 +68,7 @@ def _clave_pasada_sql(p: PasadaNormalizada) -> tuple:
         p.fecha_operativa.isoformat(),
         p.turno,
         p.objetivo_id,
-        p.hora.isoformat(),
+        p.hora.strftime("%H:%M"),
     )
 
 
@@ -280,14 +280,14 @@ def detectar_pasadas_existentes(
             fecha_operativa,
             turno,
             objetivo_id,
-            hora,
+            strftime('%H:%M', hora),
             supervisor_id
         FROM pasadas
         WHERE (
             fecha_operativa,
             turno,
             objetivo_id,
-            hora
+            strftime('%H:%M', hora)
         ) IN ({placeholders})
         """,
         parametros,

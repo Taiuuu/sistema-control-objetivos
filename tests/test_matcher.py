@@ -2,7 +2,9 @@ from services.importador.matcher import (
     matchear_objetivo,
     matchear_supervisor,
     inferir_supervisor_faltante,
+    obtener_objetivos_bd,
 )
+import sqlite3
 
 CATALOGO = [
     "BARRIO EL FLORIDO",
@@ -91,6 +93,53 @@ def test_acepta_catalogo_como_tuplas():
     r = matchear_objetivo("cortijo - ruta 8", catalogo_tuplas)
     assert r.tipo == "exacto"
     assert r.objetivo_exacto.id == 7
+
+
+def test_sigla_con_puntos_matchea_sin_modificar_nombre():
+    resultado = matchear_objetivo("CAM", [{"id": 7, "nombre": "C.A.M."}])
+    assert resultado.tipo == "exacto"
+    assert resultado.objetivo_exacto.id == 7
+    assert resultado.objetivo_exacto.nombre == "C.A.M."
+
+
+def test_sufijos_p1_y_p2_no_se_confunden():
+    catalogo = [
+        {"id": 1, "nombre": "OBRA MERLO 1003 P1"},
+        {"id": 2, "nombre": "OBRA MERLO 1003 P2"},
+        {"id": 3, "nombre": "OBRA MERLO"},
+    ]
+    resultado = matchear_objetivo("OBRA MERLO 1003 P2", catalogo)
+    assert resultado.tipo == "exacto"
+    assert resultado.objetivo_exacto.id == 2
+
+    resultado = matchear_objetivo("OBRA MERLO 1003 P3", catalogo)
+    assert resultado.tipo != "exacto"
+
+
+def test_alias_se_prioriza_y_apunta_al_objetivo_canonico():
+    resultado = matchear_objetivo(
+        "OBRA ALBUERA (EX MAIPU)",
+        [{"id": 12, "nombre": "OBRA ALBUERA", "aliases": ["OBRA ALBUERA (EX MAIPU)"]}],
+    )
+    assert resultado.tipo == "exacto"
+    assert resultado.objetivo_exacto.id == 12
+
+
+def test_alias_persistido_se_lee_desde_la_base():
+    conexion = sqlite3.connect(":memory:")
+    conexion.execute("CREATE TABLE objetivos (id INTEGER PRIMARY KEY, nombre TEXT)")
+    conexion.execute("CREATE TABLE objetivos_aliases (objetivo_id INTEGER, nombre_alias TEXT, nombre_alias_normalizado TEXT)")
+    conexion.execute("INSERT INTO objetivos VALUES (12, 'OBRA ALBUERA')")
+    conexion.execute(
+        "INSERT INTO objetivos_aliases VALUES (12, ?, ?)",
+        ("OBRA ALBUERA (EX MAIPU)", "OBRA ALBUERA (EX MAIPU)"),
+    )
+
+    objetivos = obtener_objetivos_bd(conexion)
+    resultado = matchear_objetivo("OBRA ALBUERA (EX MAIPU)", objetivos)
+
+    assert resultado.tipo == "exacto"
+    assert resultado.objetivo_exacto.id == 12
 
 
 # ---------------------------------------------------------------------------

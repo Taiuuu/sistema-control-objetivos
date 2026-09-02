@@ -75,10 +75,18 @@ def normalizar_hora(valor_crudo: Any) -> ResultadoHora:
             return ResultadoHora(None, False, None)
 
         texto = texto.replace(";", ":")
+        hora_incompleta = bool(re.fullmatch(r"\d{1,2}:\s*", texto))
         texto = re.sub(r"(?i)(?<=\d)\s*[A-Za-z]+\s*$", "", texto)
 
         if ":" in texto:
-            return _normalizar_desde_hhmm(texto, valor_crudo)
+            resultado = _normalizar_desde_hhmm(texto, valor_crudo)
+            if hora_incompleta and resultado.error is None:
+                return ResultadoHora(
+                    resultado.hora,
+                    True,
+                    "hora incompleta; minutos asumidos como 00",
+                )
+            return resultado
 
         return _normalizar_desde_texto_numerico(texto, valor_crudo)
 

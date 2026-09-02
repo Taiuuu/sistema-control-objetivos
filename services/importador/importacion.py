@@ -37,6 +37,7 @@ from .modelos import (
     ResultadoMatchObjetivo,
     ResultadoMatchSupervisor,
 )
+from .matcher import normalizar_nombre
 
 
 # ============================================================================
@@ -501,6 +502,25 @@ def _crear_objetivo(
     return objetivo_id
 
 
+def _crear_alias_objetivo(conexion_bd, nombre_alias: str, objetivo_id: int) -> None:
+    alias_limpio = " ".join((nombre_alias or "").strip().split())
+    clave = normalizar_nombre(alias_limpio)
+    if not clave:
+        raise ValueError("No se puede crear un alias de objetivo vacío.")
+    existente = conexion_bd.execute(
+        "SELECT objetivo_id FROM objetivos_aliases WHERE nombre_alias_normalizado = ?",
+        (clave,),
+    ).fetchone()
+    if existente:
+        if existente[0] != objetivo_id:
+            raise ValueError(f"El alias '{alias_limpio}' ya pertenece a otro objetivo.")
+        return
+    conexion_bd.execute(
+        "INSERT INTO objetivos_aliases (objetivo_id, nombre_alias, nombre_alias_normalizado) VALUES (?, ?, ?)",
+        (objetivo_id, alias_limpio, clave),
+    )
+
+
 # ============================================================================
 # CREACIÓN DE SUPERVISOR
 # ============================================================================
@@ -635,12 +655,16 @@ def _resolver_nombre_match(
         )
 
         if existente:
+            if registro.tipo == "crear_alias":
+                _crear_alias_objetivo(conexion_bd, problema.objetivo or "", existente[0])
             return (
                 existente[1],
                 existente[0],
             )
 
         if registro.tipo != "crear_nuevo":
+            if registro.tipo == "crear_alias":
+                raise ValueError("El objetivo elegido para alias no existe en la base de datos.")
             raise ValueError(
                 f"El objetivo '{nombre_elegido}' "
                 "ya no existe en la base de datos."
@@ -736,6 +760,7 @@ def _aplicar_resoluciones(
         if registro.tipo in (
             "match_existente",
             "crear_nuevo",
+            "crear_alias",
         ):
 
             nombre, entidad_id = (
