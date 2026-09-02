@@ -53,9 +53,9 @@ def _construir_pasadas_normalizadas(
     """Devuelve (pasadas_normalizadas, problemas, hojas_encontradas,
     pasadas_detectadas).
 
-    `pasadas_detectadas` cuenta todos los bloques NO VACÍOS leídos del
-    Excel, incluso los que después no pudieron normalizarse (ej. hora
-    inválida) y por lo tanto no generan PasadaNormalizada.
+    `pasadas_detectadas` cuenta solo los bloques que tienen una hora válida
+    y generan una PasadaNormalizada. Las filas sin hora o con hora inválida
+    quedan registradas como advertencias de pasadas omitidas.
     """
     hojas = parser.leer_hojas_de_datos(path)
     problemas: list[Problema] = []
@@ -72,8 +72,6 @@ def _construir_pasadas_normalizadas(
 
         crudas = parser.leer_pasadas_crudas(path, hoja)
         crudas_no_vacias = [c for c in crudas if not c.esta_vacia()]
-        pasadas_detectadas += len(crudas_no_vacias)
-
         for cruda in crudas_no_vacias:
             # --- Fase 4: hora ---------------------------------------------
             resultado_hora = normalizar_hora(cruda.hora)
@@ -81,8 +79,12 @@ def _construir_pasadas_normalizadas(
             if resultado_hora.error is not None:
                 problemas.append(
                     Problema(
-                        tipo="error_critico",
-                        descripcion=f"Hora inválida: {resultado_hora.error}.",
+                        tipo="advertencia",
+                        descripcion=(
+                            f"Pasada omitida: {resultado_hora.error}. "
+                            "El supervisor no cargó una hora válida; la pasada "
+                            "queda visible en este informe, pero no se importa."
+                        ),
                         hoja=hoja,
                         objetivo=cruda.objetivo,
                         valor_problema=cruda.hora,
@@ -102,10 +104,11 @@ def _construir_pasadas_normalizadas(
                 # porque hora es obligatoria en PasadaNormalizada.
                 problemas.append(
                     Problema(
-                        tipo="error_critico",
+                        tipo="advertencia",
                         descripcion=(
-                            "Pasada con datos (móvil/turno/supervisor) pero "
-                            "sin hora cargada."
+                            "Pasada omitida: el supervisor no cargó la hora. "
+                            "La pasada queda visible en este informe, pero "
+                            "no se importa."
                         ),
                         hoja=hoja,
                         objetivo=cruda.objetivo,
@@ -176,6 +179,7 @@ def _construir_pasadas_normalizadas(
                     supervisor_nombre=cruda.supervisor,
                 )
             )
+            pasadas_detectadas += 1
 
     return pasadas_normalizadas, problemas, len(hojas), pasadas_detectadas
 

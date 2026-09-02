@@ -374,16 +374,16 @@ class ImportarExcel(QWidget):
         self.resumen_label.setText(importador_reporte.generar_resumen_texto(resultado))
         self.resumen_label.setVisible(True)
 
-        # Errores críticos: la pasada nunca se construyó (ej. hora
-        # inválida), así que no hay nada que "resolver" acá. Hay que
-        # corregir el Excel original y volver a analizarlo.
+        # Las pasadas sin una hora válida se muestran como advertencias y se
+        # omiten de la importación, sin bloquear el resto del archivo.
         criticos = [p for p in resultado.problemas if p.tipo == "error_critico"]
+        advertencias = [p for p in resultado.problemas if p.tipo == "advertencia"]
         self.lista_errores.clear()
-        for p in criticos:
+        for p in criticos + advertencias:
             self.lista_errores.addItem(
                 f"[{p.hoja or '?'} fila {p.fila_excel or '?'}] {p.descripcion}"
             )
-        self.lista_errores.setVisible(bool(criticos))
+        self.lista_errores.setVisible(bool(criticos or advertencias))
         self.boton_descargar_informe.setEnabled(bool(resultado.problemas))
 
         self.boton_resolver_objetivos.setEnabled(resultado.objetivos_para_revisar > 0)

@@ -128,6 +128,8 @@ def _normalizar_desde_texto_numerico(texto: Optional[str], original: Any) -> Res
 
 def _normalizar_desde_hhmm(texto: str, original: Any) -> ResultadoHora:
     partes = texto.split(":")
+    if len(partes) == 2 and partes[1].strip() == "":
+        partes[1] = "00"
     if len(partes) != 2 or not all(p.strip().isdigit() for p in partes):
         return ResultadoHora(
             None, False, f"Hora '{original}' inválida (formato no reconocido)"

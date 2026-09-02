@@ -117,11 +117,11 @@ def test_hora_con_sufijo_textual_se_normaliza_y_advertencia():
         assert error is None
 
 
-def test_hora_incompleta_sigue_siendo_error_critico():
+def test_hora_incompleta_se_interpreta_como_hora_en_punto():
     hora, fue_normalizada, error = normalizar_hora("01:")
-    assert hora is None
-    assert fue_normalizada is False
-    assert "no reconocido" in error
+    assert hora == datetime.time(1, 0)
+    assert fue_normalizada is True
+    assert error is None
 
 
 # --- FASE 5: normalizar_turno ---
