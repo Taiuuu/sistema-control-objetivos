@@ -10,7 +10,7 @@ import time
 import hashlib
 from collections import defaultdict
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel,
+    QApplication, QWidget, QVBoxLayout, QLabel,
     QLineEdit, QPushButton, QMessageBox, QHBoxLayout
 )
 from PyQt6.QtGui import QPixmap, QIcon

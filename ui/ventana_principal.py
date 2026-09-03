@@ -145,6 +145,11 @@ class BotonMenu(QPushButton):
         self._activo = activo
         self._aplicar_estilo()
 
+    def actualizar_tema(self, oscuro: bool):
+        """Actualiza la paleta del botón conservando su estado activo."""
+        self._oscuro = oscuro
+        self._aplicar_estilo()
+
     def colapsar(self):
         self._expandido = False
         self.setText(f" {self._icono}")
