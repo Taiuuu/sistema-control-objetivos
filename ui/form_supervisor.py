@@ -72,7 +72,11 @@ class FormSupervisor(QWidget):
             QMessageBox.warning(self, "Error de Validación", str(e))
             return
 
-        agregar_supervisor(nombre)
+        try:
+            agregar_supervisor(nombre)
+        except Exception as error:
+            QMessageBox.critical(self, "Error", f"No se pudo guardar el supervisor: {error}")
+            return
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id
         registrar_accion(get_usuario_id(), f"Agregó supervisor: {nombre}")     

@@ -134,7 +134,11 @@ class FormObjetivo(QWidget):
             return
 
         # CORRECCIÓN: el orden correcto es (nombre, fecha_inicio, dias_semana, fecha_fin)
-        agregar_objetivo(nombre, inicio, dias_str, fecha_fin, self.selector_tipo.currentData())
+        try:
+            agregar_objetivo(nombre, inicio, dias_str, fecha_fin, self.selector_tipo.currentData())
+        except Exception as error:
+            QMessageBox.critical(self, "Error", f"No se pudo guardar el objetivo: {error}")
+            return
 
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id

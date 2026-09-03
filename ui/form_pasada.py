@@ -26,7 +26,7 @@ from database.db import DB_PATH
 from services.tema import obtener_tema
 from services.validaciones import validar_pasada, ErrorValidacion
 from services.validador_horas_limite import validar_hora_turno_nocturno
-from services.importador.modelos import ResultadoMatchObjetivo, ResultadoMatchSupervisor
+from services.importador.modelos import ResultadoMatchSupervisor
 from ui.widgets.dialogos import confirmar_mensaje, mostrar_mensaje
 
 # =============================================================================
@@ -35,44 +35,34 @@ from ui.widgets.dialogos import confirmar_mensaje, mostrar_mensaje
 
 def _cargar_objetivos(fecha: str = None) -> list:
     """Retorna objetivos activos según fecha."""
-    objetivos = [ResultadoMatchObjetivo(id=None, nombre="Sin supervisor", tipo="no_asignado")]
-
-
     if not fecha:
-        return objetivos
-
-    objetivos_filtrados = []
+        fecha = QDate.currentDate().toString("yyyy-MM-dd")
 
     try:
         conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
-
-        for obj in objetivos:
-            obj_id = obj[0]
-
-            cursor.execute("""
-                SELECT fecha_inicio, fecha_fin
-                FROM objetivos
-                WHERE id = ?
-            """, (obj_id,))
-
-            resultado = cursor.fetchone()
-
-            if resultado:
-                fecha_inicio, fecha_fin = resultado
-
-                if (
-                    (not fecha_inicio or fecha >= fecha_inicio)
-                    and
-                    (fecha_fin is None or fecha <= fecha_fin)
-                ):
-                    objetivos_filtrados.append(obj)
-
+        cursor.execute("""
+            SELECT o.id, o.nombre
+            FROM objetivos o
+            WHERE EXISTS (
+                SELECT 1 FROM objetivo_periodos p
+                WHERE p.objetivo_id = o.id
+                  AND p.fecha_inicio <= ?
+                  AND (p.fecha_fin IS NULL OR p.fecha_fin >= ?)
+            )
+            OR (
+                NOT EXISTS (SELECT 1 FROM objetivo_periodos p0 WHERE p0.objetivo_id = o.id)
+                AND (o.fecha_inicio IS NULL OR o.fecha_inicio <= ?)
+                AND (o.fecha_fin IS NULL OR o.fecha_fin >= ?)
+            )
+            ORDER BY o.nombre
+        """, (fecha, fecha, fecha, fecha))
+        objetivos_filtrados = cursor.fetchall()
         conexion.close()
 
     except Exception as e:
         print("Error cargando objetivos:", e)
-        return objetivos
+        return []
 
     return objetivos_filtrados
 

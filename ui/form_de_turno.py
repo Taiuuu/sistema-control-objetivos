@@ -141,6 +141,10 @@ class FormTurno(QWidget):
         sup2  = self.input_sup2.currentData()
         sup3  = self.input_sup3.currentData() if self._tiene_tercero else None
 
+        if sup1 is None or sup2 is None or (self._tiene_tercero and sup3 is None):
+            QMessageBox.warning(self, "Error", "Seleccioná todos los supervisores requeridos.")
+            return
+
         ids = [sup1, sup2]
         if sup3 is not None:
             ids.append(sup3)
@@ -149,6 +153,10 @@ class FormTurno(QWidget):
             QMessageBox.warning(self, "Error", "Los supervisores deben ser distintos entre sí.")
             return
 
-        guardar_equipo_turno(fecha, turno, sup1, sup2, sup3)
+        try:
+            guardar_equipo_turno(fecha, turno, sup1, sup2, sup3)
+        except Exception as error:
+            QMessageBox.critical(self, "Error", f"No se pudo guardar el turno: {error}")
+            return
         QMessageBox.information(self, "Listo", "Turno registrado correctamente.")
         self.close()
