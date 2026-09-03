@@ -110,7 +110,7 @@ def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
     except Exception as e:
         print("Error cargando supervisores:", e)
 
-    return [ResultadoMatchSupervisor(id=None, nombre="Sin supervisor", tipo="no_asignado")]
+    return []
 
 # =============================================================================
 # MEMORIA DEL ÚLTIMO TURNO

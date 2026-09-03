@@ -198,13 +198,10 @@ class ListaObjetivos(QWidget):
 
         self.tabla = QTableWidget()
         # Agregar columna de eliminar si es admin
-        num_cols = 7 if self.es_admin else 6
+        num_cols = 6
         self.tabla.setColumnCount(num_cols)
         
         headers = ["Nombre", "Inicio", "Fin", "Días", "Editar", "Dar de baja"]
-        if self.es_admin:
-            headers.append("🗑 Eliminar")
-        
         self.tabla.setHorizontalHeaderLabels(headers)
         self.tabla.setColumnWidth(0, 220)
         self.tabla.setColumnWidth(1, 100)
@@ -212,8 +209,6 @@ class ListaObjetivos(QWidget):
         self.tabla.setColumnWidth(3, 200)
         self.tabla.setColumnWidth(4, 80)
         self.tabla.setColumnWidth(5, 100)
-        if self.es_admin:
-            self.tabla.setColumnWidth(6, 100)
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
@@ -248,14 +243,6 @@ class ListaObjetivos(QWidget):
                 )
                 self.tabla.setCellWidget(i, 5, boton_baja)
 
-            # "Eliminar": solo para admins, y solo si la tabla tiene columna 6
-            if self.es_admin:
-                boton_eliminar = QPushButton("Eliminar")
-                boton_eliminar.setStyleSheet("background-color: #d32f2f; color: white; font-weight: bold;")
-                boton_eliminar.clicked.connect(
-                    lambda checked, obj_id=o.id, nombre=o.nombre: self._eliminar_permanentemente(obj_id, nombre)
-                )
-                self.tabla.setCellWidget(i, 6, boton_eliminar)
     
     def _editar(self, objetivo: Objetivo) -> None:
         self.dialogo_edicion = DialogoEditarObjetivo(objetivo, self)

@@ -22,8 +22,6 @@ from services.reportes import obtener_objetivos_del_dia
 from services.queries_tabla import (
     obtener_equipo, cargar_supervisores
 )
-from ui.animaciones import animar_entrada
-from ui.animaciones import animar_aparecer
 from ui.form_objetivo import FormObjetivo
 from ui.form_supervisor import FormSupervisor
 from ui.form_pasada import FormPasada
@@ -194,7 +192,6 @@ class VentanaPrincipal(QWidget):
         self._construir_ui()
         self.cargar_tabla()
         self._mostrar_landing_inicial()
-        animar_entrada(self)
         self._configurar_shortcuts()
         self._configurar_timers()
         self._configurar_event_filter()
@@ -654,7 +651,8 @@ class VentanaPrincipal(QWidget):
         self._sep_header.show()
         self.tabla.show()
         self.cargar_tabla()
-        animar_aparecer(self._panel_derecho, 220)
+        self._panel_derecho.update()
+        self.tabla.viewport().update()
 
     def _mostrar_landing_inicial(self) -> None:
         self._metricas.hide()
@@ -662,7 +660,7 @@ class VentanaPrincipal(QWidget):
         self._sep_header.hide()
         self.tabla.hide()
         self._landing.show()
-        animar_aparecer(self._landing, 260)
+        self._landing.update()
 
     def _construir_metricas(self) -> QWidget:
         contenedor = QWidget()
@@ -802,7 +800,7 @@ class VentanaPrincipal(QWidget):
 
         self._widget_filtros = QWidget()
         self._widget_filtros.setStyleSheet(f"background-color: {obtener_color('bg_header', oscuro)};")
-        fila = QHBoxLayout(self._widget_filtros)
+        fila = QHBoxLayout()
         fila.setContentsMargins(16, 0, 16, 0)
         fila.setSpacing(8)
 
@@ -850,6 +848,12 @@ class VentanaPrincipal(QWidget):
         self.buscador.setStyleSheet(estilo_input)
         self.buscador.textChanged.connect(self.cargar_tabla)
 
+        self._btn_filtros = QPushButton("Filtros")
+        self._btn_filtros.setCheckable(True)
+        self._btn_filtros.setFixedWidth(85)
+        self._btn_filtros.setStyleSheet(estilo_btn_accion)
+        self._btn_filtros.toggled.connect(self._alternar_panel_filtros)
+
         self._btn_filtrar = QPushButton("Aplicar")
         self._btn_filtrar.setFixedWidth(75)
         self._btn_filtrar.setStyleSheet(estilo_btn_accion)
@@ -861,24 +865,47 @@ class VentanaPrincipal(QWidget):
         lbl_sup    = QLabel("Supervisor"); lbl_sup.setStyleSheet(estilo_lbl)
         lbl_estado = QLabel("Estado");    lbl_estado.setStyleSheet(estilo_lbl)
 
+        self._panel_filtros = QWidget()
+        panel_filtros_layout = QHBoxLayout(self._panel_filtros)
+        panel_filtros_layout.setContentsMargins(16, 4, 16, 4)
+        panel_filtros_layout.setSpacing(8)
+        panel_filtros_layout.addWidget(lbl_turno)
+        panel_filtros_layout.addWidget(self.filtro_turno)
+        panel_filtros_layout.addWidget(lbl_sup)
+        panel_filtros_layout.addWidget(self.filtro_supervisor)
+        panel_filtros_layout.addWidget(lbl_estado)
+        panel_filtros_layout.addWidget(self.filtro_estado)
+        panel_filtros_layout.addStretch()
+        self._panel_filtros.setVisible(False)
+
+        contenido = QWidget()
+        contenido_layout = QVBoxLayout(contenido)
+        contenido_layout.setContentsMargins(0, 0, 0, 0)
+        contenido_layout.setSpacing(0)
+        contenido_layout.addLayout(fila)
+        contenido_layout.addWidget(self._panel_filtros)
+        scroll_filtros.setWidget(contenido)
+        self._contenido_filtros = contenido
+
         fila.addWidget(lbl_fecha)
         fila.addWidget(self._boton_ant)
         fila.addWidget(self.selector_fecha)
         fila.addWidget(self._boton_sig)
         fila.addSpacing(4)
-        fila.addWidget(lbl_turno)
-        fila.addWidget(self.filtro_turno)
-        fila.addWidget(lbl_sup)
-        fila.addWidget(self.filtro_supervisor)
-        fila.addWidget(lbl_estado)
-        fila.addWidget(self.filtro_estado)
-        fila.addSpacing(4)
         fila.addWidget(self.buscador)
+        fila.addWidget(self._btn_filtros)
         fila.addWidget(self._btn_filtrar)
         fila.addStretch()
 
-        scroll_filtros.setWidget(self._widget_filtros)
+        contenido.setStyleSheet(f"background-color: {obtener_color('bg_header', oscuro)};")
         return scroll_filtros
+
+    def _alternar_panel_filtros(self, visible: bool) -> None:
+        self._panel_filtros.setVisible(visible)
+        self._btn_filtros.setText("Ocultar filtros" if visible else "Filtros")
+        self._barra_filtros_widget.setFixedHeight(112 if visible else 54)
+        self._contenido_filtros.adjustSize()
+        self._barra_filtros_widget.updateGeometry()
 
     def _estilo_input(self, oscuro: bool) -> str:
         return f"""
@@ -917,12 +944,11 @@ class VentanaPrincipal(QWidget):
         oscuro = self._oscuro
 
         self.tabla = QTableWidget()
-        self.tabla.setColumnCount(7)
+        self.tabla.setColumnCount(6)
         self.tabla.setHorizontalHeaderLabels([
             "Objetivo",
             "Equipo diurno", "Pasadas día",
-            "Equipo nocturno", "Pasadas noche",
-            "Estado", "Acción"
+            "Equipo nocturno", "Pasadas noche", "Estado"
         ])
 
         self.tabla.setColumnWidth(0, 210)
@@ -931,7 +957,6 @@ class VentanaPrincipal(QWidget):
         self.tabla.setColumnWidth(3, 155)
         self.tabla.setColumnWidth(4, 95)
         self.tabla.setColumnWidth(5, 145)
-        self.tabla.setColumnWidth(6, 110)
 
         self.tabla.setAlternatingRowColors(False)
         self.tabla.setSortingEnabled(True)
@@ -1185,7 +1210,7 @@ class VentanaPrincipal(QWidget):
                 background: {obtener_color('scrollbar_handle', oscuro)}; border-radius: 1px;
             }}
         """)
-        self._widget_filtros.setStyleSheet(f"background-color: {obtener_color('bg_header', oscuro)};")
+        self._contenido_filtros.setStyleSheet(f"background-color: {obtener_color('bg_header', oscuro)};")
         estilo_input = self._estilo_input(oscuro)
         for w in (self.selector_fecha, self.filtro_turno,
                 self.filtro_supervisor, self.filtro_estado, self.buscador):
@@ -1206,6 +1231,14 @@ class VentanaPrincipal(QWidget):
         self._boton_ant.setStyleSheet(estilo_btn_nav)
         self._boton_sig.setStyleSheet(estilo_btn_nav)
         self._btn_filtrar.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {obtener_color('accent', oscuro)};
+                color: white; border: none; border-radius: 7px;
+                padding: 4px 14px; font-size: 12px; font-weight: 600; min-height: 28px;
+            }}
+            QPushButton:hover {{ background-color: {obtener_color('accent_dark', oscuro)}; }}
+        """)
+        self._btn_filtros.setStyleSheet(f"""
             QPushButton {{
                 background-color: {obtener_color('accent', oscuro)};
                 color: white; border: none; border-radius: 7px;
