@@ -26,7 +26,6 @@ from database.db import DB_PATH
 from services.tema import obtener_tema
 from services.validaciones import validar_pasada, ErrorValidacion
 from services.validador_horas_limite import validar_hora_turno_nocturno
-from services.importador.modelos import ResultadoMatchSupervisor
 from ui.widgets.dialogos import confirmar_mensaje, mostrar_mensaje
 
 # =============================================================================

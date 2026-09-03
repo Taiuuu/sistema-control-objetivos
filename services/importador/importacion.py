@@ -36,6 +36,7 @@ from .modelos import (
     ResultadoAnalisis,
     ResultadoMatchObjetivo,
     ResultadoMatchSupervisor,
+    turno_para_sistema,
 )
 from .matcher import normalizar_nombre
 from .duplicados import detectar_pasadas_existentes
@@ -1062,7 +1063,7 @@ def _obtener_pasada_existente(
             _valor_sql(
                 pasada.hora
             ),
-            pasada.turno,
+            turno_para_sistema(pasada.turno),
             pasada.objetivo_id,
         ),
     ).fetchone()
@@ -1106,7 +1107,7 @@ def _insertar_pasada(
             _valor_sql(
                 pasada.hora
             ),
-            pasada.turno,
+            turno_para_sistema(pasada.turno),
             pasada.objetivo_id,
             pasada.supervisor_id,
             "",

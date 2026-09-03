@@ -70,11 +70,11 @@ def calcular_reporte_objetivo(
         fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
 
         cursor.execute(
-            "SELECT 1 FROM objetivo_periodos WHERE objetivo_id = ? "
+            "SELECT fecha_inicio, fecha_fin FROM objetivo_periodos WHERE objetivo_id = ? "
             "AND fecha_inicio <= ? AND (fecha_fin IS NULL OR fecha_fin >= ?) LIMIT 1",
             (objetivo_id, fecha, fecha),
         )
-        if not cursor.fetchone():
+        if not cursor.fetchone() and ((inicio and fecha < inicio) or (fin and fecha > fin)):
             continue
         if not objetivo_corresponde(fecha, dias_str):
             continue
@@ -85,7 +85,7 @@ def calcular_reporte_objetivo(
         cursor.execute("""
             SELECT s.nombre FROM pasadas p
             JOIN supervisores s ON p.supervisor_id = s.id
-                        WHERE p.fecha = ? AND p.objetivo_id = ? AND p.turno = 'diurno'
+                        WHERE COALESCE(p.fecha_operativa, p.fecha) = ? AND p.objetivo_id = ? AND p.turno = 'diurno'
                             AND (? IS NULL OR p.supervisor_id = ?)
                 """, (fecha, objetivo_id, supervisor_id, supervisor_id))
         supervisores_dia = cursor.fetchall()
@@ -97,7 +97,7 @@ def calcular_reporte_objetivo(
         cursor.execute("""
             SELECT s.nombre FROM pasadas p
             JOIN supervisores s ON p.supervisor_id = s.id
-                        WHERE p.fecha = ? AND p.objetivo_id = ? AND p.turno = 'nocturno'
+                        WHERE COALESCE(p.fecha_operativa, p.fecha) = ? AND p.objetivo_id = ? AND p.turno = 'nocturno'
                             AND (? IS NULL OR p.supervisor_id = ?)
                 """, (fecha, objetivo_id, supervisor_id, supervisor_id))
         supervisores_noche = cursor.fetchall()

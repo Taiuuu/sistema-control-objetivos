@@ -42,6 +42,15 @@ AccionPasada = Literal["nueva", "actualizar", "omitir"]
 Turno = Literal["D", "N"]
 
 
+def turno_para_sistema(turno: str) -> str:
+    """Convierte el turno del Excel al formato persistido por la aplicación."""
+    equivalencias = {"D": "diurno", "N": "nocturno", "diurno": "diurno", "nocturno": "nocturno"}
+    try:
+        return equivalencias[turno.strip().lower() if turno.lower() in {"diurno", "nocturno"} else turno.strip().upper()]
+    except (AttributeError, KeyError):
+        raise ValueError(f"Turno no reconocido: {turno!r}")
+
+
 # ============================================================================
 # FASE 9 — Problemas de validación
 # ============================================================================

@@ -190,17 +190,19 @@ class ImportWorker(QObject):
     finished = pyqtSignal(dict)
     error = pyqtSignal(str)
 
-    def __init__(self, analisis, resoluciones, usuario, conexion_bd):
+    def __init__(self, analisis, resoluciones, usuario, conexion_bd, forzar_sobrescritura=False):
         super().__init__()
         self.analisis = analisis
         self.resoluciones = resoluciones
         self.usuario = usuario
         self.conexion_bd = conexion_bd
+        self.forzar_sobrescritura = forzar_sobrescritura
 
     def run(self) -> None:
         try:
             resultado = confirmar_importacion(
-                self.analisis, self.resoluciones, self.usuario, self.conexion_bd
+                self.analisis, self.resoluciones, self.usuario, self.conexion_bd,
+                forzar_sobrescritura=self.forzar_sobrescritura,
             )
             self.finished.emit(resultado)
         except Exception as exc:
@@ -536,7 +538,8 @@ class ImportarExcel(QWidget):
 
         conexion = gestor_db.obtener_conexion()
         self._import_worker = ImportWorker(
-            self.analisis, self.resoluciones, get_usuario_id(), conexion
+            self.analisis, self.resoluciones, get_usuario_id(), conexion,
+            self.forzar_sobrescritura,
         )
         self._import_thread = QThread(self)
         self._import_worker.moveToThread(self._import_thread)

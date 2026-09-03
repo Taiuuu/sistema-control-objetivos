@@ -232,9 +232,12 @@ def analizar_excel(
     mostrar en la pantalla de revisión."""
 
     # --- Fase 1-5: lectura + normalización -----------------------------
-    pasadas, problemas, hojas_encontradas, pasadas_detectadas = _construir_pasadas_normalizadas(
-        path, anio
-    )
+    try:
+        pasadas, problemas, hojas_encontradas, pasadas_detectadas = _construir_pasadas_normalizadas(
+            path, anio
+        )
+    finally:
+        parser.liberar_workbook(path)
 
     # --- Fase 6-7: matching ----------------------------------------------
     objetivos_bd = matcher.obtener_objetivos_bd(conexion_bd)

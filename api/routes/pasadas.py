@@ -23,9 +23,15 @@ def create_pasada():
         if not all([fecha, turno, objetivo_id, supervisor_id]):
             return jsonify({'error': 'Campos requeridos: fecha, turno, objetivo_id, supervisor_id'}), 400
 
-        registrar_turno(fecha, hora, turno, objetivo_id, supervisor_id)
+        pasada = registrar_turno(
+            fecha=fecha,
+            turno=turno,
+            objetivo_id=objetivo_id,
+            supervisor_id=supervisor_id,
+            hora=hora,
+        )
 
-        return jsonify({'message': 'Pasada registrada'}), 201
+        return jsonify({'message': 'Pasada registrada', 'id': pasada.id}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -36,11 +42,12 @@ def get_pasadas_dia(fecha):
     try:
         pasadas = listar_turnos_del_dia(fecha)
         return jsonify([{
-            'id': p[0],
-            'hora': p[1],
-            'turno': p[2],
-            'objetivo': p[3],
-            'supervisor': p[4]
+            'id': p.id,
+            'fecha': p.fecha,
+            'hora': p.hora,
+            'turno': p.turno,
+            'objetivo_id': p.objetivo_id,
+            'supervisor_id': p.supervisor_id,
         } for p in pasadas]), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500

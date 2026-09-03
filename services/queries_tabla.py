@@ -82,8 +82,8 @@ def cargar_supervisores() -> list:
 def obtener_todas_pasadas_por_turno(fecha: str, supervisor_id: int = None) -> tuple:
     query = """
         SELECT objetivo_id, turno, COUNT(*) as total
-        FROM pasadas 
-        WHERE fecha = ?
+        FROM pasadas
+        WHERE COALESCE(fecha_operativa, fecha) = ?
     """
     params = [fecha]
     
@@ -103,6 +103,7 @@ def obtener_todas_pasadas_por_turno(fecha: str, supervisor_id: int = None) -> tu
         turno = fila['turno']
         count = fila['total']
         
+        turno = {"D": "diurno", "N": "nocturno"}.get(turno, turno)
         if turno == "diurno":
             pasadas_dia[obj_id] = count
         elif turno == "nocturno":

@@ -1478,7 +1478,7 @@ class VentanaPrincipal(QWidget):
 
     def _limpiar_tabla(self):
         for row in range(self.tabla.rowCount()):
-            for col in (2, 4, 5, 6):
+            for col in (2, 4, 5):
                 w = self.tabla.cellWidget(row, col)
                 if w is not None:
                     self.tabla.removeCellWidget(row, col)

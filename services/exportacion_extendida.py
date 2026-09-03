@@ -22,12 +22,12 @@ def exportar_pasadas_csv(anio: int, mes: int, ruta: str) -> None:
     fecha_fin = f"{anio}-{mes:02d}-{total_dias:02d}"
     
     cursor.execute("""
-        SELECT p.fecha, p.hora, p.turno, o.nombre, s.nombre
+        SELECT COALESCE(p.fecha_operativa, p.fecha), p.hora, p.turno, o.nombre, s.nombre
         FROM pasadas p
         JOIN objetivos o ON p.objetivo_id = o.id
         JOIN supervisores s ON p.supervisor_id = s.id
-        WHERE p.fecha BETWEEN ? AND ?
-        ORDER BY p.fecha, p.hora
+        WHERE COALESCE(p.fecha_operativa, p.fecha) BETWEEN ? AND ?
+        ORDER BY COALESCE(p.fecha_operativa, p.fecha), p.hora
     """, (fecha_inicio, fecha_fin))
     
     pasadas = cursor.fetchall()
@@ -55,7 +55,7 @@ def exportar_reporte_json(anio: int, mes: int, ruta: str) -> None:
         'periodo': f"{anio}-{mes:02d}",
         'resumen': {
             'total_objetivos': len(reporte['objetivos']),
-            'objetivos_cumplen': sum(1 for o in reporte['objetivos'] if o['cumplimiento'] >= 80),
+            'objetivos_cumplen': sum(1 for o in reporte['objetivos'] if o['cumplimiento'] >= 75),
             'cumplimiento_promedio': round(
                 sum(o['cumplimiento'] for o in reporte['objetivos']) / len(reporte['objetivos'])
                 if reporte['objetivos'] else 0, 1

@@ -366,9 +366,9 @@ def generar_reporte_mensual(
         
         # Obtener todas las pasadas del mes en una sola query (optimización)
         query_pasadas = """
-            SELECT fecha, objetivo_id, COUNT(*) as total
+            SELECT COALESCE(fecha_operativa, fecha) AS fecha, objetivo_id, COUNT(*) as total
             FROM pasadas
-            WHERE fecha BETWEEN ? AND ?
+            WHERE COALESCE(fecha_operativa, fecha) BETWEEN ? AND ?
               AND (? IS NULL OR supervisor_id = ?)
               AND (? IS NULL OR turno = ?)
             GROUP BY fecha, objetivo_id

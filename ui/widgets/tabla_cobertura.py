@@ -451,7 +451,7 @@ class TablaCoberturaWidget(QWidget):
         conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
         
-        query = "SELECT objetivo_id, turno, COUNT(*) FROM pasadas WHERE fecha = ?"
+        query = "SELECT objetivo_id, turno, COUNT(*) FROM pasadas WHERE COALESCE(fecha_operativa, fecha) = ?"
         params = [fecha]
         
         if supervisor_id:
@@ -465,6 +465,7 @@ class TablaCoberturaWidget(QWidget):
         pasadas_noche = {}
         
         for obj_id, turno, count in cursor.fetchall():
+            turno = {"D": "diurno", "N": "nocturno"}.get(turno, turno)
             if turno == "diurno":
                 pasadas_dia[obj_id] = count
             elif turno == "nocturno":

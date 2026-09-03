@@ -59,6 +59,13 @@ def _get_workbook(path: str) -> "openpyxl.Workbook":
     return wb
 
 
+def liberar_workbook(path: str) -> None:
+    """Cierra y elimina el workbook cacheado para un archivo."""
+    wb = _CACHE_WORKBOOKS.pop(path, None)
+    if wb is not None:
+        wb.close()
+
+
 @dataclass
 class PasadaCruda:
     """Una fila cruda de un bloque de columnas, tal cual viene del Excel.

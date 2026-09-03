@@ -23,12 +23,12 @@ def obtener_estadisticas_semana() -> dict:
     # UNA SOLA QUERY para toda la semana
     query = """
         SELECT 
-            fecha,
+            COALESCE(fecha_operativa, fecha) AS fecha,
             turno,
             COUNT(*) as total_pasadas,
             COUNT(DISTINCT objetivo_id) as objetivos_controlados
         FROM pasadas
-        WHERE fecha BETWEEN ? AND ?
+        WHERE COALESCE(fecha_operativa, fecha) BETWEEN ? AND ?
         GROUP BY fecha, turno
         ORDER BY fecha
     """
@@ -39,7 +39,7 @@ def obtener_estadisticas_semana() -> dict:
     datos_por_fecha = defaultdict(lambda: {'diurno': 0, 'nocturno': 0, 'objetivos': 0})
     for r in resultados:
         fecha = r['fecha']
-        turno = r['turno']
+        turno = {'D': 'diurno', 'N': 'nocturno'}.get(r['turno'], r['turno'])
         datos_por_fecha[fecha][turno] = r['total_pasadas']
         # El máximo de objetivos entre turnos (puede haber objetivos en ambos)
         datos_por_fecha[fecha]['objetivos'] = max(
@@ -84,7 +84,7 @@ def obtener_cumplimiento_por_objetivo(anio: int, mes: int) -> list:
             'cumplimiento': obj['cumplimiento'],
             'dias_esperados': obj['dias_esperados'],
             'dias_controlados': obj['dias_esperados'] - obj['dias_sin_control'],
-            'cumple': obj['cumplimiento'] >= 80
+            'cumple': obj['cumplimiento'] >= 75
         })
     
     return datos

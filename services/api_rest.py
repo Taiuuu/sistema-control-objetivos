@@ -55,11 +55,11 @@ def _parse_request_body(env):
 def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_id: int = None) -> int:
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
-    query = "SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?"
+    query = "SELECT COUNT(*) FROM pasadas WHERE COALESCE(fecha_operativa, fecha) = ? AND objetivo_id = ?"
     params = [fecha, objetivo_id]
     if turno:
         query += " AND turno = ?"
-        params.append(turno)
+        params.append({"D": "diurno", "N": "nocturno"}.get(turno, turno))
     if supervisor_id:
         query += " AND supervisor_id = ?"
         params.append(supervisor_id)
@@ -94,14 +94,16 @@ def _insertar_pasada(data: dict) -> dict:
 
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
+    turno = {"D": "diurno", "N": "nocturno"}.get(data["turno"], data["turno"])
     cursor.execute(
-        "INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id, fecha_operativa) VALUES (?, ?, ?, ?, ?, ?)",
         (
             data["fecha"],
             data["hora"],
-            data["turno"],
+            turno,
             int(data["objetivo_id"]),
             int(data.get("supervisor_id")) if data.get("supervisor_id") is not None else None,
+            data["fecha"],
         )
     )
     conexion.commit()

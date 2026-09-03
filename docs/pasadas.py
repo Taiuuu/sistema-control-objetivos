@@ -23,7 +23,13 @@ def create_pasada():
         if not all([fecha, turno, objetivo_id, supervisor_id]):
             return jsonify({'error': 'Campos requeridos: fecha, turno, objetivo_id, supervisor_id'}), 400
 
-        registrar_turno(fecha, hora, turno, objetivo_id, supervisor_id)
+        registrar_turno(
+            fecha=fecha,
+            turno=turno,
+            objetivo_id=objetivo_id,
+            supervisor_id=supervisor_id,
+            hora=hora,
+        )
 
         return jsonify({'message': 'Pasada registrada'}), 201
     except Exception as e:
