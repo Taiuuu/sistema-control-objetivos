@@ -665,8 +665,8 @@ class VentanaPrincipal(QWidget):
     def _construir_metricas(self) -> QWidget:
         contenedor = QWidget()
         layout = QHBoxLayout(contenedor)
-        layout.setContentsMargins(18, 14, 18, 12)
-        layout.setSpacing(12)
+        layout.setContentsMargins(18, 6, 18, 6)
+        layout.setSpacing(24)
         self._metricas_valores = {}
 
         for clave, titulo, valor in (
@@ -674,19 +674,20 @@ class VentanaPrincipal(QWidget):
             ("pasadas", "Pasadas del día", "0"),
             ("alertas", "Alertas pendientes", "0"),
         ):
-            card = QFrame()
-            card.setObjectName("MetricCard")
-            card.setMinimumHeight(82)
-            card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(14, 10, 14, 10)
+            metric = QWidget()
+            metric.setObjectName("MetricItem")
+            metric_layout = QHBoxLayout(metric)
+            metric_layout.setContentsMargins(0, 0, 0, 0)
+            metric_layout.setSpacing(6)
             caption = QLabel(titulo)
             caption.setObjectName("MetricCaption")
             value = QLabel(valor)
             value.setObjectName("MetricValue")
-            card_layout.addWidget(caption)
-            card_layout.addWidget(value)
-            layout.addWidget(card, 1)
+            metric_layout.addWidget(caption)
+            metric_layout.addWidget(value)
+            layout.addWidget(metric)
             self._metricas_valores[clave] = value
+        layout.addStretch()
         return contenedor
 
     def _actualizar_metricas(self, objetivos, pasadas_dia, pasadas_noche) -> None:

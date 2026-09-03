@@ -20,7 +20,6 @@ from services.reportes import objetivo_corresponde, clasificar_cumplimiento
 from database.db import DB_PATH
 from services.queries_tabla import cargar_supervisores
 from services.tema import obtener_tema_actual
-from ui.animaciones import animar_aparecer
 from ui.widgets.estilos import obtener_color
 
 
@@ -57,6 +56,34 @@ def calcular_reporte_objetivo(
     nombre, inicio, fin, dias_str = row
     total_dias = calendar.monthrange(anio, mes)[1]
 
+    cursor.execute(
+        "SELECT fecha_inicio, fecha_fin FROM objetivo_periodos WHERE objetivo_id = ? "
+        "ORDER BY fecha_inicio",
+        (objetivo_id,),
+    )
+    periodos = cursor.fetchall()
+
+    cursor.execute(
+        """
+        SELECT COALESCE(p.fecha_operativa, p.fecha) AS fecha,
+               p.turno, s.nombre
+        FROM pasadas p
+        JOIN supervisores s ON p.supervisor_id = s.id
+        WHERE COALESCE(p.fecha_operativa, p.fecha) BETWEEN ? AND ?
+          AND p.objetivo_id = ?
+          AND (? IS NULL OR p.supervisor_id = ?)
+        ORDER BY fecha, p.turno, s.nombre
+        """,
+        (f"{anio}-{mes:02d}-01", f"{anio}-{mes:02d}-{total_dias:02d}", objetivo_id,
+         supervisor_id, supervisor_id),
+    )
+    pasadas_por_fecha = {}
+    for fecha_pasada, turno_pasada, supervisor in cursor.fetchall():
+        turno_pasada = {"D": "diurno", "N": "nocturno"}.get(turno_pasada, turno_pasada)
+        pasadas_por_fecha.setdefault(fecha_pasada, {"diurno": [], "nocturno": []})
+        if turno_pasada in ("diurno", "nocturno"):
+            pasadas_por_fecha[fecha_pasada][turno_pasada].append(supervisor)
+
     NOMBRES_DIA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
     dias = []
@@ -69,12 +96,14 @@ def calcular_reporte_objetivo(
         fecha = f"{anio}-{mes:02d}-{dia:02d}"
         fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
 
-        cursor.execute(
-            "SELECT fecha_inicio, fecha_fin FROM objetivo_periodos WHERE objetivo_id = ? "
-            "AND fecha_inicio <= ? AND (fecha_fin IS NULL OR fecha_fin >= ?) LIMIT 1",
-            (objetivo_id, fecha, fecha),
+        activo = any(
+            periodo_inicio <= fecha and
+            (periodo_fin is None or periodo_fin >= fecha)
+            for periodo_inicio, periodo_fin in periodos
+        ) if periodos else (
+            (not inicio or fecha >= inicio) and (not fin or fecha <= fin)
         )
-        if not cursor.fetchone() and ((inicio and fecha < inicio) or (fin and fecha > fin)):
+        if not activo:
             continue
         if not objetivo_corresponde(fecha, dias_str):
             continue
@@ -82,26 +111,13 @@ def calcular_reporte_objetivo(
         dias_esperados += 1
         nombre_dia = NOMBRES_DIA[fecha_dt.weekday()]
 
-        cursor.execute("""
-            SELECT s.nombre FROM pasadas p
-            JOIN supervisores s ON p.supervisor_id = s.id
-                        WHERE COALESCE(p.fecha_operativa, p.fecha) = ? AND p.objetivo_id = ? AND p.turno = 'diurno'
-                            AND (? IS NULL OR p.supervisor_id = ?)
-                """, (fecha, objetivo_id, supervisor_id, supervisor_id))
-        supervisores_dia = cursor.fetchall()
-        supervisores_dia_nombres = [s[0] for s in supervisores_dia]
+        pasadas_fecha = pasadas_por_fecha.get(fecha, {"diurno": [], "nocturno": []})
+        supervisores_dia_nombres = pasadas_fecha["diurno"]
         diurno_texto = "✔" if supervisores_dia_nombres else "✘"
         if supervisores_dia_nombres:
             diurno_texto = ", ".join(supervisores_dia_nombres)
 
-        cursor.execute("""
-            SELECT s.nombre FROM pasadas p
-            JOIN supervisores s ON p.supervisor_id = s.id
-                        WHERE COALESCE(p.fecha_operativa, p.fecha) = ? AND p.objetivo_id = ? AND p.turno = 'nocturno'
-                            AND (? IS NULL OR p.supervisor_id = ?)
-                """, (fecha, objetivo_id, supervisor_id, supervisor_id))
-        supervisores_noche = cursor.fetchall()
-        supervisores_noche_nombres = [s[0] for s in supervisores_noche]
+        supervisores_noche_nombres = pasadas_fecha["nocturno"]
         nocturno_texto = "✔" if supervisores_noche_nombres else "✘"
         if supervisores_noche_nombres:
             nocturno_texto = ", ".join(supervisores_noche_nombres)
@@ -156,6 +172,7 @@ def calcular_reporte_objetivo(
             "dias_con_noche": dias_con_noche,
             "dias_sin_control": dias_sin_control,
             "porcentaje": porcentaje,
+            "estado_cumplimiento": clasificar_cumplimiento(porcentaje)[0],
         }
     }
 
@@ -170,11 +187,20 @@ def cargar_objetivos_del_mes(anio: int, mes: int) -> list:
     ultimo_dia = f"{anio}-{mes:02d}-{calendar.monthrange(anio, mes)[1]:02d}"
 
     cursor.execute("""
-        SELECT id, nombre FROM objetivos
-        WHERE (fecha_fin IS NULL OR fecha_fin >= ?)
-          AND (fecha_inicio IS NULL OR fecha_inicio <= ?)
-        ORDER BY nombre
-    """, (primer_dia, ultimo_dia))
+        SELECT o.id, o.nombre FROM objetivos o
+        WHERE EXISTS (
+            SELECT 1 FROM objetivo_periodos p
+            WHERE p.objetivo_id = o.id
+              AND p.fecha_inicio <= ?
+              AND (p.fecha_fin IS NULL OR p.fecha_fin >= ?)
+        )
+        OR (
+            NOT EXISTS (SELECT 1 FROM objetivo_periodos p0 WHERE p0.objetivo_id = o.id)
+            AND (o.fecha_fin IS NULL OR o.fecha_fin >= ?)
+            AND (o.fecha_inicio IS NULL OR o.fecha_inicio <= ?)
+        )
+        ORDER BY o.nombre
+    """, (ultimo_dia, primer_dia, primer_dia, ultimo_dia))
     objetivos = cursor.fetchall()
     conexion.close()
     return objetivos
@@ -555,7 +581,6 @@ class ReporteObjetivo(QWidget):
         self._set_controls_enabled(True)
         self.boton_excel.setEnabled(True)
         self.boton_pdf.setEnabled(True)
-        animar_aparecer(self.tabla, 180)
 
     def _on_error(self, mensaje: str) -> None:
         QMessageBox.critical(self, "Error", mensaje)

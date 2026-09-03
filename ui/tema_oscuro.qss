@@ -82,6 +82,16 @@ QPushButton#DangerButton {
     color: #FFD8DE;
     border-color: #A94659;
 }
+QPushButton#ColoredRowAction {
+    min-height: 24px;
+    padding: 0 8px;
+    color: #172033;
+    background-color: rgba(255, 255, 255, 210);
+    border: 1px solid rgba(23, 32, 51, 90);
+    border-radius: 6px;
+    font-weight: 600;
+}
+QPushButton#ColoredRowAction:hover { color: #172033; background-color: #FFFFFF; border-color: #172033; }
 QToolButton#TabButton, QPushButton#TabButton {
     min-height: 32px;
     padding: 0 14px;

@@ -252,8 +252,10 @@ class VistaSincronizacion(QWidget):
             item_estado = QTableWidgetItem(estado)
             if "✅" in estado:
                 item_estado.setBackground(QColor(200, 255, 200))
+                item_estado.setForeground(QColor("#14532D"))
             else:
                 item_estado.setBackground(QColor(255, 200, 200))
+                item_estado.setForeground(QColor("#7F1D1D"))
             self.tabla_modulos.setItem(i, 1, item_estado)
             
             self.tabla_modulos.setItem(i, 2, QTableWidgetItem(ultima))
@@ -276,10 +278,13 @@ class VistaSincronizacion(QWidget):
             # Color según tipo
             if tipo == 'datos_cambiados':
                 item.setBackground(QColor(255, 255, 200))
+                item.setForeground(QColor("#713F12"))
             elif tipo == 'cache_invalidado':
                 item.setBackground(QColor(200, 255, 200))
+                item.setForeground(QColor("#14532D"))
             elif tipo == 'tabla_actualizar':
                 item.setBackground(QColor(200, 200, 255))
+                item.setForeground(QColor("#1E3A8A"))
             
             self.lista_eventos.addItem(item)
 

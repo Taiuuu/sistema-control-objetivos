@@ -10,7 +10,8 @@ QFrame#Card, QFrame#CardContenedor, QFrame#MetricCard, QFrame#PanelGlass {
 }
 QLabel#TituloPrincipal, QLabel#DashboardTitle { color: #172033; font-size: 23px; font-weight: 700; }
 QLabel#Subtitulo, QLabel#MutedText, QLabel#MetricCaption { color: #667085; font-size: 12px; }
-QLabel#MetricValue { color: #172033; font-size: 28px; font-weight: 700; }
+QLabel#MetricValue { color: #172033; font-size: 18px; font-weight: 700; }
+QWidget#MetricItem { min-height: 28px; }
 QLabel#LandingTitle { color: #172033; font-size: 24px; font-weight: 700; }
 QLabel#LandingSubtitle { color: #667085; font-size: 13px; }
 QPushButton#LandingCard { min-height: 92px; padding: 14px; color: #344054; background-color: #FFFFFF; border: 1px solid #DCE3EE; border-radius: 10px; font-size: 14px; font-weight: 600; }
@@ -26,6 +27,8 @@ QPushButton:disabled { color: #98A2B3; background-color: #F2F4F7; border-color: 
 QPushButton#PrimaryButton { color: #FFFFFF; background-color: #16A34A; border: none; }
 QPushButton#PrimaryButton:hover { background-color: #15803D; }
 QPushButton#DangerButton { color: #B42318; border-color: #FDA29B; }
+QPushButton#ColoredRowAction { min-height: 24px; padding: 0 8px; color: #172033; background-color: rgba(255, 255, 255, 190); border: 1px solid rgba(23, 32, 51, 70); border-radius: 6px; font-weight: 600; }
+QPushButton#ColoredRowAction:hover { color: #172033; background-color: #FFFFFF; border-color: #172033; }
 QToolButton#TabButton, QPushButton#TabButton { min-height: 32px; padding: 0 14px; border: none; background: transparent; color: #667085; border-radius: 16px; }
 QToolButton#TabButton:checked, QPushButton#TabButton:checked { color: #FFFFFF; background-color: #16A34A; }
 QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox { min-height: 34px; padding: 0 10px; color: #172033; background-color: #FFFFFF; border: 1px solid #D0D5DD; border-radius: 8px; selection-background-color: #BBF7D0; }

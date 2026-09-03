@@ -115,8 +115,10 @@ class TablaDiaria(QWidget):
                     self.tabla.setCellWidget(i, 3, combo_accion)
 
                     color = QColor("#90EE90") if pasadas > 0 else QColor("#FF6B6B")
+                    foreground = QColor("#14532D") if pasadas > 0 else QColor("#7F1D1D")
                     for col in range(3):
                         self.tabla.item(i, col).setBackground(color)
+                        self.tabla.item(i, col).setForeground(foreground)
 
             sorting_enabled = self.tabla.isSortingEnabled()
             self.tabla.setSortingEnabled(False)

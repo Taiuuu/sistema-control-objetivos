@@ -151,7 +151,7 @@ class ListaSupervisores(QWidget):
         leyenda = QHBoxLayout()
         for color, texto in [("#c8f7c5", "Activo"), ("#ffd6d6", "Dado de baja")]:
             lbl = QLabel(f"  {texto}  ")
-            lbl.setStyleSheet(f"background-color: {color}; border-radius: 4px; padding: 2px 8px; font-size: 11px;")
+            lbl.setStyleSheet(f"background-color: {color}; color: #172033; border-radius: 4px; padding: 2px 8px; font-size: 11px;")
             leyenda.addWidget(lbl)
         leyenda.addStretch()
         layout.addLayout(leyenda)
@@ -231,6 +231,7 @@ class ListaSupervisores(QWidget):
             contenedor.setStyleSheet(f"background-color: {'#c8f7c5' if activo else '#ffd6d6'};")
 
             btn_editar = QPushButton("✏ Editar")
+            btn_editar.setObjectName("ColoredRowAction")
             btn_editar.setFixedHeight(26)
             btn_editar.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_editar.clicked.connect(
@@ -241,27 +242,27 @@ class ListaSupervisores(QWidget):
 
             if activo:
                 btn_baja = QPushButton("📅 Dar de baja")
+                btn_baja.setObjectName("ColoredRowAction")
                 btn_baja.setFixedHeight(26)
                 btn_baja.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn_baja.setStyleSheet("color: #c0392b; font-weight: 600;")
                 btn_baja.clicked.connect(
                     lambda _, sid=sup_id, n=nombre: self._dar_de_baja(sid, n)
                 )
                 fila_btn.addWidget(btn_baja)
             else:
                 btn_reactivar = QPushButton("↩ Reactivar")
+                btn_reactivar.setObjectName("ColoredRowAction")
                 btn_reactivar.setFixedHeight(26)
                 btn_reactivar.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn_reactivar.setStyleSheet("color: #27ae60; font-weight: 600;")
                 btn_reactivar.clicked.connect(
                     lambda _, sid=sup_id, n=nombre: self._reactivar(sid, n)
                 )
                 fila_btn.addWidget(btn_reactivar)
 
             btn_eliminar = QPushButton("Eliminar")
+            btn_eliminar.setObjectName("ColoredRowAction")
             btn_eliminar.setFixedHeight(26)
             btn_eliminar.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_eliminar.setStyleSheet("color: #e74c3c; font-weight: 600;")
             btn_eliminar.clicked.connect(
                 lambda _, sid=sup_id, n=nombre: self._eliminar(sid, n)
             )

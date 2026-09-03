@@ -230,8 +230,10 @@ class VistaAuditoria(QWidget):
                 self.tabla_auditoria.setItem(i, 5, QTableWidgetItem(str(detalles)[:50]))
                 
                 color_fondo = "#d4edda" if estado == "EXITOSO" else "#f8d7da"
+                color_texto = "#155724" if estado == "EXITOSO" else "#721c24"
                 for col in range(6):
                     self.tabla_auditoria.item(i, col).setBackground(QColor(color_fondo))
+                    self.tabla_auditoria.item(i, col).setForeground(QColor(color_texto))
 
                 # Botón ver cambios
                 btn = QPushButton("Ver")

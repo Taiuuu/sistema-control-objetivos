@@ -247,6 +247,7 @@ class VistaIndexacion(QWidget):
             # Estado
             estado_item = QTableWidgetItem("✅ OK")
             estado_item.setBackground(QColor(200, 255, 200))
+            estado_item.setForeground(QColor("#14532D"))
             self.tabla_stats.setItem(row, 4, estado_item)
             
             total_filas += stats['total_filas']
@@ -298,6 +299,7 @@ class VistaIndexacion(QWidget):
             
             impacto_item = QTableWidgetItem(f"{sug['impacto_porcentaje']:.1f}%")
             impacto_item.setBackground(self._color_impacto(sug['impacto_porcentaje']))
+            impacto_item.setForeground(QColor("#172033"))
             self.tabla_recomendaciones.setItem(row, 3, impacto_item)
             
             btn_crear = QPushButton("Crear")

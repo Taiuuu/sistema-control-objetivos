@@ -167,9 +167,10 @@ class ReporteMensual(QWidget):
 
             oscuro = obtener_tema_actual() == "oscuro"
             color = QColor(obtener_color(f"estado_{categoria}_bg", oscuro))
+            foreground = QColor(obtener_color(f"estado_{categoria}_fg", oscuro))
             for col in range(6):
                 self.tabla.item(i, col).setBackground(color)
-                self.tabla.item(i, col).setForeground(QColor(obtener_color("text_primary", oscuro)))
+                self.tabla.item(i, col).setForeground(foreground)
 
         self.tabla.setUpdatesEnabled(True)
         self.estado_label.setText(

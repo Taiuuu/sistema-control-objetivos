@@ -224,8 +224,10 @@ class VistaValidaciones(QWidget):
             item_estado = QTableWidgetItem(estado)
             if "❌" in estado:
                 item_estado.setBackground(QColor(255, 200, 200))
+                item_estado.setForeground(QColor("#7F1D1D"))
             else:
                 item_estado.setBackground(QColor(200, 255, 200))
+                item_estado.setForeground(QColor("#14532D"))
             self.tabla_chequeos.setItem(i, 1, item_estado)
             
             self.tabla_chequeos.setItem(i, 2, QTableWidgetItem(detalle))
@@ -334,6 +336,7 @@ class VistaValidaciones(QWidget):
                 
                 item_resultado = QTableWidgetItem("✅ OK")
                 item_resultado.setBackground(QColor(200, 255, 200))
+                item_resultado.setForeground(QColor("#14532D"))
                 self.tabla_reparaciones.setItem(row, 3, item_resultado)
 
             # Auditar
