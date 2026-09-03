@@ -32,6 +32,15 @@ from .exceptions import (
 logger = logging.getLogger(__name__)
 
 
+def clasificar_cumplimiento(porcentaje: float) -> tuple[str, str]:
+    """Devuelve estado y categoría visual según el porcentaje."""
+    if porcentaje >= 75:
+        return "Cumplió", "verde"
+    if porcentaje >= 50:
+        return "Cumplió", "amarillo"
+    return "No cumplió", "rojo"
+
+
 # =============================================================================
 # CONSTANTES
 # =============================================================================
@@ -120,13 +129,25 @@ def obtener_objetivos_del_dia(fecha: str) -> List[Tuple[int, str, str]]:
         
         # Query optimizada
         query = """
-            SELECT id, nombre, dias_semana, fecha_inicio, fecha_fin
-            FROM objetivos
-            WHERE (fecha_inicio IS NULL OR fecha_inicio <= ?)
-              AND (fecha_fin IS NULL OR fecha_fin >= ?)
+            SELECT o.id, o.nombre, o.dias_semana, o.fecha_inicio, o.fecha_fin
+            FROM objetivos o
+            WHERE EXISTS (
+                SELECT 1 FROM objetivo_periodos p
+                WHERE p.objetivo_id = o.id AND p.fecha_inicio <= ?
+                  AND (p.fecha_fin IS NULL OR p.fecha_fin >= ?)
+            )
+            OR (NOT EXISTS (SELECT 1 FROM objetivo_periodos p0 WHERE p0.objetivo_id = o.id)
+                AND (o.fecha_inicio IS NULL OR o.fecha_inicio <= ?)
+                AND (o.fecha_fin IS NULL OR o.fecha_fin >= ?))
         """
-        
-        objetivos_db = gestor_db.ejecutar(query, (fecha, fecha))
+
+        objetivos_db = gestor_db.ejecutar(query, (fecha, fecha, fecha, fecha))
+        periodos_raw = gestor_db.ejecutar(
+            "SELECT objetivo_id, fecha_inicio, fecha_fin FROM objetivo_periodos"
+        )
+        periodos_por_objetivo = defaultdict(list)
+        for periodo in periodos_raw:
+            periodos_por_objetivo[periodo['objetivo_id']].append(periodo)
         
         if not objetivos_db:
             logger.debug(f"No hay objetivos para {fecha}")
@@ -143,9 +164,13 @@ def obtener_objetivos_del_dia(fecha: str) -> List[Tuple[int, str, str]]:
             fecha_fin = obj['fecha_fin']
             
             # Validar fechas de inicio/fin
-            if fecha_inicio and fecha < fecha_inicio:
-                continue
-            if fecha_fin and fecha > fecha_fin:
+            if periodos_por_objetivo[obj_id] and not any(
+                p['fecha_inicio'] <= fecha and
+                (p['fecha_fin'] is None or p['fecha_fin'] >= fecha)
+                for p in periodos_por_objetivo[obj_id]
+            ) or not periodos_por_objetivo[obj_id] and (
+                (fecha_inicio and fecha < fecha_inicio) or (fecha_fin and fecha > fecha_fin)
+            ):
                 continue
             
             # Verificar que sea un día válido para este objetivo
@@ -319,6 +344,12 @@ def generar_reporte_mensual(
             """SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana 
                FROM objetivos ORDER BY nombre"""
         )
+        periodos_raw = gestor_db.ejecutar(
+            "SELECT objetivo_id, fecha_inicio, fecha_fin FROM objetivo_periodos"
+        )
+        periodos_por_objetivo = defaultdict(list)
+        for periodo in periodos_raw:
+            periodos_por_objetivo[periodo['objetivo_id']].append(periodo)
         
         reporte = {
             'anio': anio,
@@ -381,9 +412,13 @@ def generar_reporte_mensual(
                 fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
                 
                 # Validar fechas de inicio/fin
-                if inicio and fecha < inicio:
-                    continue
-                if fin and fecha > fin:
+                if periodos_por_objetivo[obj_id] and not any(
+                    p['fecha_inicio'] <= fecha and
+                    (p['fecha_fin'] is None or p['fecha_fin'] >= fecha)
+                    for p in periodos_por_objetivo[obj_id]
+                ) or not periodos_por_objetivo[obj_id] and (
+                    (inicio and fecha < inicio) or (fin and fecha > fin)
+                ):
                     continue
                 
                 # Verificar que sea un día válido
@@ -405,8 +440,9 @@ def generar_reporte_mensual(
             if dias_esperados == 0:
                 continue
 
-            estado_objetivo = "CUMPLE" if cumplimiento >= 80 else "NO CUMPLE"
-            if estado != "Todos" and estado_objetivo != estado:
+            estado_objetivo = clasificar_cumplimiento(cumplimiento)[0]
+            estado_objetivo_filtro = "CUMPLE" if estado_objetivo == "Cumplió" else "NO CUMPLE"
+            if estado != "Todos" and estado_objetivo_filtro != estado:
                 continue
             
             reporte['objetivos'].append({

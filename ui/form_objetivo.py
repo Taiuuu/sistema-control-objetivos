@@ -6,7 +6,7 @@
 import sqlite3
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLabel,
-    QLineEdit, QPushButton, QCheckBox, QDateEdit, QMessageBox, QFrame
+    QLineEdit, QPushButton, QCheckBox, QDateEdit, QMessageBox, QFrame, QComboBox
 )
 from PyQt6.QtCore import QDate, Qt
 from ui.animaciones import animar_entrada
@@ -49,6 +49,10 @@ class FormObjetivo(QWidget):
         self.input_inicio.setDisplayFormat("dd/MM/yyyy")
         self.input_inicio.setFixedHeight(34)
 
+        self.selector_tipo = QComboBox()
+        self.selector_tipo.addItem("Puntual", "puntual")
+        self.selector_tipo.addItem("Intermitente", "intermitente")
+
         self.checkbox_fin = QCheckBox("Definir fecha fin")
         self.checkbox_fin.setFixedHeight(30)
 
@@ -76,6 +80,7 @@ class FormObjetivo(QWidget):
         form_layout.setContentsMargins(0, 0, 0, 0)
         form_layout.addRow(QLabel("Nombre del objetivo"), self.input_nombre)
         form_layout.addRow(QLabel("Fecha inicio"), self.input_inicio)
+        form_layout.addRow(QLabel("Tipo de objetivo"), self.selector_tipo)
         form_layout.addRow(self.checkbox_fin, self.input_fin)
 
         dias_widget = QFrame()
@@ -129,7 +134,7 @@ class FormObjetivo(QWidget):
             return
 
         # CORRECCIÓN: el orden correcto es (nombre, fecha_inicio, dias_semana, fecha_fin)
-        agregar_objetivo(nombre, inicio, dias_str, fecha_fin)
+        agregar_objetivo(nombre, inicio, dias_str, fecha_fin, self.selector_tipo.currentData())
 
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id

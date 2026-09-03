@@ -12,7 +12,7 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
-from services.reportes import generar_reporte_mensual
+from services.reportes import generar_reporte_mensual, clasificar_cumplimiento
 
 
 MESES = [
@@ -151,11 +151,11 @@ def exportar_excel(anio: int, mes: int, ruta: str, reporte: dict | None = None, 
         celda.alignment = Alignment(horizontal="center")
 
     for fila, r in enumerate(resultados, 8):
-        estado = "CUMPLE" if r[3] >= 80 else "NO CUMPLE"
+        estado, categoria = clasificar_cumplimiento(r[3])
         valores = [r[0], r[1], r[2], f"{r[3]:.1f}%", estado]
         for col, val in enumerate(valores, 1):
             celda = ws.cell(row=fila, column=col, value=val)
-            color = "C8E6C9" if r[3] >= 80 else "FFCDD2"
+            color = {"verde": "C8E6C9", "amarillo": "FFF3CD", "rojo": "FFCDD2"}[categoria]
             celda.fill = PatternFill(fill_type="solid", fgColor=color)
             celda.alignment = Alignment(horizontal="center")
 
@@ -223,7 +223,7 @@ def exportar_pdf(anio: int, mes: int, ruta: str, reporte: dict | None = None, fi
 
     datos = [["Objetivo", "Días con pasada", "Días sin pasada", "Cumplimiento", "Estado"]]
     for r in resultados:
-        estado = "CUMPLE" if r[3] >= 80 else "NO CUMPLE"
+        estado, _ = clasificar_cumplimiento(r[3])
         datos.append([r[0], str(r[1]), str(r[2]), f"{r[3]:.1f}%", estado])
 
     tabla = Table(datos, colWidths=[5.5*cm, 3*cm, 3*cm, 2.5*cm, 3*cm])
@@ -238,16 +238,17 @@ def exportar_pdf(anio: int, mes: int, ruta: str, reporte: dict | None = None, fi
     ]))
 
     for i, r in enumerate(resultados, 1):
-        color = colors.HexColor("#C8E6C9") if r[3] >= 80 else colors.HexColor("#FFCDD2")
+        _, categoria = clasificar_cumplimiento(r[3])
+        color = colors.HexColor({"verde": "#C8E6C9", "amarillo": "#FFF3CD", "rojo": "#FFCDD2"}[categoria])
         tabla.setStyle(TableStyle([("BACKGROUND", (0, i), (-1, i), color)]))
 
     elementos.append(tabla)
     elementos.append(Spacer(1, 0.5*cm))
 
     total = len(resultados)
-    cumplen = sum(1 for r in resultados if r[3] >= 80)
+    cumplen = sum(1 for r in resultados if clasificar_cumplimiento(r[3])[0] == "Cumplió")
     elementos.append(Paragraph(
-        f"<b>Resumen:</b> {cumplen} de {total} objetivos cumplen el 80% o más de cobertura.",
+        f"<b>Resumen:</b> {cumplen} de {total} objetivos cumplen el 50% o más de cobertura.",
         estilos["Normal"]
     ))
 

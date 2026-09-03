@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QHeaderView
 from PyQt6.QtCore import Qt
 from services.background_task import run_background_task
 from services.exportar import exportar_excel, exportar_pdf
-from services.reportes import objetivo_corresponde
+from services.reportes import objetivo_corresponde, clasificar_cumplimiento
 from database.db import DB_PATH
 from services.queries_tabla import cargar_supervisores
 from services.tema import obtener_tema_actual
@@ -69,9 +69,12 @@ def calcular_reporte_objetivo(
         fecha = f"{anio}-{mes:02d}-{dia:02d}"
         fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
 
-        if inicio and fecha < inicio:
-            continue
-        if fin and fecha > fin:
+        cursor.execute(
+            "SELECT 1 FROM objetivo_periodos WHERE objetivo_id = ? "
+            "AND fecha_inicio <= ? AND (fecha_fin IS NULL OR fecha_fin >= ?) LIMIT 1",
+            (objetivo_id, fecha, fecha),
+        )
+        if not cursor.fetchone():
             continue
         if not objetivo_corresponde(fecha, dias_str):
             continue
@@ -231,6 +234,7 @@ def _exportar_excel_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str, d
 
     # Resumen
     r = datos["resumen"]
+    _, categoria_cumplimiento = clasificar_cumplimiento(r["porcentaje"])
     fila_res = len(datos["dias"]) + 5
     ws.cell(row=fila_res,     column=1, value="Días esperados:").font    = Font(bold=True)
     ws.cell(row=fila_res,     column=2, value=r["dias_esperados"])
@@ -241,7 +245,11 @@ def _exportar_excel_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str, d
     ws.cell(row=fila_res + 3, column=1, value="Días sin control:").font = Font(bold=True)
     ws.cell(row=fila_res + 3, column=2, value=r["dias_sin_control"])
     ws.cell(row=fila_res + 4, column=1, value="Cumplimiento:").font     = Font(bold=True)
-    ws.cell(row=fila_res + 4, column=2, value=f"{r['porcentaje']:.1f}%")
+    celda_cumplimiento = ws.cell(row=fila_res + 4, column=2, value=f"{r['porcentaje']:.1f}%")
+    celda_cumplimiento.fill = PatternFill(
+        "solid",
+        fgColor={"verde": "C8E6C9", "amarillo": "FFF3CD", "rojo": "FFCDD2"}[categoria_cumplimiento],
+    )
 
     # Ancho columnas - ajustar para nombres de supervisores
     ws.column_dimensions["A"].width = 14
@@ -537,6 +545,11 @@ class ReporteObjetivo(QWidget):
             f"Con nocturno: {r['dias_con_noche']}  |  "
             f"Sin control: {r['dias_sin_control']}  |  "
             f"Cumplimiento: {r['porcentaje']:.1f}%"
+        )
+        _, categoria = clasificar_cumplimiento(r["porcentaje"])
+        self.resumen_label.setStyleSheet(
+            f"background-color: {obtener_color(f'estado_{categoria}_bg', oscuro)}; "
+            f"color: {obtener_color(f'estado_{categoria}_fg', oscuro)}; padding: 6px;"
         )
         self.estado_label.setText(f"Reporte generado: {datos['nombre']}")
         self._set_controls_enabled(True)

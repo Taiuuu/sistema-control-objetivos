@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import QHeaderView
 from PyQt6.QtCore import Qt
 from services.background_task import run_background_task
 from services.exportar import exportar_excel, exportar_pdf
-from services.reportes import generar_reporte_mensual
+from services.reportes import generar_reporte_mensual, clasificar_cumplimiento
 from services.queries_tabla import cargar_supervisores
 from services.tema import obtener_tema_actual
 from ui.animaciones import animar_aparecer
@@ -156,7 +156,7 @@ class ReporteMensual(QWidget):
 
         for i, r in enumerate(resultados['objetivos']):
             cumplimiento = r['cumplimiento_porcentaje']
-            estado = "CUMPLE" if cumplimiento >= 80 else "NO CUMPLE"
+            estado, categoria = clasificar_cumplimiento(cumplimiento)
 
             self.tabla.setItem(i, 0, QTableWidgetItem(r['nombre']))
             self.tabla.setItem(i, 1, QTableWidgetItem(str(r['dias_esperados'])))
@@ -166,7 +166,7 @@ class ReporteMensual(QWidget):
             self.tabla.setItem(i, 5, QTableWidgetItem(estado))
 
             oscuro = obtener_tema_actual() == "oscuro"
-            color = QColor(obtener_color("estado_verde_bg", oscuro) if cumplimiento >= 80 else obtener_color("estado_rojo_bg", oscuro))
+            color = QColor(obtener_color(f"estado_{categoria}_bg", oscuro))
             for col in range(6):
                 self.tabla.item(i, col).setBackground(color)
                 self.tabla.item(i, col).setForeground(QColor(obtener_color("text_primary", oscuro)))

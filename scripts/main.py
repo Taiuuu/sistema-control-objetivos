@@ -14,6 +14,7 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import QTimer
 
 from ui.login import LoginWindow
@@ -102,7 +103,24 @@ def aplicar_tema(app: QApplication, nombre_tema: str) -> None:
         nombre_tema = "oscuro"
 
     app.setStyle("Fusion")
-    app.setPalette(app.style().standardPalette())
+    palette = QPalette()
+    if nombre_tema == "claro":
+        palette.setColor(QPalette.ColorRole.Window, QColor("#F5F7FB"))
+        palette.setColor(QPalette.ColorRole.Base, QColor("#FFFFFF"))
+        palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#F8FAFC"))
+        palette.setColor(QPalette.ColorRole.Text, QColor("#172033"))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor("#172033"))
+        palette.setColor(QPalette.ColorRole.Button, QColor("#FFFFFF"))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor("#344054"))
+    else:
+        palette.setColor(QPalette.ColorRole.Window, QColor("#16181E"))
+        palette.setColor(QPalette.ColorRole.Base, QColor("#0D142D"))
+        palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#1D2648"))
+        palette.setColor(QPalette.ColorRole.Text, QColor("#F4F7FB"))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor("#F4F7FB"))
+        palette.setColor(QPalette.ColorRole.Button, QColor("#1D2648"))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor("#EAF0FF"))
+    app.setPalette(palette)
     stylesheet = cargar_qss(f"tema_{nombre_tema}.qss")
     if not stylesheet:
         raise RuntimeError(f"No se pudo cargar el stylesheet del tema '{nombre_tema}'")

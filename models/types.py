@@ -59,6 +59,7 @@ class Objetivo:
     fecha_fin: Optional[str] = None
     creado_en: Optional[str] = None
     actualizado_en: Optional[str] = None
+    tipo_objetivo: str = "puntual"
 
     def es_activo(self) -> bool:
         return self.fecha_fin is None

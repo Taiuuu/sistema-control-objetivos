@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QDate
 from PyQt6.QtGui import QColor
 from services.reportes import obtener_objetivos_del_dia
+from services.background_task import run_background_task
 from database.db import DB_PATH
 from ui.form_objetivo import FormObjetivo
 from ui.lista_objetivos import DialogoEditarObjetivo
@@ -61,12 +62,34 @@ class TablaDiaria(QWidget):
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
+        self.estado = QLabel("Listo")
+        layout.insertWidget(1, self.estado)
         self.cargar_tabla()
 
     def cargar_tabla(self):
+        fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
+        self.estado.setText("Cargando objetivos...")
+        self.tabla.setEnabled(False)
+        task = run_background_task(self._obtener_datos, fecha)
+        task.signals.finished.connect(self._mostrar_datos)
+        task.signals.error.connect(self._mostrar_error)
+
+    @staticmethod
+    def _obtener_datos(fecha):
+        objetivos = obtener_objetivos_del_dia(fecha)
+        conexion = sqlite3.connect(DB_PATH)
+        cursor = conexion.cursor()
+        cursor.execute(
+            "SELECT objetivo_id, COUNT(*) FROM pasadas WHERE fecha = ? GROUP BY objetivo_id",
+            (fecha,),
+        )
+        pasadas = dict(cursor.fetchall())
+        conexion.close()
+        return objetivos, pasadas
+
+    def _mostrar_datos(self, datos):
         try:
-            fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
-            objetivos = obtener_objetivos_del_dia(fecha)
+            objetivos, pasadas_por_objetivo = datos
 
             self.tabla.setUpdatesEnabled(False)
             self._limpiar_tabla()
@@ -75,7 +98,7 @@ class TablaDiaria(QWidget):
                 self.tabla.setRowCount(len(objetivos))
 
                 for i, o in enumerate(objetivos):
-                    pasadas = contar_pasadas(fecha, o[0])
+                    pasadas = pasadas_por_objetivo.get(o[0], 0)
                     estado = "OK" if pasadas > 0 else "FALTA"
 
                     self.tabla.setItem(i, 0, QTableWidgetItem(o[1]))
@@ -100,11 +123,15 @@ class TablaDiaria(QWidget):
             self.tabla.setUpdatesEnabled(True)
             self.tabla.setSortingEnabled(sorting_enabled)
             self.tabla.update()
+            self.tabla.setEnabled(True)
+            self.estado.setText(f"{len(objetivos)} objetivos cargados")
 
         except Exception as e:
-            print(f"Error al cargar tabla: {e}")
-            import traceback
-            traceback.print_exc()
+            self._mostrar_error(str(e))
+
+    def _mostrar_error(self, mensaje):
+        self.tabla.setEnabled(True)
+        self.estado.setText(f"Error al cargar: {mensaje}")
 
     def _limpiar_tabla(self):
         """Elimina widgets y contenido previo de la tabla sin romper el renderizado."""
@@ -129,21 +156,11 @@ class TablaDiaria(QWidget):
     def _editar_objetivo(self, objetivo_id: int) -> None:
         """Abre el formulario para editar un objetivo."""
         # Obtener los datos del objetivo
-        conexion = sqlite3.connect(DB_PATH)
-        cursor = conexion.cursor()
-        cursor.execute('''
-            SELECT id, nombre, fecha_inicio, fecha_fin, descripcion, ubicacion,
-                   zona, tipo, requiere_turno_doble
-            FROM objetivos WHERE id = ?
-        ''', (objetivo_id,))
-        objetivo_data = cursor.fetchone()
-        conexion.close()
-
-        if objetivo_data:
-            # Crear y mostrar el diálogo de edición
-            dialogo = DialogoEditarObjetivo(objetivo_data, self)
-            dialogo.exec()
-            self.cargar_tabla()  # Recargar la tabla después de editar
+        from models.objetivos import obtener_objetivo
+        objetivo = obtener_objetivo(objetivo_id)
+        dialogo = DialogoEditarObjetivo(objetivo, self)
+        dialogo.exec()
+        self.cargar_tabla()
 
 
 def iniciar_interfaz():

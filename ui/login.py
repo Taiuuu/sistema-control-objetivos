@@ -231,6 +231,13 @@ class LoginWindow(QWidget):
             Qt.WindowType.WindowCloseButtonHint
         )
         self.setWindowIcon(QIcon(ruta_asset("assets/vespLogoDarkGreen.svg")))
+        pantalla = QApplication.primaryScreen()
+        if pantalla:
+            area = pantalla.availableGeometry()
+            self.move(
+                area.center().x() - self.width() // 2,
+                area.center().y() - self.height() // 2,
+            )
 
         layout = QVBoxLayout()
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)

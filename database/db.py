@@ -59,6 +59,16 @@ def crear_base_datos() -> None:
     """)
 
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS objetivo_periodos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            objetivo_id INTEGER NOT NULL,
+            fecha_inicio TEXT NOT NULL,
+            fecha_fin TEXT,
+            FOREIGN KEY (objetivo_id) REFERENCES objetivos(id) ON DELETE CASCADE
+        )
+    """)
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS feriados (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             fecha        TEXT NOT NULL UNIQUE,
@@ -177,6 +187,7 @@ def crear_base_datos() -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_fecha_usuario ON auditoria(fecha DESC, usuario_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_objetivos_fecha_fin ON objetivos(fecha_fin)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_objetivos_aliases_objetivo ON objetivos_aliases(objetivo_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_objetivo_periodos_objetivo_fechas ON objetivo_periodos(objetivo_id, fecha_inicio, fecha_fin)")
     cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_feriados_fecha ON feriados(fecha)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_supervisores_nombre ON supervisores(nombre)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_usuario_id ON logs(usuario_id)")
@@ -366,6 +377,7 @@ def migrar_objetivos_campos(cursor: sqlite3.Cursor | None = None) -> None:
         for columna_def in (
             "descripcion TEXT",
             "activo INTEGER DEFAULT 1",
+            "tipo_objetivo TEXT DEFAULT 'puntual'",
         ):
             try:
                 actualizar_cursor.execute(f"ALTER TABLE objetivos ADD COLUMN {columna_def}")
@@ -378,6 +390,29 @@ def migrar_objetivos_campos(cursor: sqlite3.Cursor | None = None) -> None:
         )
         actualizar_cursor.execute(
             "UPDATE objetivos SET activo = 1 WHERE activo IS NULL"
+        )
+        actualizar_cursor.execute(
+            "UPDATE objetivos SET tipo_objetivo = 'puntual' WHERE tipo_objetivo IS NULL OR tipo_objetivo = ''"
+        )
+        actualizar_cursor.execute("""
+            CREATE TABLE IF NOT EXISTS objetivo_periodos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                objetivo_id INTEGER NOT NULL,
+                fecha_inicio TEXT NOT NULL,
+                fecha_fin TEXT,
+                FOREIGN KEY (objetivo_id) REFERENCES objetivos(id) ON DELETE CASCADE
+            )
+        """)
+        actualizar_cursor.execute("""
+            INSERT INTO objetivo_periodos (objetivo_id, fecha_inicio, fecha_fin)
+            SELECT o.id, o.fecha_inicio, o.fecha_fin
+            FROM objetivos o
+            WHERE NOT EXISTS (
+                SELECT 1 FROM objetivo_periodos p WHERE p.objetivo_id = o.id
+            ) AND o.fecha_inicio IS NOT NULL
+        """)
+        actualizar_cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_objetivo_periodos_objetivo_fechas ON objetivo_periodos(objetivo_id, fecha_inicio, fecha_fin)"
         )
         if conexion is not None:
             conexion.commit()

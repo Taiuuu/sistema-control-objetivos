@@ -77,7 +77,8 @@ class VistaFeriados(QWidget):
             QPushButton {{ background-color: {tema['background_secundario']}; color: {tema['texto']}; border: 1px solid {tema['border']}; border-radius: 8px; padding: 6px 10px; }}
             QPushButton:hover {{ background-color: {tema['primario']}; color: white; }}
             QFrame#Dia {{ border: 1px solid {tema['border']}; border-radius: 10px; padding: 8px; background-color: {tema['background_secundario']}; }}
-            QFrame#DiaFeriado {{ border: 1px solid {tema['primario']}; border-radius: 10px; padding: 8px; background-color: {tema['primario']}; color: white; }}
+            QFrame#DiaFeriado {{ border: 1px solid #4f46e5; border-radius: 10px; padding: 8px; background-color: #4f46e5; color: white; }}
+            QPushButton#DiaFeriado {{ border: 1px solid #4f46e5; border-radius: 10px; padding: 8px; background-color: #4f46e5; color: white; }}
         """
 
     def _cargar_calendario(self) -> None:

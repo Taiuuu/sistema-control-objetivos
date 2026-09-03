@@ -7,12 +7,13 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget,
     QTableWidgetItem, QPushButton, QMessageBox, QDialog,
     QLabel, QLineEdit, QDateEdit, QCheckBox, QDialogButtonBox,
-    QInputDialog
+    QInputDialog, QComboBox, QListWidget
 )
 from PyQt6.QtCore import QDate
 from models.objetivos import (
     actualizar_objetivo,
     dar_de_baja_objetivo,
+    listar_periodos, pausar_objetivo, reactivar_objetivo,
     eliminar_objetivo,
     listar_objetivos,
 )
@@ -38,8 +39,8 @@ def _cargar_objetivos() -> list[Objetivo]:
 
 
 def _actualizar_objetivo(objetivo_id: int, nombre: str, fecha_inicio: str,
-                          fecha_fin: str | None, dias_semana: str) -> None:
-    actualizar_objetivo(objetivo_id, nombre, fecha_inicio, dias_semana, fecha_fin)
+                          fecha_fin: str | None, dias_semana: str, tipo_objetivo: str) -> None:
+    actualizar_objetivo(objetivo_id, nombre, fecha_inicio, dias_semana, fecha_fin, tipo_objetivo)
 
 
 class DialogoEditarObjetivo(QDialog):
@@ -48,7 +49,7 @@ class DialogoEditarObjetivo(QDialog):
         super().__init__(parent)
         self.objetivo_id = objetivo.id
         self.setWindowTitle("Editar objetivo")
-        self.setFixedSize(400, 480)
+        self.setFixedSize(440, 620)
 
         layout = QVBoxLayout()
 
@@ -63,6 +64,13 @@ class DialogoEditarObjetivo(QDialog):
         self.input_inicio.setCalendarPopup(True)
         self.input_inicio.setDate(QDate.fromString(objetivo.fecha_inicio, "yyyy-MM-dd"))
         layout.addWidget(self.input_inicio)
+
+        layout.addWidget(QLabel("Tipo de objetivo:"))
+        self.selector_tipo = QComboBox()
+        self.selector_tipo.addItem("Puntual", "puntual")
+        self.selector_tipo.addItem("Intermitente", "intermitente")
+        self.selector_tipo.setCurrentIndex(1 if objetivo.tipo_objetivo == "intermitente" else 0)
+        layout.addWidget(self.selector_tipo)
 
         # Fecha fin opcional
         self.check_fin = QCheckBox("Tiene fecha de finalización:")
@@ -89,6 +97,16 @@ class DialogoEditarObjetivo(QDialog):
             layout.addWidget(cb)
             self.dias[nombre_dia] = cb
 
+        self.historial = QListWidget()
+        layout.addWidget(QLabel("Historial de períodos:"))
+        layout.addWidget(self.historial)
+        self._cargar_historial()
+
+        self.boton_periodo = QPushButton()
+        self.boton_periodo.clicked.connect(self._cambiar_periodo)
+        layout.addWidget(self.boton_periodo)
+        self._actualizar_boton_periodo()
+
         # Botones
         botones = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save |
@@ -102,6 +120,28 @@ class DialogoEditarObjetivo(QDialog):
 
     def _toggle_fecha_fin(self, checked: bool) -> None:
         self.input_fin.setEnabled(checked)
+
+    def _cargar_historial(self) -> None:
+        self.historial.clear()
+        for periodo in listar_periodos(self.objetivo_id):
+            self.historial.addItem(f"{periodo['fecha_inicio']} - {periodo['fecha_fin'] or 'Activo'}")
+
+    def _actualizar_boton_periodo(self) -> None:
+        periodos = listar_periodos(self.objetivo_id)
+        activo = bool(periodos and periodos[-1]['fecha_fin'] is None)
+        self.boton_periodo.setText("Pausar" if activo else "Reactivar")
+
+    def _cambiar_periodo(self) -> None:
+        try:
+            fecha = QDate.currentDate().toString("yyyy-MM-dd")
+            if self.boton_periodo.text() == "Pausar":
+                pausar_objetivo(self.objetivo_id, fecha)
+            else:
+                reactivar_objetivo(self.objetivo_id, fecha)
+            self._cargar_historial()
+            self._actualizar_boton_periodo()
+        except Exception as error:
+            QMessageBox.warning(self, "Período", str(error))
 
     def _guardar(self) -> None:
         nombre = self.input_nombre.text().strip()
@@ -124,7 +164,7 @@ class DialogoEditarObjetivo(QDialog):
             return
 
         dias_str = ",".join(dias_seleccionados)
-        _actualizar_objetivo(self.objetivo_id, nombre, inicio, fin, dias_str)
+        _actualizar_objetivo(self.objetivo_id, nombre, inicio, fin, dias_str, self.selector_tipo.currentData())
 
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id
