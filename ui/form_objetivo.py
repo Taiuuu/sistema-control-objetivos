@@ -66,6 +66,7 @@ class FormObjetivo(QWidget):
 
         self.dias = {dia: QCheckBox(dia) for dia in DIAS_MAP}
         for checkbox in self.dias.values():
+            checkbox.setChecked(True)
             checkbox.setFixedHeight(28)
 
         self.boton_guardar = QPushButton("Guardar objetivo")

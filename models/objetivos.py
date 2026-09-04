@@ -166,15 +166,15 @@ def listar_objetivos(
         if solo_activos:
             query = f"""
                 SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana,
-                       datetime('now') as creado_en, tipo_objetivo
+                      datetime('now') as creado_en, tipo_objetivo, pendiente_revision
                 FROM objetivos
-                WHERE fecha_fin IS NULL
+                  WHERE fecha_fin IS NULL OR fecha_fin >= date('now')
                 ORDER BY {orden}
             """
         else:
             query = f"""
                 SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana,
-                       datetime('now') as creado_en, tipo_objetivo
+                      datetime('now') as creado_en, tipo_objetivo, pendiente_revision
                 FROM objetivos
                 ORDER BY CASE WHEN fecha_fin IS NULL THEN 0 ELSE 1 END,
                          {orden}
@@ -189,7 +189,8 @@ def listar_objetivos(
                 fecha_inicio=r['fecha_inicio'],
                 fecha_fin=r['fecha_fin'],
                 dias_semana=r['dias_semana'],
-                creado_en=r.get('creado_en'), tipo_objetivo=r.get('tipo_objetivo') or 'puntual'
+                creado_en=r.get('creado_en'), tipo_objetivo=r.get('tipo_objetivo') or 'puntual',
+                pendiente_revision=bool(r.get('pendiente_revision', 0))
             )
             for r in resultados
         ]
@@ -220,7 +221,7 @@ def obtener_objetivo(objetivo_id: int) -> Objetivo:
         objetivo_id = validar_id(objetivo_id)
         
         resultado = gestor_db.ejecutar(
-            """SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana, tipo_objetivo
+            """SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana, tipo_objetivo, pendiente_revision
                FROM objetivos WHERE id = ?""",
             (objetivo_id,)
         )
@@ -235,7 +236,8 @@ def obtener_objetivo(objetivo_id: int) -> Objetivo:
             nombre=r['nombre'],
             fecha_inicio=r['fecha_inicio'],
             fecha_fin=r['fecha_fin'],
-            dias_semana=r['dias_semana'], tipo_objetivo=r.get('tipo_objetivo') or 'puntual'
+            dias_semana=r['dias_semana'], tipo_objetivo=r.get('tipo_objetivo') or 'puntual',
+            pendiente_revision=bool(r.get('pendiente_revision', 0))
         )
         
         logger.debug(f"Objetivo obtenido: {objetivo.nombre}")
@@ -371,6 +373,21 @@ def actualizar_objetivo(
     except Exception as e:
         logger.error(f"Error inesperado: {e}")
         raise DatabaseError("UPDATE", str(e))
+
+
+def marcar_objetivo_revisado(objetivo_id: int) -> None:
+    """Marca como revisado un objetivo creado desde una importación."""
+    objetivo_id = validar_id(objetivo_id)
+    with gestor_db.transaction() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE objetivos SET pendiente_revision = 0 WHERE id = ?",
+            (objetivo_id,),
+        )
+        if cursor.rowcount == 0:
+            raise ObjetivoNoEncontrado(objetivo_id)
+    invalidar_objetivos()
+    notificar_cambio("objetivos", "UPDATE", {"id": objetivo_id, "pendiente_revision": 0})
 
 
 def listar_periodos(objetivo_id: int) -> list[dict]:

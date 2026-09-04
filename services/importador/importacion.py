@@ -426,6 +426,7 @@ def _crear_objetivo(
     nombre: str,
     usuario,
     fecha_inicio: date | None = None,
+    dias_semana: str = "1,2,3,4,5,6,7,8",
 ) -> int:
 
     nombre = (nombre or "").strip()
@@ -457,7 +458,8 @@ def _crear_objetivo(
             fecha_inicio,
             fecha_fin,
             dias_semana,
-            activo
+            activo,
+            pendiente_revision
         )
         VALUES (?, ?, ?, ?, ?, ?)
         """,
@@ -467,6 +469,7 @@ def _crear_objetivo(
             fecha_inicio_sql,
             None,
             None,
+            1,
             1,
         ),
     )
@@ -490,8 +493,9 @@ def _crear_objetivo(
                 "descripcion": "",
                 "fecha_inicio": fecha_inicio_sql,
                 "fecha_fin": None,
-                "dias_semana": None,
+                "dias_semana": "1,2,3,4,5,6,7,8",
                 "activo": 1,
+                "pendiente_revision": 1,
             },
             "detalles": {
                 "accion": "Alta desde importación",
@@ -502,6 +506,19 @@ def _crear_objetivo(
     )
 
     return objetivo_id
+
+
+def _primera_fecha_aparicion(analisis: ResultadoAnalisis, problema: Problema) -> date | None:
+    """Obtiene la primera fecha de hoja del objetivo que se está resolviendo."""
+    clave = matcher.normalizar_nombre(problema.objetivo or "")
+    fechas = [
+        pasada.fecha_hoja
+        for pasada in analisis.pasadas
+        if pasada.objetivo_nombre
+        and matcher.normalizar_nombre(pasada.objetivo_nombre) == clave
+        and pasada.fecha_hoja is not None
+    ]
+    return min(fechas) if fechas else None
 
 
 def _crear_alias_objetivo(conexion_bd, nombre_alias: str, objetivo_id: int) -> None:
@@ -679,7 +696,8 @@ def _resolver_nombre_match(
             nombre_elegido,
             usuario,
             fecha_inicio=(
-                resultado.fecha_inicio_sugerida
+                _primera_fecha_aparicion(analisis, problema)
+                or resultado.fecha_inicio_sugerida
             ),
         )
 

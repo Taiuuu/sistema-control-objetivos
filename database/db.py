@@ -378,6 +378,7 @@ def migrar_objetivos_campos(cursor: sqlite3.Cursor | None = None) -> None:
             "descripcion TEXT",
             "activo INTEGER DEFAULT 1",
             "tipo_objetivo TEXT DEFAULT 'puntual'",
+            "pendiente_revision INTEGER DEFAULT 0",
         ):
             try:
                 actualizar_cursor.execute(f"ALTER TABLE objetivos ADD COLUMN {columna_def}")
@@ -393,6 +394,12 @@ def migrar_objetivos_campos(cursor: sqlite3.Cursor | None = None) -> None:
         )
         actualizar_cursor.execute(
             "UPDATE objetivos SET tipo_objetivo = 'puntual' WHERE tipo_objetivo IS NULL OR tipo_objetivo = ''"
+        )
+        actualizar_cursor.execute(
+            "UPDATE objetivos SET pendiente_revision = 0 WHERE pendiente_revision IS NULL"
+        )
+        actualizar_cursor.execute(
+            "UPDATE objetivos SET activo = 0 WHERE fecha_fin IS NOT NULL AND fecha_fin < date('now')"
         )
         actualizar_cursor.execute("""
             CREATE TABLE IF NOT EXISTS objetivo_periodos (

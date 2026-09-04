@@ -207,6 +207,7 @@ def _construir_pasadas_normalizadas(
                     fecha_calendario=fecha_calendario,
                     turno=turno_final,
                     turno_hoja=turno_hoja,
+                    fecha_hoja=fecha_hoja,
                     hora=resultado_hora.hora,
                     movil=cruda.movil,
                     objetivo_nombre=(cruda.objetivo or "").strip() if cruda.objetivo else "",

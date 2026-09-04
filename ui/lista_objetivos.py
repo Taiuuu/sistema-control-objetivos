@@ -7,15 +7,16 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget,
     QTableWidgetItem, QPushButton, QMessageBox, QDialog,
     QLabel, QLineEdit, QDateEdit, QCheckBox, QDialogButtonBox,
-    QInputDialog, QComboBox, QListWidget
+    QInputDialog, QComboBox, QListWidget, QTabWidget
 )
-from PyQt6.QtCore import QDate
+from PyQt6.QtCore import QDate, Qt
 from models.objetivos import (
     actualizar_objetivo,
     dar_de_baja_objetivo,
     listar_periodos, pausar_objetivo, reactivar_objetivo,
     eliminar_objetivo,
     listar_objetivos,
+    marcar_objetivo_revisado,
 )
 from models.types import Objetivo
 from services.sincronizacion import obtener_sincronizador
@@ -196,20 +197,16 @@ class ListaObjetivos(QWidget):
             info_label.setStyleSheet("color: #ff9800; font-weight: bold;")
             layout.addWidget(info_label)
 
-        self.tabla = QTableWidget()
-        # Agregar columna de eliminar si es admin
-        num_cols = 6
-        self.tabla.setColumnCount(num_cols)
-        
-        headers = ["Nombre", "Inicio", "Fin", "Días", "Editar", "Dar de baja"]
-        self.tabla.setHorizontalHeaderLabels(headers)
-        self.tabla.setColumnWidth(0, 220)
-        self.tabla.setColumnWidth(1, 100)
-        self.tabla.setColumnWidth(2, 100)
-        self.tabla.setColumnWidth(3, 200)
-        self.tabla.setColumnWidth(4, 80)
-        self.tabla.setColumnWidth(5, 100)
-        layout.addWidget(self.tabla)
+        self.tabs = QTabWidget()
+        self.tablas = {}
+        for clave, titulo in (("actuales", "Objetivos actuales"), ("finalizados", "Objetivos finalizados"), ("todos", "Todos")):
+            tabla = QTableWidget()
+            self._configurar_tabla(tabla)
+            self.tablas[clave] = tabla
+            self.tabs.addTab(tabla, titulo)
+        self.tabla = self.tablas["actuales"]
+        self.tabs.currentChanged.connect(self._cargar_tabla)
+        layout.addWidget(self.tabs)
 
         self.setLayout(layout)
         self._cargar_tabla()
@@ -218,30 +215,56 @@ class ListaObjetivos(QWidget):
         self.sincronizador = obtener_sincronizador()
         self.sincronizador.datos_cambiados.connect(self._on_datos_cambiados)
 
-    def _cargar_tabla(self) -> None:
-        objetivos = _cargar_objetivos()
-        self.tabla.setRowCount(len(objetivos))
+    def _configurar_tabla(self, tabla: QTableWidget) -> None:
+        tabla.setColumnCount(7)
+        tabla.setHorizontalHeaderLabels(["Nombre", "Inicio", "Fin", "Días", "Estado", "Editar", "Acción"])
+        for columna, ancho in enumerate((220, 100, 100, 180, 150, 80, 100)):
+            tabla.setColumnWidth(columna, ancho)
 
+    def _cargar_tabla(self, _indice: int = 0) -> None:
+        objetivos = _cargar_objetivos()
+        filtros = {
+            "actuales": lambda obj: obj.es_activo(),
+            "finalizados": lambda obj: not obj.es_activo(),
+            "todos": lambda obj: True,
+        }
+        for clave, tabla in self.tablas.items():
+            tabla.setRowCount(0)
+            seleccionados = [obj for obj in objetivos if filtros[clave](obj)]
+            tabla.setRowCount(len(seleccionados))
+            self._llenar_tabla(tabla, seleccionados)
+
+    def _llenar_tabla(self, tabla: QTableWidget, objetivos: list[Objetivo]) -> None:
         for i, o in enumerate(objetivos):
             dias_texto = ", ".join([DIAS_MAP.get(d, d) for d in (o.dias_semana or "").split(",")])
             fin_texto = o.fecha_fin if o.fecha_fin else "Sin fecha fin"
 
-            self.tabla.setItem(i, 0, QTableWidgetItem(o.nombre))
-            self.tabla.setItem(i, 1, QTableWidgetItem(o.fecha_inicio))
-            self.tabla.setItem(i, 2, QTableWidgetItem(fin_texto))
-            self.tabla.setItem(i, 3, QTableWidgetItem(dias_texto))
+            tabla.setItem(i, 0, QTableWidgetItem(o.nombre))
+            tabla.setItem(i, 1, QTableWidgetItem(o.fecha_inicio))
+            tabla.setItem(i, 2, QTableWidgetItem(fin_texto))
+            tabla.setItem(i, 3, QTableWidgetItem(dias_texto))
+            estado = "Pendiente de revisión" if o.pendiente_revision else ("Vigente" if o.es_activo() else "Finalizado")
+            tabla.setItem(i, 4, QTableWidgetItem(estado))
 
             boton_editar = QPushButton("Editar")
             boton_editar.clicked.connect(lambda checked, obj=o: self._editar(obj))
-            self.tabla.setCellWidget(i, 4, boton_editar)
+            tabla.setCellWidget(i, 5, boton_editar)
 
-            # "Dar de baja": siempre visible para admin, solo sin fecha fin para el resto
-            if not o.fecha_fin or self.es_admin:
+            if o.pendiente_revision:
+                boton_revision = QPushButton("Revisado")
+                boton_revision.clicked.connect(lambda checked, obj_id=o.id: self._marcar_revisado(obj_id))
+                tabla.setCellWidget(i, 6, boton_revision)
+            elif not o.fecha_fin or self.es_admin:
                 boton_baja = QPushButton("Dar de baja")
-                boton_baja.clicked.connect(
-                    lambda checked, obj_id=o.id, nombre=o.nombre: self._dar_de_baja(obj_id, nombre)
-                )
-                self.tabla.setCellWidget(i, 5, boton_baja)
+                boton_baja.clicked.connect(lambda checked, obj_id=o.id, nombre=o.nombre: self._dar_de_baja(obj_id, nombre))
+                tabla.setCellWidget(i, 6, boton_baja)
+
+    def _marcar_revisado(self, objetivo_id: int) -> None:
+        try:
+            marcar_objetivo_revisado(objetivo_id)
+            self._cargar_tabla()
+        except Exception as error:
+            QMessageBox.warning(self, "Revisión", str(error))
 
     
     def _editar(self, objetivo: Objetivo) -> None:

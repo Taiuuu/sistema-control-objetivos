@@ -129,6 +129,7 @@ class PasadaNormalizada:
     # ------------------------------------------------------------------
 
     turno_hoja: Optional[Turno] = None
+    fecha_hoja: Optional[date] = None
     """Turno que indica el NOMBRE de la hoja (ej. "12-7 (N)" -> "N"),
     independiente de lo que haya cargado la celda TURNO de esta fila
     puntual. Representa el turno REAL que trabajó la cuadrilla (la

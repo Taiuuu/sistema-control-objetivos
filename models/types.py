@@ -8,6 +8,7 @@ en toda la capa de modelos para mayor claridad y consistencia.
 """
 
 from dataclasses import dataclass
+from datetime import date
 from enum import Enum
 from typing import Optional
 
@@ -60,9 +61,10 @@ class Objetivo:
     creado_en: Optional[str] = None
     actualizado_en: Optional[str] = None
     tipo_objetivo: str = "puntual"
+    pendiente_revision: bool = False
 
     def es_activo(self) -> bool:
-        return self.fecha_fin is None
+        return self.fecha_fin is None or self.fecha_fin >= date.today().isoformat()
 
     def __hash__(self):
         return hash(self.id)
