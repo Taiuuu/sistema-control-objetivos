@@ -1,44 +1,26 @@
 # VESP Control de Objetivos
 
-Sistema profesional de gestión de rondas y objetivos de seguridad privada, basado en escritorio
-con PyQt6 y SQLite. Permite registrar y supervisar pasadas por turno, gestionar objetivos y
-supervisores, generar reportes de cumplimiento, mantener auditoría completa, y soporte de
-importación desde Excel y API REST local.
+VESP Control de Objetivos es una aplicación de escritorio para gestionar rondas de seguridad
+privada. Permite registrar pasadas por turno, administrar objetivos, supervisores y equipos,
+generar reportes de cumplimiento e importar recorridos desde Excel.
 
-> **Estado del proyecto:** la aplicación principal continúa siendo de escritorio. La migración
-> a una aplicación web queda cancelada; la API REST disponible es un servicio auxiliar local.
+**Versión actual:** 1.5.2 estable
+**Aplicación principal:** PyQt6 + SQLite
+**API REST:** servicio Flask auxiliar local, no reemplaza la aplicación de escritorio
 
-## ¿Qué hace este proyecto?
+## Funcionalidades
 
-- Registrar y administrar objetivos de seguridad.
-- Controlar pasadas por turno diurno y nocturno.
-- Gestionar supervisores y equipos de turno.
-- Importar datos desde Excel (formato CONTROL_RECORRIDOS).
-- Generar reportes de cumplimiento y estadísticas (Excel/PDF).
-- Mantener auditoría de operaciones y copias de seguridad automáticas.
-- Autenticar usuarios con permisos según roles (admin, supervisor, operador, auditor, gerente).
+- Gestión de objetivos, supervisores, equipos y pasadas diurnas/nocturnas.
+- Importación de archivos Excel `CONTROL_RECORRIDOS`, con vista previa y detección de duplicados.
+- Reportes mensuales y diarios con exportación a Excel y PDF.
+- Usuarios, roles, permisos, cambio obligatorio de contraseña y control de sesiones.
+- Auditoría de operaciones, copias de seguridad automáticas y restauración/fábrica.
+- Feriados, notas diarias, sincronización y notificaciones según la configuración instalada.
 
-## Estructura del proyecto
+## Requisitos
 
-- `scripts/` - Lanzador principal y utilidades de mantenimiento.
-- `ui/` - Interfaces gráficas PyQt6 para todas las pantallas de la aplicación.
-- `services/` - Lógica de negocio: validaciones, importadores, sincronización, backup, notificaciones.
-- `database/` - Acceso y migración de la base de datos SQLite (`db.py`, `gestor_db.py`).
-- `models/` - Definiciones de entidades y validaciones de dominio.
-- `api/` - API REST auxiliar con rutas Flask; no reemplaza la aplicación de escritorio.
-- `docs/` - Documentación técnica y guías internas.
-- `tests/` - Suite de pruebas automatizadas.
-
-## Tecnologías utilizadas
-
-- Python 3.11+ (compatible hasta 3.14)
-- PyQt6
-- SQLite (acceso directo, sin ORM)
-- Flask + Flask-JWT-Extended (API REST)
-- openpyxl / pandas (importación Excel)
-- bcrypt (hashing de contraseñas)
-- reportlab (exportación PDF)
-- redis (opcional, si se usan SSE/notificaciones)
+- Python 3.10 o superior.
+- Windows para la aplicación distribuida; el código usa SQLite y puede ejecutarse en otros sistemas con sus dependencias de Python.
 
 ## Instalación
 
@@ -47,22 +29,19 @@ git clone https://github.com/Taiuuu/sistema-control-objetivos.git
 cd sistema-control-objetivos
 
 python -m venv venv
-venv\Scripts\activate      # Windows
-# source venv/bin/activate # macOS/Linux
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # macOS/Linux
 
 python -m pip install -r requirements.txt
+copy .env.example .env         # Windows
+# cp .env.example .env         # macOS/Linux
 ```
 
-Configurar variables de entorno:
+Antes de usar la aplicación o la API, reemplazar en `.env` los valores de ejemplo de
+`VESP_JWT_SECRET` y `VESP_ENCRYPTION_KEY` por secretos propios. El resto de las variables es
+opcional y está documentado en `.env.example`.
 
-```bash
-copy .env.example .env     # Windows
-# cp .env.example .env     # macOS/Linux
-```
-
-Ajustar `VESP_JWT_SECRET` y `VESP_ENCRYPTION_KEY` en `.env` antes de usar en producción.
-
-## Ejecución
+## Uso
 
 ### Aplicación de escritorio
 
@@ -70,26 +49,30 @@ Ajustar `VESP_JWT_SECRET` y `VESP_ENCRYPTION_KEY` en `.env` antes de usar en pro
 python scripts/main.py
 ```
 
-Al iniciar, inicializa: base de datos SQLite local, migraciones de esquema, backup automático,
-servidor API local de soporte, e interfaz de login.
+En el primer inicio se crea o actualiza la base SQLite local, se ejecutan las migraciones y se
+abre la pantalla de login. Las credenciales iniciales son `admin` / `0000`; el cambio de
+contraseña es obligatorio en el primer acceso.
 
-**Primer acceso:**
-- Usuario: `admin`
-- Contraseña: `0000` (cambio obligatorio en el primer login)
+### API REST independiente
 
-### API REST auxiliar (opcional)
+La API requiere `VESP_JWT_SECRET` y se inicia desde la raíz del proyecto:
 
 ```bash
-python api/app.py
+python -m api.app
 ```
 
-Levanta el servicio auxiliar en `http://0.0.0.0:5000`. Rutas principales:
+Por defecto queda disponible en `http://127.0.0.1:5000`. El host, puerto y modo debug pueden
+configurarse con `VESP_API_HOST`, `VESP_API_PORT` y `VESP_API_DEBUG`. La especificación OpenAPI
+está disponible en `GET /api/docs`.
+
+Rutas principales:
 
 - `POST /api/auth/login`
-- `GET /api/objetivos` · `POST /api/objetivos`
-- `GET /api/supervisores`
-- `POST /api/pasadas`
+- `GET|POST /api/objetivos`
+- `GET|POST /api/supervisores`
+- `GET|POST /api/pasadas`
 - `GET /api/reportes/mensual/<anio>/<mes>`
+- `GET /api/sse/events`
 
 ## Pruebas
 
@@ -97,24 +80,25 @@ Levanta el servicio auxiliar en `http://0.0.0.0:5000`. Rutas principales:
 python -m pytest
 ```
 
-## Variables de entorno (`.env.example`)
+Las dependencias de desarrollo adicionales se encuentran en `docs/requirements-dev.txt`.
 
-- `VESP_JWT_SECRET` - Secreto JWT obligatorio para la API
-- `VESP_ENCRYPTION_KEY` - Clave de cifrado obligatoria para la app
-- `VESP_DB_PATH` - Ruta opcional a la base de datos SQLite
-- `VESP_API_HOST` - Host de la API
-- `VESP_API_PORT` - Puerto de la API
-- `VESP_API_DEBUG` - Activar modo debug para la API
-- `VESP_LOG_LEVEL` - Nivel de logging
+## Estructura
 
-## Notas de arquitectura
+- `scripts/` - Entrada principal y utilidades de mantenimiento.
+- `ui/` - Ventanas y componentes de la interfaz PyQt6.
+- `services/` - Lógica de negocio, importación, reportes, sincronización y seguridad.
+- `models/` - Entidades y validaciones de dominio.
+- `database/` - Inicialización, migraciones y acceso thread-safe a SQLite.
+- `api/` - API Flask modular y sus blueprints.
+- `tests/` - Pruebas automatizadas.
+- `docs/` - Manual de usuario, contexto técnico y documentación de desarrollo.
 
-- UI construida con PyQt6 en `ui/`, sin llamadas directas a la BD (pasa siempre por `services/`).
-- Lógica de negocio agrupada en `services/` (validaciones, importadores, sincronización, reportes).
-- Base de datos SQLite manejada desde `database/db.py` y `database/gestor_db.py`.
-- `api/` contiene una versión Flask de la API REST, independiente de la app de escritorio.
+## Documentación adicional
 
-## Autor y empresa
+- [Manual de usuario](docs/MANUAL_USUARIO.md)
+- [Contexto técnico](docs/CONTEXT.md)
+- [Guía del instalador](GUIA_INSTALADOR_INNO_SETUP.txt)
 
-- Autor: Taiel Clot
-- Empresa: V.E.S.P Organizations SA
+## Autoría
+
+Taiel Clot - V.E.S.P Organizations SA
