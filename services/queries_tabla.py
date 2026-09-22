@@ -64,6 +64,28 @@ def obtener_equipo(fecha: str, turno: str) -> str:
     return ", ".join(nombres[:-1]) + " y " + nombres[-1]
 
 
+def obtener_supervisores_de_pasadas(fecha: str, turno: str) -> str:
+    """Obtiene los supervisores que registraron pasadas en una fecha y turno."""
+    turnos = (turno, "D") if turno == "diurno" else (turno, "N")
+    query = """
+        SELECT s.nombre
+        FROM pasadas p
+        JOIN supervisores s ON p.supervisor_id = s.id
+        WHERE COALESCE(p.fecha_operativa, p.fecha) = ?
+          AND p.turno IN (?, ?)
+        GROUP BY s.id, s.nombre
+        ORDER BY MIN(p.hora), MIN(p.id)
+    """
+    resultados = gestor_db.ejecutar(query, (fecha, *turnos))
+    nombres = [fila['nombre'] for fila in resultados if fila['nombre']]
+
+    if not nombres:
+        return "—"
+    if len(nombres) == 1:
+        return nombres[0]
+    return ", ".join(nombres[:-1]) + " y " + nombres[-1]
+
+
 # =============================================================================
 # SUPERVISORES
 # =============================================================================

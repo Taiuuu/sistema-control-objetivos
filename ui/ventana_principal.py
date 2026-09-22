@@ -20,7 +20,7 @@ from PyQt6.QtCore import (
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
 from services.reportes import obtener_objetivos_del_dia
 from services.queries_tabla import (
-    obtener_equipo, cargar_supervisores
+    obtener_equipo, obtener_supervisores_de_pasadas, cargar_supervisores
 )
 from ui.form_objetivo import FormObjetivo
 from ui.form_supervisor import FormSupervisor
@@ -1544,8 +1544,12 @@ class VentanaPrincipal(QWidget):
         texto_busq    = self.buscador.text().strip().lower()
 
         objetivos = sorted(obtener_objetivos_del_dia(fecha), key=lambda o: o[1].lower())
-        equipo_dia   = obtener_equipo(fecha, "diurno")
-        equipo_noche = obtener_equipo(fecha, "nocturno")
+        equipo_dia_importado = obtener_supervisores_de_pasadas(fecha, "diurno")
+        equipo_noche_importado = obtener_supervisores_de_pasadas(fecha, "nocturno")
+        equipo_dia_manual = obtener_equipo(fecha, "diurno")
+        equipo_noche_manual = obtener_equipo(fecha, "nocturno")
+        equipo_dia = equipo_dia_manual if equipo_dia_manual != "—" else equipo_dia_importado
+        equipo_noche = equipo_noche_manual if equipo_noche_manual != "—" else equipo_noche_importado
 
         pasadas_dia_tot, pasadas_noche_tot = self._obtener_todas_pasadas_por_turno(fecha)
         self._actualizar_metricas(objetivos, pasadas_dia_tot, pasadas_noche_tot)
