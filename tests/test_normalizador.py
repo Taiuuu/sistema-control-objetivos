@@ -43,6 +43,36 @@ def test_texto_con_punto_y_coma_en_vez_de_dos_puntos():
     assert error is None
 
 
+def test_texto_horario_acepta_separadores_y_hora_de_un_digito():
+    formatos = (
+        ("12,43", datetime.time(12, 43)),
+        ("12:43", datetime.time(12, 43)),
+        ("12;43", datetime.time(12, 43)),
+        ("12.43", datetime.time(12, 43)),
+        ("1:01", datetime.time(1, 1)),
+        ("1,01", datetime.time(1, 1)),
+        ("12,08;", datetime.time(12, 8)),
+        ("'12,08;", datetime.time(12, 8)),
+    )
+    for valor, esperado in formatos:
+        hora, fue_normalizada, error = normalizar_hora(valor)
+        assert hora == esperado, valor
+        assert fue_normalizada is True, valor
+        assert error is None, valor
+
+
+def test_horario_con_separador_alternativo_respeta_rangos():
+    for valor in ("24,00", "12.60", "24;00"):
+        hora, fue_normalizada, error = normalizar_hora(valor)
+        assert hora is None
+        assert fue_normalizada is False
+        assert "fuera de rango" in error
+
+    hora, _, error = normalizar_hora("12 43")
+    assert hora is None
+    assert "no reconocido" in error
+
+
 def test_hora_fuera_de_rango_es_error_critico():
     hora, fue_normalizada, error = normalizar_hora(26)
     assert hora is None

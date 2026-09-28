@@ -24,7 +24,7 @@ from .modelos import Problema
 #     - `5`      -> 05:00   (1-2 dígitos: hora en punto)
 #     - `205`    -> 02:05   (3-4 dígitos: los últimos 2 son minutos)
 #     - `2149`   -> 21:49
-#     - `"00;52"`-> 00:52   (texto con ';' en vez de ':')
+#     - `"00;52"`-> 00:52   (separadores comunes convertidos a ':')
 #     - horas >= 24 (o minutos >= 60) -> error crítico (no se corrige solo)
 #     - celda vacía / None -> no es una pasada, no es un error
 
@@ -40,8 +40,8 @@ def normalizar_hora(valor_crudo: Any) -> ResultadoHora:
 
     Devuelve (hora, fue_normalizada, error):
       - hora: datetime.time válido, o None si no hay pasada o hubo error.
-      - fue_normalizada: True si se tuvo que convertir/reinterpretar el
-        valor (número, texto con ';', texto "HH:MM"). False si ya venía
+            - fue_normalizada: True si se tuvo que convertir/reinterpretar el
+                valor (número, texto con separadores alternativos, texto "HH:MM"). False si ya venía
         como datetime.time listo para usar.
       - error: mensaje si el valor está fuera de rango o no se puede
         interpretar. None si todo OK (incluyendo el caso "sin pasada").
@@ -73,6 +73,13 @@ def normalizar_hora(valor_crudo: Any) -> ResultadoHora:
         texto = valor_crudo.strip()
         if texto == "":
             return ResultadoHora(None, False, None)
+
+        texto = texto.strip("'\"").strip()
+        partes = re.fullmatch(r"(\d{1,2})\s*[:,;.]\s*(\d{1,2});?", texto)
+        if partes:
+            return _validar_y_construir(
+                int(partes.group(1)), int(partes.group(2)), valor_crudo
+            )
 
         texto = texto.replace(";", ":")
         hora_incompleta = bool(re.fullmatch(r"\d{1,2}:\s*", texto))
