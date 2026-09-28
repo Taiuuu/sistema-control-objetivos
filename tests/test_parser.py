@@ -139,6 +139,28 @@ def _guardar_libro_con_bloques(ruta: Path, nombre: str, filas: dict[int, dict]):
     libro.save(ruta)
 
 
+def test_excel_hora_numerica_con_decimal_se_convierte_a_hhmm(tmp_path: Path):
+    ruta = tmp_path / "hora_decimal.xlsx"
+    _guardar_libro_con_bloques(
+        ruta,
+        "17-9 (D)",
+        {3: {1: [1, "OBJETIVO", "D", "M-1", 13.34, "SUPERVISOR"]}},
+    )
+
+    crudas = [
+        pasada
+        for pasada in leer_pasadas_crudas(str(ruta), "17-9 (D)")
+        if not pasada.esta_vacia()
+    ]
+    assert isinstance(crudas[0].hora, float)
+
+    pasadas, problemas, _, _ = _construir_pasadas_normalizadas(str(ruta), 2026)
+
+    assert len(pasadas) == 1
+    assert pasadas[0].hora == time(13, 34)
+    assert not any("hora inválida" in problema.descripcion for problema in problemas)
+
+
 def test_pasa_bloque_uno_y_dos(tmp_path: Path):
     ruta = tmp_path / "dos_bloques.xlsx"
     _guardar_libro_con_bloques(

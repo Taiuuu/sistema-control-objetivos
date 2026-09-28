@@ -510,12 +510,12 @@ def _crear_objetivo(
 
 def _primera_fecha_aparicion(analisis: ResultadoAnalisis, problema: Problema) -> date | None:
     """Obtiene la primera fecha de hoja del objetivo que se está resolviendo."""
-    clave = matcher.normalizar_nombre(problema.objetivo or "")
+    clave = normalizar_nombre(problema.objetivo or "")
     fechas = [
         pasada.fecha_hoja
         for pasada in analisis.pasadas
         if pasada.objetivo_nombre
-        and matcher.normalizar_nombre(pasada.objetivo_nombre) == clave
+        and normalizar_nombre(pasada.objetivo_nombre) == clave
         and pasada.fecha_hoja is not None
     ]
     return min(fechas) if fechas else None
@@ -644,6 +644,7 @@ def _resolver_nombre_match(
     problema: Problema,
     registro,
     usuario,
+    analisis: ResultadoAnalisis | None = None,
 ) -> tuple[str, int]:
 
     nombre_elegido = (
@@ -697,8 +698,10 @@ def _resolver_nombre_match(
             usuario,
             fecha_inicio=(
                 _primera_fecha_aparicion(analisis, problema)
-                or resultado.fecha_inicio_sugerida
-            ),
+                if analisis is not None
+                else None
+            )
+            or resultado.fecha_inicio_sugerida,
         )
 
         return (
@@ -760,9 +763,12 @@ def _aplicar_resoluciones(
 
     resultado = {}
 
-    for id_problema, registro in (
-        resoluciones._resoluciones.items()
-    ):
+    registros_ordenados = sorted(
+        resoluciones._resoluciones.items(),
+        key=lambda item: (item[1].tipo == "crear_alias", item[0]),
+    )
+
+    for id_problema, registro in registros_ordenados:
 
         if (
             id_problema < 0
@@ -789,6 +795,7 @@ def _aplicar_resoluciones(
                     problema,
                     registro,
                     usuario,
+                    analisis=analisis,
                 )
             )
 

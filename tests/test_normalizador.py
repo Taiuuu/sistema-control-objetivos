@@ -36,6 +36,26 @@ def test_numero_4_digitos():
     assert error is None
 
 
+def test_float_decimal_excel_se_interpreta_como_hora_y_minutos():
+    for valor, esperado in (
+        (13.34, datetime.time(13, 34)),
+        (13.4, datetime.time(13, 40)),
+        (1.01, datetime.time(1, 1)),
+    ):
+        hora, fue_normalizada, error = normalizar_hora(valor)
+        assert hora == esperado, valor
+        assert fue_normalizada is True, valor
+        assert error is None, valor
+
+
+def test_float_decimal_excel_invalido_se_rechaza():
+    for valor in (13.333, 13.60, 24.00):
+        hora, fue_normalizada, error = normalizar_hora(valor)
+        assert hora is None, valor
+        assert fue_normalizada is False, valor
+        assert error is not None, valor
+
+
 def test_texto_con_punto_y_coma_en_vez_de_dos_puntos():
     hora, fue_normalizada, error = normalizar_hora("00;52")
     assert hora == datetime.time(0, 52)

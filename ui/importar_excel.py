@@ -65,11 +65,15 @@ class DialogoResolverCoincidencias(QDialog):
         }
     """
 
+    OPCION_CREAR = "-- Crear nuevo --"
+    OPCION_VINCULAR = "-- Vincular a otro nombre de este archivo --"
+
     def __init__(self, titulo, grupos, nombres_existentes, parent=None):
         super().__init__(parent)
         self.setWindowTitle(titulo)
         self.setMinimumWidth(700)
         self.controles = []
+        es_resolucion_objetivos = "objetivos" in titulo.lower()
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(
@@ -94,7 +98,10 @@ class DialogoResolverCoincidencias(QDialog):
             completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
             combo.setCompleter(completer)
             combo.addItems(nombres_existentes)
-            combo.addItem("-- Crear nuevo --")
+            combo.addItem(self.OPCION_CREAR)
+            grupos_para_vincular = [otro for otro in grupos if otro is not grupo]
+            if es_resolucion_objetivos and grupos_para_vincular:
+                combo.addItem(self.OPCION_VINCULAR)
 
             mejor_nombre = None
             if resultado.tipo == "sugerencias" and resultado.sugerencias:
@@ -108,26 +115,49 @@ class DialogoResolverCoincidencias(QDialog):
             if mejor_nombre:
                 combo.setCurrentText(mejor_nombre)
             else:
-                combo.setCurrentIndex(combo.count() - 1)
+                combo.setCurrentText(self.OPCION_CREAR)
                 line_edit.setText(resultado.nombre_sugerido_nuevo or nombre_excel)
 
-            line_edit.setVisible(combo.currentText() == "-- Crear nuevo --")
+            link_combo = QComboBox()
+            link_combo.addItems([g["nombre_excel"] for g in grupos_para_vincular])
+            link_combo.setVisible(False)
+            link_combo.setMinimumWidth(220)
+            link_label = QLabel("Vincular con:")
+            link_label.setVisible(False)
 
-            combo.currentIndexChanged.connect(
-                lambda _=None, line=line_edit, combo=combo: line.setVisible(
-                    combo.currentText() == "-- Crear nuevo --"
+            alias = QCheckBox("Guardar alias")
+            alias.setVisible(False)
+
+            def actualizar_controles(
+                seleccion,
+                line=line_edit,
+                link=link_combo,
+                label=link_label,
+                alias_check=alias,
+                es_objetivo=es_resolucion_objetivos,
+            ):
+                line.setVisible(seleccion == self.OPCION_CREAR)
+                link.setVisible(seleccion == self.OPCION_VINCULAR)
+                label.setVisible(seleccion == self.OPCION_VINCULAR)
+                alias_check.setVisible(
+                    es_objetivo
+                    and seleccion not in (self.OPCION_CREAR, self.OPCION_VINCULAR)
                 )
-            )
+
+            combo.currentTextChanged.connect(actualizar_controles)
+            actualizar_controles(combo.currentText())
 
             fila = QHBoxLayout()
             fila.addWidget(combo)
             fila.addWidget(line_edit)
-            alias = QCheckBox("Guardar alias")
-            alias.setVisible(titulo.lower().find("objetivos") >= 0)
+            fila.addWidget(link_label)
+            fila.addWidget(link_combo)
             fila.addWidget(alias)
             form_layout.addRow(nombre_excel, fila)
 
-            self.controles.append((grupo, combo, line_edit, alias))
+            self.controles.append(
+                (grupo, combo, line_edit, alias, link_combo, grupos_para_vincular)
+            )
 
         scroll_widget.setLayout(form_layout)
         scroll_area.setWidget(scroll_widget)
@@ -143,9 +173,33 @@ class DialogoResolverCoincidencias(QDialog):
     def obtener_resoluciones(self):
         """Devuelve lista de (grupo, tipo, nombre_elegido)."""
         salida = []
-        for grupo, combo, line_edit, alias in self.controles:
+        controles_por_grupo = {
+            id(grupo): (combo, line_edit)
+            for grupo, combo, line_edit, _, _, _ in self.controles
+        }
+
+        for grupo, combo, line_edit, alias, link_combo, grupos_para_vincular in self.controles:
             seleccionado = combo.currentText().strip()
-            if seleccionado == "-- Crear nuevo --":
+            if seleccionado == self.OPCION_VINCULAR:
+                grupo_objetivo = grupos_para_vincular[link_combo.currentIndex()]
+                combo_objetivo, entrada_objetivo = controles_por_grupo[id(grupo_objetivo)]
+                seleccion_objetivo = combo_objetivo.currentText().strip()
+                if seleccion_objetivo == self.OPCION_VINCULAR:
+                    raise ValueError(
+                        f"Primero elegí un objetivo existente o nuevo para: "
+                        f"{grupo_objetivo['nombre_excel']}"
+                    )
+                if seleccion_objetivo == self.OPCION_CREAR:
+                    nombre_objetivo = entrada_objetivo.text().strip()
+                else:
+                    nombre_objetivo = seleccion_objetivo
+                if not nombre_objetivo:
+                    raise ValueError(
+                        f"Completá o resolvé primero el objetivo: "
+                        f"{grupo_objetivo['nombre_excel']}"
+                    )
+                salida.append((grupo, "alias", nombre_objetivo))
+            elif seleccionado == self.OPCION_CREAR:
                 nuevo = line_edit.text().strip()
                 if not nuevo:
                     raise ValueError(

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import datetime
 import re
+from decimal import Decimal, InvalidOperation
 from datetime import date, time
 from typing import Any, NamedTuple, Optional
 
@@ -67,6 +68,8 @@ def normalizar_hora(valor_crudo: Any) -> ResultadoHora:
         )
 
     if isinstance(valor_crudo, (int, float)):
+        if isinstance(valor_crudo, float) and not valor_crudo.is_integer():
+            return _normalizar_desde_decimal_horario(valor_crudo)
         return _normalizar_desde_texto_numerico(_numero_a_texto(valor_crudo), valor_crudo)
 
     if isinstance(valor_crudo, str):
@@ -114,6 +117,29 @@ def _numero_a_texto(valor_crudo: float | int) -> Optional[str]:
     if valor_crudo < 0:
         return None
     return str(valor_crudo)
+
+
+def _normalizar_desde_decimal_horario(valor_crudo: float) -> ResultadoHora:
+    try:
+        valor = Decimal(str(valor_crudo))
+    except InvalidOperation:
+        return ResultadoHora(
+            None, False, f"Hora '{valor_crudo}' inválida (formato no reconocido)"
+        )
+
+    if not valor.is_finite() or valor < 0:
+        return ResultadoHora(
+            None, False, f"Hora '{valor_crudo}' inválida (formato no reconocido)"
+        )
+
+    hora = int(valor)
+    minutos_decimal = (valor - hora) * 100
+    if minutos_decimal != minutos_decimal.to_integral_value():
+        return ResultadoHora(
+            None, False, f"Hora '{valor_crudo}' inválida (formato no reconocido)"
+        )
+
+    return _validar_y_construir(hora, int(minutos_decimal), valor_crudo)
 
 
 def _normalizar_desde_texto_numerico(texto: Optional[str], original: Any) -> ResultadoHora:
