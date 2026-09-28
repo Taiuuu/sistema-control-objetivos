@@ -379,6 +379,61 @@ def aplicar_matching_objetivos(
     return resultados
 
 
+def inferir_movil_supervisor(pasadas: list[PasadaNormalizada]) -> int:
+    """Completa móvil o supervisor ausente desde pares únicos de la misma hoja.
+
+    Solo usa relaciones explícitas presentes en pasadas normalizadas, por lo
+    que las filas sin hora (que no llegan a esta lista) nunca sirven de fuente.
+    Las relaciones ambiguas se dejan para revisión manual.
+    """
+    moviles_por_supervisor: dict[tuple[str, str], dict[str, str]] = {}
+    supervisores_por_movil: dict[tuple[str, str], dict[str, str]] = {}
+
+    for pasada in pasadas:
+        objetivo = (pasada.objetivo_nombre or "").strip()
+        supervisor = (pasada.supervisor_nombre or "").strip()
+        movil = (pasada.movil or "").strip()
+        if pasada.hora is None or not objetivo or not supervisor or not movil:
+            continue
+
+        hoja_key = _normalizar_nombre(pasada.hoja)
+        supervisor_key = _normalizar_nombre(supervisor)
+        movil_key = _normalizar_nombre(movil)
+        moviles_por_supervisor.setdefault((hoja_key, supervisor_key), {}).setdefault(
+            movil_key, movil
+        )
+        supervisores_por_movil.setdefault((hoja_key, movil_key), {}).setdefault(
+            supervisor_key, supervisor
+        )
+
+    inferidas = 0
+    for pasada in pasadas:
+        if pasada.hora is None or not (pasada.objetivo_nombre or "").strip():
+            continue
+        supervisor = (pasada.supervisor_nombre or "").strip()
+        movil = (pasada.movil or "").strip()
+        hoja_key = _normalizar_nombre(pasada.hoja)
+
+        if supervisor and not movil:
+            opciones = moviles_por_supervisor.get(
+                (hoja_key, _normalizar_nombre(supervisor)), {}
+            )
+            if len(opciones) == 1:
+                pasada.movil = next(iter(opciones.values()))
+                inferidas += 1
+        elif movil and not supervisor:
+            opciones = supervisores_por_movil.get(
+                (hoja_key, _normalizar_nombre(movil)), {}
+            )
+            if len(opciones) == 1:
+                pasada.supervisor_nombre = next(iter(opciones.values()))
+                inferidas += 1
+
+    if inferidas:
+        logger.info("Inferidos %d campos de móvil/supervisor desde la misma hoja", inferidas)
+    return inferidas
+
+
 def aplicar_matching_supervisores(
     pasadas: list[PasadaNormalizada],
     supervisores_bd: list[SupervisorBD],

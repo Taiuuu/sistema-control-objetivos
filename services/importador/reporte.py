@@ -244,6 +244,7 @@ def analizar_excel(
     objetivos_bd = matcher.obtener_objetivos_bd(conexion_bd)
     supervisores_bd = matcher.obtener_supervisores_bd(conexion_bd)
 
+    matcher.inferir_movil_supervisor(pasadas)
     resultados_match_objetivo = matcher.aplicar_matching_objetivos(pasadas, objetivos_bd)
     resultados_match_supervisor = matcher.aplicar_matching_supervisores(pasadas, supervisores_bd)
 

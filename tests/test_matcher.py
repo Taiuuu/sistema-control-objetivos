@@ -2,9 +2,12 @@ from services.importador.matcher import (
     matchear_objetivo,
     matchear_supervisor,
     inferir_supervisor_faltante,
+    inferir_movil_supervisor,
     obtener_objetivos_bd,
 )
 import sqlite3
+from datetime import time
+from types import SimpleNamespace
 
 CATALOGO = [
     "BARRIO EL FLORIDO",
@@ -24,6 +27,16 @@ CATALOGO = [
     "POLI - A. SOURDEAUX",
     "POLI - NOGUES",
 ]
+
+
+def _pasada_inferencia(hoja, objetivo, supervisor, movil, hora=time(10, 0)):
+    return SimpleNamespace(
+        hoja=hoja,
+        objetivo_nombre=objetivo,
+        supervisor_nombre=supervisor,
+        movil=movil,
+        hora=hora,
+    )
 
 
 def test_match_exacto_case_insensitive_y_trim():
@@ -300,6 +313,43 @@ def test_inferir_valor_puntual_todo_vacio():
     assert inferir_supervisor_faltante(None) is None
     assert inferir_supervisor_faltante("") is None
     assert inferir_supervisor_faltante("   ") is None
+
+
+def test_inferir_movil_y_supervisor_solo_en_la_misma_hoja():
+    pasadas = [
+        _pasada_inferencia("28-9 (D)", "OBJ A", "URBANO", "Movil A"),
+        _pasada_inferencia("28-9 (D)", "OBJ B", "PRIETO", "Movil B"),
+        _pasada_inferencia("28-9 (D)", "OBJ C", "URBANO", None),
+        _pasada_inferencia("28-9 (D)", "OBJ D", None, "Movil B"),
+        _pasada_inferencia("29-9 (D)", "OBJ E", "OTRO", None),
+        _pasada_inferencia("28-9 (D)", "", "OTRO", "Movil C"),
+        _pasada_inferencia("28-9 (D)", "OBJ F", "OTRO", None),
+        _pasada_inferencia("28-9 (D)", "OBJ G", "OTRO", "Movil C", hora=None),
+        _pasada_inferencia("28-9 (D)", "OBJ H", "URBANO", None, hora=None),
+    ]
+
+    assert inferir_movil_supervisor(pasadas) == 2
+    assert pasadas[2].movil == "Movil A"
+    assert pasadas[3].supervisor_nombre == "PRIETO"
+    assert pasadas[4].movil is None
+    assert pasadas[6].movil is None
+    assert pasadas[7].movil == "Movil C"
+    assert pasadas[8].movil is None
+
+
+def test_no_inferir_relaciones_movil_supervisor_ambiguas():
+    pasadas = [
+        _pasada_inferencia("28-9 (D)", "OBJ A", "URBANO", "Movil A"),
+        _pasada_inferencia("28-9 (D)", "OBJ B", "URBANO", "Movil B"),
+        _pasada_inferencia("28-9 (D)", "OBJ C", "PRIETO", "Movil C"),
+        _pasada_inferencia("28-9 (D)", "OBJ D", "LOPEZ", "Movil C"),
+        _pasada_inferencia("28-9 (D)", "OBJ E", "URBANO", None),
+        _pasada_inferencia("28-9 (D)", "OBJ F", None, "Movil C"),
+    ]
+
+    assert inferir_movil_supervisor(pasadas) == 0
+    assert pasadas[4].movil is None
+    assert pasadas[5].supervisor_nombre is None
 
 if __name__ == "__main__":
     import sys
