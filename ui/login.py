@@ -8,6 +8,7 @@ import bcrypt
 import re
 import time
 import hashlib
+from pathlib import Path
 from collections import defaultdict
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel,
@@ -267,7 +268,10 @@ class LoginWindow(QWidget):
 
         # Versión actual
         try:
-            version = open(ruta_asset("version.txt")).read().strip()
+            ruta_version = Path(ruta_asset("version.txt"))
+            if not ruta_version.is_file():
+                ruta_version = Path(__file__).resolve().parents[1] / "docs" / "version.txt"
+            version = ruta_version.read_text(encoding="utf-8").strip()
         except Exception:
             version = ""
         version_label = QLabel(f"v{version}")

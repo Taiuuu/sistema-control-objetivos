@@ -4,7 +4,7 @@ VESP Control de Objetivos es una aplicación de escritorio para gestionar rondas
 privada. Permite registrar pasadas por turno, administrar objetivos, supervisores y equipos,
 generar reportes de cumplimiento e importar recorridos desde Excel.
 
-**Versión actual:** 1.5.2 estable
+**Versión actual:** 1.7.4
 **Aplicación principal:** PyQt6 + SQLite
 **API REST:** servicio Flask auxiliar local, no reemplaza la aplicación de escritorio
 

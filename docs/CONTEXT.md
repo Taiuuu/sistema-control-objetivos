@@ -1,12 +1,12 @@
 # CONTEXT.md - VESP Control de Objetivos
 
-## Last updated: Agosto 2026 | Version: 1.5.2
+## Last updated: Agosto 2026 | Version: 1.7.4
 
 ---
 
 ## ⚠️ Notas de consolidación (leer antes de tocar código)
 
-- **Versión real: 1.5.2** (según `version.txt`, la fuente más confiable).
+- **Versión real: 1.7.4** (según `version.txt`, la fuente más confiable).
 - **ANALISIS_ESTABILIDAD.md estaba obsoleto**: describía como "pendientes" 9 de 12 problemas
   que la sección 6 de este mismo CONTEXT ya marcaba como resueltos en v1.1.0-v1.5.2. Se descartó.
 - **Conflicto detectado sin resolver — revisar manualmente:**

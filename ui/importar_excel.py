@@ -539,7 +539,7 @@ class ImportarExcel(QWidget):
         conexion = gestor_db.obtener_conexion()
         self._import_worker = ImportWorker(
             self.analisis, self.resoluciones, get_usuario_id(), conexion,
-            self.forzar_sobrescritura,
+            self.check_forzar.isChecked(),
         )
         self._import_thread = QThread(self)
         self._import_worker.moveToThread(self._import_thread)
