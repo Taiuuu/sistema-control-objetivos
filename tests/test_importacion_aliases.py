@@ -153,3 +153,62 @@ def test_alias_puede_vincular_a_objetivo_nuevo_aunque_se_resuelva_antes(monkeypa
     assert conexion.execute(
         "SELECT nombre_alias FROM objetivos_aliases"
     ).fetchone() == ("OBRA ARROYO",)
+
+
+def test_crear_objetivo_persiste_con_todas_las_columnas_requeridas():
+    from services.importador import importacion
+
+    conexion = sqlite3.connect(":memory:")
+    conexion.executescript(
+        """
+        CREATE TABLE objetivos (
+            id INTEGER PRIMARY KEY,
+            nombre TEXT NOT NULL,
+            descripcion TEXT,
+            fecha_inicio TEXT,
+            fecha_fin TEXT,
+            dias_semana TEXT,
+            activo INTEGER,
+            pendiente_revision INTEGER
+        );
+        CREATE TABLE usuarios (
+            id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE
+        );
+        INSERT INTO usuarios (username) VALUES ('admin');
+        CREATE TABLE auditoria (
+            id INTEGER PRIMARY KEY,
+            fecha TEXT,
+            hora TEXT,
+            usuario_id INTEGER,
+            tipo_operacion TEXT,
+            tabla TEXT,
+            registro_id INTEGER,
+            valores_anteriores TEXT,
+            valores_nuevos TEXT,
+            detalles TEXT,
+            estado TEXT
+        );
+        """
+    )
+
+    objetivo_id = importacion._crear_objetivo(
+        conexion,
+        "OBJETIVO REGRESION",
+        usuario="admin",
+    )
+
+    fila = conexion.execute(
+        "SELECT nombre, descripcion, fecha_inicio, fecha_fin, dias_semana, activo, pendiente_revision FROM objetivos WHERE id = ?",
+        (objetivo_id,),
+    ).fetchone()
+
+    assert fila == (
+        "OBJETIVO REGRESION",
+        "",
+        None,
+        None,
+        "1,2,3,4,5,6,7,8",
+        1,
+        1,
+    )

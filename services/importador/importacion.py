@@ -449,29 +449,39 @@ def _crear_objetivo(
         if isinstance(fecha_inicio, date)
         else None
     )
+    dias_semana_sql = dias_semana or "1,2,3,4,5,6,7,8"
 
+    columnas = [
+        "nombre",
+        "descripcion",
+        "fecha_inicio",
+        "fecha_fin",
+        "dias_semana",
+        "activo",
+    ]
+    valores = [
+        nombre,
+        "",
+        fecha_inicio_sql,
+        None,
+        dias_semana_sql,
+        1,
+    ]
+
+    columnas_objetivos = conexion_bd.execute("PRAGMA table_info(objetivos)").fetchall()
+    if any(columna[1] == "pendiente_revision" for columna in columnas_objetivos):
+        columnas.append("pendiente_revision")
+        valores.append(1)
+
+    placeholders = ", ".join("?" for _ in columnas)
     cursor = conexion_bd.execute(
-        """
+        f"""
         INSERT INTO objetivos (
-            nombre,
-            descripcion,
-            fecha_inicio,
-            fecha_fin,
-            dias_semana,
-            activo,
-            pendiente_revision
+            {', '.join(columnas)}
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES ({placeholders})
         """,
-        (
-            nombre,
-            "",
-            fecha_inicio_sql,
-            None,
-            None,
-            1,
-            1,
-        ),
+        tuple(valores),
     )
 
     objetivo_id = cursor.lastrowid
@@ -480,6 +490,18 @@ def _crear_objetivo(
     # FASE 14 — Alta desde importación
     # --------------------------------------------------------------
 
+    auditoria_valores = {
+        "id": objetivo_id,
+        "nombre": nombre,
+        "descripcion": "",
+        "fecha_inicio": fecha_inicio_sql,
+        "fecha_fin": None,
+        "dias_semana": dias_semana_sql,
+        "activo": 1,
+    }
+    if any(columna[1] == "pendiente_revision" for columna in columnas_objetivos):
+        auditoria_valores["pendiente_revision"] = 1
+
     registrar_auditoria(
         {
             "usuario": usuario,
@@ -487,16 +509,7 @@ def _crear_objetivo(
             "tabla": "objetivos",
             "registro_id": objetivo_id,
             "valores_anteriores": None,
-            "valores_nuevos": {
-                "id": objetivo_id,
-                "nombre": nombre,
-                "descripcion": "",
-                "fecha_inicio": fecha_inicio_sql,
-                "fecha_fin": None,
-                "dias_semana": "1,2,3,4,5,6,7,8",
-                "activo": 1,
-                "pendiente_revision": 1,
-            },
+            "valores_nuevos": auditoria_valores,
             "detalles": {
                 "accion": "Alta desde importación",
                 "entidad": "objetivo",
