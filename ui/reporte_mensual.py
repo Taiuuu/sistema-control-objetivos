@@ -10,16 +10,15 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QTableWidget, QTableWidgetItem, QComboBox, QFileDialog, QMessageBox, QScrollArea
 )
-from PyQt6.QtGui import QColor, QShortcut, QKeySequence
+from PyQt6.QtGui import QShortcut, QKeySequence
 from PyQt6.QtWidgets import QHeaderView
 from PyQt6.QtCore import Qt
 from services.background_task import run_background_task
 from services.exportar import exportar_excel, exportar_pdf
 from services.reportes import generar_reporte_mensual, clasificar_cumplimiento
 from services.queries_tabla import cargar_supervisores
-from services.tema import obtener_tema_actual
 from ui.animaciones import animar_aparecer
-from ui.widgets.estilos import obtener_color
+from ui.components import StatusBadge
 from database.db import DB_PATH
 
 
@@ -163,14 +162,10 @@ class ReporteMensual(QWidget):
             self.tabla.setItem(i, 2, QTableWidgetItem(str(r['dias_con_pasada'])))
             self.tabla.setItem(i, 3, QTableWidgetItem(str(r['dias_sin_pasada'])))
             self.tabla.setItem(i, 4, QTableWidgetItem(f"{cumplimiento:.1f}%"))
-            self.tabla.setItem(i, 5, QTableWidgetItem(estado))
-
-            oscuro = obtener_tema_actual() == "oscuro"
-            color = QColor(obtener_color(f"estado_{categoria}_bg", oscuro))
-            foreground = QColor(obtener_color(f"estado_{categoria}_fg", oscuro))
-            for col in range(6):
-                self.tabla.item(i, col).setBackground(color)
-                self.tabla.item(i, col).setForeground(foreground)
+            status = {"verde": "ok", "amarillo": "warning", "rojo": "danger"}.get(
+                categoria, "info"
+            )
+            self.tabla.setCellWidget(i, 5, StatusBadge(estado, status))
 
         self.tabla.setUpdatesEnabled(True)
         self.estado_label.setText(

@@ -8,11 +8,12 @@ from PyQt6.QtWidgets import (
     QTabWidget, QTableWidget, QTableWidgetItem, QMessageBox,
     QGroupBox, QTextEdit, QScrollArea, QListWidget, QListWidgetItem
 )
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtGui import QFont
 from services.sincronizacion import obtener_sincronizador, conectar_modulo
 from services.auditoria import registrar_auditoria, TipoOperacion
 from datetime import datetime
 import json
+from ui.components import StatusBadge
 
 
 class VistaSincronizacion(QWidget):
@@ -249,14 +250,9 @@ class VistaSincronizacion(QWidget):
         for i, (modulo, estado, ultima) in enumerate(modulos):
             self.tabla_modulos.setItem(i, 0, QTableWidgetItem(modulo))
             
-            item_estado = QTableWidgetItem(estado)
-            if "✅" in estado:
-                item_estado.setBackground(QColor(200, 255, 200))
-                item_estado.setForeground(QColor("#14532D"))
-            else:
-                item_estado.setBackground(QColor(255, 200, 200))
-                item_estado.setForeground(QColor("#7F1D1D"))
-            self.tabla_modulos.setItem(i, 1, item_estado)
+            self.tabla_modulos.setCellWidget(
+                i, 1, StatusBadge(estado, "ok" if "✅" in estado else "danger")
+            )
             
             self.tabla_modulos.setItem(i, 2, QTableWidgetItem(ultima))
 
@@ -274,17 +270,6 @@ class VistaSincronizacion(QWidget):
             
             item = QListWidgetItem(texto)
             item.setData(Qt.ItemDataRole.UserRole, evento)
-            
-            # Color según tipo
-            if tipo == 'datos_cambiados':
-                item.setBackground(QColor(255, 255, 200))
-                item.setForeground(QColor("#713F12"))
-            elif tipo == 'cache_invalidado':
-                item.setBackground(QColor(200, 255, 200))
-                item.setForeground(QColor("#14532D"))
-            elif tipo == 'tabla_actualizar':
-                item.setBackground(QColor(200, 200, 255))
-                item.setForeground(QColor("#1E3A8A"))
             
             self.lista_eventos.addItem(item)
 

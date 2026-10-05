@@ -1,5 +1,7 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QProgressBar, QVBoxLayout, QWidget
+from ui.components.base import rgba
+from ui.theme.theme_manager import get_theme_manager
 
 
 class OverlayProgreso(QWidget):
@@ -7,12 +9,9 @@ class OverlayProgreso(QWidget):
 
     def __init__(self, parent=None, mensaje: str = "Procesando archivo..."):
         super().__init__(parent)
+        self._theme_manager = get_theme_manager()
         self.setObjectName("OverlayProgreso")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet(
-            "#OverlayProgreso { background-color: rgba(8, 14, 35, 220); }"
-            "#OverlayProgreso QLabel { color: #F4F7FB; font-size: 15px; font-weight: 600; }"
-        )
         layout = QVBoxLayout(self)
         layout.setContentsMargins(80, 80, 80, 80)
         layout.setSpacing(14)
@@ -22,7 +21,21 @@ class OverlayProgreso(QWidget):
         self.barra.setRange(0, 0)
         layout.addWidget(self.etiqueta)
         layout.addWidget(self.barra)
+        self._theme_manager.theme_changed.connect(self._aplicar_tema)
+        self._aplicar_tema(self._theme_manager.current())
         self.hide()
+
+    def _aplicar_tema(self, theme_name: str) -> None:
+        tokens = self._theme_manager.tokens(theme_name)
+        overlay = rgba(tokens["bg_gradient_start"], 224)
+        self.setStyleSheet(f"""
+            QWidget#OverlayProgreso {{ background-color: {overlay}; }}
+            QWidget#OverlayProgreso QLabel {{
+                color: {tokens['text_primary']};
+                font-size: {tokens['font_size_lg']};
+                font-weight: 600;
+            }}
+        """)
 
     def mostrar(self, mensaje: str = "Procesando archivo...") -> None:
         self.etiqueta.setText(mensaje)

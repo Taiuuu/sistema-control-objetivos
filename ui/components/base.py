@@ -1,8 +1,8 @@
 """Bases y estilos compartidos para componentes que responden al tema."""
 
-from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QFrame, QGraphicsDropShadowEffect, QVBoxLayout
 
+from ui.theme.colors import parse_color
 from ui.theme.theme_manager import get_theme_manager
 
 
@@ -11,8 +11,8 @@ def px(tokens: dict[str, str], key: str) -> int:
 
 
 def rgba(color: str, alpha: int) -> str:
-    parsed = QColor(color)
-    return f"rgba({parsed.red()}, {parsed.green()}, {parsed.blue()}, {alpha})"
+    red, green, blue, _ = parse_color(color).getRgb()
+    return f"rgba({red}, {green}, {blue}, {alpha})"
 
 
 class GlassCard(QFrame):
@@ -61,7 +61,7 @@ class GlassCard(QFrame):
             """
         )
         if self._shadow_effect is not None:
-            color = QColor(tokens["shadow"])
+            color = parse_color(tokens["shadow"])
             self._shadow_effect.setColor(color)
 
     def add_widget(self, widget, stretch: int = 0) -> None:

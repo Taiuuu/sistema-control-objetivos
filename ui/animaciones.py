@@ -17,7 +17,7 @@ def _guardar_animacion(animacion):
     animacion.finished.connect(lambda: _active_animations.remove(animacion))
 
 
-def animar_aparecer(widget: QWidget, duracion: int = 300) -> None:
+def animar_aparecer(widget: QWidget, duracion: int = 180) -> None:
     """Anima la aparición de un widget con efecto fade in."""
     efecto = QGraphicsOpacityEffect(widget)
     widget.setGraphicsEffect(efecto)
@@ -41,7 +41,7 @@ def animar_deslizar(widget: QWidget, desde: QPoint, hasta: QPoint, duracion: int
     animacion.start()
 
 
-def animar_entrada(widget: QWidget, duracion: int = 350, offset_y: int = 40) -> None:
+def animar_entrada(widget: QWidget, duracion: int = 180, offset_y: int = 12) -> None:
     """Aplica una animación suave de entrada con fade in y deslizado desde abajo."""
     original_pos = widget.pos()
     widget.move(original_pos + QPoint(0, offset_y))

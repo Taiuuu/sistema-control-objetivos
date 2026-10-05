@@ -4,12 +4,12 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QLabel, QPushButton, QDateEdit, QComboBox
 )
 from PyQt6.QtCore import QDate
-from PyQt6.QtGui import QColor
 from services.reportes import obtener_objetivos_del_dia
 from services.background_task import run_background_task
 from database.db import DB_PATH
 from ui.form_objetivo import FormObjetivo
 from ui.lista_objetivos import DialogoEditarObjetivo
+from ui.components import GlassCard, PillButton, StatusBadge
 import sqlite3
 from functools import partial
 
@@ -33,6 +33,8 @@ class TablaDiaria(QWidget):
         self.setGeometry(200, 200, 700, 400)
 
         layout = QVBoxLayout()
+        card = GlassCard()
+        card_layout = card.content_layout
 
         # Selector de fecha
         fecha_layout = QHBoxLayout()
@@ -40,12 +42,12 @@ class TablaDiaria(QWidget):
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.setCalendarPopup(True)
         self.selector_fecha.dateChanged.connect(self.cargar_tabla)  # Auto-reload when date changes
-        boton_buscar = QPushButton("Buscar")
+        boton_buscar = PillButton("Buscar", "primary")
         boton_buscar.clicked.connect(self.cargar_tabla)
         fecha_layout.addWidget(QLabel("Fecha:"))
         fecha_layout.addWidget(self.selector_fecha)
         fecha_layout.addWidget(boton_buscar)
-        layout.addLayout(fecha_layout)
+        card_layout.addLayout(fecha_layout)
 
         # Tabla
         self.tabla = QTableWidget()
@@ -56,11 +58,12 @@ class TablaDiaria(QWidget):
         self.tabla.setColumnWidth(2, 80)
         self.tabla.setColumnWidth(3, 120)
         self.tabla.setMinimumSize(600, 200)
-        self.tabla.setShowGrid(True)
-        self.tabla.setAlternatingRowColors(True)
+        self.tabla.setShowGrid(False)
+        self.tabla.setAlternatingRowColors(False)
         self.tabla.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.tabla)
+        card_layout.addWidget(self.tabla)
 
+        layout.addWidget(card)
         self.setLayout(layout)
         self.estado = QLabel("Listo")
         layout.insertWidget(1, self.estado)
@@ -103,7 +106,9 @@ class TablaDiaria(QWidget):
 
                     self.tabla.setItem(i, 0, QTableWidgetItem(o[1]))
                     self.tabla.setItem(i, 1, QTableWidgetItem(str(pasadas)))
-                    self.tabla.setItem(i, 2, QTableWidgetItem(estado))
+                    self.tabla.setCellWidget(
+                        i, 2, StatusBadge(estado, "ok" if pasadas > 0 else "danger")
+                    )
 
                     combo_accion = QComboBox()
                     combo_accion.addItem("Seleccionar acción")
@@ -113,12 +118,6 @@ class TablaDiaria(QWidget):
                         partial(self._ejecutar_accion, obj_id=o[0], obj_nombre=o[1], combo=combo_accion)
                     )
                     self.tabla.setCellWidget(i, 3, combo_accion)
-
-                    color = QColor("#90EE90") if pasadas > 0 else QColor("#FF6B6B")
-                    foreground = QColor("#14532D") if pasadas > 0 else QColor("#7F1D1D")
-                    for col in range(3):
-                        self.tabla.item(i, col).setBackground(color)
-                        self.tabla.item(i, col).setForeground(foreground)
 
             sorting_enabled = self.tabla.isSortingEnabled()
             self.tabla.setSortingEnabled(False)
@@ -139,10 +138,11 @@ class TablaDiaria(QWidget):
         """Elimina widgets y contenido previo de la tabla sin romper el renderizado."""
         row_count = self.tabla.rowCount()
         for row in range(row_count):
-            widget = self.tabla.cellWidget(row, 3)
-            if widget is not None:
-                self.tabla.removeCellWidget(row, 3)
-                widget.deleteLater()
+            for column in (2, 3):
+                widget = self.tabla.cellWidget(row, column)
+                if widget is not None:
+                    self.tabla.removeCellWidget(row, column)
+                    widget.deleteLater()
 
         self.tabla.clearContents()
         self.tabla.setRowCount(0)

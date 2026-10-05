@@ -43,6 +43,7 @@ from ui.vista_validaciones import VistaValidaciones
 from ui.vista_indexacion import VistaIndexacion
 from ui.vista_sincronizacion import VistaSincronizacion
 from ui.configuracion import ConfiguracionDialog
+from ui.animaciones import animar_aparecer
 from ui.theme.theme_manager import get_theme_manager
 from ui.theme.tokens import THEMES
 from services.permisos import tiene_permiso
@@ -110,7 +111,7 @@ class BotonMenu(QPushButton):
 
     def _aplicar_estilo(self):
         bg_activo   = obtener_color("accent", self._oscuro)
-        text_activo = "#ffffff"
+        text_activo = self._theme_manager.tokens()["accent_text"]
         bg_hover    = obtener_color("btn_menu_hover", self._oscuro)
         text_normal = obtener_color("btn_menu_text", self._oscuro)
 
@@ -144,7 +145,7 @@ class BotonMenu(QPushButton):
                 }}
                 QPushButton:pressed {{
                     background-color: {bg_activo};
-                    color: white;
+                    color: {obtener_color('accent_text', self._oscuro)};
                 }}
             """)
 
@@ -334,7 +335,7 @@ class VentanaPrincipal(QWidget):
             }}
             QToolButton:hover {{
                 background: {obtener_color('accent', oscuro)};
-                color: white;
+                color: {obtener_color('accent_text', oscuro)};
             }}
         """)
         self.btn_colapsar.clicked.connect(self._toggle_sidebar)
@@ -460,7 +461,7 @@ class VentanaPrincipal(QWidget):
             }}
             QPushButton:hover {{
                 background-color: {obtener_color('accent', oscuro)};
-                color: white;
+                color: {obtener_color('accent_text', oscuro)};
                 border-color: {obtener_color('accent', oscuro)};
             }}
         """
@@ -588,25 +589,26 @@ class VentanaPrincipal(QWidget):
             }}
             QPushButton:hover {{
                 background-color: {obtener_color('accent', oscuro)};
-                color: white;
+                color: {obtener_color('accent_text', oscuro)};
                 border-color: {obtener_color('accent', oscuro)};
             }}
         """
 
     def _estilo_btn_logout(self, oscuro: bool) -> str:
+        tokens = self._theme_manager.tokens()
         return f"""
             QPushButton {{
-                background-color: {obtener_color('accent_red', oscuro)};
-                color: white;
-                border: 1px solid {obtener_color('accent_red', oscuro)};
+                background-color: {tokens['danger_button_bg']};
+                color: {tokens['danger_button_text']};
+                border: 1px solid {tokens['danger_button_bg']};
                 border-radius: 7px;
                 font-size: 11px;
                 padding: 0 10px;
                 text-align: center;
             }}
             QPushButton:hover {{
-                background-color: #ff5252;
-                border-color: #ff5252;
+                background-color: {tokens['danger_button_hover']};
+                border-color: {tokens['danger_button_hover']};
             }}
         """
 
@@ -1160,7 +1162,8 @@ class VentanaPrincipal(QWidget):
                 font-size: 14px; font-weight: bold;
             }}
             QToolButton:hover {{
-                background: {obtener_color('accent', oscuro)}; color: white;
+                background: {obtener_color('accent', oscuro)};
+                color: {obtener_color('accent_text', oscuro)};
             }}
         """)
         for b in self._botones_menu:
@@ -1181,7 +1184,8 @@ class VentanaPrincipal(QWidget):
             }}
             QPushButton:hover {{
                 background-color: {obtener_color('accent', oscuro)};
-                color: white; border-color: {obtener_color('accent', oscuro)};
+                color: {obtener_color('accent_text', oscuro)};
+                border-color: {obtener_color('accent', oscuro)};
             }}
         """
         self._btn_zoom_menos.setStyleSheet(estilo_mini_btn)
@@ -1509,13 +1513,14 @@ class VentanaPrincipal(QWidget):
         return pasadas_dia, pasadas_noche
 
     def _obtener_estado_detallado(self, pasadas_dia: int, pasadas_noche: int) -> tuple:
+        tokens = self._theme_manager.tokens()
         if pasadas_dia > 0 and pasadas_noche > 0:
-            return "Pasaron los dos", "#90EE90"
+            return "Pasaron los dos", tokens["success"]
         if pasadas_dia > 0 and pasadas_noche == 0:
-            return "No pasó noche", "#FFD700"
+            return "No pasó noche", tokens["warning"]
         if pasadas_dia == 0 and pasadas_noche > 0:
-            return "No pasó día", "#FFD700"
-        return "No pasó nadie", "#FF6B6B"
+            return "No pasó día", tokens["warning"]
+        return "No pasó nadie", tokens["danger"]
 
     def _crear_item(self, texto: str) -> QTableWidgetItem:
         item = QTableWidgetItem(texto)
@@ -1731,6 +1736,8 @@ class VentanaPrincipal(QWidget):
                 ventana.destroyed.connect(on_close)
 
             ventana.show()
+            if ventana.graphicsEffect() is None:
+                animar_aparecer(ventana, 180)
         else:
             ventana.raise_()
             ventana.activateWindow()

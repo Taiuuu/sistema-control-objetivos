@@ -9,55 +9,37 @@ from PyQt6.QtWidgets import (
     QFrame, QHeaderView
 )
 from PyQt6.QtCore import Qt, QDate, pyqtSignal
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtGui import QFont
 import sqlite3
 from database.db import DB_PATH
 from services.reportes import obtener_objetivos_del_dia
 from ui.widgets.badges import BadgeEstado, BadgeNumero
-
-
-# =============================================================================
-# PALETAS DE COLOR
-# =============================================================================
-
-PALETA_OSCURA = {
-    "bg_main":           "#16181e",
-    "bg_header":         "#1a1d24",
-    "bg_tabla":          "#1e2128",
-    "bg_tabla_alt":      "#1a1d24",
-    "accent":            "#4ade80",
-    "accent_dark":       "#22c55e",
-    "accent_red":        "#f87171",
-    "text_primary":      "#f1f5f9",
-    "text_secondary":    "#94a3b8",
-    "text_muted":        "#475569",
-    "border":            "#2a2d36",
-    "border_light":      "#1e2128",
-    "btn_menu_hover":    "#2a2d36",
-    "scrollbar_handle":  "#3f4556",
-}
-
-PALETA_CLARA = {
-    "bg_main":           "#ffffff",
-    "bg_header":         "#f8fafc",
-    "bg_tabla":          "#ffffff",
-    "bg_tabla_alt":      "#f8fafc",
-    "accent":            "#16a34a",
-    "accent_dark":       "#15803d",
-    "accent_red":        "#dc2626",
-    "text_primary":      "#0f172a",
-    "text_secondary":    "#475569",
-    "text_muted":        "#94a3b8",
-    "border":            "#e2e8f0",
-    "border_light":      "#f1f5f9",
-    "btn_menu_hover":    "#e2e8f0",
-    "scrollbar_handle":  "#94a3b8",
-}
+from ui.theme.colors import parse_color
+from ui.theme.theme_manager import get_theme_manager
 
 
 def p(key: str, oscuro: bool) -> str:
-    """Acceso rápido a paleta."""
-    return (PALETA_OSCURA if oscuro else PALETA_CLARA)[key]
+    """Acceso de compatibilidad a los tokens semánticos del tema activo."""
+    tokens = get_theme_manager().tokens()
+    aliases = {
+        "bg_main": "bg_gradient_start",
+        "bg_header": "surface_alt",
+        "bg_tabla": "surface",
+        "bg_tabla_alt": "surface_alt",
+        "accent": "accent",
+        "accent_text": "accent_text",
+        "accent_hover_text": "accent_hover_text",
+        "accent_dark": "accent_hover",
+        "accent_red": "danger",
+        "text_primary": "text_primary",
+        "text_secondary": "text_secondary",
+        "text_muted": "text_disabled",
+        "border": "border",
+        "border_light": "border",
+        "btn_menu_hover": "sidebar_active_bg",
+        "scrollbar_handle": "accent",
+    }
+    return tokens[aliases[key]]
 
 
 # =============================================================================
@@ -75,9 +57,11 @@ class TablaCoberturaWidget(QWidget):
     def __init__(self, oscuro: bool, parent=None):
         super().__init__(parent)
         self._oscuro = oscuro
+        self._theme_manager = get_theme_manager()
         self._objetivos = []
         
         self._construir_ui()
+        self._theme_manager.theme_changed.connect(self._al_cambiar_tema)
 
     def _construir_ui(self):
         oscuro = self._oscuro
@@ -133,6 +117,7 @@ class TablaCoberturaWidget(QWidget):
         scroll.setFixedHeight(54)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._scroll_filtros = scroll
         scroll.setStyleSheet(f"""
             QScrollArea {{
                 border: none;
@@ -149,6 +134,7 @@ class TablaCoberturaWidget(QWidget):
         """)
         
         widget = QWidget()
+        self._widget_filtros = widget
         widget.setStyleSheet(f"background-color: {p('bg_header', oscuro)};")
         fila = QHBoxLayout(widget)
         fila.setContentsMargins(16, 0, 16, 0)
@@ -164,12 +150,14 @@ class TablaCoberturaWidget(QWidget):
         
         # Botones navegación fecha
         btn_ant = QPushButton("‹")
+        self._botones_navegacion = [btn_ant]
         btn_ant.setToolTip("Día anterior (Ctrl+←)")
         btn_ant.setStyleSheet(self._estilo_btn_nav(oscuro))
         btn_ant.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_ant.clicked.connect(lambda: self._cambiar_fecha(-1))
         
         btn_sig = QPushButton("›")
+        self._botones_navegacion.append(btn_sig)
         btn_sig.setToolTip("Día siguiente (Ctrl+→)")
         btn_sig.setStyleSheet(self._estilo_btn_nav(oscuro))
         btn_sig.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -207,6 +195,7 @@ class TablaCoberturaWidget(QWidget):
         
         # Botón aplicar
         btn_aplicar = QPushButton("Aplicar")
+        self._boton_aplicar = btn_aplicar
         btn_aplicar.setFixedWidth(75)
         btn_aplicar.setStyleSheet(self._estilo_btn_accion(oscuro))
         btn_aplicar.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -215,14 +204,22 @@ class TablaCoberturaWidget(QWidget):
         # Labels
         estilo_lbl = f"color: {p('text_secondary', oscuro)}; font-size: 11px; font-weight: 500;"
         
-        fila.addWidget(QLabel("Fecha")); fila.setSpacing(4)
+        self._labels_filtros = [
+            QLabel("Fecha"), QLabel("Turno"), QLabel("Supervisor"), QLabel("Estado")
+        ]
+        fecha_lbl, turno_lbl, supervisor_lbl, estado_lbl = self._labels_filtros
+        estilo_lbl = f"color: {p('text_secondary', oscuro)}; font-size: 11px; font-weight: 500;"
+        for label in self._labels_filtros:
+            label.setStyleSheet(estilo_lbl)
+
+        fila.addWidget(fecha_lbl); fila.setSpacing(4)
         fila.addWidget(btn_ant)
         fila.addWidget(self._selector_fecha)
         fila.addWidget(btn_sig)
         fila.addSpacing(4)
-        fila.addWidget(QLabel("Turno")); fila.addWidget(self._filtro_turno)
-        fila.addWidget(QLabel("Supervisor")); fila.addWidget(self._filtro_supervisor)
-        fila.addWidget(QLabel("Estado")); fila.addWidget(self._filtro_estado)
+        fila.addWidget(turno_lbl); fila.addWidget(self._filtro_turno)
+        fila.addWidget(supervisor_lbl); fila.addWidget(self._filtro_supervisor)
+        fila.addWidget(estado_lbl); fila.addWidget(self._filtro_estado)
         fila.addSpacing(4)
         fila.addWidget(self._buscador)
         fila.addWidget(btn_aplicar)
@@ -242,6 +239,7 @@ class TablaCoberturaWidget(QWidget):
                 font-size: 12px;
                 min-height: 28px;
                 selection-background-color: {p('accent', oscuro)};
+                selection-color: {p('accent_text', oscuro)};
             }}
             QComboBox:hover, QLineEdit:hover, QDateEdit:hover {{
                 border-color: {p('accent', oscuro)};
@@ -259,7 +257,7 @@ class TablaCoberturaWidget(QWidget):
                 color: {p('text_primary', oscuro)};
                 border: 1px solid {p('border', oscuro)};
                 selection-background-color: {p('accent', oscuro)};
-                selection-color: white;
+                selection-color: {p('accent_text', oscuro)};
                 outline: none;
             }}
         """
@@ -278,8 +276,12 @@ class TablaCoberturaWidget(QWidget):
             }}
             QPushButton:hover {{
                 background-color: {p('accent', oscuro)};
-                color: white;
+                color: {p('accent_text', oscuro)};
                 border-color: {p('accent', oscuro)};
+            }}
+            QPushButton:pressed {{
+                background-color: {p('accent_dark', oscuro)};
+                color: {p('accent_hover_text', oscuro)};
             }}
         """
 
@@ -287,7 +289,7 @@ class TablaCoberturaWidget(QWidget):
         return f"""
             QPushButton {{
                 background-color: {p('accent', oscuro)};
-                color: white;
+                color: {p('accent_text', oscuro)};
                 border: none;
                 border-radius: 7px;
                 padding: 4px 14px;
@@ -297,6 +299,10 @@ class TablaCoberturaWidget(QWidget):
             }}
             QPushButton:hover {{
                 background-color: {p('accent_dark', oscuro)};
+            }}
+            QPushButton:pressed {{
+                background-color: {p('accent_dark', oscuro)};
+                color: {p('accent_hover_text', oscuro)};
             }}
         """
 
@@ -529,15 +535,15 @@ class TablaCoberturaWidget(QWidget):
             # Objetivo
             item = QTableWidgetItem(o[1])
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            item.setForeground(QColor(p("text_primary", oscuro)))
-            item.setBackground(QColor(bg))
+            item.setForeground(parse_color(p("text_primary", oscuro)))
+            item.setBackground(parse_color(bg))
             self._tabla.setItem(i, 0, item)
             
             # Equipo día
             item = QTableWidgetItem(equipo_dia)
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            item.setForeground(QColor(p("text_secondary", oscuro)))
-            item.setBackground(QColor(bg))
+            item.setForeground(parse_color(p("text_secondary", oscuro)))
+            item.setBackground(parse_color(bg))
             self._tabla.setItem(i, 1, item)
             
             # Pasadas día (badge)
@@ -547,8 +553,8 @@ class TablaCoberturaWidget(QWidget):
             # Equipo noche
             item = QTableWidgetItem(equipo_noche)
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            item.setForeground(QColor(p("text_secondary", oscuro)))
-            item.setBackground(QColor(bg))
+            item.setForeground(parse_color(p("text_secondary", oscuro)))
+            item.setBackground(parse_color(bg))
             self._tabla.setItem(i, 3, item)
             
             # Pasadas noche (badge)
@@ -575,8 +581,44 @@ class TablaCoberturaWidget(QWidget):
         contenedor.setStyleSheet(f"background-color: {bg_color};")
         return contenedor
 
+    def _aplicar_estilo_filtros(self) -> None:
+        oscuro = self._oscuro
+        self._scroll_filtros.setStyleSheet(f"""
+            QScrollArea {{ border: none; background: {p('bg_header', oscuro)}; }}
+            QScrollBar:horizontal {{
+                height: 3px; background: transparent;
+            }}
+            QScrollBar::handle:horizontal {{
+                background: {p('scrollbar_handle', oscuro)}; border-radius: 1px;
+            }}
+        """)
+        self._widget_filtros.setStyleSheet(
+            f"background-color: {p('bg_header', oscuro)};"
+        )
+        for control in (
+            self._selector_fecha,
+            self._filtro_turno,
+            self._filtro_supervisor,
+            self._filtro_estado,
+            self._buscador,
+        ):
+            control.setStyleSheet(self._estilo_input(oscuro))
+        for button in self._botones_navegacion:
+            button.setStyleSheet(self._estilo_btn_nav(oscuro))
+        self._boton_aplicar.setStyleSheet(self._estilo_btn_accion(oscuro))
+        estilo_lbl = (
+            f"color: {p('text_secondary', oscuro)}; "
+            "font-size: 11px; font-weight: 500;"
+        )
+        for label in self._labels_filtros:
+            label.setStyleSheet(estilo_lbl)
+
+    def _al_cambiar_tema(self, nombre_tema: str) -> None:
+        self.actualizar_tema(nombre_tema != "Claro")
+
     def actualizar_tema(self, oscuro: bool):
         """Actualiza los estilos cuando cambia el tema."""
         self._oscuro = oscuro
+        self._aplicar_estilo_filtros()
         self._aplicar_estilo_tabla()
         self.cargar_datos()

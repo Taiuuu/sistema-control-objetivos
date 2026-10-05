@@ -90,6 +90,10 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             selection-background-color: {tokens["accent"]};
             selection-color: {tokens["accent_text"]};
         }}
+        QTableWidget::item:hover, QTableWidget::item:selected {{
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface_alt"]};
+        }}
         QHeaderView::section {{
             color: {tokens["text_secondary"]};
             background-color: {tokens["surface_alt"]};

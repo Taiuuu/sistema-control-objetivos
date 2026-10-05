@@ -8,12 +8,12 @@ from PyQt6.QtWidgets import (
     QTabWidget, QTableWidget, QTableWidgetItem, QMessageBox,
     QTextEdit, QGroupBox, QScrollArea, QProgressBar
 )
-from PyQt6.QtGui import QColor
 from services.validaciones import validar_integridad_bd, ErrorValidacion
 from services.auditoria import registrar_auditoria, TipoOperacion
 from database.db import conectar
 import json
 from datetime import datetime
+from ui.components import StatusBadge
 
 
 class VistaValidaciones(QWidget):
@@ -94,7 +94,7 @@ class VistaValidaciones(QWidget):
         resumen_layout = QVBoxLayout()
         
         self.label_resumen = QLabel("Errores: 0 | Advertencias: 0 | Pasadas: 0 | Objetivos: 0 | Supervisores: 0")
-        self.label_resumen.setStyleSheet("font-size: 11px; color: gray;")
+        self.label_resumen.setStyleSheet("font-size: 11px;")
         resumen_layout.addWidget(self.label_resumen)
         
         group_resumen.setLayout(resumen_layout)
@@ -196,10 +196,11 @@ class VistaValidaciones(QWidget):
         # Estado
         if es_valido:
             self.label_estado.setText("✅ Base de datos válida")
-            self.label_estado.setStyleSheet("font-size: 12px; color: green; font-weight: bold;")
+            self.label_estado.setObjectName("SuccessText")
         else:
             self.label_estado.setText("❌ Problemas detectados")
-            self.label_estado.setStyleSheet("font-size: 12px; color: red; font-weight: bold;")
+            self.label_estado.setObjectName("DangerText")
+        self.label_estado.setStyleSheet("font-size: 12px; font-weight: bold;")
 
         # Actualizar tabla de chequeos
         self.tabla_chequeos.setRowCount(0)
@@ -221,14 +222,9 @@ class VistaValidaciones(QWidget):
             self.tabla_chequeos.insertRow(i)
             self.tabla_chequeos.setItem(i, 0, QTableWidgetItem(chequeo))
             
-            item_estado = QTableWidgetItem(estado)
-            if "❌" in estado:
-                item_estado.setBackground(QColor(255, 200, 200))
-                item_estado.setForeground(QColor("#7F1D1D"))
-            else:
-                item_estado.setBackground(QColor(200, 255, 200))
-                item_estado.setForeground(QColor("#14532D"))
-            self.tabla_chequeos.setItem(i, 1, item_estado)
+            self.tabla_chequeos.setCellWidget(
+                i, 1, StatusBadge(estado, "danger" if "❌" in estado else "ok")
+            )
             
             self.tabla_chequeos.setItem(i, 2, QTableWidgetItem(detalle))
 
@@ -334,10 +330,9 @@ class VistaValidaciones(QWidget):
                 self.tabla_reparaciones.setItem(row, 1, QTableWidgetItem("AUTO"))
                 self.tabla_reparaciones.setItem(row, 2, QTableWidgetItem(log))
                 
-                item_resultado = QTableWidgetItem("✅ OK")
-                item_resultado.setBackground(QColor(200, 255, 200))
-                item_resultado.setForeground(QColor("#14532D"))
-                self.tabla_reparaciones.setItem(row, 3, item_resultado)
+                self.tabla_reparaciones.setCellWidget(
+                    row, 3, StatusBadge("✅ OK", "ok")
+                )
 
             # Auditar
             if self.usuario_actual:

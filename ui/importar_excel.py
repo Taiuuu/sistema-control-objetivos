@@ -47,6 +47,7 @@ from services.importador.resolucion import EstadoResolucion
 from ui.widgets.dialogos import confirmar_mensaje, mostrar_mensaje
 from ui.widgets.overlay_progreso import OverlayProgreso
 from ui.widgets.toggle_switch import ToggleSwitch
+from ui.theme.theme_manager import get_theme_manager
 
 
 # =============================================================================
@@ -274,6 +275,7 @@ class ImportarExcel(QWidget):
         self.setObjectName("ImportarExcel")
         self.setWindowTitle("Importar desde Excel")
         self.setGeometry(200, 200, 900, 700)
+        self._theme_manager = get_theme_manager()
 
         self.ruta_archivo: Optional[str] = None
         self.analisis: Optional[ResultadoAnalisis] = None
@@ -287,13 +289,13 @@ class ImportarExcel(QWidget):
         layout = QVBoxLayout(self)
 
         titulo = QLabel("Importar datos desde Excel")
+        titulo.setObjectName("ImportTitle")
         titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        titulo.setStyleSheet("font-size: 16px; font-weight: bold; color: #4CAF50;")
         layout.addWidget(titulo)
 
         fila_archivo = QHBoxLayout()
         self.label_archivo = QLabel("Ningún archivo seleccionado")
-        self.label_archivo.setStyleSheet("color: #888;")
+        self.label_archivo.setObjectName("ImportFileLabel")
         boton_archivo = QPushButton("Seleccionar Excel")
         boton_archivo.clicked.connect(self._seleccionar_archivo)
         fila_archivo.addWidget(self.label_archivo)
@@ -324,9 +326,7 @@ class ImportarExcel(QWidget):
         layout.addWidget(self.progress_bar)
 
         self.resumen_label = QLabel("")
-        self.resumen_label.setStyleSheet(
-            "background-color: #263238; color: #ffffff; padding: 8px; border-radius: 4px;"
-        )
+        self.resumen_label.setObjectName("ImportSummary")
         self.resumen_label.setWordWrap(True)
         self.resumen_label.setVisible(False)
         layout.addWidget(self.resumen_label)
@@ -344,9 +344,7 @@ class ImportarExcel(QWidget):
 
         self.lista_errores = QListWidget()
         self.lista_errores.setVisible(False)
-        self.lista_errores.setStyleSheet(
-            "color: #ffccbc; background-color: #1e1e1e; border: 1px solid #442200;"
-        )
+        self.lista_errores.setObjectName("ImportErrors")
         self.lista_errores.setMinimumHeight(120)
         layout.addWidget(self.lista_errores)
 
@@ -363,11 +361,41 @@ class ImportarExcel(QWidget):
         layout.addWidget(self.boton_importar)
 
         self.log = QTextEdit()
+        self.log.setObjectName("ImportLog")
         self.log.setReadOnly(True)
         self.log.setMinimumHeight(140)
         layout.addWidget(self.log)
 
         self.overlay_progreso = OverlayProgreso(self)
+        self._theme_manager.theme_changed.connect(self._aplicar_tema)
+        self._aplicar_tema(self._theme_manager.current())
+
+    def _aplicar_tema(self, theme_name: str) -> None:
+        tokens = self._theme_manager.tokens(theme_name)
+        self.setStyleSheet(f"""
+            QLabel#ImportTitle {{
+                color: {tokens['accent']};
+                font-size: {tokens['font_size_title']};
+                font-weight: 700;
+            }}
+            QLabel#ImportFileLabel {{
+                color: {tokens['success'] if self.label_archivo.property('selected') else tokens['text_secondary']};
+            }}
+            QLabel#ImportSummary {{
+                color: {tokens['text_primary']};
+                background: {tokens['surface_alt']};
+                border: 1px solid {tokens['border']};
+                border-radius: {tokens['radius_md']};
+                padding: {tokens['spacing_sm']};
+            }}
+            QListWidget#ImportErrors, QTextEdit#ImportLog {{
+                color: {tokens['text_primary']};
+                background: {tokens['surface_alt']};
+                border: 1px solid {tokens['border']};
+                border-radius: {tokens['radius_sm']};
+                padding: {tokens['spacing_sm']};
+            }}
+        """)
 
     # ------------------------------------------------------------------
     # Selección de archivo
@@ -380,7 +408,8 @@ class ImportarExcel(QWidget):
         if ruta:
             self.ruta_archivo = ruta
             self.label_archivo.setText(os.path.basename(ruta))
-            self.label_archivo.setStyleSheet("color: #4CAF50;")
+            self.label_archivo.setProperty("selected", True)
+            self._aplicar_tema(self._theme_manager.current())
             self.boton_analizar.setEnabled(True)
             self._resetear_resultado()
 
@@ -629,7 +658,8 @@ class ImportarExcel(QWidget):
         self._resetear_resultado()
         self.ruta_archivo = None
         self.label_archivo.setText("Ningún archivo seleccionado")
-        self.label_archivo.setStyleSheet("color: #888;")
+        self.label_archivo.setProperty("selected", False)
+        self._aplicar_tema(self._theme_manager.current())
         self.boton_analizar.setEnabled(False)
 
     def _on_importacion_error(self, mensaje: str) -> None:

@@ -9,15 +9,16 @@ from PyQt6.QtWidgets import (
     QGraphicsDropShadowEffect
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal
-from PyQt6.QtGui import QPixmap, QIcon, QFont
+from PyQt6.QtGui import QIcon, QFont
 from services.permisos import tiene_permiso
-from services.assets import ruta_asset
-from services.tema import obtener_color_ui
+from ui.widgets.estilos import obtener_color
+from ui.components import ThemeLogo
+from ui.theme.theme_manager import get_theme_manager
 
 
 def p(key: str, oscuro: bool) -> str:
     """Acceso rápido a paleta."""
-    return obtener_color_ui(key, oscuro)
+    return obtener_color(key, oscuro)
 
 
 # =============================================================================
@@ -54,7 +55,7 @@ class BotonMenu(QPushButton):
 
     def _aplicar_estilo(self):
         bg_activo   = p("accent", self._oscuro)
-        text_activo = "#ffffff"
+        text_activo = get_theme_manager().tokens()["accent_text"]
         bg_hover    = p("btn_menu_hover", self._oscuro)
         text_normal = p("btn_menu_text", self._oscuro)
 
@@ -88,7 +89,7 @@ class BotonMenu(QPushButton):
                 }}
                 QPushButton:pressed {{
                     background-color: {bg_activo};
-                    color: white;
+                    color: {get_theme_manager().tokens()["accent_text"]};
                 }}
             """)
 
@@ -141,14 +142,19 @@ class SidebarWidget(QWidget):
         self._sidebar_expandido = True
         self._botones = {}
         self._zoom_nivel = 13
+        self._theme_manager = get_theme_manager()
         
         self.setFixedWidth(self.EXPANDIDO)
         self._construir_ui()
+        self._theme_manager.theme_changed.connect(
+            lambda name: self.actualizar_tema(name != "Claro")
+        )
 
     def _construir_ui(self):
         oscuro = self._oscuro
+        self.setObjectName("SidebarWidget")
         self.setStyleSheet(f"""
-            QWidget {{
+            QWidget#SidebarWidget {{
                 background-color: {p('bg_sidebar', oscuro)};
                 border-right: 1px solid {p('border', oscuro)};
             }}
@@ -184,6 +190,7 @@ class SidebarWidget(QWidget):
         """)
         
         self._contenedor = QWidget()
+        self._contenedor.setObjectName("SidebarContent")
         self._contenedor.setStyleSheet(f"background-color: {p('bg_sidebar', oscuro)};")
         self._layout_botones = QVBoxLayout(self._contenedor)
         self._layout_botones.setSpacing(2)
@@ -209,18 +216,14 @@ class SidebarWidget(QWidget):
         fila = QHBoxLayout()
         fila.setContentsMargins(0, 0, 0, 0)
         
-        self._logo_label = QLabel()
-        pixmap = QPixmap(ruta_asset("assets/vesp.png")).scaled(
-            36, 36, Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        self._logo_label.setPixmap(pixmap)
+        self._logo_label = ThemeLogo(size=36)
         
         self._btn_colapsar = QToolButton()
         self._btn_colapsar.setText("‹")
         self._btn_colapsar.setFixedSize(24, 24)
         self._btn_colapsar.setToolTip("Colapsar menú (Ctrl+\\)")
         self._btn_colapsar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_colapsar.setObjectName("SidebarCollapse")
         self._btn_colapsar.setStyleSheet(f"""
             QToolButton {{
                 background: {p('btn_menu_hover', oscuro)};
@@ -232,7 +235,7 @@ class SidebarWidget(QWidget):
             }}
             QToolButton:hover {{
                 background: {p('accent', oscuro)};
-                color: white;
+                color: {get_theme_manager().tokens()["accent_text"]};
             }}
         """)
         self._btn_colapsar.clicked.connect(self._toggle_sidebar)
@@ -289,18 +292,20 @@ class SidebarWidget(QWidget):
             }}
             QPushButton:hover {{
                 background-color: {p('accent', oscuro)};
-                color: white;
+                color: {get_theme_manager().tokens()["accent_text"]};
                 border-color: {p('accent', oscuro)};
             }}
         """
         
         self._btn_zoom_menos = QPushButton("A−")
+        self._btn_zoom_menos.setObjectName("SidebarZoom")
         self._btn_zoom_menos.setToolTip("Reducir zoom (Ctrl+−)")
         self._btn_zoom_menos.setStyleSheet(estilo_btn)
         self._btn_zoom_menos.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_zoom_menos.clicked.connect(self._zoom_menos)
         
         self._btn_zoom_mas = QPushButton("A+")
+        self._btn_zoom_mas.setObjectName("SidebarZoom")
         self._btn_zoom_mas.setToolTip("Aumentar zoom (Ctrl+=)")
         self._btn_zoom_mas.setStyleSheet(estilo_btn)
         self._btn_zoom_mas.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -318,6 +323,7 @@ class SidebarWidget(QWidget):
         # Botón tema
         texto_tema = "☀  Modo claro" if self._oscuro else "🌙  Modo oscuro"
         self._btn_tema = QPushButton(texto_tema)
+        self._btn_tema.setObjectName("SidebarTheme")
         self._btn_tema.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_tema.setFixedHeight(34)
         self._btn_tema.setStyleSheet(f"""
@@ -332,7 +338,7 @@ class SidebarWidget(QWidget):
             }}
             QPushButton:hover {{
                 background-color: {p('accent', oscuro)};
-                color: white;
+                color: {get_theme_manager().tokens()["accent_text"]};
                 border-color: {p('accent', oscuro)};
             }}
         """)
@@ -356,12 +362,13 @@ class SidebarWidget(QWidget):
         
         # Logout
         self._btn_logout = QPushButton("🚪 Cerrar sesión")
+        self._btn_logout.setObjectName("SidebarLogout")
         self._btn_logout.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_logout.setFixedHeight(34)
         self._btn_logout.setStyleSheet(f"""
             QPushButton {{
                 background-color: {p('accent_red', oscuro)};
-                color: white;
+                color: {get_theme_manager().tokens()["danger_button_text"]};
                 border: 1px solid {p('accent_red', oscuro)};
                 border-radius: 7px;
                 font-size: 11px;
@@ -369,8 +376,8 @@ class SidebarWidget(QWidget):
                 text-align: center;
             }}
             QPushButton:hover {{
-                background-color: #ff5252;
-                border-color: #ff5252;
+                background-color: {p('accent_red', oscuro)};
+                border-color: {p('accent_red', oscuro)};
             }}
         """)
         self._btn_logout.clicked.connect(self.logout_clicado.emit)
@@ -438,4 +445,55 @@ class SidebarWidget(QWidget):
     def actualizar_tema(self, oscuro: bool):
         """Actualiza los estilos cuando cambia el tema."""
         self._oscuro = oscuro
-        # Por implementar: recrear estilos con nueva paleta
+        tokens = self._theme_manager.tokens()
+        for widget in self.findChildren(QWidget):
+            if not isinstance(widget, ThemeLogo):
+                widget.setStyleSheet("")
+        self.setStyleSheet(f"""
+            QWidget#SidebarWidget, QWidget#SidebarContent {{
+                background: {tokens['surface']};
+                border-right: 1px solid {tokens['border']};
+            }}
+            QPushButton#SidebarCollapse, QPushButton#SidebarZoom,
+            QPushButton#SidebarTheme {{
+                background: {tokens['surface_alt']};
+                color: {tokens['text_secondary']};
+                border: 1px solid {tokens['border']};
+                border-radius: {tokens['radius_sm']};
+                padding: 4px 8px;
+            }}
+            QPushButton#SidebarCollapse:hover, QPushButton#SidebarZoom:hover,
+            QPushButton#SidebarTheme:hover {{
+                background: {tokens['accent']};
+                color: {tokens['accent_text']};
+                border-color: {tokens['accent']};
+            }}
+            QPushButton#SidebarCollapse:pressed, QPushButton#SidebarZoom:pressed,
+            QPushButton#SidebarTheme:pressed {{
+                background: {tokens['accent_hover']};
+                color: {tokens['accent_hover_text']};
+            }}
+            QPushButton#SidebarLogout {{
+                background: {tokens['danger_button_bg']};
+                color: {tokens['danger_button_text']};
+                border: 1px solid {tokens['danger_button_bg']};
+                border-radius: {tokens['radius_sm']};
+            }}
+            QPushButton#SidebarLogout:hover {{
+                background: {tokens['danger_button_hover']};
+                border-color: {tokens['danger_button_hover']};
+            }}
+            QToolButton#SidebarCollapse {{
+                background: {tokens['surface_alt']};
+                color: {tokens['text_secondary']};
+            }}
+            QToolButton#SidebarCollapse:hover {{
+                background: {tokens['accent']};
+                color: {tokens['accent_text']};
+            }}
+        """)
+        for boton in self._botones.values():
+            boton._aplicar_estilo()
+        self._btn_tema.setText(
+            "☀  Modo claro" if oscuro else "🌙  Modo oscuro"
+        )

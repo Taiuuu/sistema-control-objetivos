@@ -4,6 +4,7 @@
 
 
 from services.tema import PALETAS_UI, obtener_color_ui
+from ui.theme.theme_manager import get_theme_manager
 
 PALETA_OSCURA = PALETAS_UI["oscuro"]
 PALETA_CLARA = PALETAS_UI["claro"]
@@ -14,6 +15,38 @@ PALETA_CLARA = PALETAS_UI["claro"]
 # =========================================================================
 
 def obtener_color(key: str, oscuro: bool) -> str:
+    tokens = get_theme_manager().tokens()
+    aliases = {
+        "bg_main": "bg_gradient_start",
+        "bg_header": "surface_alt",
+        "bg_sidebar": "surface",
+        "badge_bg": "surface_alt",
+        "bg_tabla": "surface",
+        "bg_tabla_alt": "surface_alt",
+        "accent": "accent",
+        "accent_dark": "accent_hover",
+        "accent_text": "accent_text",
+        "accent_hover_text": "accent_hover_text",
+        "danger_button_text": "danger_button_text",
+        "accent_red": "danger",
+        "text_primary": "text_primary",
+        "text_secondary": "text_secondary",
+        "text_muted": "text_disabled",
+        "text_disabled": "text_disabled",
+        "btn_menu_hover": "surface_alt",
+        "btn_menu_text": "text_secondary",
+        "border": "border",
+        "border_light": "border",
+        "scrollbar_handle": "accent",
+        "estado_verde_bg": "success",
+        "estado_verde_fg": "accent_text",
+        "estado_amarillo_bg": "warning",
+        "estado_amarillo_fg": "text_primary",
+        "estado_rojo_bg": "danger",
+        "estado_rojo_fg": "accent_text",
+    }
+    if key in aliases:
+        return tokens[aliases[key]]
     return obtener_color_ui(key, oscuro)
 
 
@@ -64,7 +97,7 @@ def estilo_tabla(oscuro: bool) -> str:
 
 def estilo_boton_menu(oscuro: bool, activo: bool = False) -> str:
     bg = obtener_color("accent", oscuro) if activo else "transparent"
-    fg = "#ffffff" if activo else obtener_color("btn_menu_text", oscuro)
+    fg = get_theme_manager().tokens()["accent_text"] if activo else obtener_color("btn_menu_text", oscuro)
     hover = obtener_color("btn_menu_hover", oscuro)
 
     return f"""
@@ -95,7 +128,7 @@ def estilo_btn_tema(oscuro: bool) -> str:
     }}
     QPushButton:hover {{
         background-color: {accent};
-        color: white;
+        color: {get_theme_manager().tokens()["accent_text"]};
     }}
     """
 
@@ -115,7 +148,7 @@ def estilo_btn_zoom(oscuro: bool) -> str:
     }}
     QPushButton:hover {{
         background-color: {accent};
-        color: white;
+        color: {get_theme_manager().tokens()["accent_text"]};
     }}
     """
 
@@ -145,7 +178,7 @@ def estilo_btn_logout(oscuro: bool) -> str:
     return f"""
     QPushButton {{
         background-color: {rojo};
-        color: white;
+        color: {get_theme_manager().tokens()["danger_button_text"]};
         border-radius: 6px;
     }}
     """

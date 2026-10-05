@@ -8,10 +8,11 @@ from PyQt6.QtWidgets import (
     QTabWidget, QTableWidget, QTableWidgetItem, QMessageBox,
     QGroupBox, QTextEdit, QProgressBar, QComboBox
 )
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtGui import QFont
 from services.db_analyzer import AnalisisBD
 from services.auditoria import registrar_auditoria, TipoOperacion
 from datetime import datetime
+from ui.components import StatusBadge
 
 
 class VistaIndexacion(QWidget):
@@ -245,10 +246,7 @@ class VistaIndexacion(QWidget):
             self.tabla_stats.setItem(row, 3, QTableWidgetItem(str(stats['indices'])))
             
             # Estado
-            estado_item = QTableWidgetItem("✅ OK")
-            estado_item.setBackground(QColor(200, 255, 200))
-            estado_item.setForeground(QColor("#14532D"))
-            self.tabla_stats.setItem(row, 4, estado_item)
+            self.tabla_stats.setCellWidget(row, 4, StatusBadge("✅ OK", "ok"))
             
             total_filas += stats['total_filas']
             total_mb += stats['tamaño_mb']
@@ -297,25 +295,17 @@ class VistaIndexacion(QWidget):
             self.tabla_recomendaciones.setItem(row, 1, QTableWidgetItem(", ".join(sug["columnas"])))
             self.tabla_recomendaciones.setItem(row, 2, QTableWidgetItem(sug["razon"]))
             
-            impacto_item = QTableWidgetItem(f"{sug['impacto_porcentaje']:.1f}%")
-            impacto_item.setBackground(self._color_impacto(sug['impacto_porcentaje']))
-            impacto_item.setForeground(QColor("#172033"))
-            self.tabla_recomendaciones.setItem(row, 3, impacto_item)
+            impacto = sug["impacto_porcentaje"]
+            impacto_status = "ok" if impacto >= 8.5 else ("warning" if impacto >= 7.0 else "danger")
+            self.tabla_recomendaciones.setCellWidget(
+                row, 3, StatusBadge(f"{impacto:.1f}%", impacto_status)
+            )
             
             btn_crear = QPushButton("Crear")
             btn_crear.clicked.connect(
                 lambda checked, t=sug["tabla"], c=sug["columnas"]: self.crear_indice(t, c)
             )
             self.tabla_recomendaciones.setCellWidget(row, 4, btn_crear)
-
-    def _color_impacto(self, impacto: float) -> QColor:
-        """Retorna color según impacto."""
-        if impacto >= 8.5:
-            return QColor(100, 200, 100)  # Verde
-        elif impacto >= 7.0:
-            return QColor(255, 255, 150)  # Amarillo
-        else:
-            return QColor(255, 200, 200)  # Rosa
 
     def crear_indice(self, tabla: str, columnas: list):
         """Crea un índice."""

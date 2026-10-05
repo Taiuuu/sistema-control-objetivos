@@ -191,6 +191,8 @@ def iniciar_app() -> None:
             nonlocal ventana_principal
             ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso, app, alternar_tema)
             ventana_principal.show()
+            from ui.animaciones import animar_aparecer
+            animar_aparecer(ventana_principal, 180)
 
             # Verificar actualizaciones después de un delay
             QTimer.singleShot(1000, lambda: verificar_actualizacion(ventana_principal))

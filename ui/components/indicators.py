@@ -100,7 +100,7 @@ class StatusBadge(QLabel):
     def _apply_theme(self, theme_name: str) -> None:
         tokens = self._theme_manager.tokens(theme_name)
         status_color = tokens[self._STATUS_COLORS[self.status]]
-        background = rgba(status_color, 44 if theme_name == "Claro" else 58)
+        background = rgba(status_color, 18)
         self.setStyleSheet(
             f"""
             QLabel {{

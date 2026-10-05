@@ -11,13 +11,13 @@ from PyQt6.QtWidgets import (
     QSplitter, QFileDialog
 )
 from PyQt6.QtCore import QDate, Qt
-from PyQt6.QtGui import QColor
 from services.auditoria import (
     obtener_auditoria_usuario, obtener_auditoria_tabla,
     obtener_cambios_por_fecha, validar_integridad_auditoria,
     exportar_auditoria_csv, TipoOperacion
 )
 from services.sesion import get_usuario_id
+from ui.components import StatusBadge
 
 
 def _obtener_nombre_usuario(usuario_id: int | None) -> str:
@@ -48,7 +48,7 @@ class VistaAuditoria(QWidget):
 
         # Título
         titulo = QLabel("Auditoría del Sistema")
-        titulo.setStyleSheet("font-size: 18px; font-weight: bold; color: #2a82da;")
+        titulo.setStyleSheet("font-size: 18px; font-weight: bold;")
         layout_principal.addWidget(titulo)
 
         # Controles de filtrado
@@ -124,15 +124,6 @@ class VistaAuditoria(QWidget):
         layout_detalles = QVBoxLayout()
         self.texto_cambios = QTextEdit()
         self.texto_cambios.setReadOnly(True)
-        self.texto_cambios.setStyleSheet("""
-            QTextEdit {
-                background-color: #f5f5f5;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                font-family: 'Courier New';
-                font-size: 11px;
-            }
-        """)
         layout_detalles.addWidget(self.texto_cambios)
         widget_detalles = QWidget()
         widget_detalles.setLayout(layout_detalles)
@@ -229,11 +220,10 @@ class VistaAuditoria(QWidget):
                 self.tabla_auditoria.setItem(i, 4, QTableWidgetItem(reg_id))
                 self.tabla_auditoria.setItem(i, 5, QTableWidgetItem(str(detalles)[:50]))
                 
-                color_fondo = "#d4edda" if estado == "EXITOSO" else "#f8d7da"
-                color_texto = "#155724" if estado == "EXITOSO" else "#721c24"
-                for col in range(6):
-                    self.tabla_auditoria.item(i, col).setBackground(QColor(color_fondo))
-                    self.tabla_auditoria.item(i, col).setForeground(QColor(color_texto))
+                badge_estado = StatusBadge(
+                    estado, "ok" if estado == "EXITOSO" else "danger"
+                )
+                self.tabla_auditoria.setCellWidget(i, 6, badge_estado)
 
                 # Botón ver cambios
                 btn = QPushButton("Ver")

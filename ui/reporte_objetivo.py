@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QTableWidget, QTableWidgetItem,
     QComboBox, QFileDialog, QMessageBox, QScrollArea
 )
-from PyQt6.QtGui import QColor, QShortcut, QKeySequence
+from PyQt6.QtGui import QShortcut, QKeySequence
 from PyQt6.QtWidgets import QHeaderView
 from PyQt6.QtCore import Qt
 from services.background_task import run_background_task
@@ -19,8 +19,7 @@ from services.exportar import exportar_excel, exportar_pdf
 from services.reportes import objetivo_corresponde, clasificar_cumplimiento
 from database.db import DB_PATH
 from services.queries_tabla import cargar_supervisores
-from services.tema import obtener_tema_actual
-from ui.widgets.estilos import obtener_color
+from ui.components import StatusBadge
 
 
 # =============================================================================
@@ -466,7 +465,7 @@ class ReporteObjetivo(QWidget):
         layout.addWidget(self.tabla)
 
         # --- Resumen ---
-        self.resumen_label = QLabel("")
+        self.resumen_label = StatusBadge("", "info")
         layout.addWidget(self.resumen_label)
 
         self.setLayout(layout)
@@ -537,31 +536,27 @@ class ReporteObjetivo(QWidget):
         dias = datos["dias"]
         r = datos["resumen"]
 
-        oscuro = obtener_tema_actual() == "oscuro"
-        COLOR_COMPLETO = QColor(obtener_color("estado_verde_bg", oscuro))
-        COLOR_PARCIAL = QColor(obtener_color("estado_amarillo_bg", oscuro))
-        COLOR_SIN = QColor(obtener_color("estado_rojo_bg", oscuro))
-        COLOR_TEXTO = QColor(obtener_color("text_primary", oscuro))
-
-        def color_estado(estado):
-            if estado == "Completo":
-                return COLOR_COMPLETO
-            elif estado in ("Solo diurno", "Solo nocturno"):
-                return COLOR_PARCIAL
-            return COLOR_SIN
-
         self.tabla.setUpdatesEnabled(False)
+        for row in range(self.tabla.rowCount()):
+            badge = self.tabla.cellWidget(row, 4)
+            if badge:
+                self.tabla.removeCellWidget(row, 4)
+                badge.deleteLater()
         self.tabla.clearContents()
         self.tabla.setRowCount(len(dias))
 
         for i, d in enumerate(dias):
             valores = [d["fecha"], d["dia_semana"], d["diurno"], d["nocturno"], d["estado"]]
-            color = color_estado(d["estado"])
-            for col, val in enumerate(valores):
-                item = QTableWidgetItem(val)
-                item.setBackground(color)
-                item.setForeground(COLOR_TEXTO)
-                self.tabla.setItem(i, col, item)
+            for col, val in enumerate(valores[:4]):
+                self.tabla.setItem(i, col, QTableWidgetItem(val))
+            estado_status = {
+                "Completo": "ok",
+                "Solo diurno": "warning",
+                "Solo nocturno": "warning",
+            }.get(d["estado"], "danger")
+            self.tabla.setCellWidget(
+                i, 4, StatusBadge(d["estado"], estado_status)
+            )
 
         self.tabla.setUpdatesEnabled(True)
 
@@ -573,9 +568,10 @@ class ReporteObjetivo(QWidget):
             f"Cumplimiento: {r['porcentaje']:.1f}%"
         )
         _, categoria = clasificar_cumplimiento(r["porcentaje"])
-        self.resumen_label.setStyleSheet(
-            f"background-color: {obtener_color(f'estado_{categoria}_bg', oscuro)}; "
-            f"color: {obtener_color(f'estado_{categoria}_fg', oscuro)}; padding: 6px;"
+        self.resumen_label.set_status(
+            {"verde": "ok", "amarillo": "warning", "rojo": "danger"}.get(
+                categoria, "info"
+            )
         )
         self.estado_label.setText(f"Reporte generado: {datos['nombre']}")
         self._set_controls_enabled(True)

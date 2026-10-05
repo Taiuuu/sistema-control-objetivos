@@ -10,6 +10,8 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QMessageBox
 )
+from ui.components import GlassCard, PillButton
+from ui.theme.theme_manager import get_theme_manager
 
 
 # =============================================================================
@@ -27,7 +29,7 @@ def campo_password_con_ojito(placeholder: str) -> tuple:
     input_pw.setEchoMode(QLineEdit.EchoMode.Password)
     input_pw.setFixedHeight(40)
 
-    boton_ojo = QPushButton("👁")
+    boton_ojo = PillButton("👁", "ghost")
     boton_ojo.setFixedSize(40, 40)
     boton_ojo.setCheckable(True)
     boton_ojo.toggled.connect(
@@ -81,37 +83,51 @@ class CambiarPassword(QWidget):
         self.on_completado = on_completado
         self.setWindowTitle("Cambiar contraseña")
         self.setFixedSize(380, 420)
+        self._theme_manager = get_theme_manager()
 
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        card = GlassCard(content_margins=16)
+        contenido = card.content_layout
 
-        layout.addWidget(QLabel("Nueva contraseña:"))
+        contenido.addWidget(QLabel("Nueva contraseña:"))
         contenedor1, self.input_nueva = campo_password_con_ojito("Nueva contraseña")
-        layout.addWidget(contenedor1)
+        contenido.addWidget(contenedor1)
         self.input_nueva.textChanged.connect(self._actualizar_indicadores)
 
-        layout.addWidget(QLabel("Repetir contraseña:"))
+        contenido.addWidget(QLabel("Repetir contraseña:"))
         contenedor2, self.input_repetir = campo_password_con_ojito("Repetir contraseña")
-        layout.addWidget(contenedor2)
+        contenido.addWidget(contenedor2)
 
-        layout.addSpacing(8)
-        layout.addWidget(QLabel("Requisitos:"))
+        contenido.addSpacing(8)
+        contenido.addWidget(QLabel("Requisitos:"))
 
         # Indicadores visuales de requisitos
         self.indicadores = {}
         for clave, texto in LABELS_REQUISITOS.items():
             label = QLabel(f"✗  {texto}")
-            label.setStyleSheet("color: #FF6B6B; font-size: 12px;")
-            layout.addWidget(label)
+            label.setProperty("valid", False)
+            contenido.addWidget(label)
             self.indicadores[clave] = label
 
-        layout.addSpacing(8)
+        contenido.addSpacing(8)
 
-        boton_guardar = QPushButton("Guardar")
+        boton_guardar = PillButton("Guardar", "primary")
         boton_guardar.setFixedHeight(40)
         boton_guardar.clicked.connect(self._guardar)
-        layout.addWidget(boton_guardar)
+        contenido.addWidget(boton_guardar)
 
-        self.setLayout(layout)
+        layout.addWidget(card)
+        self._theme_manager.theme_changed.connect(self._aplicar_tema)
+        self._aplicar_tema(self._theme_manager.current())
+
+    def _aplicar_tema(self, theme_name: str) -> None:
+        tokens = self._theme_manager.tokens(theme_name)
+        for label in self.indicadores.values():
+            color = tokens["success"] if label.property("valid") else tokens["danger"]
+            label.setStyleSheet(
+                f"color: {color}; font-size: {tokens['font_size_sm']};"
+            )
 
     def _actualizar_indicadores(self, texto: str) -> None:
         """Actualiza los indicadores visuales de requisitos en tiempo real."""
@@ -128,10 +144,10 @@ class CambiarPassword(QWidget):
             texto_label = textos_dinamicos[clave]
             if cumple:
                 label.setText(f"✓  {texto_label}")
-                label.setStyleSheet("color: #90EE90; font-size: 12px;")
             else:
                 label.setText(f"✗  {texto_label}")
-                label.setStyleSheet("color: #FF6B6B; font-size: 12px;")
+            label.setProperty("valid", cumple)
+        self._aplicar_tema(self._theme_manager.current())
 
     def _guardar(self) -> None:
         """Valida y guarda la nueva contraseña en la base de datos."""
