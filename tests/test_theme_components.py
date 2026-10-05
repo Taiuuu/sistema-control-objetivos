@@ -81,3 +81,36 @@ def test_component_preview_switches_all_components_live(app, tmp_path, monkeypat
 
     manager.set_theme(original_theme)
     preview.close()
+
+
+def test_sidebar_menu_buttons_initialize_and_refresh_theme(app, tmp_path, monkeypatch):
+    from ui.ventana_principal import BotonMenu as MainMenuButton
+    from ui.widgets.sidebar import BotonMenu as SidebarMenuButton
+
+    manager = get_theme_manager()
+    original_theme = manager.current()
+    monkeypatch.setattr(manager, "_config_file", tmp_path / "tema.json")
+    buttons = [
+        MainMenuButton("📋", "Control diario", False),
+        SidebarMenuButton("📋", "Control diario", False),
+    ]
+
+    try:
+        for theme_name in manager.available_themes():
+            manager.set_theme(theme_name)
+            for button in buttons:
+                button.actualizar_tema(theme_name != "Claro")
+                button.set_activo(True)
+                assert THEMES[theme_name]["accent"] in button.styleSheet()
+                assert (
+                    THEMES[theme_name]["accent_text"] in button.styleSheet()
+                )
+                button.set_activo(False)
+                button.colapsar()
+                button.expandir()
+                assert "Control diario" in button.text()
+    finally:
+        manager.set_theme(original_theme)
+        for button in buttons:
+            button.deleteLater()
+        app.processEvents()

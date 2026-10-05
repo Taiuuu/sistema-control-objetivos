@@ -6,7 +6,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QToolButton, QScrollArea, QFrame,
-    QGraphicsDropShadowEffect
+    QGraphicsDropShadowEffect, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtGui import QIcon, QFont
@@ -38,6 +38,7 @@ class BotonMenu(QPushButton):
         self._oscuro = oscuro
         self._activo = False
         self._accion = None  # Callback de acción
+        self._theme_manager = get_theme_manager()
 
         self.setText(self._texto_completo)
         self.setProperty("icono", icono)
@@ -55,7 +56,7 @@ class BotonMenu(QPushButton):
 
     def _aplicar_estilo(self):
         bg_activo   = p("accent", self._oscuro)
-        text_activo = get_theme_manager().tokens()["accent_text"]
+        text_activo = self._theme_manager.tokens()["accent_text"]
         bg_hover    = p("btn_menu_hover", self._oscuro)
         text_normal = p("btn_menu_text", self._oscuro)
 
@@ -89,12 +90,17 @@ class BotonMenu(QPushButton):
                 }}
                 QPushButton:pressed {{
                     background-color: {bg_activo};
-                    color: {get_theme_manager().tokens()["accent_text"]};
+                    color: {self._theme_manager.tokens()["accent_text"]};
                 }}
             """)
 
     def set_activo(self, activo: bool):
         self._activo = activo
+        self._aplicar_estilo()
+
+    def actualizar_tema(self, oscuro: bool) -> None:
+        """Actualiza los colores sin perder el estado activo del botón."""
+        self._oscuro = oscuro
         self._aplicar_estilo()
 
     def colapsar(self):

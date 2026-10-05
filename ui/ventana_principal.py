@@ -99,6 +99,7 @@ class BotonMenu(QPushButton):
         self._expandido = True
         self._oscuro = oscuro
         self._activo = False
+        self._theme_manager = get_theme_manager()
 
         self.setText(self._texto_completo)
         self.setProperty("icono", icono)
