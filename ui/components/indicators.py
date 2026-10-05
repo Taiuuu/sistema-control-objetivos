@@ -19,8 +19,9 @@ class KpiCard(GlassCard):
         parent=None,
         *,
         shadow: bool = False,
+        contrast: bool = False,
     ):
-        super().__init__(parent, shadow=shadow)
+        super().__init__(parent, shadow=shadow, contrast=contrast)
         row = QHBoxLayout()
         row.setSpacing(12)
         self.icon_label = QLabel(icon)
@@ -98,14 +99,14 @@ class StatusBadge(QLabel):
 
     def _apply_theme(self, theme_name: str) -> None:
         tokens = self._theme_manager.tokens(theme_name)
-        color = tokens[self._STATUS_COLORS[self.status]]
-        background = rgba(color, 44 if theme_name == "Claro" else 58)
+        status_color = tokens[self._STATUS_COLORS[self.status]]
+        background = rgba(status_color, 44 if theme_name == "Claro" else 58)
         self.setStyleSheet(
             f"""
             QLabel {{
-                color: {color};
+                color: {tokens["text_primary"]};
                 background-color: {background};
-                border: 1px solid {rgba(color, 100)};
+                border: 1px solid {status_color};
                 border-radius: {tokens["radius_lg"]};
                 padding: {tokens["spacing_xs"]} {tokens["spacing_sm"]};
                 font-size: {tokens["font_size_sm"]};
@@ -113,6 +114,25 @@ class StatusBadge(QLabel):
             }}
             """
         )
+
+    def set_status(self, status: str) -> None:
+        if status not in self._STATUS_COLORS:
+            raise ValueError(
+                f"Estado no válido: {status!r}. Opciones: {sorted(self._STATUS_COLORS)}"
+            )
+        self.status = status
+        self._apply_theme(self._theme_manager.current())
+
+
+class CountChip(StatusBadge):
+    """Contador compacto en formato pill, con superficie discreta."""
+
+    def __init__(self, count: int, parent=None):
+        super().__init__(str(count), "info", parent)
+        self.setMinimumWidth(32)
+
+    def set_count(self, count: int) -> None:
+        self.setText(str(count))
 
 
 class ThemeLogo(QLabel):

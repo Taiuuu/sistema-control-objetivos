@@ -2,7 +2,13 @@
 
 from ui.components.base import GlassCard
 from ui.components.controls import PillButton, ProgressBarThin, SearchInput
-from ui.components.indicators import ContrastCard, KpiCard, StatusBadge, ThemeLogo
+from ui.components.indicators import (
+    ContrastCard,
+    CountChip,
+    KpiCard,
+    StatusBadge,
+    ThemeLogo,
+)
 
 __all__ = [
     "GlassCard",
@@ -12,5 +18,6 @@ __all__ = [
     "StatusBadge",
     "ProgressBarThin",
     "ContrastCard",
+    "CountChip",
     "ThemeLogo",
 ]
