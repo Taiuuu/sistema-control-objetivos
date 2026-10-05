@@ -43,6 +43,15 @@ class ThemeManager(QObject):
     def current(self) -> str:
         return self._current
 
+    def tokens(self, nombre: str | None = None) -> dict[str, str]:
+        """Devuelve una copia de los tokens del tema activo o del indicado."""
+        theme_name = nombre or self._current
+        if theme_name not in THEMES:
+            raise ValueError(
+                f"Tema no válido: {theme_name!r}. Opciones: {', '.join(THEMES)}"
+            )
+        return THEMES[theme_name].copy()
+
     @staticmethod
     def available_themes() -> list[str]:
         return list(THEMES)

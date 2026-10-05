@@ -40,6 +40,7 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             font-weight: 600;
         }}
         QPushButton:hover {{
+            color: {tokens["accent_hover_text"]};
             background-color: {tokens["accent_hover"]};
             border-color: {tokens["accent_hover"]};
         }}
