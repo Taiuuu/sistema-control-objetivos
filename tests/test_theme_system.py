@@ -5,7 +5,10 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QFrame
 
-from ui.animaciones import animar_aparecer, animar_entrada
+from ui.animaciones import (
+    animar_aparecer,
+    tiene_animacion_activa,
+)
 from ui.theme.stylesheet import generate_stylesheet
 from ui.theme.colors import parse_color
 from ui.theme.theme_manager import get_theme_manager
@@ -258,6 +261,7 @@ def test_window_fades_do_not_nest_graphics_paint_effects():
         assert login.graphicsEffect() is None
         assert card is not None
         assert card.graphicsEffect() is not None
+        assert tiene_animacion_activa(login)
         login.show()
         QTest.qWait(240)
         assert login.isVisible()

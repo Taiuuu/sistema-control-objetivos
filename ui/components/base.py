@@ -55,7 +55,7 @@ class GlassCard(QFrame):
             f"""
             QFrame#{self.objectName()} {{
                 background-color: {background};
-                border: 1px solid {tokens["border"]};
+                border: 1px solid {tokens["glass_border"]};
                 border-radius: {tokens["radius_card"]};
             }}
             """

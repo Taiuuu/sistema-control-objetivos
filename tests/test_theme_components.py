@@ -1,5 +1,13 @@
 import pytest
-from PyQt6.QtWidgets import QApplication
+from types import SimpleNamespace
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import (
+    QApplication,
+    QTableWidget,
+    QTableWidgetItem,
+    QToolButton,
+    QWidget,
+)
 
 from ui.components import (
     ContrastCard,
@@ -113,4 +121,57 @@ def test_sidebar_menu_buttons_initialize_and_refresh_theme(app, tmp_path, monkey
         manager.set_theme(original_theme)
         for button in buttons:
             button.deleteLater()
+        app.processEvents()
+
+
+def test_dashboard_metrics_are_compact_and_can_be_collapsed(app):
+    from ui.ventana_principal import VentanaPrincipal
+
+    owner = SimpleNamespace(_metricas_valores={})
+    metrics = VentanaPrincipal._construir_metricas(owner)
+    assert all(card.height() == 72 for card in owner._metricas_valores.values())
+
+    toggle = QToolButton()
+    dashboard = SimpleNamespace(
+        _metricas=metrics,
+        _btn_toggle_metricas=toggle,
+        _metricas_colapsadas=False,
+    )
+    VentanaPrincipal._alternar_metricas(dashboard)
+    assert metrics.isHidden()
+    assert dashboard._metricas_colapsadas
+    assert toggle.text() == "⌄"
+
+    VentanaPrincipal._alternar_metricas(dashboard)
+    assert not metrics.isHidden()
+    assert not dashboard._metricas_colapsadas
+    assert toggle.text() == "⌃"
+    metrics.deleteLater()
+    toggle.deleteLater()
+    app.processEvents()
+
+
+def test_dashboard_table_recolors_existing_rows_without_reloading(app):
+    from ui.ventana_principal import VentanaPrincipal
+
+    manager = get_theme_manager()
+    table = QTableWidget(1, 6)
+    table.setItem(0, 0, QTableWidgetItem("Objetivo"))
+    table.setItem(0, 1, QTableWidgetItem("Equipo"))
+    wrapper = QWidget()
+    table.setCellWidget(0, 2, wrapper)
+    target = SimpleNamespace(_theme_manager=manager, tabla=table)
+
+    original_theme = manager.current()
+    try:
+        manager._current = "Grafito"
+        VentanaPrincipal._actualizar_colores_tabla(target)
+        tokens = THEMES["Grafito"]
+        assert table.item(0, 0).foreground().color() == QColor(tokens["text_primary"])
+        assert table.item(0, 1).foreground().color() == QColor(tokens["text_secondary"])
+        assert table.item(0, 0).background().color().alpha() == 190
+        assert "#BE" in wrapper.styleSheet().upper()
+    finally:
+        manager._current = original_theme
+        table.deleteLater()
         app.processEvents()

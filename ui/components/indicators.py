@@ -20,16 +20,26 @@ class KpiCard(GlassCard):
         *,
         shadow: bool = False,
         contrast: bool = False,
+        compact: bool = False,
     ):
-        super().__init__(parent, shadow=shadow, contrast=contrast)
+        super().__init__(
+            parent,
+            shadow=shadow,
+            contrast=contrast,
+            content_margins=10 if compact else None,
+        )
+        self._compact = compact
+        if compact:
+            self.setFixedHeight(72)
         row = QHBoxLayout()
-        row.setSpacing(12)
+        row.setSpacing(8 if compact else 12)
         self.icon_label = QLabel(icon)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.icon_label.setFixedSize(42, 42)
+        icon_size = 30 if compact else 42
+        self.icon_label.setFixedSize(icon_size, icon_size)
 
         text_column = QVBoxLayout()
-        text_column.setSpacing(3)
+        text_column.setSpacing(2 if compact else 3)
         self.caption_label = QLabel(label)
         self.value_label = QLabel(str(value))
         text_column.addWidget(self.caption_label)
@@ -67,7 +77,18 @@ class KpiCard(GlassCard):
             """
         )
         style_label(self.caption_label, tokens["text_secondary"], tokens["font_size_sm"])
-        style_label(self.value_label, tokens["text_primary"], tokens["font_size_display"], weight=700)
+        style_label(
+            self.value_label,
+            tokens["text_primary"],
+            tokens["font_size_title"] if self._compact else tokens["font_size_display"],
+            weight=700,
+        )
+        if self._compact:
+            style_label(
+                self.caption_label,
+                tokens["text_secondary"],
+                tokens["font_size_xs"],
+            )
 
 
 class ContrastCard(GlassCard):

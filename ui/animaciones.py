@@ -17,6 +17,15 @@ def _guardar_animacion(animacion):
     animacion.finished.connect(lambda: _active_animations.remove(animacion))
 
 
+def tiene_animacion_activa(widget: QWidget) -> bool:
+    """Indica si una animación de entrada/salida del widget sigue ejecutándose."""
+    return any(
+        animacion.parent() is widget
+        and animacion.state() == animacion.State.Running
+        for animacion in _active_animations
+    )
+
+
 def animar_aparecer(widget: QWidget, duracion: int = 180) -> None:
     """Anima la aparición de un widget con efecto fade in."""
     if widget.isWindow():

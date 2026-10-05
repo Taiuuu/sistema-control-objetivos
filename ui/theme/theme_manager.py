@@ -5,7 +5,6 @@ import logging
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtCore import QEasingCurve, QPropertyAnimation
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QApplication
 
@@ -40,7 +39,7 @@ class ThemeManager(QObject):
         self._config_file = _CONFIG_FILE
         self._current = self._load_preference()
         self._font_size = self._load_font_size()
-        self._theme_animations = []
+        self._style_application_id = None
         self._initialized = True
 
     @classmethod
@@ -81,11 +80,12 @@ class ThemeManager(QObject):
 
         self._save_preference(canonical_name)
         changed = canonical_name != self._current
-        changed = canonical_name != self._current
+        if not changed:
+            return
+
         self._current = canonical_name
-        self._apply_to_application(animate=changed)
-        if changed:
-            self.theme_changed.emit(canonical_name)
+        self._apply_to_application()
+        self.theme_changed.emit(canonical_name)
 
     def set_font_size(self, size: int) -> None:
         if isinstance(size, bool) or not isinstance(size, int):
@@ -185,32 +185,16 @@ class ThemeManager(QObject):
             encoding="utf-8",
         )
 
-    def _apply_to_application(self, *, animate: bool = False) -> None:
+    def _apply_to_application(self) -> None:
         app = QApplication.instance()
         if app is None:
             return
 
-        visible_windows = [
-            widget for widget in app.topLevelWidgets()
-            if widget.isVisible()
-        ] if animate else []
-        animations = []
-        for window in visible_windows:
-            animation = QPropertyAnimation(window, b"windowOpacity", window)
-            animation.setDuration(180)
-            animation.setStartValue(min(window.windowOpacity(), 0.92))
-            animation.setEndValue(1.0)
-            animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-            animations.append(animation)
-            self._theme_animations.append(animation)
-            animation.finished.connect(
-                lambda current=animation: self._theme_animations.remove(current)
-                if current in self._theme_animations else None
-            )
-
         tokens = THEMES[self._current].copy()
         tokens["font_size_md"] = f"{self._font_size}px"
-        app.setStyle("Fusion")
+        if self._style_application_id != id(app):
+            app.setStyle("Fusion")
+            self._style_application_id = id(app)
         palette = QPalette()
         palette.setColor(QPalette.ColorRole.Window, QColor(tokens["bg_gradient_start"]))
         palette.setColor(QPalette.ColorRole.Base, QColor(tokens["surface_alt"]))
@@ -223,8 +207,6 @@ class ThemeManager(QObject):
         palette.setColor(QPalette.ColorRole.HighlightedText, QColor(tokens["accent_text"]))
         app.setPalette(palette)
         app.setStyleSheet(generate_stylesheet(tokens))
-        for animation in animations:
-            animation.start()
 
 
 def get_theme_manager() -> ThemeManager:

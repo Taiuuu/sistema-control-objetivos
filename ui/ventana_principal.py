@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     , QDialog, QDialogButtonBox, QCheckBox, QGridLayout
 )
 from PyQt6.QtCore import (
-    QDate, QTimer, QEvent, Qt, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
+    QDate, QTimer, QEvent, Qt
 )
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
 from services.reportes import obtener_objetivos_del_dia
@@ -43,9 +43,10 @@ from ui.vista_validaciones import VistaValidaciones
 from ui.vista_indexacion import VistaIndexacion
 from ui.vista_sincronizacion import VistaSincronizacion
 from ui.configuracion import ConfiguracionDialog
-from ui.animaciones import animar_aparecer
+from ui.animaciones import animar_aparecer, tiene_animacion_activa
 from ui.theme.theme_manager import get_theme_manager
 from ui.theme.tokens import THEMES
+from ui.theme.colors import parse_color
 from services.permisos import tiene_permiso
 from services.backup import hacer_backup
 from services.logger import registrar_accion
@@ -187,6 +188,7 @@ class VentanaPrincipal(QWidget):
         self.alternar_tema_fn = alternar_tema_fn
         self.zoom_nivel       = 13
         self._sidebar_expandido = True
+        self._metricas_colapsadas = False
         self._boton_activo      = None
         self._menu_visible = obtener_menu_usuario(usuario_id)
 
@@ -700,7 +702,8 @@ class VentanaPrincipal(QWidget):
 
     def _mostrar_dashboard(self) -> None:
         self._landing.hide()
-        self._metricas.show()
+        self._metricas.setVisible(not self._metricas_colapsadas)
+        self._btn_toggle_metricas.show()
         self._barra_filtros_widget.show()
         self._sep_header.show()
         self.tabla.show()
@@ -710,6 +713,7 @@ class VentanaPrincipal(QWidget):
 
     def _mostrar_landing_inicial(self) -> None:
         self._metricas.hide()
+        self._btn_toggle_metricas.hide()
         self._barra_filtros_widget.hide()
         self._sep_header.hide()
         self.tabla.hide()
@@ -717,9 +721,9 @@ class VentanaPrincipal(QWidget):
         self._landing.update()
 
     def _construir_metricas(self) -> QWidget:
-        contenedor = GlassCard(shadow=True, content_margins=12)
+        contenedor = GlassCard(shadow=False, content_margins=8)
         layout = QHBoxLayout()
-        layout.setSpacing(12)
+        layout.setSpacing(8)
         self._metricas_valores = {}
 
         for clave, titulo, valor, icono in (
@@ -728,19 +732,29 @@ class VentanaPrincipal(QWidget):
             ("alertas", "Alertas pendientes", "0", "!"),
         ):
             card_type = KpiCard
-            kwargs = {"contrast": True} if clave == "alertas" else {}
             metric = card_type(
                 titulo,
                 valor,
                 icono,
                 shadow=False,
-                **kwargs,
+                contrast=clave == "alertas",
+                compact=True,
             )
             metric.setMinimumWidth(0)
             layout.addWidget(metric, 1)
             self._metricas_valores[clave] = metric
         contenedor.add_layout(layout)
         return contenedor
+
+    def _alternar_metricas(self) -> None:
+        self._metricas_colapsadas = not self._metricas_colapsadas
+        visible = not self._metricas_colapsadas
+        self._metricas.setVisible(visible)
+        self._btn_toggle_metricas.setText("⌃" if visible else "⌄")
+        accion = "Ocultar" if visible else "Mostrar"
+        self._btn_toggle_metricas.setToolTip(
+            f"{accion} métricas para {'dar más espacio' if visible else 'ver el resumen'}"
+        )
 
     def _actualizar_metricas(self, objetivos, pasadas_dia, pasadas_noche) -> None:
         total_pasadas = sum(pasadas_dia.values()) + sum(pasadas_noche.values())
@@ -771,6 +785,15 @@ class VentanaPrincipal(QWidget):
         lay.addStretch()
 
         self.lbl_estado_sync = StatusBadge("● En vivo", "ok")
+        self._btn_toggle_metricas = QToolButton()
+        self._btn_toggle_metricas.setObjectName("ToggleMetrics")
+        self._btn_toggle_metricas.setText("⌃")
+        self._btn_toggle_metricas.setToolTip("Ocultar métricas para dar más espacio")
+        self._btn_toggle_metricas.setAccessibleName("Plegar o desplegar métricas")
+        self._btn_toggle_metricas.setFixedSize(28, 28)
+        self._btn_toggle_metricas.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_toggle_metricas.clicked.connect(self._alternar_metricas)
+        lay.addWidget(self._btn_toggle_metricas)
         lay.addWidget(self.lbl_estado_sync)
         self._header = header
         self._theme_manager.theme_changed.connect(self._estilizar_header)
@@ -791,6 +814,23 @@ class VentanaPrincipal(QWidget):
         self._lbl_subtitulo_header.setStyleSheet(
             f"color: {tokens['text_secondary']}; font-size: {tokens['font_size_sm']}; "
             "background: transparent;"
+        )
+        self._btn_toggle_metricas.setStyleSheet(
+            f"""
+            QToolButton#ToggleMetrics {{
+                color: {tokens["text_secondary"]};
+                background: {tokens["surface"]};
+                border: 1px solid {tokens["border"]};
+                border-radius: {tokens["radius_sm"]};
+                font-size: {tokens["font_size_md"]};
+                font-weight: 700;
+            }}
+            QToolButton#ToggleMetrics:hover {{
+                color: {tokens["accent_text"]};
+                background: {tokens["accent"]};
+                border-color: {tokens["accent"]};
+            }}
+            """
         )
 
     def _construir_barra_filtros(self) -> QWidget:
@@ -1125,8 +1165,7 @@ class VentanaPrincipal(QWidget):
             oscuro = self._oscuro
             self._refrescar_tema_sidebar(oscuro)
             self._refrescar_tema_panel_derecho(oscuro)
-            self.tabla.setStyleSheet(self._estilo_tabla(oscuro))
-            self.cargar_tabla()
+            self._actualizar_colores_tabla()
         except Exception as e:
             print(f"⚠️ Error refrescando tema: {e}")
             # No lanzar para que la app siga funcionando
@@ -1255,9 +1294,35 @@ class VentanaPrincipal(QWidget):
             QFrame {{ background: {tokens['border']}; max-height: 1px; border: none; margin: 0; }}
         """)
 
-        # Tabla (el stylesheet + recargar regenera badges con la paleta nueva)
+        # El tema actualiza los badges; las celdas se recolorean sin consultar datos.
         self.tabla.setStyleSheet(self._estilo_tabla(oscuro))
-        self.cargar_tabla()
+
+    def _actualizar_colores_tabla(self) -> None:
+        """Aplica los colores actuales sin volver a consultar ni recrear filas."""
+        tokens = self._theme_manager.tokens()
+        self.tabla.setUpdatesEnabled(False)
+        try:
+            for row in range(self.tabla.rowCount()):
+                background = parse_color(
+                    tokens["surface"] if row % 2 == 0 else tokens["surface_alt"]
+                )
+                for column in range(self.tabla.columnCount()):
+                    item = self.tabla.item(row, column)
+                    if item is not None:
+                        color_key = (
+                            "text_secondary" if column in (1, 3) else "text_primary"
+                        )
+                        item.setForeground(parse_color(tokens[color_key]))
+                        item.setBackground(background)
+
+                    cell_widget = self.tabla.cellWidget(row, column)
+                    if cell_widget is not None:
+                        cell_widget.setStyleSheet(
+                            f"background-color: {background.name(QColor.NameFormat.HexArgb)};"
+                        )
+        finally:
+            self.tabla.setUpdatesEnabled(True)
+        self.tabla.viewport().update()
 
     # =========================================================================
     # SIDEBAR COLAPSAR / EXPANDIR
@@ -1265,7 +1330,7 @@ class VentanaPrincipal(QWidget):
 
     def _toggle_sidebar(self):
         if self._sidebar_expandido:
-            self._animar_sidebar(self.SIDEBAR_COLAPSADO)
+            self._ajustar_sidebar(self.SIDEBAR_COLAPSADO)
             self._sidebar_expandido = False
             self.btn_colapsar.setText("›")
             self.btn_colapsar.setToolTip("Expandir menú (Ctrl+\\)")
@@ -1277,7 +1342,7 @@ class VentanaPrincipal(QWidget):
             for b in self._botones_menu:
                 b.colapsar()
         else:
-            self._animar_sidebar(self.SIDEBAR_EXPANDIDO)
+            self._ajustar_sidebar(self.SIDEBAR_EXPANDIDO)
             self._sidebar_expandido = True
             self.btn_colapsar.setText("‹")
             self.btn_colapsar.setToolTip("Colapsar menú (Ctrl+\\)")
@@ -1289,24 +1354,8 @@ class VentanaPrincipal(QWidget):
             for b in self._botones_menu:
                 b.expandir()
 
-    def _animar_sidebar(self, ancho_destino: int):
-        anim = QPropertyAnimation(self.panel_lateral, b"minimumWidth")
-        anim.setDuration(220)
-        anim.setStartValue(self.panel_lateral.width())
-        anim.setEndValue(ancho_destino)
-        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-
-        anim2 = QPropertyAnimation(self.panel_lateral, b"maximumWidth")
-        anim2.setDuration(220)
-        anim2.setStartValue(self.panel_lateral.width())
-        anim2.setEndValue(ancho_destino)
-        anim2.setEasingCurve(QEasingCurve.Type.OutCubic)
-
-        grupo = QParallelAnimationGroup(self)
-        grupo.addAnimation(anim)
-        grupo.addAnimation(anim2)
-        grupo.start()
-        self._anim_sidebar = grupo
+    def _ajustar_sidebar(self, ancho_destino: int) -> None:
+        self.panel_lateral.setFixedWidth(ancho_destino)
 
     # =========================================================================
     # ZOOM
@@ -1673,8 +1722,8 @@ class VentanaPrincipal(QWidget):
 
         def item(txt: str, color_key: str = "text_primary") -> QTableWidgetItem:
             it = self._crear_item(txt)
-            it.setForeground(QColor(tokens[color_key]))
-            it.setBackground(QColor(bg))
+            it.setForeground(parse_color(tokens[color_key]))
+            it.setBackground(parse_color(bg))
             return it
 
         def celda(widget: QWidget) -> QWidget:
@@ -1737,7 +1786,7 @@ class VentanaPrincipal(QWidget):
                 ventana.destroyed.connect(on_close)
 
             ventana.show()
-            if ventana.graphicsEffect() is None:
+            if not tiene_animacion_activa(ventana):
                 animar_aparecer(ventana, 180)
         else:
             ventana.raise_()
