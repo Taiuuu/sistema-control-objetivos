@@ -7,7 +7,8 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget,
     QTableWidgetItem, QPushButton, QMessageBox, QDialog,
     QLabel, QLineEdit, QDateEdit, QCheckBox, QDialogButtonBox,
-    QInputDialog, QComboBox, QListWidget, QTabWidget
+    QInputDialog, QComboBox, QListWidget, QTabWidget, QMenu, QHeaderView,
+    QHBoxLayout
 )
 from PyQt6.QtCore import QDate, Qt
 from models.objetivos import (
@@ -21,6 +22,8 @@ from models.objetivos import (
 from models.types import Objetivo
 from services.sincronizacion import obtener_sincronizador
 from services.sesion import get_rol
+from ui.components import StatusBadge
+from ui.theme.theme_manager import get_theme_manager
 
 
 DIAS_MAP = {
@@ -185,6 +188,7 @@ class ListaObjetivos(QWidget):
         super().__init__()
         self.setWindowTitle("Listado de objetivos")
         self.setGeometry(200, 200, 950, 400)
+        self._theme_manager = get_theme_manager()
 
         layout = QVBoxLayout()
 
@@ -193,8 +197,8 @@ class ListaObjetivos(QWidget):
         self.es_admin = rol_actual in ("administrador", "admin")
         
         if self.es_admin:
-            info_label = QLabel("⚠ Modo administrador: puedes eliminar objetivos permanentemente")
-            info_label.setStyleSheet("color: #ff9800; font-weight: bold;")
+            info_label = QLabel("Modo administrador · permisos de gestión habilitados")
+            info_label.setObjectName("AdminModeBanner")
             layout.addWidget(info_label)
 
         self.tabs = QTabWidget()
@@ -205,6 +209,8 @@ class ListaObjetivos(QWidget):
             self.tablas[clave] = tabla
             self.tabs.addTab(tabla, titulo)
         self.tabla = self.tablas["actuales"]
+        self._aplicar_tema(self._theme_manager.current())
+        self._theme_manager.theme_changed.connect(self._aplicar_tema)
         self.tabs.currentChanged.connect(self._cargar_tabla)
         layout.addWidget(self.tabs)
 
@@ -216,10 +222,108 @@ class ListaObjetivos(QWidget):
         self.sincronizador.datos_cambiados.connect(self._on_datos_cambiados)
 
     def _configurar_tabla(self, tabla: QTableWidget) -> None:
-        tabla.setColumnCount(7)
-        tabla.setHorizontalHeaderLabels(["Nombre", "Inicio", "Fin", "Días", "Estado", "Editar", "Acción"])
-        for columna, ancho in enumerate((220, 100, 100, 180, 150, 80, 100)):
+        tabla.setColumnCount(6)
+        tabla.setHorizontalHeaderLabels(["Nombre", "Inicio", "Fin", "Días", "Estado", "Acciones"])
+        for columna, ancho in enumerate((220, 100, 100, 180, 170, 85)):
             tabla.setColumnWidth(columna, ancho)
+        tabla.setShowGrid(False)
+        tabla.setAlternatingRowColors(False)
+        tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        tabla.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        tabla.verticalHeader().setVisible(False)
+        tabla.verticalHeader().setDefaultSectionSize(48)
+        tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        tabla.horizontalHeader().setStretchLastSection(True)
+
+    def _aplicar_tema(self, theme_name: str) -> None:
+        tokens = self._theme_manager.tokens(theme_name)
+        self.setStyleSheet(f"""
+            QTabWidget::pane {{
+                border: 1px solid {tokens['border']};
+                border-radius: {tokens['radius_md']};
+                background: {tokens['surface']};
+                top: -1px;
+            }}
+            QTabBar::tab {{
+                background: {tokens['surface_alt']};
+                color: {tokens['text_secondary']};
+                border: 1px solid {tokens['border']};
+                border-radius: {tokens['radius_lg']};
+                padding: 7px 14px;
+                margin: 0 4px 8px 0;
+                font-weight: 600;
+            }}
+            QTabBar::tab:selected {{
+                background: {tokens['accent']};
+                color: {tokens['accent_text']};
+                border-color: {tokens['accent']};
+            }}
+            QTabBar::tab:hover:!selected {{
+                background: {tokens['sidebar_active_bg']};
+                color: {tokens['text_primary']};
+            }}
+            QTableWidget {{
+                background: {tokens['surface']};
+                color: {tokens['text_primary']};
+                border: none;
+                gridline-color: transparent;
+                outline: none;
+                selection-background-color: {tokens['surface_alt']};
+                selection-color: {tokens['text_primary']};
+                font-size: {tokens['font_size_sm']};
+            }}
+            QTableWidget::item {{
+                border-bottom: 1px solid {tokens['border']};
+                padding: 6px 10px;
+            }}
+            QHeaderView::section {{
+                background: {tokens['surface_alt']};
+                color: {tokens['text_secondary']};
+                border: none;
+                border-bottom: 1px solid {tokens['border']};
+                padding: 9px 10px;
+                font-weight: 600;
+            }}
+            QLabel#AdminModeBanner {{
+                color: {tokens['text_secondary']};
+                background: {tokens['surface_alt']};
+                border: 1px solid {tokens['border']};
+                border-radius: {tokens['radius_md']};
+                padding: 7px 10px;
+            }}
+            QPushButton#ObjectiveActions {{
+                background: {tokens['surface_alt']};
+                color: {tokens['text_primary']};
+                border: 1px solid {tokens['border']};
+                border-radius: {tokens['radius_md']};
+                font-size: {tokens['font_size_lg']};
+                font-weight: 700;
+                min-width: 32px;
+                min-height: 30px;
+            }}
+            QPushButton#ObjectiveActions:hover {{
+                background: {tokens['sidebar_active_bg']};
+                border-color: {tokens['accent']};
+            }}
+            QMenu {{
+                background: {tokens['surface']};
+                color: {tokens['text_primary']};
+                border: 1px solid {tokens['border']};
+                padding: 4px;
+            }}
+            QMenu::item {{ padding: 7px 22px; border-radius: {tokens['radius_sm']}; }}
+            QMenu::item:selected {{
+                background: {tokens['surface_alt']};
+                color: {tokens['text_primary']};
+            }}
+            QMenu::item[danger="true"] {{ color: {tokens['danger']}; }}
+            QMenu::item[danger="true"]:selected {{
+                background: {tokens['danger']};
+                color: {tokens['accent_text']};
+            }}
+        """)
+        if hasattr(self, "tablas"):
+            self._cargar_tabla()
 
     def _cargar_tabla(self, _indice: int = 0) -> None:
         objetivos = _cargar_objetivos()
@@ -244,20 +348,39 @@ class ListaObjetivos(QWidget):
             tabla.setItem(i, 2, QTableWidgetItem(fin_texto))
             tabla.setItem(i, 3, QTableWidgetItem(dias_texto))
             estado = "Pendiente de revisión" if o.pendiente_revision else ("Vigente" if o.es_activo() else "Finalizado")
-            tabla.setItem(i, 4, QTableWidgetItem(estado))
+            estado_tipo = "warning" if o.pendiente_revision else ("ok" if o.es_activo() else "info")
+            estado_badge = StatusBadge(estado, estado_tipo)
+            tabla.setCellWidget(i, 4, self._centrar_widget(estado_badge))
 
-            boton_editar = QPushButton("Editar")
-            boton_editar.clicked.connect(lambda checked, obj=o: self._editar(obj))
-            tabla.setCellWidget(i, 5, boton_editar)
-
+            menu = QMenu(self)
+            accion_editar = menu.addAction("Editar")
+            accion_editar.triggered.connect(lambda checked=False, obj=o: self._editar(obj))
             if o.pendiente_revision:
-                boton_revision = QPushButton("Revisado")
-                boton_revision.clicked.connect(lambda checked, obj_id=o.id: self._marcar_revisado(obj_id))
-                tabla.setCellWidget(i, 6, boton_revision)
+                accion_revision = menu.addAction("Marcar revisado")
+                accion_revision.triggered.connect(
+                    lambda checked=False, obj_id=o.id: self._marcar_revisado(obj_id)
+                )
             elif not o.fecha_fin or self.es_admin:
-                boton_baja = QPushButton("Dar de baja")
-                boton_baja.clicked.connect(lambda checked, obj_id=o.id, nombre=o.nombre: self._dar_de_baja(obj_id, nombre))
-                tabla.setCellWidget(i, 6, boton_baja)
+                accion_baja = menu.addAction("Dar de baja")
+                accion_baja.setProperty("danger", True)
+                accion_baja.triggered.connect(
+                    lambda checked=False, obj_id=o.id, nombre=o.nombre: self._dar_de_baja(obj_id, nombre)
+                )
+            boton_acciones = QPushButton("⋯")
+            boton_acciones.setObjectName("ObjectiveActions")
+            boton_acciones.setToolTip("Acciones del objetivo")
+            boton_acciones.setMenu(menu)
+            tabla.setCellWidget(i, 5, self._centrar_widget(boton_acciones))
+
+    @staticmethod
+    def _centrar_widget(widget: QWidget) -> QWidget:
+        contenedor = QWidget()
+        layout = QHBoxLayout(contenedor)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.addStretch()
+        layout.addWidget(widget)
+        layout.addStretch()
+        return contenedor
 
     def _marcar_revisado(self, objetivo_id: int) -> None:
         try:

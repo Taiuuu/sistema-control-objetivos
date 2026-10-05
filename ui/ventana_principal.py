@@ -769,6 +769,7 @@ class VentanaPrincipal(QWidget):
 
         self.lbl_estado_sync = StatusBadge("● En vivo", "ok")
         lay.addWidget(self.lbl_estado_sync)
+        self._header = header
         self._theme_manager.theme_changed.connect(self._estilizar_header)
         self._estilizar_header(self._theme_manager.current())
 
