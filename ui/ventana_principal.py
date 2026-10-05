@@ -42,7 +42,8 @@ from ui.vista_auditoria import VistaAuditoria
 from ui.vista_validaciones import VistaValidaciones
 from ui.vista_indexacion import VistaIndexacion
 from ui.vista_sincronizacion import VistaSincronizacion
-from services.tema import obtener_tema_actual
+from ui.theme.theme_manager import get_theme_manager
+from ui.theme.tokens import THEMES
 from services.permisos import tiene_permiso
 from services.backup import hacer_backup
 from services.logger import registrar_accion
@@ -185,17 +186,40 @@ class VentanaPrincipal(QWidget):
         self.move(80, 60)
         self.resize(1340, 660)
         self.setMinimumSize(720, 440)
-        self.setWindowIcon(QIcon(ruta_asset("assets/vespLogoDarkGreen.svg")))
+        self._theme_manager = get_theme_manager()
+        self.setWindowIcon(QIcon(THEMES[self._theme_manager.current()]["logo_path"]))
 
-        self._oscuro = obtener_tema_actual() == "oscuro"
+        self._oscuro = self._theme_manager.current() != "Claro"
 
         self._construir_ui()
+        self._theme_manager.theme_changed.connect(self._al_cambiar_tema)
         self.cargar_tabla()
         self._mostrar_landing_inicial()
         self._configurar_shortcuts()
         self._configurar_timers()
         self._configurar_event_filter()
         self._configurar_sincronizacion()
+
+    def _actualizar_logo_tema(self, nombre_tema: str) -> None:
+        ruta_logo = THEMES[nombre_tema]["logo_path"]
+        self.setWindowIcon(QIcon(ruta_logo))
+        if hasattr(self, "logo_label"):
+            self.logo_label.setPixmap(
+                QPixmap(ruta_logo).scaled(
+                    36,
+                    36,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+
+    def _al_cambiar_tema(self, nombre_tema: str) -> None:
+        self._oscuro = nombre_tema != "Claro"
+        self.btn_tema.setText(
+            "🌙  Grafito" if nombre_tema == "Claro" else "☀  Claro"
+        )
+        self._actualizar_logo_tema(nombre_tema)
+        self._refrescar_tema()
 
     # =========================================================================
     # CONSTRUCCIÓN UI
@@ -209,7 +233,6 @@ class VentanaPrincipal(QWidget):
         self._construir_sidebar(layout_raiz)
         self._construir_panel_derecho(layout_raiz)
 
-        self.setStyleSheet(f"QWidget#VentanaPrincipal {{ background-color: {obtener_color('bg_main', self._oscuro)}; }}")
         self.setObjectName("VentanaPrincipal")
 
     # -------------------------------------------------------------------------
@@ -307,11 +330,7 @@ class VentanaPrincipal(QWidget):
         self.btn_colapsar.clicked.connect(self._toggle_sidebar)
 
         self.logo_label = QLabel()
-        pixmap = QPixmap(ruta_asset("assets/vespLogoDarkGreen.svg")).scaled(
-            36, 36, Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        self.logo_label.setPixmap(pixmap)
+        self._actualizar_logo_tema(self._theme_manager.current())
 
         fila_logo = QHBoxLayout()
         fila_logo.setContentsMargins(0, 0, 0, 0)
@@ -457,7 +476,7 @@ class VentanaPrincipal(QWidget):
         fila_zoom.addWidget(self._btn_zoom_mas)
         lay.addLayout(fila_zoom)
 
-        texto_tema = "☀  Modo claro" if oscuro else "🌙  Modo oscuro"
+        texto_tema = "☀  Claro" if oscuro else "🌙  Grafito"
         self.btn_tema = QPushButton(texto_tema)
         self.btn_tema.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_tema.setFixedHeight(34)
@@ -1051,28 +1070,19 @@ class VentanaPrincipal(QWidget):
             # ✅ Llamar al callback global de tema
             self.alternar_tema_fn(self.app, self)
             
-            # ✅ Actualizar estado local
-            tema_actual = obtener_tema_actual()
-            self._oscuro = tema_actual == "oscuro"
-            
-            # ✅ Refrescar todos los componentes de la UI
-            self._refrescar_tema()
-            
-            # ✅ Persistir tema en BD
-            from services.tema import establecer_tema_actual
-            establecer_tema_actual("oscuro" if self._oscuro else "claro")
+            tema_actual = get_theme_manager().current()
             
             # ✅ Loguear cambio
             try:
                 from services.logger import registrar_accion
                 registrar_accion(
                     self.usuario_id,
-                    f"Cambió tema a {'oscuro' if self._oscuro else 'claro'}"
+                    f"Cambió tema a {tema_actual}"
                 )
             except Exception:
                 pass  # No interrumpir si logging falla
             
-            print(f"✅ Tema cambiado a: {'oscuro' if self._oscuro else 'claro'}")
+            print(f"✅ Tema cambiado a: {tema_actual}")
             
         except Exception as e:
             print(f"❌ Error al alternar tema: {e}")

@@ -19,6 +19,8 @@ from PyQt6.QtCore import Qt
 from database.db import DB_PATH
 from services.assets import ruta_asset
 from ui.animaciones import animar_entrada
+from ui.theme.theme_manager import get_theme_manager
+from ui.theme.tokens import THEMES
 
 
 # =============================================================================
@@ -224,6 +226,7 @@ class LoginWindow(QWidget):
     def __init__(self, on_login_exitoso):
         super().__init__()
         self.on_login_exitoso = on_login_exitoso
+        self._theme_manager = get_theme_manager()
         self.setWindowTitle("V.E.S.P Organizations")
         self.setFixedSize(400, 540)
         self.setWindowFlags(
@@ -231,7 +234,7 @@ class LoginWindow(QWidget):
             Qt.WindowType.WindowTitleHint |
             Qt.WindowType.WindowCloseButtonHint
         )
-        self.setWindowIcon(QIcon(ruta_asset("assets/vespLogoDarkGreen.svg")))
+        self.setWindowIcon(QIcon(THEMES[self._theme_manager.current()]["logo_path"]))
         pantalla = QApplication.primaryScreen()
         if pantalla:
             area = pantalla.availableGeometry()
@@ -245,15 +248,11 @@ class LoginWindow(QWidget):
         layout.setSpacing(15)
 
         # Logo
-        logo_label = QLabel()
-        pixmap = QPixmap(ruta_asset("assets/vespLogoDarkGreen.svg")).scaled(
-            180, 180,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        logo_label.setPixmap(pixmap)
-        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(logo_label)
+        self.logo_label = QLabel()
+        self._actualizar_logo_tema(self._theme_manager.current())
+        self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.logo_label)
+        self._theme_manager.theme_changed.connect(self._actualizar_logo_tema)
 
         # Nombre y subtítulo
         nombre_label = QLabel("V.E.S.P Organizations")
@@ -301,6 +300,18 @@ class LoginWindow(QWidget):
         layout.addSpacing(10)
         self.setLayout(layout)
         animar_entrada(self)
+
+    def _actualizar_logo_tema(self, nombre_tema: str) -> None:
+        ruta_logo = THEMES[nombre_tema]["logo_path"]
+        self.setWindowIcon(QIcon(ruta_logo))
+        self.logo_label.setPixmap(
+            QPixmap(ruta_logo).scaled(
+                180,
+                180,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
 
     def _validar_entrada_login(self, username: str, password: str) -> bool:
         """

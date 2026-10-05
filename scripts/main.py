@@ -7,14 +7,12 @@ import sys
 import os
 import logging
 import traceback
-from pathlib import Path
 from typing import Optional
 
 # Agregar el directorio raíz del proyecto al path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
-from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import QTimer
 
 from ui.login import LoginWindow
@@ -22,17 +20,8 @@ from ui.ventana_principal import VentanaPrincipal
 from database.db import crear_base_datos, migrar_supervisor3, migrar_supervisores_alta_baja, migrar_usuarios_activo, migrar_feriados
 from services.backup import hacer_backup
 from services.actualizador import verificar_actualizacion
-from services.tema import obtener_tema_actual, establecer_tema_actual
 from services.api_rest import iniciar_api_rest
-
-
-def cargar_qss(nombre: str) -> str:
-    """Carga un stylesheet empaquetado junto con la aplicación."""
-    ruta = Path(__file__).resolve().parent.parent / "ui" / nombre
-    try:
-        return ruta.read_text(encoding="utf-8")
-    except OSError:
-        return ""
+from ui.theme.theme_manager import get_theme_manager
 
 
 # =============================================================================
@@ -97,53 +86,10 @@ def inicializar_componente(logger: logging.Logger, nombre: str, funcion, *args, 
         return False
 
 
-def aplicar_tema(app: QApplication, nombre_tema: str) -> None:
-    """Aplica el único stylesheet correspondiente al tema activo."""
-    if nombre_tema not in {"oscuro", "claro"}:
-        nombre_tema = "oscuro"
-
-    app.setStyle("Fusion")
-    palette = QPalette()
-    if nombre_tema == "claro":
-        palette.setColor(QPalette.ColorRole.Window, QColor("#F5F7FB"))
-        palette.setColor(QPalette.ColorRole.Base, QColor("#FFFFFF"))
-        palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#F8FAFC"))
-        palette.setColor(QPalette.ColorRole.Text, QColor("#172033"))
-        palette.setColor(QPalette.ColorRole.WindowText, QColor("#172033"))
-        palette.setColor(QPalette.ColorRole.Button, QColor("#FFFFFF"))
-        palette.setColor(QPalette.ColorRole.ButtonText, QColor("#344054"))
-    else:
-        palette.setColor(QPalette.ColorRole.Window, QColor("#16181E"))
-        palette.setColor(QPalette.ColorRole.Base, QColor("#0D142D"))
-        palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#1D2648"))
-        palette.setColor(QPalette.ColorRole.Text, QColor("#F4F7FB"))
-        palette.setColor(QPalette.ColorRole.WindowText, QColor("#F4F7FB"))
-        palette.setColor(QPalette.ColorRole.Button, QColor("#1D2648"))
-        palette.setColor(QPalette.ColorRole.ButtonText, QColor("#EAF0FF"))
-    app.setPalette(palette)
-    stylesheet = cargar_qss(f"tema_{nombre_tema}.qss")
-    if not stylesheet:
-        raise RuntimeError(f"No se pudo cargar el stylesheet del tema '{nombre_tema}'")
-    app.setStyleSheet(stylesheet)
-
-
-def aplicar_tema_oscuro(app: QApplication) -> None:
-    aplicar_tema(app, "oscuro")
-
-
-def aplicar_tema_claro(app: QApplication) -> None:
-    aplicar_tema(app, "claro")
-
-
 def alternar_tema(app: QApplication, ventana) -> None:
-    if obtener_tema_actual() == "oscuro":
-        aplicar_tema_claro(app)
-        establecer_tema_actual("claro")
-        ventana.btn_tema.setText("🌙 Modo oscuro")
-    else:
-        aplicar_tema_oscuro(app)
-        establecer_tema_actual("oscuro")
-        ventana.btn_tema.setText("☀ Modo claro")
+    """Atajo temporal entre Claro y Grafito hasta la selección en Configuración."""
+    manager = get_theme_manager()
+    manager.set_theme("Claro" if manager.current() != "Claro" else "Grafito")
 
 def iniciar_app() -> None:
     """
@@ -208,15 +154,12 @@ def iniciar_app() -> None:
         app = QApplication(sys.argv)
         logger.info("✅ QApplication inicializada")
 
-        # Aplicar tema inicial
+        # Aplicar el tema global guardado antes de crear ventanas y diálogos.
         try:
-            if obtener_tema_actual() == "claro":
-                aplicar_tema_claro(app)
-            else:
-                aplicar_tema_oscuro(app)
+            get_theme_manager().apply_current()
         except Exception as e:
-            logger.warning(f"Error aplicando tema inicial: {e}, usando tema oscuro por defecto")
-            aplicar_tema_oscuro(app)
+            logger.warning(f"Error aplicando tema inicial: {e}, usando Grafito")
+            get_theme_manager().set_theme("Grafito")
 
         logger.info("✅ Tema aplicado")
 

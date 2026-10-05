@@ -167,6 +167,8 @@ class TablaDiaria(QWidget):
 
 def iniciar_interfaz():
     app = QApplication(sys.argv)
+    from ui.theme.theme_manager import get_theme_manager
+    get_theme_manager().apply_current()
     ventana = TablaDiaria()
     ventana.show()
     sys.exit(app.exec())
