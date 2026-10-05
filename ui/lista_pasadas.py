@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
     QSpinBox, QLineEdit, QFileDialog
 )
 from PyQt6.QtCore import QDate, QTime
-from PyQt6.QtGui import QColor
 
 from database.db import DB_PATH
 from services.sincronizacion import obtener_sincronizador
@@ -20,6 +19,7 @@ from services.sesion import get_rol
 from services.validador_horas_limite import validar_hora_turno_nocturno
 from services.background_task import run_background_task
 from services.exportar import exportar_pasadas_excel, exportar_pasadas_pdf
+from ui.components import GlassCard, PillButton, SearchInput, StatusBadge
 
 
 # =============================================================================
@@ -385,6 +385,8 @@ class ListaPasadas(QWidget):
         self.resize(900, 500)
 
         layout = QVBoxLayout()
+        card = GlassCard()
+        card_layout = card.content_layout
 
         # Filtros principales
         fila = QHBoxLayout()
@@ -398,33 +400,32 @@ class ListaPasadas(QWidget):
 
         fila.addWidget(self.selector_fecha)
 
-        self.buscador = QLineEdit()
-        self.buscador.setPlaceholderText("Buscar objetivo o supervisor...")
+        self.buscador = SearchInput("Buscar objetivo o supervisor...")
         self.buscador.setClearButtonEnabled(True)
         self.buscador.textChanged.connect(self._cargar_tabla)
         fila.addWidget(self.buscador, 1)
 
-        self.btn_filtrar = QPushButton("Filtrar")
+        self.btn_filtrar = PillButton("Filtrar", "secondary")
         self.btn_filtrar.setCheckable(True)
         self.btn_filtrar.toggled.connect(self._alternar_filtros)
         fila.addWidget(self.btn_filtrar)
 
-        self.btn_exportar_excel = QPushButton("Exportar Excel")
+        self.btn_exportar_excel = PillButton("Exportar Excel", "secondary")
         self.btn_exportar_excel.clicked.connect(self._exportar_excel)
         fila.addWidget(self.btn_exportar_excel)
 
-        self.btn_exportar_pdf = QPushButton("Exportar PDF")
+        self.btn_exportar_pdf = PillButton("Exportar PDF", "secondary")
         self.btn_exportar_pdf.clicked.connect(self._exportar_pdf)
         fila.addWidget(self.btn_exportar_pdf)
 
-        self.btn_eliminar_dia = QPushButton("Eliminar día (Admin)")
+        self.btn_eliminar_dia = PillButton("Eliminar día (Admin)", "danger")
         self.btn_eliminar_dia.clicked.connect(self._eliminar_dia_actual)
         self.btn_eliminar_dia.setVisible(False)
 
         fila.addWidget(self.btn_eliminar_dia)
         fila.addStretch()
 
-        layout.addLayout(fila)
+        card_layout.addLayout(fila)
 
         # Filtros avanzados colapsables
         self.panel_filtros = QWidget()
@@ -446,7 +447,7 @@ class ListaPasadas(QWidget):
         panel_layout.addStretch()
         self.panel_filtros.setVisible(False)
 
-        layout.addWidget(self.panel_filtros)
+        card_layout.addWidget(self.panel_filtros)
 
         # Filtros para mes
         fila_mes = QHBoxLayout()
@@ -469,14 +470,14 @@ class ListaPasadas(QWidget):
         self.selector_ano.setValue(QDate.currentDate().year())
         fila_mes.addWidget(self.selector_ano)
 
-        self.btn_eliminar_mes = QPushButton("Eliminar mes (Admin)")
+        self.btn_eliminar_mes = PillButton("Eliminar mes (Admin)", "danger")
         self.btn_eliminar_mes.clicked.connect(self._eliminar_mes_actual)
         self.btn_eliminar_mes.setVisible(False)
 
         fila_mes.addWidget(self.btn_eliminar_mes)
         fila_mes.addStretch()
 
-        layout.addLayout(fila_mes)
+        card_layout.addLayout(fila_mes)
 
         # Tabla
         self.tabla = QTableWidget()
@@ -499,10 +500,14 @@ class ListaPasadas(QWidget):
         self.tabla.setColumnWidth(5, 100)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.verticalHeader().setVisible(False)
+        self.tabla.setShowGrid(False)
+        self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.tabla.horizontalHeader().setStretchLastSection(True)
         self.tabla.setSortingEnabled(True)
 
-        layout.addWidget(self.tabla)
+        card_layout.addWidget(self.tabla)
 
+        layout.addWidget(card)
         self.setLayout(layout)
 
         self._actualizar_permisos()
@@ -536,38 +541,43 @@ class ListaPasadas(QWidget):
 
         self.tabla.setRowCount(len(datos))
 
-        COLOR_DIURNO = QColor("#fff9db")
-        COLOR_NOCTURNO = QColor("#dbeafe")
-        COLOR_TEXTO = QColor("#111111")
-
         for fila, item in enumerate(datos):
 
             pasada_id = item[0]
             turno_pasada = item[2]
-            color = COLOR_DIURNO if turno_pasada == "diurno" else COLOR_NOCTURNO
 
             def _item(texto):
-                it = QTableWidgetItem(texto)
-                it.setBackground(color)
-                it.setForeground(COLOR_TEXTO)
-                return it
+                return QTableWidgetItem(texto)
 
             self.tabla.setItem(fila, 0, _item(item[1]))
-            self.tabla.setItem(fila, 1, _item(item[2].capitalize()))
+            badge_turno = StatusBadge(
+                item[2].capitalize(), "info" if turno_pasada == "diurno" else "warning"
+            )
+            self.tabla.setCellWidget(fila, 1, self._centrar_widget(badge_turno))
             self.tabla.setItem(fila, 2, _item(item[3]))
             self.tabla.setItem(fila, 3, _item(item[4]))
 
-            btn_editar = QPushButton("Editar")
+            btn_editar = PillButton("Editar", "secondary")
             btn_editar.clicked.connect(
                 lambda _, pid=pasada_id: self._editar(pid)
             )
             self.tabla.setCellWidget(fila, 4, btn_editar)
 
-            btn_eliminar = QPushButton("Eliminar")
+            btn_eliminar = PillButton("Eliminar", "danger")
             btn_eliminar.clicked.connect(
                 lambda _, pid=pasada_id: self._eliminar(pid)
             )
             self.tabla.setCellWidget(fila, 5, btn_eliminar)
+
+    @staticmethod
+    def _centrar_widget(widget: QWidget) -> QWidget:
+        contenedor = QWidget()
+        layout = QHBoxLayout(contenedor)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.addStretch()
+        layout.addWidget(widget)
+        layout.addStretch()
+        return contenedor
 
     def _filtros_actuales(self) -> tuple[list, dict]:
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")

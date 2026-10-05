@@ -6,7 +6,7 @@ from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGridLayout, QMessageBox, QFrame
+    QGridLayout
 )
 from PyQt6.QtCore import Qt, QDate
 
@@ -16,16 +16,16 @@ from services.feriados import (
     obtener_feriados_mes,
     es_feriado,
 )
-from services.tema import obtener_tema
+from ui.components import GlassCard, PillButton, StatusBadge
+from ui.theme.theme_manager import get_theme_manager
 
 
 class VistaFeriados(QWidget):
     def __init__(self):
         super().__init__()
-        self._tema = obtener_tema()
+        self._theme_manager = get_theme_manager()
         self.setWindowTitle("Feriados")
         self.resize(860, 620)
-        self.setStyleSheet(self._estilos())
 
         self._fecha_actual = QDate.currentDate()
         self._mes_actual = self._fecha_actual.month()
@@ -41,11 +41,11 @@ class VistaFeriados(QWidget):
         cabecera.addWidget(self._titulo)
         cabecera.addStretch()
 
-        self._btn_anterior = QPushButton("◀")
+        self._btn_anterior = PillButton("◀", "secondary")
         self._btn_anterior.clicked.connect(self._mes_anterior)
-        self._btn_actual = QPushButton("Hoy")
+        self._btn_actual = PillButton("Hoy", "ghost")
         self._btn_actual.clicked.connect(self._ir_hoy)
-        self._btn_siguiente = QPushButton("▶")
+        self._btn_siguiente = PillButton("▶", "secondary")
         self._btn_siguiente.clicked.connect(self._mes_siguiente)
         cabecera.addWidget(self._btn_anterior)
         cabecera.addWidget(self._btn_actual)
@@ -56,30 +56,48 @@ class VistaFeriados(QWidget):
         self._lbl_mes.setObjectName("Mes")
         layout.addWidget(self._lbl_mes)
 
+        calendario_card = GlassCard(shadow=True)
         self._calendario = QGridLayout()
         self._calendario.setSpacing(8)
-        layout.addLayout(self._calendario)
+        calendario_card.add_layout(self._calendario)
+        layout.addWidget(calendario_card, 1)
 
-        self._estado = QLabel("Hacé clic en un día para agregar o quitar un feriado.")
-        self._estado.setObjectName("Estado")
+        self._estado = StatusBadge(
+            "Hacé clic en un día para agregar o quitar un feriado.", "info"
+        )
         self._estado.setWordWrap(True)
         layout.addWidget(self._estado)
 
+        self._theme_manager.theme_changed.connect(self._aplicar_tema)
+        self._aplicar_tema(self._theme_manager.current())
         self._cargar_calendario()
 
-    def _estilos(self) -> str:
-        tema = self._tema
-        return f"""
-            QWidget {{ background-color: {tema['background']}; color: {tema['texto']}; font-family: Segoe UI, Arial, sans-serif; }}
-            QLabel#Titulo {{ font-size: 18px; font-weight: 700; }}
-            QLabel#Mes {{ font-size: 14px; font-weight: 600; color: {tema['primario']}; }}
-            QLabel#Estado {{ color: {tema['texto_secundario']}; font-size: 12px; }}
-            QPushButton {{ background-color: {tema['background_secundario']}; color: {tema['texto']}; border: 1px solid {tema['border']}; border-radius: 8px; padding: 6px 10px; }}
-            QPushButton:hover {{ background-color: {tema['primario']}; color: white; }}
-            QFrame#Dia {{ border: 1px solid {tema['border']}; border-radius: 10px; padding: 8px; background-color: {tema['background_secundario']}; }}
-            QFrame#DiaFeriado {{ border: 1px solid #4f46e5; border-radius: 10px; padding: 8px; background-color: #4f46e5; color: white; }}
-            QPushButton#DiaFeriado {{ border: 1px solid #4f46e5; border-radius: 10px; padding: 8px; background-color: #4f46e5; color: white; }}
-        """
+    def _aplicar_tema(self, theme_name: str) -> None:
+        tokens = self._theme_manager.tokens(theme_name)
+        self.setStyleSheet(f"""
+            QLabel#Titulo {{ color: {tokens['text_primary']}; font-size: {tokens['font_size_title']}; font-weight: 700; }}
+            QLabel#Mes {{ color: {tokens['accent']}; font-size: {tokens['font_size_lg']}; font-weight: 600; }}
+            QLabel#Weekday {{ color: {tokens['text_secondary']}; font-weight: 700; }}
+            QPushButton#HolidayDay {{
+                background: {tokens['surface_alt']};
+                color: {tokens['text_primary']};
+                border: 1px solid {tokens['border']};
+                border-radius: {tokens['radius_md']};
+                font-weight: 600;
+            }}
+            QPushButton#HolidayDay:hover {{
+                border-color: {tokens['accent']};
+                background: {tokens['sidebar_active_bg']};
+            }}
+            QPushButton#HolidayDay[feriado="true"] {{
+                background: {tokens['accent']};
+                color: {tokens['accent_text']};
+                border-color: {tokens['accent']};
+            }}
+            QPushButton#HolidayDay[feriado="true"]:hover {{
+                background: {tokens['accent_hover']};
+            }}
+        """)
 
     def _cargar_calendario(self) -> None:
         for i in reversed(range(self._calendario.count())):
@@ -93,8 +111,8 @@ class VistaFeriados(QWidget):
         nombres = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
         for idx, nombre in enumerate(nombres):
             label = QLabel(nombre)
+            label.setObjectName("Weekday")
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            label.setStyleSheet("font-weight: 700; color: #6b7280;")
             self._calendario.addWidget(label, 0, idx)
 
         primer_dia = QDate(self._anio_actual, self._mes_actual, 1)
@@ -106,12 +124,11 @@ class VistaFeriados(QWidget):
             fila = (offset + inicio_columna - 1) // 7 + 1
             columna = (offset + inicio_columna - 1) % 7
             boton = QPushButton(str(offset))
+            boton.setObjectName("HolidayDay")
             boton.setCursor(Qt.CursorShape.PointingHandCursor)
             boton.setFixedHeight(64)
             fecha_str = fecha.toString("yyyy-MM-dd")
-            es_feriado = fecha_str in self._feriados_mes
-            boton.setProperty("feriado", es_feriado)
-            boton.setObjectName("DiaFeriado" if es_feriado else "Dia")
+            boton.setProperty("feriado", fecha_str in self._feriados_mes)
             boton.clicked.connect(lambda checked=False, f=fecha_str: self._alternar_feriado(f))
             self._calendario.addWidget(boton, fila, columna)
 

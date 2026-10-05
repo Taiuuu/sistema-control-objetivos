@@ -6,11 +6,12 @@
 from services.cache import obtener_supervisores_cache
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
-    QPushButton, QComboBox, QDateEdit, QMessageBox, QFrame, QSizePolicy
+    QPushButton, QComboBox, QDateEdit, QMessageBox, QSizePolicy
 )
 from PyQt6.QtCore import QDate, Qt
 from ui.animaciones import animar_entrada
 from models.equipos import guardar_equipo_turno
+from ui.components import GlassCard, PillButton
 
 
 def _cargar_supervisores() -> list:
@@ -55,12 +56,12 @@ class FormTurno(QWidget):
         self.input_sup3.setFixedHeight(34)
         self._poblar_combo(self.input_sup3)
 
-        self.btn_agregar_sup3 = QPushButton("＋  Agregar supervisor")
+        self.btn_agregar_sup3 = PillButton("＋  Agregar supervisor", "secondary")
         self.btn_agregar_sup3.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_agregar_sup3.setFixedHeight(34)
         self.btn_agregar_sup3.clicked.connect(self._mostrar_sup3)
 
-        self.btn_quitar_sup3 = QPushButton("✕ Quitar")
+        self.btn_quitar_sup3 = PillButton("✕ Quitar", "ghost")
         self.btn_quitar_sup3.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_quitar_sup3.setFixedWidth(86)
         self.btn_quitar_sup3.setFixedHeight(30)
@@ -79,7 +80,7 @@ class FormTurno(QWidget):
         fila_layout.addWidget(self.input_sup3)
         self._fila_sup3.setVisible(False)
 
-        self.boton_guardar = QPushButton("Guardar turno")
+        self.boton_guardar = PillButton("Guardar turno", "primary")
         self.boton_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.boton_guardar.setFixedHeight(42)
         self.boton_guardar.clicked.connect(self._guardar)
@@ -94,8 +95,7 @@ class FormTurno(QWidget):
         form_layout.addRow(QLabel("Supervisor 1"), self.input_sup1)
         form_layout.addRow(QLabel("Supervisor 2"), self.input_sup2)
 
-        card = QFrame()
-        card.setObjectName("CardContenedor")
+        card = GlassCard()
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(18, 18, 18, 18)
         card_layout.setSpacing(16)

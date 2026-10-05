@@ -14,7 +14,6 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDateEdit,
     QTimeEdit,
-    QFrame,
     QMessageBox,
     QSizePolicy
 )
@@ -23,10 +22,10 @@ from PyQt6.QtCore import QDate, QTime, pyqtSignal, Qt
 from models.turnos import registrar_turno
 from ui.animaciones import animar_entrada
 from database.db import DB_PATH
-from services.tema import obtener_tema
 from services.validaciones import validar_pasada, ErrorValidacion
 from services.validador_horas_limite import validar_hora_turno_nocturno
 from ui.widgets.dialogos import confirmar_mensaje, mostrar_mensaje
+from ui.components import GlassCard, PillButton
 
 # =============================================================================
 # FUNCIONES AUXILIARES
@@ -131,7 +130,6 @@ class FormPasada(QWidget):
 
         global _ultimo_turno
 
-        self._tema = obtener_tema()
         self.setWindowTitle("Registrar pasada")
         self.setMinimumSize(420, 420)
         self.setWindowFlag(Qt.WindowType.Window)
@@ -163,7 +161,7 @@ class FormPasada(QWidget):
         self.input_supervisor = QComboBox()
         self.input_supervisor.setFixedHeight(34)
 
-        self.boton_guardar = QPushButton("Registrar pasada")
+        self.boton_guardar = PillButton("Registrar pasada", "primary")
         self.boton_guardar.setObjectName("PrimaryButton")
         self.boton_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.boton_guardar.setFixedHeight(40)
@@ -188,8 +186,7 @@ class FormPasada(QWidget):
         form_layout.addRow(QLabel("Objetivo"), self.input_objetivo)
         form_layout.addRow(QLabel("Supervisor"), self.input_supervisor)
 
-        card = QFrame()
-        card.setObjectName("CardContenedor")
+        card = GlassCard()
         card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(18, 18, 18, 18)
@@ -217,58 +214,6 @@ class FormPasada(QWidget):
         # ---------------------------------------------------------------------
         self._actualizar_listas()
         animar_entrada(self)
-
-    def _generar_estilos(self) -> str:
-        tema = self._tema
-        return f"""
-            QWidget {{
-                background-color: {tema['background']};
-                color: {tema['texto']};
-                font-family: Segoe UI, Arial, sans-serif;
-                font-size: 13px;
-            }}
-            QLabel#TituloPrincipal {{
-                color: {tema['texto']};
-                font-size: 18px;
-                font-weight: 700;
-            }}
-            QLabel#Subtitulo {{
-                color: {tema['texto_secundario']};
-                font-size: 12px;
-            }}
-            QFrame#CardContenedor {{
-                background-color: {tema['background_secundario']};
-                border: 1px solid {tema['border']};
-                border-radius: 14px;
-            }}
-            QComboBox, QDateEdit, QTimeEdit {{
-                background-color: {tema['input_background']};
-                color: {tema['texto']};
-                border: 1px solid {tema['border']};
-                border-radius: 8px;
-                padding: 6px 10px;
-            }}
-            QComboBox::drop-down {{
-                border: none;
-            }}
-            QPushButton {{
-                background-color: {tema['primario']};
-                color: #ffffff;
-                border: none;
-                border-radius: 10px;
-                font-weight: 700;
-                padding: 8px 18px;
-            }}
-            QPushButton:hover {{
-                background-color: {tema['primario_hover']};
-            }}
-            QPushButton:pressed {{
-                background-color: {tema['primario']};
-            }}
-            QLabel {{
-                color: {tema['texto']};
-            }}
-        """
 
     # =========================================================================
     # ACTUALIZAR COMBOS

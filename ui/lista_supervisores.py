@@ -10,13 +10,13 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox, QHeaderView, QComboBox
 )
 from PyQt6.QtCore import QDate, Qt
-from PyQt6.QtGui import QColor
 from models.supervisores import (
     listar_supervisores, actualizar_supervisor,
     dar_de_baja_supervisor, reactivar_supervisor,
     eliminar_supervisor, reasignar_pasadas_supervisor,
 )
 from services.sincronizacion import obtener_sincronizador
+from ui.components import GlassCard, PillButton, SearchInput, StatusBadge
 
 
 # =============================================================================
@@ -122,39 +122,36 @@ class ListaSupervisores(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Listado de supervisores")
-        self.setGeometry(200, 200, 580, 380)
+        self.setGeometry(200, 200, 900, 520)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
+        card = GlassCard()
+        card_layout = card.content_layout
 
         # Filtros
         filtros = QHBoxLayout()
         filtros.setSpacing(8)
 
-        filtros.addWidget(QLabel("Buscar:"))
-        self.input_buscar = QLineEdit()
-        self.input_buscar.setPlaceholderText("Buscar por nombre...")
+        self.input_buscar = SearchInput("Buscar por nombre...")
         self.input_buscar.textChanged.connect(self._cargar_tabla)
         filtros.addWidget(self.input_buscar)
 
-        filtros.addWidget(QLabel("Estado:"))
+        filtros.addWidget(QLabel("Estado"))
         self.filtro_estado = QComboBox()
         self.filtro_estado.addItems(["Todos", "Activos", "Dado de baja"])
         self.filtro_estado.currentTextChanged.connect(self._cargar_tabla)
         filtros.addWidget(self.filtro_estado)
 
         filtros.addStretch()
-        layout.addLayout(filtros)
+        card_layout.addLayout(filtros)
 
-        # Leyenda de colores
         leyenda = QHBoxLayout()
-        for color, texto in [("#c8f7c5", "Activo"), ("#ffd6d6", "Dado de baja")]:
-            lbl = QLabel(f"  {texto}  ")
-            lbl.setStyleSheet(f"background-color: {color}; color: #172033; border-radius: 4px; padding: 2px 8px; font-size: 11px;")
-            leyenda.addWidget(lbl)
+        leyenda.addWidget(StatusBadge("Activo", "ok"))
+        leyenda.addWidget(StatusBadge("Dado de baja", "danger"))
         leyenda.addStretch()
-        layout.addLayout(leyenda)
+        card_layout.addLayout(leyenda)
 
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(5)
@@ -165,13 +162,16 @@ class ListaSupervisores(QWidget):
         self.tabla.setColumnWidth(1, 95)
         self.tabla.setColumnWidth(2, 95)
         self.tabla.setColumnWidth(3, 80)
-        self.tabla.horizontalHeader().setStretchLastSection(True)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.verticalHeader().setVisible(False)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.tabla.setShowGrid(False)
+        self.tabla.setAlternatingRowColors(False)
+        self.tabla.horizontalHeader().setStretchLastSection(True)
         self.tabla.setSortingEnabled(True)
-        layout.addWidget(self.tabla)
+        card_layout.addWidget(self.tabla)
 
+        layout.addWidget(card)
         self.setLayout(layout)
         self._cargar_tabla()
 
@@ -196,23 +196,14 @@ class ListaSupervisores(QWidget):
         self.tabla.clearContents()
         self.tabla.setRowCount(len(supervisores))
 
-        COLOR_ACTIVO = QColor("#c8f7c5")
-        COLOR_BAJA   = QColor("#ffd6d6")
-        COLOR_TEXTO  = QColor("#111111")
-
         for i, s in enumerate(supervisores):
             sup_id = s.id
             nombre = s.nombre
             fecha_alta = s.fecha_alta
             fecha_baja = s.fecha_baja
             activo = s.fecha_baja is None
-            color  = COLOR_ACTIVO if activo else COLOR_BAJA
-
             def _item(texto):
-                it = QTableWidgetItem(texto or "—")
-                it.setBackground(color)
-                it.setForeground(COLOR_TEXTO)
-                return it
+                return QTableWidgetItem(texto or "—")
 
             self.tabla.setItem(i, 0, _item(nombre))
             self.tabla.setItem(i, 1, _item(
@@ -221,18 +212,18 @@ class ListaSupervisores(QWidget):
             self.tabla.setItem(i, 2, _item(
                 self._formatear_fecha(fecha_baja) if fecha_baja else "—"
             ))
-            self.tabla.setItem(i, 3, _item("Activo" if activo else "Baja"))
+            estado = StatusBadge("Activo" if activo else "Baja", "ok" if activo else "danger")
+            self.tabla.setCellWidget(i, 3, self._centrar_widget(estado))
 
             # Botones de acción
             contenedor = QWidget()
             fila_btn = QHBoxLayout(contenedor)
             fila_btn.setContentsMargins(4, 2, 4, 2)
             fila_btn.setSpacing(6)
-            contenedor.setStyleSheet(f"background-color: {'#c8f7c5' if activo else '#ffd6d6'};")
 
-            btn_editar = QPushButton("✏ Editar")
+            btn_editar = PillButton("✏ Editar", "secondary")
             btn_editar.setObjectName("ColoredRowAction")
-            btn_editar.setFixedHeight(26)
+            btn_editar.setFixedHeight(34)
             btn_editar.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_editar.clicked.connect(
                 lambda _, sid=sup_id, n=nombre, fa=fecha_alta, fb=fecha_baja:
@@ -241,27 +232,27 @@ class ListaSupervisores(QWidget):
             fila_btn.addWidget(btn_editar)
 
             if activo:
-                btn_baja = QPushButton("📅 Dar de baja")
+                btn_baja = PillButton("📅 Dar de baja", "danger")
                 btn_baja.setObjectName("ColoredRowAction")
-                btn_baja.setFixedHeight(26)
+                btn_baja.setFixedHeight(34)
                 btn_baja.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn_baja.clicked.connect(
                     lambda _, sid=sup_id, n=nombre: self._dar_de_baja(sid, n)
                 )
                 fila_btn.addWidget(btn_baja)
             else:
-                btn_reactivar = QPushButton("↩ Reactivar")
+                btn_reactivar = PillButton("↩ Reactivar", "secondary")
                 btn_reactivar.setObjectName("ColoredRowAction")
-                btn_reactivar.setFixedHeight(26)
+                btn_reactivar.setFixedHeight(34)
                 btn_reactivar.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn_reactivar.clicked.connect(
                     lambda _, sid=sup_id, n=nombre: self._reactivar(sid, n)
                 )
                 fila_btn.addWidget(btn_reactivar)
 
-            btn_eliminar = QPushButton("Eliminar")
+            btn_eliminar = PillButton("Eliminar", "danger")
             btn_eliminar.setObjectName("ColoredRowAction")
-            btn_eliminar.setFixedHeight(26)
+            btn_eliminar.setFixedHeight(34)
             btn_eliminar.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_eliminar.clicked.connect(
                 lambda _, sid=sup_id, n=nombre: self._eliminar(sid, n)
@@ -269,9 +260,19 @@ class ListaSupervisores(QWidget):
             fila_btn.addWidget(btn_eliminar)
 
             self.tabla.setCellWidget(i, 4, contenedor)
-            self.tabla.setRowHeight(i, 36)
+            self.tabla.setRowHeight(i, 44)
 
         self.tabla.setUpdatesEnabled(True)
+
+    @staticmethod
+    def _centrar_widget(widget: QWidget) -> QWidget:
+        contenedor = QWidget()
+        layout = QHBoxLayout(contenedor)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.addStretch()
+        layout.addWidget(widget)
+        layout.addStretch()
+        return contenedor
 
     def _formatear_fecha(self, fecha_iso: str | None) -> str:
         if not fecha_iso:

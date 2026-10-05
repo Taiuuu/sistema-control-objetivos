@@ -14,13 +14,14 @@ from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel,
     QLineEdit, QPushButton, QMessageBox, QHBoxLayout
 )
-from PyQt6.QtGui import QPixmap, QIcon
+from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
 from database.db import DB_PATH
 from services.assets import ruta_asset
 from ui.animaciones import animar_entrada
 from ui.theme.theme_manager import get_theme_manager
 from ui.theme.tokens import THEMES
+from ui.components import GlassCard, PillButton, ThemeLogo
 
 
 # =============================================================================
@@ -202,7 +203,7 @@ def campo_password_con_ojito(placeholder: str) -> tuple:
     input_pw.setEchoMode(QLineEdit.EchoMode.Password)
     input_pw.setFixedHeight(40)
 
-    boton_ojo = QPushButton("👁")
+    boton_ojo = PillButton("👁", "ghost")
     boton_ojo.setFixedSize(40, 40)
     boton_ojo.setCheckable(True)
     boton_ojo.toggled.connect(
@@ -243,27 +244,30 @@ class LoginWindow(QWidget):
                 area.center().y() - self.height() // 2,
             )
 
-        layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(15)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(22, 22, 22, 22)
+        card = GlassCard(shadow=True, content_margins=24)
+        contenido = QVBoxLayout()
+        contenido.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        contenido.setSpacing(15)
+        card.add_layout(contenido)
 
         # Logo
-        self.logo_label = QLabel()
+        self.logo_label = ThemeLogo(size=144)
         self._actualizar_logo_tema(self._theme_manager.current())
-        self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.logo_label)
+        contenido.addWidget(self.logo_label)
         self._theme_manager.theme_changed.connect(self._actualizar_logo_tema)
 
         # Nombre y subtítulo
         nombre_label = QLabel("V.E.S.P Organizations")
         nombre_label.setObjectName("LoginTitle")
         nombre_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(nombre_label)
+        contenido.addWidget(nombre_label)
 
         subtitulo = QLabel("Seguridad Privada")
         subtitulo.setObjectName("LoginSubtitle")
         subtitulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(subtitulo)
+        contenido.addWidget(subtitulo)
 
         # Versión actual
         try:
@@ -276,42 +280,34 @@ class LoginWindow(QWidget):
         version_label = QLabel(f"v{version}")
         version_label.setObjectName("LoginVersion")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(version_label)
+        contenido.addWidget(version_label)
 
-        layout.addSpacing(10)
+        contenido.addSpacing(10)
 
         # Campos de usuario y contraseña
         self.input_usuario = QLineEdit()
         self.input_usuario.setPlaceholderText("Usuario")
         self.input_usuario.setFixedHeight(40)
-        layout.addWidget(self.input_usuario)
+        contenido.addWidget(self.input_usuario)
 
         contenedor_pw, self.input_password = campo_password_con_ojito("Contraseña")
-        layout.addWidget(contenedor_pw)
+        contenido.addWidget(contenedor_pw)
 
         # Botón entrar
-        boton_entrar = QPushButton("Entrar")
+        boton_entrar = PillButton("Entrar", "primary")
         boton_entrar.setObjectName("PrimaryButton")
         boton_entrar.setFixedHeight(40)
         boton_entrar.clicked.connect(self.intentar_login)
         self.input_password.returnPressed.connect(self.intentar_login)
-        layout.addWidget(boton_entrar)
+        contenido.addWidget(boton_entrar)
 
-        layout.addSpacing(10)
-        self.setLayout(layout)
+        contenido.addSpacing(10)
+        layout.addWidget(card)
         animar_entrada(self)
 
     def _actualizar_logo_tema(self, nombre_tema: str) -> None:
         ruta_logo = THEMES[nombre_tema]["logo_path"]
         self.setWindowIcon(QIcon(ruta_logo))
-        self.logo_label.setPixmap(
-            QPixmap(ruta_logo).scaled(
-                180,
-                180,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-        )
 
     def _validar_entrada_login(self, username: str, password: str) -> bool:
         """

@@ -12,6 +12,7 @@ from PyQt6.QtCore import QDate, Qt
 from ui.animaciones import animar_entrada
 from models.objetivos import agregar_objetivo
 from services.validaciones import validar_objetivo, ErrorValidacion
+from ui.components import GlassCard, PillButton
 
 
 # Mapeo de días de la semana a su número (formato ISO: 1=lunes, 7=domingo)
@@ -69,7 +70,7 @@ class FormObjetivo(QWidget):
             checkbox.setChecked(True)
             checkbox.setFixedHeight(28)
 
-        self.boton_guardar = QPushButton("Guardar objetivo")
+        self.boton_guardar = PillButton("Guardar objetivo", "primary")
         self.boton_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.boton_guardar.setFixedHeight(42)
         self.boton_guardar.clicked.connect(self._guardar)
@@ -93,8 +94,7 @@ class FormObjetivo(QWidget):
 
         form_layout.addRow(QLabel("Días de cobertura"), dias_widget)
 
-        card = QFrame()
-        card.setObjectName("CardContenedor")
+        card = GlassCard()
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(18, 18, 18, 18)
         card_layout.setSpacing(16)
