@@ -20,6 +20,10 @@ class ThemeManager(QObject):
     """Mantiene, persiste y aplica el tema elegido a toda la QApplication."""
 
     theme_changed = pyqtSignal(str)
+    font_size_changed = pyqtSignal(int)
+    MIN_FONT_SIZE = 9
+    MAX_FONT_SIZE = 20
+    DEFAULT_FONT_SIZE = 13
     _instance = None
 
     def __new__(cls):
@@ -34,6 +38,7 @@ class ThemeManager(QObject):
             return
         self._config_file = _CONFIG_FILE
         self._current = self._load_preference()
+        self._font_size = self._load_font_size()
         self._initialized = True
 
     @classmethod
@@ -42,6 +47,9 @@ class ThemeManager(QObject):
 
     def current(self) -> str:
         return self._current
+
+    def font_size(self) -> int:
+        return self._font_size
 
     def tokens(self, nombre: str | None = None) -> dict[str, str]:
         """Devuelve una copia de los tokens del tema activo o del indicado."""
@@ -76,6 +84,23 @@ class ThemeManager(QObject):
         if changed:
             self.theme_changed.emit(canonical_name)
 
+    def set_font_size(self, size: int) -> None:
+        if isinstance(size, bool) or not isinstance(size, int):
+            raise ValueError("El tamaño de fuente debe ser un entero.")
+        if not self.MIN_FONT_SIZE <= size <= self.MAX_FONT_SIZE:
+            raise ValueError(
+                f"El tamaño de fuente debe estar entre {self.MIN_FONT_SIZE} "
+                f"y {self.MAX_FONT_SIZE}."
+            )
+
+        changed = size != self._font_size
+        if not changed:
+            return
+        self._save_font_size(size)
+        self._font_size = size
+        self._apply_to_application()
+        self.font_size_changed.emit(size)
+
     def apply_current(self) -> None:
         """Aplica el tema activo sin modificar la preferencia guardada."""
         self._apply_to_application()
@@ -107,18 +132,50 @@ class ThemeManager(QObject):
             return _LEGACY_THEME_NAMES.get(legacy_name.strip().lower(), "Grafito")
         return "Grafito"
 
-    def _save_preference(self, nombre: str) -> None:
-        data = {}
-        if self._config_file.exists():
-            try:
-                loaded = json.loads(self._config_file.read_text(encoding="utf-8"))
-                if isinstance(loaded, dict):
-                    data = loaded
-            except (OSError, json.JSONDecodeError) as exc:
-                logging.warning("Se reemplazará la configuración de tema inválida: %s", exc)
+    def _load_font_size(self) -> int:
+        try:
+            data = json.loads(self._config_file.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return self.DEFAULT_FONT_SIZE
+        except (OSError, json.JSONDecodeError) as exc:
+            logging.warning("No se pudo leer el tamaño de fuente: %s", exc)
+            return self.DEFAULT_FONT_SIZE
+        if not isinstance(data, dict):
+            return self.DEFAULT_FONT_SIZE
+        size = data.get("font_size", self.DEFAULT_FONT_SIZE)
+        if (
+            isinstance(size, int)
+            and not isinstance(size, bool)
+            and self.MIN_FONT_SIZE <= size <= self.MAX_FONT_SIZE
+        ):
+            return size
+        return self.DEFAULT_FONT_SIZE
 
+    def _save_preference(self, nombre: str) -> None:
+        data = self._read_config()
         data["tema"] = "claro" if nombre == "Claro" else "oscuro"
         data["tema_visual"] = nombre
+        self._write_config(data)
+
+    def _save_font_size(self, size: int) -> None:
+        data = self._read_config()
+        data["font_size"] = size
+        self._write_config(data)
+
+    def _read_config(self) -> dict:
+        try:
+            loaded = json.loads(self._config_file.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return {}
+        except (OSError, json.JSONDecodeError) as exc:
+            logging.warning("Se reemplazará la configuración inválida: %s", exc)
+            return {}
+        if isinstance(loaded, dict):
+            return loaded
+        logging.warning("Se reemplazará la configuración que no sea un objeto JSON.")
+        return {}
+
+    def _write_config(self, data: dict) -> None:
         self._config_file.parent.mkdir(parents=True, exist_ok=True)
         self._config_file.write_text(
             json.dumps(data, ensure_ascii=False, indent=2),
@@ -130,7 +187,8 @@ class ThemeManager(QObject):
         if app is None:
             return
 
-        tokens = THEMES[self._current]
+        tokens = THEMES[self._current].copy()
+        tokens["font_size_md"] = f"{self._font_size}px"
         app.setStyle("Fusion")
         palette = QPalette()
         palette.setColor(QPalette.ColorRole.Window, QColor(tokens["bg_gradient_start"]))

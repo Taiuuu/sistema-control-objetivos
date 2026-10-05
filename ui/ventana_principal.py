@@ -42,6 +42,7 @@ from ui.vista_auditoria import VistaAuditoria
 from ui.vista_validaciones import VistaValidaciones
 from ui.vista_indexacion import VistaIndexacion
 from ui.vista_sincronizacion import VistaSincronizacion
+from ui.configuracion import ConfiguracionDialog
 from ui.theme.theme_manager import get_theme_manager
 from ui.theme.tokens import THEMES
 from services.permisos import tiene_permiso
@@ -187,12 +188,14 @@ class VentanaPrincipal(QWidget):
         self.resize(1340, 660)
         self.setMinimumSize(720, 440)
         self._theme_manager = get_theme_manager()
+        self.zoom_nivel = self._theme_manager.font_size()
         self.setWindowIcon(QIcon(THEMES[self._theme_manager.current()]["logo_path"]))
 
         self._oscuro = self._theme_manager.current() != "Claro"
 
         self._construir_ui()
         self._theme_manager.theme_changed.connect(self._al_cambiar_tema)
+        self._theme_manager.font_size_changed.connect(self._sincronizar_tamano_fuente)
         self.cargar_tabla()
         self._mostrar_landing_inicial()
         self._configurar_shortcuts()
@@ -497,6 +500,13 @@ class VentanaPrincipal(QWidget):
         self.usuario_label.setWordWrap(True)
         lay.addWidget(self.usuario_label)
 
+        self.btn_configuracion = QPushButton("⚙ Configuración")
+        self.btn_configuracion.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_configuracion.setFixedHeight(30)
+        self.btn_configuracion.setStyleSheet(self._estilo_btn_tema(oscuro))
+        self.btn_configuracion.clicked.connect(self._abrir_configuracion)
+        lay.addWidget(self.btn_configuracion)
+
         self.btn_configurar_menu = QPushButton("⚙ Configurar menú")
         self.btn_configurar_menu.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_configurar_menu.setFixedHeight(30)
@@ -513,6 +523,10 @@ class VentanaPrincipal(QWidget):
         lay.addWidget(self.btn_logout)
 
         return zona
+
+    def _abrir_configuracion(self) -> None:
+        dialog = ConfiguracionDialog(self)
+        dialog.exec()
 
     def _configurar_menu(self) -> None:
         dialogo = QDialog(self)
@@ -1184,6 +1198,8 @@ class VentanaPrincipal(QWidget):
         texto_tema = "☀  Modo claro" if oscuro else "🌙  Modo oscuro"
         self.btn_tema.setText(texto_tema)
         self.btn_tema.setStyleSheet(self._estilo_btn_tema(oscuro))
+        self.btn_configuracion.setStyleSheet(self._estilo_btn_tema(oscuro))
+        self.btn_configurar_menu.setStyleSheet(self._estilo_btn_tema(oscuro))
         self.btn_logout.setStyleSheet(self._estilo_btn_logout(oscuro))
         self.usuario_label.setStyleSheet(f"""
             color: {obtener_color('text_muted', oscuro)};
@@ -1319,22 +1335,20 @@ class VentanaPrincipal(QWidget):
     # =========================================================================
 
     def _zoom_mas(self):
-        if self.zoom_nivel < 20:
-            self.zoom_nivel += 1
-            self._aplicar_zoom()
+        if self.zoom_nivel < self._theme_manager.MAX_FONT_SIZE:
+            self._theme_manager.set_font_size(self.zoom_nivel + 1)
 
     def _zoom_menos(self):
-        if self.zoom_nivel > 9:
-            self.zoom_nivel -= 1
-            self._aplicar_zoom()
+        if self.zoom_nivel > self._theme_manager.MIN_FONT_SIZE:
+            self._theme_manager.set_font_size(self.zoom_nivel - 1)
 
     def _aplicar_zoom(self):
-        self.lbl_zoom.setText(f"{self.zoom_nivel}px")
-        if self.app:
-            import re
-            stylesheet_actual = self.app.styleSheet()
-            nuevo = re.sub(r'font-size: \d+px;', f'font-size: {self.zoom_nivel}px;', stylesheet_actual)
-            self.app.setStyleSheet(nuevo)
+        self._theme_manager.set_font_size(self.zoom_nivel)
+
+    def _sincronizar_tamano_fuente(self, size: int) -> None:
+        self.zoom_nivel = size
+        if hasattr(self, "lbl_zoom"):
+            self.lbl_zoom.setText(f"{size}px")
 
     # =========================================================================
     # SINCRONIZACIÓN
