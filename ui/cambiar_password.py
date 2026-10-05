@@ -124,7 +124,11 @@ class CambiarPassword(QWidget):
     def _aplicar_tema(self, theme_name: str) -> None:
         tokens = self._theme_manager.tokens(theme_name)
         for label in self.indicadores.values():
-            color = tokens["success"] if label.property("valid") else tokens["danger"]
+            color = (
+                tokens["success_text"]
+                if label.property("valid")
+                else tokens["danger_text"]
+            )
             label.setStyleSheet(
                 f"color: {color}; font-size: {tokens['font_size_sm']};"
             )

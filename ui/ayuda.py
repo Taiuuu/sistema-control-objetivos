@@ -85,9 +85,9 @@ class Ayuda(QWidget):
         if hasattr(self, "_texto_estados"):
             self._texto_estados.setText(
                 f"""
-                <span style='color: {tokens["success"]};'><b>✔ Pasaron los dos:</b></span> Ambos turnos registraron pasada<br>
-                <span style='color: {tokens["warning"]};'><b>⚠ No pasó [día|noches]:</b></span> Solo un turno registró pasada<br>
-                <span style='color: {tokens["danger"]};'><b>❌ No pasó nadie:</b></span> Ningún turno registró pasada<br><br>
+                <span style='color: {tokens["success_text"]};'><b>✔ Pasaron los dos:</b></span> Ambos turnos registraron pasada<br>
+                <span style='color: {tokens["warning_text"]};'><b>⚠ No pasó [día|noches]:</b></span> Solo un turno registró pasada<br>
+                <span style='color: {tokens["danger_text"]};'><b>❌ No pasó nadie:</b></span> Ningún turno registró pasada<br><br>
                 Los colores te ayudan a identificar rápidamente qué objetivos necesitan atención.
                 """
             )

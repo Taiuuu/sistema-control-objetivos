@@ -19,9 +19,17 @@ def _guardar_animacion(animacion):
 
 def animar_aparecer(widget: QWidget, duracion: int = 180) -> None:
     """Anima la aparición de un widget con efecto fade in."""
-    efecto = QGraphicsOpacityEffect(widget)
-    widget.setGraphicsEffect(efecto)
-    animacion = QPropertyAnimation(efecto, b"opacity", widget)
+    if widget.isWindow():
+        widget.setWindowOpacity(0.0)
+        objetivo = widget
+        propiedad = b"windowOpacity"
+    else:
+        efecto = QGraphicsOpacityEffect(widget)
+        widget.setGraphicsEffect(efecto)
+        objetivo = efecto
+        propiedad = b"opacity"
+
+    animacion = QPropertyAnimation(objetivo, propiedad, widget)
     animacion.setDuration(duracion)
     animacion.setStartValue(0.0)
     animacion.setEndValue(1.0)
@@ -46,10 +54,21 @@ def animar_entrada(widget: QWidget, duracion: int = 180, offset_y: int = 12) -> 
     original_pos = widget.pos()
     widget.move(original_pos + QPoint(0, offset_y))
 
-    efecto = QGraphicsOpacityEffect(widget)
-    widget.setGraphicsEffect(efecto)
+    if widget.isWindow():
+        widget.setWindowOpacity(0.0)
+        objetivo_opacidad = widget
+        propiedad_opacidad = b"windowOpacity"
+    else:
+        efecto = QGraphicsOpacityEffect(widget)
+        widget.setGraphicsEffect(efecto)
+        objetivo_opacidad = efecto
+        propiedad_opacidad = b"opacity"
 
-    animacion_opacidad = QPropertyAnimation(efecto, b"opacity", widget)
+    animacion_opacidad = QPropertyAnimation(
+        objetivo_opacidad,
+        propiedad_opacidad,
+        widget,
+    )
     animacion_opacidad.setDuration(duracion)
     animacion_opacidad.setStartValue(0.0)
     animacion_opacidad.setEndValue(1.0)

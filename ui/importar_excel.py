@@ -379,7 +379,7 @@ class ImportarExcel(QWidget):
                 font-weight: 700;
             }}
             QLabel#ImportFileLabel {{
-                color: {tokens['success'] if self.label_archivo.property('selected') else tokens['text_secondary']};
+                color: {tokens['success_text'] if self.label_archivo.property('selected') else tokens['text_secondary']};
             }}
             QLabel#ImportSummary {{
                 color: {tokens['text_primary']};

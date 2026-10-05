@@ -48,11 +48,16 @@ class KpiCard(GlassCard):
 
     def _apply_theme(self, theme_name: str) -> None:
         tokens = self._theme_manager.tokens(theme_name)
-        style_label(self.icon_label, tokens["accent"], tokens["font_size_lg"], weight=700)
+        style_label(
+            self.icon_label,
+            tokens["text_primary"],
+            tokens["font_size_lg"],
+            weight=700,
+        )
         self.icon_label.setStyleSheet(
             f"""
             QLabel {{
-                color: {tokens["accent"]};
+                color: {tokens["text_primary"]};
                 background-color: {rgba(tokens["accent"], 35)};
                 border: 1px solid {tokens["border"]};
                 border-radius: 21px;
@@ -100,7 +105,7 @@ class StatusBadge(QLabel):
     def _apply_theme(self, theme_name: str) -> None:
         tokens = self._theme_manager.tokens(theme_name)
         status_color = tokens[self._STATUS_COLORS[self.status]]
-        background = rgba(status_color, 18)
+        background = rgba(status_color, 12)
         self.setStyleSheet(
             f"""
             QLabel {{

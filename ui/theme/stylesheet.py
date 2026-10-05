@@ -27,9 +27,9 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
         QLabel:disabled {{
             color: {tokens["text_disabled"]};
         }}
-        QLabel#SuccessText {{ color: {tokens["success"]}; }}
-        QLabel#WarningText {{ color: {tokens["warning"]}; }}
-        QLabel#DangerText {{ color: {tokens["danger"]}; }}
+        QLabel#SuccessText {{ color: {tokens["success_text"]}; }}
+        QLabel#WarningText {{ color: {tokens["warning_text"]}; }}
+        QLabel#DangerText {{ color: {tokens["danger_text"]}; }}
         QPushButton {{
             min-height: {tokens["control_height"]};
             padding: 0 {tokens["spacing_lg"]};
