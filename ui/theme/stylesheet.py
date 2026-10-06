@@ -11,26 +11,111 @@ def _rgba(color: str, alpha: int) -> str:
 
 
 def generate_date_edit_dropdown_stylesheet(tokens: Mapping[str, str]) -> str:
-    """Estilo del botón calendario, también para selectores con QSS local."""
+    """Estilo exclusivo del botón de calendario, no de los botones de hora."""
     return f"""
-        QDateTimeEdit::down-button {{
+        QDateTimeEdit[themedCalendarPopup="true"]::up-button {{
+            width: 0;
+            height: 0;
+            border: none;
+        }}
+        QDateTimeEdit[themedCalendarPopup="true"]::up-arrow {{
+            width: 0;
+            height: 0;
+            image: none;
+        }}
+        QDateTimeEdit[themedCalendarPopup="true"]::down-button {{
             subcontrol-origin: padding;
             subcontrol-position: top right;
-            width: 24px;
+            width: 26px;
+            height: 30px;
             background-color: {tokens["surface_alt"]};
             border-left: {tokens["border_width"]} solid {tokens["border"]};
             border-top-right-radius: {tokens["radius_sm"]};
             border-bottom-right-radius: {tokens["radius_sm"]};
         }}
-        QDateTimeEdit::down-button:hover {{
+        QDateTimeEdit[themedCalendarPopup="true"]::down-button:hover {{
             background-color: {_rgba(tokens["accent"], 18)};
         }}
-        QDateTimeEdit::down-arrow {{
-            width: 0;
-            height: 0;
-            border-left: 4px solid transparent;
-            border-right: 4px solid transparent;
-            border-top: 5px solid {tokens["text_secondary"]};
+    """
+
+
+def generate_calendar_stylesheet(tokens: Mapping[str, str]) -> str:
+    """Estilos específicos con prioridad sobre las reglas de tablas generales."""
+    return f"""
+        QCalendarWidget {{
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface"]};
+            border: {tokens["border_width"]} solid {tokens["border"]};
+        }}
+        QCalendarWidget QWidget#qt_calendar_navigationbar {{
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface_alt"]};
+        }}
+        QCalendarWidget QToolButton#qt_calendar_prevmonth,
+        QCalendarWidget QToolButton#qt_calendar_nextmonth,
+        QCalendarWidget QToolButton#qt_calendar_monthbutton,
+        QCalendarWidget QToolButton#qt_calendar_yearbutton {{
+            min-width: 30px;
+            min-height: 30px;
+            padding: 2px 6px;
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface_alt"]};
+            border: {tokens["border_width"]} solid transparent;
+            border-radius: {tokens["radius_sm"]};
+            font-size: {tokens["font_size_sm"]};
+            font-weight: 600;
+        }}
+        QCalendarWidget QToolButton#qt_calendar_prevmonth:hover,
+        QCalendarWidget QToolButton#qt_calendar_nextmonth:hover,
+        QCalendarWidget QToolButton#qt_calendar_monthbutton:hover,
+        QCalendarWidget QToolButton#qt_calendar_yearbutton:hover {{
+            background-color: {_rgba(tokens["accent"], 16)};
+            border-color: {tokens["border"]};
+        }}
+        QCalendarWidget QSpinBox#qt_calendar_yearedit {{
+            min-height: 28px;
+            padding: 0 4px;
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface"]};
+            border: {tokens["border_width"]} solid {tokens["border"]};
+            border-radius: {tokens["radius_sm"]};
+            selection-background-color: {tokens["accent"]};
+            selection-color: {tokens["accent_text"]};
+        }}
+        QCalendarWidget QTableView#qt_calendar_calendarview {{
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface"]};
+            alternate-background-color: {tokens["surface"]};
+            border: none;
+            gridline-color: transparent;
+            outline: none;
+            selection-background-color: {tokens["accent"]};
+            selection-color: {tokens["accent_text"]};
+            font-size: {tokens["font_size_md"]};
+        }}
+        QCalendarWidget QTableView#qt_calendar_calendarview::item,
+        QCalendarWidget QTableView#qt_calendar_calendarview::item:hover,
+        QCalendarWidget QTableView#qt_calendar_calendarview::item:selected {{
+            margin: 0;
+            padding: 0;
+            border: none;
+        }}
+        QCalendarWidget QTableView#qt_calendar_calendarview::item:hover {{
+            color: {tokens["text_primary"]};
+            background-color: {_rgba(tokens["accent"], 18)};
+        }}
+        QCalendarWidget QTableView#qt_calendar_calendarview::item:selected {{
+            color: {tokens["accent_text"]};
+            background-color: {tokens["accent"]};
+        }}
+        QCalendarWidget QTableView#qt_calendar_calendarview QHeaderView::section {{
+            min-height: 24px;
+            padding: 2px;
+            color: {tokens["text_secondary"]};
+            background-color: {tokens["surface_alt"]};
+            border: none;
+            font-size: {tokens["font_size_xs"]};
+            font-weight: 600;
         }}
     """
 
@@ -143,68 +228,6 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
         QComboBox:disabled, QDateEdit:disabled, QDateTimeEdit:disabled,
         QTimeEdit:disabled, QSpinBox:disabled {{
             color: {tokens["text_disabled"]};
-        }}
-        QCalendarWidget {{
-            color: {tokens["text_primary"]};
-            background-color: {tokens["surface"]};
-            border: {tokens["border_width"]} solid {tokens["border"]};
-        }}
-        QCalendarWidget QWidget#qt_calendar_navigationbar {{
-            color: {tokens["text_primary"]};
-            background-color: {tokens["surface_alt"]};
-        }}
-        QCalendarWidget QToolButton#qt_calendar_prevmonth,
-        QCalendarWidget QToolButton#qt_calendar_nextmonth,
-        QCalendarWidget QToolButton#qt_calendar_monthbutton,
-        QCalendarWidget QToolButton#qt_calendar_yearbutton {{
-            min-width: 28px;
-            min-height: 28px;
-            padding: 2px 6px;
-            color: {tokens["text_primary"]};
-            background-color: {tokens["surface_alt"]};
-            border: {tokens["border_width"]} solid transparent;
-            border-radius: {tokens["radius_sm"]};
-            font-weight: 600;
-        }}
-        QCalendarWidget QToolButton#qt_calendar_prevmonth:hover,
-        QCalendarWidget QToolButton#qt_calendar_nextmonth:hover,
-        QCalendarWidget QToolButton#qt_calendar_monthbutton:hover,
-        QCalendarWidget QToolButton#qt_calendar_yearbutton:hover {{
-            background-color: {_rgba(tokens["accent"], 16)};
-            border-color: {tokens["border"]};
-        }}
-        QCalendarWidget QSpinBox#qt_calendar_yearedit {{
-            min-height: 28px;
-            padding: 0 4px;
-            color: {tokens["text_primary"]};
-            background-color: {tokens["surface"]};
-            border: {tokens["border_width"]} solid {tokens["border"]};
-            border-radius: {tokens["radius_sm"]};
-            selection-background-color: {tokens["accent"]};
-            selection-color: {tokens["accent_text"]};
-        }}
-        QCalendarWidget QAbstractItemView#qt_calendar_calendarview {{
-            color: {tokens["text_primary"]};
-            background-color: {tokens["surface"]};
-            border: none;
-            outline: 0;
-            selection-background-color: {tokens["accent"]};
-            selection-color: {tokens["accent_text"]};
-        }}
-        QCalendarWidget QAbstractItemView#qt_calendar_calendarview::item:hover {{
-            color: {tokens["text_primary"]};
-            background-color: {_rgba(tokens["accent"], 18)};
-        }}
-        QCalendarWidget QAbstractItemView#qt_calendar_calendarview::item:selected {{
-            color: {tokens["accent_text"]};
-            background-color: {tokens["accent"]};
-        }}
-        QCalendarWidget QHeaderView::section {{
-            color: {tokens["text_secondary"]};
-            background-color: {tokens["surface_alt"]};
-            border: none;
-            padding: 4px;
-            font-weight: 600;
         }}
         QComboBox QAbstractItemView {{
             color: {tokens["text_primary"]};
@@ -389,4 +412,4 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             border: {tokens["border_width"]} solid {tokens["border"]};
             border-radius: {tokens["radius_card"]};
         }}
-    """ + generate_date_edit_dropdown_stylesheet(tokens)
+    """ + generate_calendar_stylesheet(tokens) + generate_date_edit_dropdown_stylesheet(tokens)

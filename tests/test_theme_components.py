@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QStyle,
     QStyleOptionSpinBox,
+    QTableView,
     QWidget,
 )
 
@@ -165,9 +166,6 @@ def test_date_calendar_tracks_all_theme_tokens(app, tmp_path, monkeypatch):
         for theme_name, tokens in THEMES.items():
             manager.set_theme(theme_name)
             manager.apply_current()
-            date_edit.setStyleSheet(
-                generate_date_edit_dropdown_stylesheet(tokens)
-            )
             app.processEvents()
             stylesheet = generate_stylesheet(tokens)
             option = QStyleOptionSpinBox()
@@ -193,11 +191,20 @@ def test_date_calendar_tracks_all_theme_tokens(app, tmp_path, monkeypatch):
             assert tokens["text_primary"] in stylesheet
             assert tokens["text_secondary"] in stylesheet
             assert tokens["accent"] in stylesheet
-            assert "QDateTimeEdit::down-button" in (
+            assert 'QDateTimeEdit[themedCalendarPopup="true"]::down-button' in (
                 generate_date_edit_dropdown_stylesheet(tokens)
             )
             assert "QCalendarWidget QSpinBox#qt_calendar_yearedit" in stylesheet
-            assert arrow_rect.width() >= 22
+            assert arrow_rect.width() >= 26
+            assert 24 <= arrow_rect.height() <= 34
+            calendar_view = calendar.findChild(
+                QTableView, "qt_calendar_calendarview"
+            )
+            assert calendar.width() >= 294
+            assert min(calendar_view.columnWidth(index) for index in range(7)) >= 40
+            assert stylesheet.index(
+                "QCalendarWidget QTableView#qt_calendar_calendarview::item"
+            ) > stylesheet.index("QTableView::item")
             assert (
                 calendar.weekdayTextFormat(Qt.DayOfWeek.Saturday)
                 .foreground()
@@ -220,9 +227,13 @@ def test_date_calendar_tracks_all_theme_tokens(app, tmp_path, monkeypatch):
                 .color()
                 == QColor(tokens["text_secondary"])
             )
+            calendar.setCurrentPage(
+                QDate.currentDate().year(), QDate.currentDate().month()
+            )
             today_format = calendar.dateTextFormat(QDate.currentDate())
             assert today_format.background().color() == QColor(tokens["accent"])
             assert today_format.foreground().color() == QColor(tokens["accent_text"])
+            calendar.setCurrentPage(2025, 9)
     finally:
         manager.set_theme(original_theme)
         manager.apply_current()
