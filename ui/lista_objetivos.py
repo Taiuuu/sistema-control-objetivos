@@ -6,7 +6,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget,
     QTableWidgetItem, QPushButton, QMessageBox, QDialog,
-    QLabel, QLineEdit, QDateEdit, QCheckBox, QDialogButtonBox,
+    QLabel, QLineEdit, QDateEdit, QCheckBox,
     QInputDialog, QComboBox, QListWidget, QTabWidget, QMenu, QHeaderView,
     QHBoxLayout
 )
@@ -22,7 +22,9 @@ from models.objetivos import (
 from models.types import Objetivo
 from services.sincronizacion import obtener_sincronizador
 from services.sesion import get_rol
-from ui.components import StatusBadge
+from services.permisos import tiene_permiso
+from ui.components import GlassCard, PillButton, StatusBadge
+from ui.components.base import rgba
 from ui.theme.theme_manager import get_theme_manager
 
 
@@ -54,15 +56,17 @@ class DialogoEditarObjetivo(QDialog):
         self.objetivo_id = objetivo.id
         self.setWindowTitle("Editar objetivo")
         self.setFixedSize(440, 620)
+        self._theme_manager = get_theme_manager()
 
+        card = GlassCard(parent=self)
         layout = QVBoxLayout()
+        layout.setSpacing(10)
+        card.add_layout(layout)
 
-        # Nombre
         layout.addWidget(QLabel("Nombre:"))
         self.input_nombre = QLineEdit(objetivo.nombre)
         layout.addWidget(self.input_nombre)
 
-        # Fecha inicio
         layout.addWidget(QLabel("Fecha inicio:"))
         self.input_inicio = QDateEdit()
         self.input_inicio.setCalendarPopup(True)
@@ -76,7 +80,6 @@ class DialogoEditarObjetivo(QDialog):
         self.selector_tipo.setCurrentIndex(1 if objetivo.tipo_objetivo == "intermitente" else 0)
         layout.addWidget(self.selector_tipo)
 
-        # Fecha fin opcional
         self.check_fin = QCheckBox("Tiene fecha de finalización:")
         self.check_fin.setChecked(objetivo.fecha_fin is not None)
         self.check_fin.toggled.connect(self._toggle_fecha_fin)
@@ -91,7 +94,6 @@ class DialogoEditarObjetivo(QDialog):
         self.input_fin.setEnabled(objetivo.fecha_fin is not None)
         layout.addWidget(self.input_fin)
 
-        # Días de cobertura
         layout.addWidget(QLabel("Días de cobertura:"))
         dias_actuales = objetivo.dias_semana.split(",") if objetivo.dias_semana else []
         self.dias = {}
@@ -107,20 +109,76 @@ class DialogoEditarObjetivo(QDialog):
         self._cargar_historial()
 
         self.boton_periodo = QPushButton()
+        self.boton_periodo.setObjectName("ObjectivePeriodAction")
         self.boton_periodo.clicked.connect(self._cambiar_periodo)
         layout.addWidget(self.boton_periodo)
         self._actualizar_boton_periodo()
 
-        # Botones
-        botones = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save |
-            QDialogButtonBox.StandardButton.Cancel
-        )
-        botones.accepted.connect(self._guardar)
-        botones.rejected.connect(self.reject)
-        layout.addWidget(botones)
+        fila_botones = QHBoxLayout()
+        fila_botones.addStretch()
+        self.boton_cancelar = PillButton("Cancelar", "secondary")
+        self.boton_cancelar.clicked.connect(self.reject)
+        self.boton_guardar = PillButton("Guardar cambios", "primary")
+        self.boton_guardar.setObjectName("EditObjectivePrimary")
+        self.boton_guardar.clicked.connect(self._guardar)
+        fila_botones.addWidget(self.boton_cancelar)
+        fila_botones.addWidget(self.boton_guardar)
+        layout.addLayout(fila_botones)
 
-        self.setLayout(layout)
+        layout_principal = QVBoxLayout(self)
+        layout_principal.setContentsMargins(16, 16, 16, 16)
+        layout_principal.addWidget(card)
+        self._theme_manager.theme_changed.connect(self._aplicar_tema)
+        self._aplicar_tema(self._theme_manager.current())
+
+    def _aplicar_tema(self, theme_name: str) -> None:
+        tokens = self._theme_manager.tokens(theme_name)
+        self.setStyleSheet(
+            f"""
+            QLineEdit, QDateEdit, QComboBox, QListWidget {{
+                color: {tokens["text_primary"]};
+                background-color: {tokens["surface_alt"]};
+                border: 1px solid {tokens["border"]};
+                border-radius: {tokens["radius_sm"]};
+                padding: 5px 8px;
+                selection-background-color: {tokens["accent"]};
+                selection-color: {tokens["accent_text"]};
+            }}
+            QLineEdit:focus, QDateEdit:focus, QComboBox:focus {{
+                border-color: {tokens["accent"]};
+            }}
+            QListWidget::item {{
+                padding: 5px;
+                border-bottom: 1px solid {rgba(tokens["border"], 45)};
+            }}
+            QListWidget::item:selected {{
+                color: {tokens["text_primary"]};
+                background-color: {tokens["surface_alt"]};
+            }}
+            QPushButton#ObjectivePeriodAction {{
+                color: {tokens["text_primary"]};
+                background-color: {tokens["surface_alt"]};
+                border: 1px solid {tokens["border"]};
+                border-radius: {tokens["radius_lg"]};
+                padding: 6px 14px;
+                font-weight: 600;
+            }}
+            QPushButton#ObjectivePeriodAction:hover {{
+                background-color: {rgba(tokens["accent"], 12)};
+                border-color: {tokens["accent"]};
+            }}
+            QPushButton#EditObjectivePrimary {{
+                color: #FFFFFF;
+                background-color: #0A6506;
+                border: 1px solid #0A6506;
+            }}
+            QPushButton#EditObjectivePrimary:hover {{
+                color: #FFFFFF;
+                background-color: #075704;
+                border-color: #075704;
+            }}
+            """
+        )
 
     def _toggle_fecha_fin(self, checked: bool) -> None:
         self.input_fin.setEnabled(checked)
@@ -190,7 +248,29 @@ class ListaObjetivos(QWidget):
         self.setGeometry(200, 200, 950, 400)
         self._theme_manager = get_theme_manager()
 
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 18)
+        card = GlassCard(content_margins=18, parent=self)
+        card_layout = card.content_layout
+        card_layout.setSpacing(14)
+
+        header = QHBoxLayout()
+        titulo = QLabel("Ver objetivos")
+        titulo.setObjectName("ObjectivesTitle")
+        subtitulo = QLabel("Consultá y gestioná los objetivos y sus períodos.")
+        subtitulo.setObjectName("ObjectivesSubtitle")
+        encabezados = QVBoxLayout()
+        encabezados.setSpacing(3)
+        encabezados.addWidget(titulo)
+        encabezados.addWidget(subtitulo)
+        header.addLayout(encabezados, 1)
+        self.boton_agregar = None
+        if tiene_permiso("objetivos.crear"):
+            self.boton_agregar = PillButton("＋  Agregar objetivo", "primary")
+            self.boton_agregar.setObjectName("ObjectivesPrimaryAction")
+            self.boton_agregar.clicked.connect(self._abrir_form_objetivo)
+            header.addWidget(self.boton_agregar, 0, Qt.AlignmentFlag.AlignVCenter)
+        card_layout.addLayout(header)
 
         # Info de permisos
         rol_actual = get_rol()
@@ -199,7 +279,7 @@ class ListaObjetivos(QWidget):
         if self.es_admin:
             info_label = QLabel("Modo administrador · permisos de gestión habilitados")
             info_label.setObjectName("AdminModeBanner")
-            layout.addWidget(info_label)
+            card_layout.addWidget(info_label)
 
         self.tabs = QTabWidget()
         self.tablas = {}
@@ -212,9 +292,9 @@ class ListaObjetivos(QWidget):
         self._aplicar_tema(self._theme_manager.current())
         self._theme_manager.theme_changed.connect(self._aplicar_tema)
         self.tabs.currentChanged.connect(self._cargar_tabla)
-        layout.addWidget(self.tabs)
+        card_layout.addWidget(self.tabs, 1)
 
-        self.setLayout(layout)
+        layout.addWidget(card)
         self._cargar_tabla()
 
         # Conectar señales de sincronización
@@ -228,6 +308,8 @@ class ListaObjetivos(QWidget):
             tabla.setColumnWidth(columna, ancho)
         tabla.setShowGrid(False)
         tabla.setAlternatingRowColors(False)
+        tabla.setMouseTracking(True)
+        tabla.viewport().setMouseTracking(True)
         tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         tabla.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         tabla.verticalHeader().setVisible(False)
@@ -239,13 +321,13 @@ class ListaObjetivos(QWidget):
         tokens = self._theme_manager.tokens(theme_name)
         self.setStyleSheet(f"""
             QTabWidget::pane {{
-                border: 1px solid {tokens['border']};
+                border: none;
                 border-radius: {tokens['radius_md']};
-                background: {tokens['surface']};
+                background: transparent;
                 top: -1px;
             }}
             QTabBar::tab {{
-                background: {tokens['surface_alt']};
+                background: transparent;
                 color: {tokens['text_secondary']};
                 border: 1px solid {tokens['border']};
                 border-radius: {tokens['radius_lg']};
@@ -254,35 +336,55 @@ class ListaObjetivos(QWidget):
                 font-weight: 600;
             }}
             QTabBar::tab:selected {{
-                background: {tokens['accent']};
-                color: {tokens['accent_text']};
+                background: {tokens['surface_alt']};
+                color: {tokens['text_primary']};
                 border-color: {tokens['accent']};
             }}
             QTabBar::tab:hover:!selected {{
-                background: {tokens['sidebar_active_bg']};
+                background: {rgba(tokens['accent'], 10)};
                 color: {tokens['text_primary']};
             }}
             QTableWidget {{
-                background: {tokens['surface']};
+                background: {rgba(tokens['surface'], 248)};
                 color: {tokens['text_primary']};
                 border: none;
                 gridline-color: transparent;
                 outline: none;
-                selection-background-color: {tokens['surface_alt']};
+                selection-background-color: {rgba(tokens['accent'], 14)};
                 selection-color: {tokens['text_primary']};
                 font-size: {tokens['font_size_sm']};
             }}
             QTableWidget::item {{
-                border-bottom: 1px solid {tokens['border']};
+                border-bottom: 1px solid {rgba(tokens['border'], 45)};
                 padding: 6px 10px;
             }}
+            QTableWidget::item:hover {{
+                background: {rgba(tokens['accent'], 10)};
+                color: {tokens['text_primary']};
+            }}
+            QTableWidget::item:selected {{
+                background: {rgba(tokens['accent'], 14)};
+                color: {tokens['text_primary']};
+            }}
             QHeaderView::section {{
-                background: {tokens['surface_alt']};
+                background: {rgba(tokens['surface_alt'], 220)};
                 color: {tokens['text_secondary']};
                 border: none;
-                border-bottom: 1px solid {tokens['border']};
-                padding: 9px 10px;
+                border-bottom: 1px solid {rgba(tokens['border'], 70)};
+                padding: 8px 10px;
+                font-size: {tokens['font_size_xs']};
                 font-weight: 600;
+            }}
+            QLabel#ObjectivesTitle {{
+                color: {tokens['text_primary']};
+                font-size: {tokens['font_size_title']};
+                font-weight: 600;
+                background: transparent;
+            }}
+            QLabel#ObjectivesSubtitle {{
+                color: {tokens['text_secondary']};
+                font-size: {tokens['font_size_sm']};
+                background: transparent;
             }}
             QLabel#AdminModeBanner {{
                 color: {tokens['text_secondary']};
@@ -302,7 +404,7 @@ class ListaObjetivos(QWidget):
                 min-height: 30px;
             }}
             QPushButton#ObjectiveActions:hover {{
-                background: {tokens['sidebar_active_bg']};
+                background: {rgba(tokens['accent'], 12)};
                 border-color: {tokens['accent']};
             }}
             QMenu {{
@@ -322,9 +424,29 @@ class ListaObjetivos(QWidget):
                 color: {tokens['accent_text']};
             }}
         """)
-        if hasattr(self, "tablas"):
-            self._cargar_tabla()
-
+        if self.boton_agregar is not None:
+            self.boton_agregar.setStyleSheet(
+                f"""
+                QPushButton {{
+                    color: #FFFFFF;
+                    background-color: #0A6506;
+                    border: 1px solid #0A6506;
+                    border-radius: {tokens['radius_lg']};
+                    padding: 0 16px;
+                    min-height: 38px;
+                    font-weight: 600;
+                }}
+                QPushButton:hover {{
+                    color: #FFFFFF;
+                    background-color: #075704;
+                    border-color: #075704;
+                }}
+                QPushButton:pressed {{
+                    color: #FFFFFF;
+                    background-color: #064A03;
+                }}
+                """
+            )
     def _cargar_tabla(self, _indice: int = 0) -> None:
         objetivos = _cargar_objetivos()
         filtros = {
@@ -371,6 +493,14 @@ class ListaObjetivos(QWidget):
             boton_acciones.setToolTip("Acciones del objetivo")
             boton_acciones.setMenu(menu)
             tabla.setCellWidget(i, 5, self._centrar_widget(boton_acciones))
+
+    def _abrir_form_objetivo(self) -> None:
+        from ui.form_objetivo import FormObjetivo
+
+        self._form_objetivo = FormObjetivo()
+        self._form_objetivo.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self._form_objetivo.destroyed.connect(self._cargar_tabla)
+        self._form_objetivo.show()
 
     @staticmethod
     def _centrar_widget(widget: QWidget) -> QWidget:

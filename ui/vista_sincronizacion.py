@@ -14,6 +14,7 @@ from services.auditoria import registrar_auditoria, TipoOperacion
 from datetime import datetime
 import json
 from ui.components import StatusBadge
+from ui.components.base import wrap_content_in_glass_card
 
 
 class VistaSincronizacion(QWidget):
@@ -75,6 +76,7 @@ class VistaSincronizacion(QWidget):
 
         layout.addWidget(self.tabs)
         self.setLayout(layout)
+        wrap_content_in_glass_card(self)
 
     def _crear_tab_estado(self):
         """Crea el tab de estado actual."""

@@ -3,6 +3,13 @@
 from collections.abc import Mapping
 
 
+def _rgba(color: str, alpha: int) -> str:
+    from ui.theme.colors import parse_color
+
+    red, green, blue, _ = parse_color(color).getRgb()
+    return f"rgba({red}, {green}, {blue}, {alpha})"
+
+
 def generate_stylesheet(tokens: Mapping[str, str]) -> str:
     """Genera QSS global evitando colores específicos de widgets."""
     return f"""
@@ -33,19 +40,19 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
         QPushButton {{
             min-height: {tokens["control_height"]};
             padding: 0 {tokens["spacing_lg"]};
-            color: {tokens["accent_text"]};
-            background-color: {tokens["accent"]};
-            border: {tokens["border_width"]} solid {tokens["accent"]};
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface"]};
+            border: {tokens["border_width"]} solid {tokens["border"]};
             border-radius: {tokens["radius_lg"]};
             font-weight: 600;
         }}
         QPushButton:hover {{
-            color: {tokens["accent_hover_text"]};
-            background-color: {tokens["accent_hover"]};
-            border-color: {tokens["accent_hover"]};
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface_alt"]};
+            border-color: {tokens["accent"]};
         }}
         QPushButton:pressed {{
-            background-color: {tokens["accent"]};
+            background-color: {_rgba(tokens["accent"], 20)};
         }}
         QPushButton:disabled {{
             color: {tokens["text_disabled"]};
@@ -57,7 +64,42 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             background-color: {tokens["sidebar_active_bg"]};
             border-color: {tokens["sidebar_active_bg"]};
         }}
-        QLineEdit, QComboBox, QDateEdit {{
+        QPushButton#PrimaryButton {{
+            color: #FFFFFF;
+            background-color: #0A6506;
+            border-color: #0A6506;
+        }}
+        QPushButton#PrimaryButton:hover {{
+            color: #FFFFFF;
+            background-color: #075704;
+            border-color: #075704;
+        }}
+        QPushButton#DangerButton {{
+            color: {tokens["danger"]};
+            background-color: {tokens["surface"]};
+            border-color: {tokens["danger"]};
+        }}
+        QPushButton#DangerButton:hover {{
+            color: {tokens["danger_button_text"]};
+            background-color: {tokens["danger_button_bg"]};
+            border-color: {tokens["danger_button_bg"]};
+        }}
+        QPushButton#ObjectiveActions {{
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface_alt"]};
+            border: {tokens["border_width"]} solid {tokens["border"]};
+            border-radius: {tokens["radius_md"]};
+            min-width: 32px;
+            min-height: 30px;
+            padding: 0;
+            font-size: {tokens["font_size_lg"]};
+            font-weight: 700;
+        }}
+        QPushButton#ObjectiveActions:hover {{
+            background-color: {_rgba(tokens["accent"], 12)};
+            border-color: {tokens["accent"]};
+        }}
+        QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox {{
             min-height: {tokens["control_height"]};
             padding: 0 {tokens["spacing_sm"]};
             color: {tokens["text_primary"]};
@@ -67,10 +109,12 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             selection-background-color: {tokens["accent"]};
             selection-color: {tokens["accent_text"]};
         }}
-        QLineEdit:focus, QComboBox:focus, QDateEdit:focus {{
+        QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus,
+        QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus {{
             border-color: {tokens["accent"]};
         }}
-        QLineEdit:disabled, QComboBox:disabled, QDateEdit:disabled {{
+        QLineEdit:disabled, QTextEdit:disabled, QPlainTextEdit:disabled,
+        QComboBox:disabled, QDateEdit:disabled, QTimeEdit:disabled, QSpinBox:disabled {{
             color: {tokens["text_disabled"]};
         }}
         QComboBox QAbstractItemView {{
@@ -80,26 +124,76 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             selection-background-color: {tokens["accent"]};
             selection-color: {tokens["accent_text"]};
         }}
+        QListWidget, QTextEdit, QPlainTextEdit {{
+            color: {tokens["text_primary"]};
+            background-color: {_rgba(tokens["surface"], 248)};
+            border: {tokens["border_width"]} solid {tokens["border"]};
+            border-radius: {tokens["radius_sm"]};
+            selection-background-color: {_rgba(tokens["accent"], 16)};
+            selection-color: {tokens["text_primary"]};
+        }}
+        QListWidget::item {{
+            padding: {tokens["spacing_xs"]} {tokens["spacing_sm"]};
+            border-bottom: {tokens["border_width"]} solid {_rgba(tokens["border"], 45)};
+        }}
+        QListWidget::item:hover, QListWidget::item:selected {{
+            background-color: {_rgba(tokens["accent"], 12)};
+            color: {tokens["text_primary"]};
+        }}
+        QGroupBox {{
+            color: {tokens["text_secondary"]};
+            background-color: {_rgba(tokens["surface"], 210)};
+            border: {tokens["border_width"]} solid {_rgba(tokens["border"], 95)};
+            border-radius: {tokens["radius_md"]};
+            margin-top: {tokens["spacing_md"]};
+            padding: {tokens["spacing_md"]};
+            font-weight: 600;
+        }}
+        QGroupBox::title {{
+            subcontrol-origin: margin;
+            left: {tokens["spacing_md"]};
+            padding: 0 {tokens["spacing_xs"]};
+        }}
         QTableWidget {{
             color: {tokens["text_primary"]};
-            background-color: {tokens["surface"]};
+            background-color: {_rgba(tokens["surface"], 248)};
             alternate-background-color: {tokens["surface_alt"]};
-            border: {tokens["border_width"]} solid {tokens["border"]};
+            border: none;
             border-radius: {tokens["radius_md"]};
-            gridline-color: {tokens["border"]};
-            selection-background-color: {tokens["accent"]};
-            selection-color: {tokens["accent_text"]};
+            gridline-color: transparent;
+            selection-background-color: {_rgba(tokens["accent"], 16)};
+            selection-color: {tokens["text_primary"]};
+        }}
+        QTableWidget::item {{
+            border-bottom: {tokens["border_width"]} solid {_rgba(tokens["border"], 45)};
+            padding: 5px 8px;
         }}
         QTableWidget::item:hover, QTableWidget::item:selected {{
             color: {tokens["text_primary"]};
-            background-color: {tokens["surface_alt"]};
+            background-color: {_rgba(tokens["accent"], 12)};
+        }}
+        QTableView {{
+            color: {tokens["text_primary"]};
+            background-color: {_rgba(tokens["surface"], 248)};
+            border: none;
+            gridline-color: transparent;
+            selection-background-color: {_rgba(tokens["accent"], 16)};
+            selection-color: {tokens["text_primary"]};
+        }}
+        QTableView::item {{
+            border-bottom: {tokens["border_width"]} solid {_rgba(tokens["border"], 45)};
+            padding: 5px 8px;
+        }}
+        QTableView::item:hover, QTableView::item:selected {{
+            background-color: {_rgba(tokens["accent"], 12)};
         }}
         QHeaderView::section {{
             color: {tokens["text_secondary"]};
-            background-color: {tokens["surface_alt"]};
+            background-color: {_rgba(tokens["surface_alt"], 225)};
             border: none;
-            border-bottom: {tokens["border_width"]} solid {tokens["border"]};
+            border-bottom: {tokens["border_width"]} solid {_rgba(tokens["border"], 70)};
             padding: {tokens["spacing_sm"]} {tokens["spacing_md"]};
+            font-size: {tokens["font_size_xs"]};
             font-weight: 600;
         }}
         QTabWidget::pane {{
@@ -117,8 +211,9 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             margin: {tokens["spacing_xs"]};
         }}
         QTabBar::tab:selected {{
-            color: {tokens["accent_text"]};
-            background-color: {tokens["accent"]};
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface_alt"]};
+            border-color: {tokens["accent"]};
         }}
         QTabBar::tab:hover:!selected {{
             color: {tokens["text_primary"]};
@@ -157,8 +252,13 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             border-radius: {tokens["radius_sm"]};
         }}
         QMenu::item:selected {{
-            color: {tokens["accent_text"]};
-            background-color: {tokens["accent"]};
+            color: {tokens["text_primary"]};
+            background-color: {_rgba(tokens["accent"], 16)};
+        }}
+        QMenu::item[danger="true"] {{ color: {tokens["danger"]}; }}
+        QMenu::item[danger="true"]:selected {{
+            color: {tokens["danger"]};
+            background-color: {_rgba(tokens["danger"], 18)};
         }}
         QCheckBox {{
             color: {tokens["text_primary"]};

@@ -10,6 +10,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QDate
 from database.db import DB_PATH
+from ui.components import GlassCard, PillButton
+from ui.components.base import wrap_content_in_glass_card
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
@@ -61,7 +63,7 @@ class NotasDiarias(QWidget):
         self.selector_fecha = QDateEdit()
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.setCalendarPopup(True)
-        boton_buscar = QPushButton("Buscar")
+        boton_buscar = PillButton("Buscar", "secondary")
         boton_buscar.clicked.connect(self._cargar_lista)
         fila.addWidget(QLabel("Fecha:"))
         fila.addWidget(self.selector_fecha)
@@ -74,7 +76,7 @@ class NotasDiarias(QWidget):
         self.lista_notas = QListWidget()
         layout.addWidget(self.lista_notas)
 
-        boton_eliminar = QPushButton("Eliminar nota seleccionada")
+        boton_eliminar = PillButton("Eliminar nota seleccionada", "ghost")
         boton_eliminar.clicked.connect(self._eliminar_seleccionada)
         layout.addWidget(boton_eliminar)
 
@@ -84,11 +86,13 @@ class NotasDiarias(QWidget):
         self.input_nota.setFixedHeight(80)
         layout.addWidget(self.input_nota)
 
-        boton_guardar = QPushButton("Guardar nota")
+        boton_guardar = PillButton("Guardar nota", "primary")
+        boton_guardar.setObjectName("PrimaryButton")
         boton_guardar.clicked.connect(self._guardar)
         layout.addWidget(boton_guardar)
 
         self.setLayout(layout)
+        wrap_content_in_glass_card(self)
         self.notas_ids = []
         self._cargar_lista()
 

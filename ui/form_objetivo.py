@@ -13,6 +13,7 @@ from ui.animaciones import animar_entrada
 from models.objetivos import agregar_objetivo
 from services.validaciones import validar_objetivo, ErrorValidacion
 from ui.components import GlassCard, PillButton
+from ui.theme.theme_manager import get_theme_manager
 
 
 # Mapeo de días de la semana a su número (formato ISO: 1=lunes, 7=domingo)
@@ -33,6 +34,7 @@ class FormObjetivo(QWidget):
         super().__init__()
         self.setWindowTitle("Agregar objetivo")
         self.setMinimumSize(440, 520)
+        self._theme_manager = get_theme_manager()
 
         self._titulo = QLabel("Agregar objetivo")
         self._titulo.setObjectName("TituloPrincipal")
@@ -71,6 +73,7 @@ class FormObjetivo(QWidget):
             checkbox.setFixedHeight(28)
 
         self.boton_guardar = PillButton("Guardar objetivo", "primary")
+        self.boton_guardar.setObjectName("ObjectiveSaveButton")
         self.boton_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.boton_guardar.setFixedHeight(42)
         self.boton_guardar.clicked.connect(self._guardar)
@@ -95,7 +98,7 @@ class FormObjetivo(QWidget):
         form_layout.addRow(QLabel("Días de cobertura"), dias_widget)
 
         card = GlassCard()
-        card_layout = QVBoxLayout(card)
+        card_layout = card.content_layout
         card_layout.setContentsMargins(18, 18, 18, 18)
         card_layout.setSpacing(16)
         card_layout.addLayout(form_layout)
@@ -108,8 +111,42 @@ class FormObjetivo(QWidget):
         layout_principal.addWidget(self._subtitulo)
         layout_principal.addWidget(card)
 
-        self.setLayout(layout_principal)
+        self._theme_manager.theme_changed.connect(self._aplicar_tema)
+        self._aplicar_tema(self._theme_manager.current())
         animar_entrada(self)
+
+    def _aplicar_tema(self, theme_name: str) -> None:
+        tokens = self._theme_manager.tokens(theme_name)
+        self._titulo.setStyleSheet(
+            f"color: {tokens['text_primary']}; font-size: {tokens['font_size_title']}; "
+            "font-weight: 600; background: transparent;"
+        )
+        self._subtitulo.setStyleSheet(
+            f"color: {tokens['text_secondary']}; font-size: {tokens['font_size_sm']}; "
+            "background: transparent;"
+        )
+        self.boton_guardar.setStyleSheet(
+            f"""
+            QPushButton {{
+                color: #FFFFFF;
+                background-color: #0A6506;
+                border: 1px solid #0A6506;
+                border-radius: {tokens['radius_lg']};
+                padding: 0 16px;
+                min-height: 42px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                color: #FFFFFF;
+                background-color: #075704;
+                border-color: #075704;
+            }}
+            QPushButton:pressed {{
+                color: #FFFFFF;
+                background-color: #064A03;
+            }}
+            """
+        )
 
     def _guardar(self) -> None:
         """Valida los datos y registra el nuevo objetivo en la base de datos."""

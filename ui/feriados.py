@@ -17,6 +17,7 @@ from services.feriados import (
     es_feriado,
 )
 from ui.components import GlassCard, PillButton, StatusBadge
+from ui.components.base import wrap_content_in_glass_card
 from ui.theme.theme_manager import get_theme_manager
 
 
@@ -70,6 +71,7 @@ class VistaFeriados(QWidget):
 
         self._theme_manager.theme_changed.connect(self._aplicar_tema)
         self._aplicar_tema(self._theme_manager.current())
+        wrap_content_in_glass_card(self)
         self._cargar_calendario()
 
     def _aplicar_tema(self, theme_name: str) -> None:

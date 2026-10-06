@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
     QTableWidgetItem, QPushButton, QMessageBox,
     QDialog, QLabel, QLineEdit, QDateEdit, QFormLayout,
-    QDialogButtonBox, QHeaderView, QComboBox
+    QDialogButtonBox, QHeaderView, QComboBox, QMenu
 )
 from PyQt6.QtCore import QDate, Qt
 from models.supervisores import (
@@ -17,6 +17,7 @@ from models.supervisores import (
 )
 from services.sincronizacion import obtener_sincronizador
 from ui.components import GlassCard, PillButton, SearchInput, StatusBadge
+from ui.theme.theme_manager import get_theme_manager
 
 
 # =============================================================================
@@ -32,6 +33,7 @@ class DialogoEditarSupervisor(QDialog):
         self.setWindowTitle("Editar supervisor")
         self.setFixedWidth(320)
         self.supervisor_id = supervisor_id
+        self._theme_manager = get_theme_manager()
 
         layout = QFormLayout()
         layout.setSpacing(10)
@@ -83,11 +85,16 @@ class DialogoEditarSupervisor(QDialog):
             QDialogButtonBox.StandardButton.Save |
             QDialogButtonBox.StandardButton.Cancel
         )
+        botones.button(QDialogButtonBox.StandardButton.Save).setObjectName("PrimaryButton")
         botones.accepted.connect(self._guardar)
         botones.rejected.connect(self.reject)
         layout.addRow(botones)
 
-        self.setLayout(layout)
+        card = GlassCard(content_margins=12, parent=self)
+        card.add_layout(layout)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.addWidget(card)
 
     def _toggle_baja(self, checked: bool) -> None:
         self._sin_baja = not checked
@@ -167,6 +174,8 @@ class ListaSupervisores(QWidget):
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.setShowGrid(False)
         self.tabla.setAlternatingRowColors(False)
+        self.tabla.setMouseTracking(True)
+        self.tabla.viewport().setMouseTracking(True)
         self.tabla.horizontalHeader().setStretchLastSection(True)
         self.tabla.setSortingEnabled(True)
         card_layout.addWidget(self.tabla)
@@ -215,51 +224,37 @@ class ListaSupervisores(QWidget):
             estado = StatusBadge("Activo" if activo else "Baja", "ok" if activo else "danger")
             self.tabla.setCellWidget(i, 3, self._centrar_widget(estado))
 
-            # Botones de acción
-            contenedor = QWidget()
-            fila_btn = QHBoxLayout(contenedor)
-            fila_btn.setContentsMargins(4, 2, 4, 2)
-            fila_btn.setSpacing(6)
-
-            btn_editar = PillButton("✏ Editar", "secondary")
-            btn_editar.setObjectName("ColoredRowAction")
-            btn_editar.setFixedHeight(34)
-            btn_editar.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_editar.clicked.connect(
-                lambda _, sid=sup_id, n=nombre, fa=fecha_alta, fb=fecha_baja:
-                self._editar(sid, n, fa, fb)
+            menu = QMenu(self)
+            menu.addAction(
+                "Editar",
+                lambda checked=False, sid=sup_id, n=nombre, fa=fecha_alta, fb=fecha_baja:
+                self._editar(sid, n, fa, fb),
             )
-            fila_btn.addWidget(btn_editar)
-
             if activo:
-                btn_baja = PillButton("📅 Dar de baja", "danger")
-                btn_baja.setObjectName("ColoredRowAction")
-                btn_baja.setFixedHeight(34)
-                btn_baja.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn_baja.clicked.connect(
-                    lambda _, sid=sup_id, n=nombre: self._dar_de_baja(sid, n)
+                accion_estado = menu.addAction(
+                    "Dar de baja",
+                    lambda checked=False, sid=sup_id, n=nombre:
+                    self._dar_de_baja(sid, n),
                 )
-                fila_btn.addWidget(btn_baja)
             else:
-                btn_reactivar = PillButton("↩ Reactivar", "secondary")
-                btn_reactivar.setObjectName("ColoredRowAction")
-                btn_reactivar.setFixedHeight(34)
-                btn_reactivar.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn_reactivar.clicked.connect(
-                    lambda _, sid=sup_id, n=nombre: self._reactivar(sid, n)
+                accion_estado = menu.addAction(
+                    "Reactivar",
+                    lambda checked=False, sid=sup_id, n=nombre:
+                    self._reactivar(sid, n),
                 )
-                fila_btn.addWidget(btn_reactivar)
-
-            btn_eliminar = PillButton("Eliminar", "danger")
-            btn_eliminar.setObjectName("ColoredRowAction")
-            btn_eliminar.setFixedHeight(34)
-            btn_eliminar.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_eliminar.clicked.connect(
-                lambda _, sid=sup_id, n=nombre: self._eliminar(sid, n)
+            if activo:
+                accion_estado.setProperty("danger", True)
+            accion_eliminar = menu.addAction(
+                "Eliminar permanentemente",
+                lambda checked=False, sid=sup_id, n=nombre:
+                self._eliminar(sid, n),
             )
-            fila_btn.addWidget(btn_eliminar)
-
-            self.tabla.setCellWidget(i, 4, contenedor)
+            accion_eliminar.setProperty("danger", True)
+            boton_acciones = QPushButton("⋯")
+            boton_acciones.setObjectName("ObjectiveActions")
+            boton_acciones.setToolTip("Acciones del supervisor")
+            boton_acciones.setMenu(menu)
+            self.tabla.setCellWidget(i, 4, self._centrar_widget(boton_acciones))
             self.tabla.setRowHeight(i, 44)
 
         self.tabla.setUpdatesEnabled(True)

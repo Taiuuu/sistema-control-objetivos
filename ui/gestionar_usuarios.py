@@ -9,8 +9,10 @@ from database.db import DB_PATH
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QTableWidget,
-    QTableWidgetItem, QComboBox, QMessageBox
+    QTableWidgetItem, QComboBox, QMessageBox, QMenu, QHeaderView
 )
+from ui.components import GlassCard, PillButton, StatusBadge
+from ui.components.base import wrap_content_in_glass_card
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
@@ -101,7 +103,8 @@ class GestionarUsuarios(QWidget):
 
         layout.addLayout(fila)
 
-        boton_agregar = QPushButton("Agregar usuario")
+        boton_agregar = PillButton("Agregar usuario", "primary")
+        boton_agregar.setObjectName("PrimaryButton")
         boton_agregar.clicked.connect(self._agregar)
         layout.addWidget(boton_agregar)
 
@@ -112,6 +115,11 @@ class GestionarUsuarios(QWidget):
 
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(4)
+        self.tabla.setShowGrid(False)
+        self.tabla.setAlternatingRowColors(False)
+        self.tabla.verticalHeader().setVisible(False)
+        self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.tabla.horizontalHeader().setStretchLastSection(True)
         self.tabla.setHorizontalHeaderLabels([
             "Usuario",
             "Rol",
@@ -127,6 +135,7 @@ class GestionarUsuarios(QWidget):
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
+        wrap_content_in_glass_card(self)
 
         self._cargar_tabla()
 
@@ -169,37 +178,30 @@ class GestionarUsuarios(QWidget):
             self.tabla.setCellWidget(fila, 1, combo)
 
             # Estado
-            estado = "⚠️ Cambiar pwd" if debe_cambiar else "✅ OK"
-
-            self.tabla.setItem(
-                fila,
-                2,
-                QTableWidgetItem(estado)
+            estado = StatusBadge(
+                "Cambiar contraseña" if debe_cambiar else "Activo",
+                "warning" if debe_cambiar else "ok",
             )
+            self.tabla.setCellWidget(fila, 2, estado)
 
             # Botones
             if username != "admin":
 
-                contenedor = QWidget()
-                fila_botones = QHBoxLayout(contenedor)
-                fila_botones.setContentsMargins(0, 0, 0, 0)
-
-                btn_reset = QPushButton("Resetear")
-                btn_reset.clicked.connect(
-                    lambda checked, uid=usuario_id:
-                    self._resetear(uid)
+                menu = QMenu(self)
+                menu.addAction(
+                    "Resetear contraseña",
+                    lambda checked=False, uid=usuario_id: self._resetear(uid),
                 )
-
-                btn_eliminar = QPushButton("Eliminar")
-                btn_eliminar.clicked.connect(
-                    lambda checked, uid=usuario_id:
-                    self._eliminar(uid)
+                accion_eliminar = menu.addAction(
+                    "Eliminar usuario",
+                    lambda checked=False, uid=usuario_id: self._eliminar(uid),
                 )
-
-                fila_botones.addWidget(btn_reset)
-                fila_botones.addWidget(btn_eliminar)
-
-                self.tabla.setCellWidget(fila, 3, contenedor)
+                accion_eliminar.setProperty("danger", True)
+                boton_acciones = QPushButton("⋯")
+                boton_acciones.setObjectName("ObjectiveActions")
+                boton_acciones.setToolTip("Acciones del usuario")
+                boton_acciones.setMenu(menu)
+                self.tabla.setCellWidget(fila, 3, boton_acciones)
 
     # =========================================================================
     # ACCIONES

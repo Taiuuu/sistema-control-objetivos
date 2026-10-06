@@ -5,11 +5,12 @@
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QLabel,
-    QLineEdit, QPushButton, QMessageBox, QFrame
+    QLineEdit, QMessageBox
 )
 from PyQt6.QtCore import Qt
 from models.supervisores import agregar_supervisor
 from services.validaciones import validar_supervisor, ErrorValidacion
+from ui.components import GlassCard, PillButton
 
 
 # =============================================================================
@@ -33,7 +34,8 @@ class FormSupervisor(QWidget):
         self.input_nombre = QLineEdit()
         self.input_nombre.setFixedHeight(34)
 
-        self.boton_guardar = QPushButton("Guardar supervisor")
+        self.boton_guardar = PillButton("Guardar supervisor", "primary")
+        self.boton_guardar.setObjectName("PrimaryButton")
         self.boton_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.boton_guardar.setFixedHeight(40)
         self.boton_guardar.clicked.connect(self._guardar)
@@ -45,22 +47,14 @@ class FormSupervisor(QWidget):
         form_layout.setSpacing(12)
         form_layout.addRow(QLabel("Nombre del supervisor"), self.input_nombre)
 
-        card = QFrame()
-        card.setObjectName("CardContenedor")
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(18, 18, 18, 18)
-        card_layout.setSpacing(16)
-        card_layout.addLayout(form_layout)
-        card_layout.addWidget(self.boton_guardar)
-
+        formulario = GlassCard()
+        formulario.add_widget(self._titulo)
+        formulario.add_widget(self._subtitulo)
+        formulario.add_layout(form_layout)
+        formulario.add_widget(self.boton_guardar)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(14)
-        layout.addWidget(self._titulo)
-        layout.addWidget(self._subtitulo)
-        layout.addWidget(card)
-
-        self.setLayout(layout)
+        layout.addWidget(formulario)
 
     def _guardar(self) -> None:
         """Valida y registra el nuevo supervisor en la base de datos."""

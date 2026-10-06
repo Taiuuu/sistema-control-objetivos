@@ -52,35 +52,25 @@ QPushButton {
     font-weight: 600;
 }
 QPushButton:hover {
-    background-color: rgba(255, 255, 255, 25);
-    border-color: #63E6BE;
+    background-color: #1C401A;
+    border-color: #60BA5A;
 }
-QPushButton:pressed { background-color: #237A66; }
+QPushButton:pressed { background-color: #273126; }
 QPushButton:disabled {
     color: #687592;
     background-color: rgba(255, 255, 255, 7);
     border-color: rgba(255, 255, 255, 14);
 }
 QPushButton#PrimaryButton {
-    color: #0E1A1B;
-    background-color: #63E6BE;
-    border: none;
+    color: #FFFFFF;
+    background-color: #0A6506;
+    border: 1px solid #0A6506;
 }
-QPushButton#PrimaryButton:hover { background-color: #8AF2D1; }
+QPushButton#PrimaryButton:hover { color: #FFFFFF; background-color: #075704; border-color: #075704; }
 QPushButton#DangerButton {
     color: #FFD8DE;
     border-color: #A94659;
 }
-QPushButton#ColoredRowAction {
-    min-height: 24px;
-    padding: 0 8px;
-    color: #172033;
-    background-color: rgba(255, 255, 255, 210);
-    border: 1px solid rgba(23, 32, 51, 90);
-    border-radius: 6px;
-    font-weight: 600;
-}
-QPushButton#ColoredRowAction:hover { color: #172033; background-color: #FFFFFF; border-color: #172033; }
 QToolButton#TabButton, QPushButton#TabButton {
     min-height: 32px;
     padding: 0 14px;

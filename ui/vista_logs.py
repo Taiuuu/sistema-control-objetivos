@@ -10,6 +10,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QDate
 from database.db import DB_PATH
+from ui.components import GlassCard, PillButton
+from ui.components.base import wrap_content_in_glass_card
 
 # =============================================================================
 # CONSULTAS A BASE DE DATOS
@@ -52,7 +54,8 @@ class VistaLogs(QWidget):
         self.selector_fecha = QDateEdit()
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.setCalendarPopup(True)
-        boton_buscar = QPushButton("Buscar")
+        boton_buscar = PillButton("Buscar", "primary")
+        boton_buscar.setObjectName("PrimaryButton")
         boton_buscar.clicked.connect(self._cargar_tabla)
         fila.addWidget(QLabel("Fecha:"))
         fila.addWidget(self.selector_fecha)
@@ -70,6 +73,7 @@ class VistaLogs(QWidget):
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
+        wrap_content_in_glass_card(self)
         self._cargar_tabla()
 
     def _cargar_tabla(self) -> None:

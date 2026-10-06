@@ -14,6 +14,7 @@ from database.db import conectar
 import json
 from datetime import datetime
 from ui.components import StatusBadge
+from ui.components.base import wrap_content_in_glass_card
 
 
 class VistaValidaciones(QWidget):
@@ -38,6 +39,7 @@ class VistaValidaciones(QWidget):
         botones_layout = QHBoxLayout()
         
         btn_validar = QPushButton("🔍 Ejecutar Validación Completa")
+        btn_validar.setObjectName("PrimaryButton")
         btn_validar.clicked.connect(self.ejecutar_validacion)
         botones_layout.addWidget(btn_validar)
         
@@ -68,6 +70,7 @@ class VistaValidaciones(QWidget):
 
         layout.addWidget(self.tabs)
         self.setLayout(layout)
+        wrap_content_in_glass_card(self)
 
     def _crear_tab_resultados(self):
         """Crea el tab de resultados generales."""

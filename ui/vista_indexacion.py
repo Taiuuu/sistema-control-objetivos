@@ -13,6 +13,7 @@ from services.db_analyzer import AnalisisBD
 from services.auditoria import registrar_auditoria, TipoOperacion
 from datetime import datetime
 from ui.components import StatusBadge
+from ui.components.base import wrap_content_in_glass_card
 
 
 class VistaIndexacion(QWidget):
@@ -42,6 +43,7 @@ class VistaIndexacion(QWidget):
         botones_layout.addWidget(btn_actualizar)
         
         btn_optimizar = QPushButton("⚡ Optimizar BD Ahora")
+        btn_optimizar.setObjectName("PrimaryButton")
         btn_optimizar.clicked.connect(self.optimizar_bd)
         botones_layout.addWidget(btn_optimizar)
         
@@ -72,6 +74,7 @@ class VistaIndexacion(QWidget):
 
         layout.addWidget(self.tabs)
         self.setLayout(layout)
+        wrap_content_in_glass_card(self)
 
     def _crear_tab_stats(self):
         """Crea el tab de estadísticas generales."""

@@ -1012,7 +1012,9 @@ class VentanaPrincipal(QWidget):
         self.tabla.verticalHeader().setDefaultSectionSize(44)
 
         self.tabla.setStyleSheet(self._estilo_tabla(oscuro))
-        layout_derecho.addWidget(self.tabla)
+        self._tabla_card = GlassCard(content_margins=8)
+        self._tabla_card.add_widget(self.tabla, 1)
+        layout_derecho.addWidget(self._tabla_card, 1)
 
     def _estilo_tabla(self, oscuro: bool) -> str:
         tokens = self._theme_manager.tokens()
@@ -1028,20 +1030,24 @@ class VentanaPrincipal(QWidget):
             }}
             QTableWidget::item {{
                 padding: 6px 10px;
-                border-bottom: 1px solid {tokens['border']};
+                border-bottom: 1px solid {rgba(tokens['border'], 45)};
+                color: {tokens['text_primary']};
+            }}
+            QTableWidget::item:hover {{
+                background-color: {rgba(tokens['accent'], 10)};
                 color: {tokens['text_primary']};
             }}
             QTableWidget::item:selected {{
-                background-color: {tokens['surface_alt']};
+                background-color: {rgba(tokens['accent'], 14)};
                 color: {tokens['text_primary']};
             }}
             QHeaderView::section {{
-                background-color: {tokens['surface_alt']};
+                background-color: {rgba(tokens['surface_alt'], 220)};
                 color: {tokens['text_secondary']};
                 border: none;
-                border-bottom: 1px solid {tokens['border']};
+                border-bottom: 1px solid {rgba(tokens['border'], 70)};
                 padding: 8px 10px;
-                font-size: {tokens['font_size_sm']};
+                font-size: {tokens['font_size_xs']};
                 font-weight: 600;
                 letter-spacing: 0.5px;
             }}

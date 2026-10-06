@@ -88,3 +88,27 @@ def connect_theme(widget, callback) -> None:
     widget._theme_manager = get_theme_manager()
     widget._theme_manager.theme_changed.connect(callback)
     callback(widget._theme_manager.current())
+
+
+def wrap_content_in_glass_card(widget, *, content_margins: int = 18) -> GlassCard:
+    """Wrap an existing root layout in a theme-aware card without changing its contents."""
+    root_layout = widget.layout()
+    if root_layout is None:
+        raise ValueError("El widget debe tener un layout raíz para envolver su contenido.")
+    if getattr(widget, "_glass_card_wrapper", None) is not None:
+        return widget._glass_card_wrapper
+
+    card = GlassCard(widget, content_margins=content_margins)
+    while root_layout.count():
+        item = root_layout.takeAt(0)
+        child_widget = item.widget()
+        child_layout = item.layout()
+        if child_widget is not None:
+            card.add_widget(child_widget)
+        elif child_layout is not None:
+            card.add_layout(child_layout)
+        else:
+            card.content_layout.addItem(item)
+    root_layout.addWidget(card)
+    widget._glass_card_wrapper = card
+    return card

@@ -19,6 +19,7 @@ from services.reportes import generar_reporte_mensual, clasificar_cumplimiento
 from services.queries_tabla import cargar_supervisores
 from ui.animaciones import animar_aparecer
 from ui.components import StatusBadge
+from ui.components.base import wrap_content_in_glass_card
 from database.db import DB_PATH
 
 
@@ -63,6 +64,7 @@ class ReporteMensual(QWidget):
         self.selector_estado.addItems(["Todos", "CUMPLE", "NO CUMPLE"])
 
         self.boton_generar = QPushButton("Generar reporte")
+        self.boton_generar.setObjectName("PrimaryButton")
         self.boton_generar.clicked.connect(self._generar)
 
         self.boton_excel = QPushButton("Exportar Excel")
@@ -114,6 +116,7 @@ class ReporteMensual(QWidget):
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
+        wrap_content_in_glass_card(self)
         QShortcut(QKeySequence("Ctrl+Enter"), self).activated.connect(self._generar)
         QShortcut(QKeySequence("Ctrl+E"), self).activated.connect(self._exportar_excel)
 

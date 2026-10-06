@@ -20,6 +20,7 @@ from services.reportes import objetivo_corresponde, clasificar_cumplimiento
 from database.db import DB_PATH
 from services.queries_tabla import cargar_supervisores
 from ui.components import StatusBadge
+from ui.components.base import wrap_content_in_glass_card
 
 
 # =============================================================================
@@ -411,6 +412,7 @@ class ReporteObjetivo(QWidget):
         self.selector_estado.addItems(["Todos", "Completo", "Solo diurno", "Solo nocturno", "Sin control"])
 
         self.boton_generar = QPushButton("Generar reporte")
+        self.boton_generar.setObjectName("PrimaryButton")
         self.boton_generar.clicked.connect(self._generar)
 
         self.boton_excel = QPushButton("Exportar Excel")
@@ -469,6 +471,7 @@ class ReporteObjetivo(QWidget):
         layout.addWidget(self.resumen_label)
 
         self.setLayout(layout)
+        wrap_content_in_glass_card(self)
         self._actualizar_objetivos()
         QShortcut(QKeySequence("Ctrl+Enter"), self).activated.connect(self._generar)
         QShortcut(QKeySequence("Ctrl+E"), self).activated.connect(self._exportar_excel)

@@ -18,6 +18,7 @@ from services.auditoria import (
 )
 from services.sesion import get_usuario_id
 from ui.components import StatusBadge
+from ui.components.base import wrap_content_in_glass_card
 
 
 def _obtener_nombre_usuario(usuario_id: int | None) -> str:
@@ -94,6 +95,7 @@ class VistaAuditoria(QWidget):
         # Botón exportar
         controles.addStretch()
         btn_exportar = QPushButton("📊 Exportar CSV")
+        btn_exportar.setObjectName("PrimaryButton")
         btn_exportar.clicked.connect(self._exportar_auditoria)
         controles.addWidget(btn_exportar)
 
@@ -142,6 +144,7 @@ class VistaAuditoria(QWidget):
         self.tabs.addTab(widget_integridad, "Integridad")
 
         layout_principal.addWidget(self.tabs)
+        wrap_content_in_glass_card(self)
 
         self._cargar_datos()
 

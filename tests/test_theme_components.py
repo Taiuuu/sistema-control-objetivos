@@ -50,7 +50,7 @@ def test_components_follow_theme_changes(app, tmp_path, monkeypatch):
 
     assert THEMES["Negro"]["surface"] in card.styleSheet()
     assert THEMES["Negro"]["card_contrast"] in contrast_card.styleSheet()
-    assert THEMES["Negro"]["accent"] in button.styleSheet()
+    assert "#0A6506" in button.styleSheet()
     assert THEMES["Negro"]["text_primary"] in search.styleSheet()
     assert THEMES["Negro"]["success"] in badge.styleSheet()
     assert THEMES["Negro"]["accent"] in progress.styleSheet()
@@ -96,6 +96,43 @@ def test_module_card_emits_click_and_follows_theme(app, tmp_path, monkeypatch):
 
     manager.set_theme(original_theme)
     card.close()
+
+
+def test_objectives_screen_uses_glass_card_and_single_branded_primary(
+    app, tmp_path, monkeypatch
+):
+    from types import SimpleNamespace
+    import ui.lista_objetivos as objectives_screen
+
+    manager = get_theme_manager()
+    original_theme = manager.current()
+    monkeypatch.setattr(manager, "_config_file", tmp_path / "tema.json")
+    monkeypatch.setattr(objectives_screen, "_cargar_objetivos", lambda: [])
+    monkeypatch.setattr(objectives_screen, "get_rol", lambda: "supervisor")
+    monkeypatch.setattr(
+        objectives_screen,
+        "tiene_permiso",
+        lambda permission: permission == "objetivos.crear",
+    )
+    monkeypatch.setattr(
+        objectives_screen,
+        "obtener_sincronizador",
+        lambda: SimpleNamespace(
+            datos_cambiados=SimpleNamespace(connect=lambda _callback: None)
+        ),
+    )
+
+    window = objectives_screen.ListaObjetivos()
+    manager.set_theme("Negro")
+
+    assert window.findChild(GlassCard) is not None
+    assert window.boton_agregar is not None
+    assert "#0A6506" in window.boton_agregar.styleSheet()
+    assert "QTableWidget::item:hover" in window.styleSheet()
+    assert len(window.tablas) == 3
+
+    manager.set_theme(original_theme)
+    window.close()
 
 
 def test_component_preview_switches_all_components_live(app, tmp_path, monkeypatch):

@@ -38,6 +38,7 @@ from services.sesion import get_usuario_id
 
 from services.importador import analizar_excel, confirmar_importacion
 from services.importador import reporte as importador_reporte
+from ui.components.base import wrap_content_in_glass_card
 from services.importador.modelos import (
     ResultadoAnalisis,
     ResultadoMatchObjetivo,
@@ -167,9 +168,11 @@ class DialogoResolverCoincidencias(QDialog):
         botones = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
+        botones.button(QDialogButtonBox.StandardButton.Ok).setObjectName("PrimaryButton")
         botones.accepted.connect(self.accept)
         botones.rejected.connect(self.reject)
         layout.addWidget(botones)
+        wrap_content_in_glass_card(self, content_margins=12)
 
     def obtener_resoluciones(self):
         """Devuelve lista de (grupo, tipo, nombre_elegido)."""
@@ -369,6 +372,7 @@ class ImportarExcel(QWidget):
         self.overlay_progreso = OverlayProgreso(self)
         self._theme_manager.theme_changed.connect(self._aplicar_tema)
         self._aplicar_tema(self._theme_manager.current())
+        wrap_content_in_glass_card(self)
 
     def _aplicar_tema(self, theme_name: str) -> None:
         tokens = self._theme_manager.tokens(theme_name)

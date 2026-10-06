@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QPushButton,
     QDateEdit, QTimeEdit, QComboBox, QMessageBox, QDialog,
     QSpinBox, QLineEdit, QFileDialog
+    , QMenu
 )
 from PyQt6.QtCore import QDate, QTime
 
@@ -20,6 +21,7 @@ from services.validador_horas_limite import validar_hora_turno_nocturno
 from services.background_task import run_background_task
 from services.exportar import exportar_pasadas_excel, exportar_pasadas_pdf
 from ui.components import GlassCard, PillButton, SearchInput, StatusBadge
+from ui.components.base import wrap_content_in_glass_card
 
 
 # =============================================================================
@@ -302,6 +304,7 @@ class DialogoEditarPasada(QDialog):
         fila_botones = QHBoxLayout()
 
         btn_guardar = QPushButton("Guardar")
+        btn_guardar.setObjectName("PrimaryButton")
         btn_guardar.clicked.connect(self._guardar)
 
         btn_cancelar = QPushButton("Cancelar")
@@ -313,6 +316,7 @@ class DialogoEditarPasada(QDialog):
         layout.addLayout(fila_botones)
 
         self.setLayout(layout)
+        wrap_content_in_glass_card(self)
 
     def _guardar(self):
 
@@ -410,7 +414,7 @@ class ListaPasadas(QWidget):
         self.btn_filtrar.toggled.connect(self._alternar_filtros)
         fila.addWidget(self.btn_filtrar)
 
-        self.btn_exportar_excel = PillButton("Exportar Excel", "secondary")
+        self.btn_exportar_excel = PillButton("Exportar Excel", "primary")
         self.btn_exportar_excel.clicked.connect(self._exportar_excel)
         fila.addWidget(self.btn_exportar_excel)
 
@@ -481,23 +485,21 @@ class ListaPasadas(QWidget):
 
         # Tabla
         self.tabla = QTableWidget()
-        self.tabla.setColumnCount(6)
+        self.tabla.setColumnCount(5)
 
         self.tabla.setHorizontalHeaderLabels([
             "Hora",
             "Turno",
             "Objetivo",
             "Supervisor",
-            "Editar",
-            "Eliminar"
+            "Acciones"
         ])
 
         self.tabla.setColumnWidth(0, 90)
         self.tabla.setColumnWidth(1, 100)
         self.tabla.setColumnWidth(2, 250)
         self.tabla.setColumnWidth(3, 180)
-        self.tabla.setColumnWidth(4, 100)
-        self.tabla.setColumnWidth(5, 100)
+        self.tabla.setColumnWidth(4, 90)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.verticalHeader().setVisible(False)
         self.tabla.setShowGrid(False)
@@ -557,17 +559,21 @@ class ListaPasadas(QWidget):
             self.tabla.setItem(fila, 2, _item(item[3]))
             self.tabla.setItem(fila, 3, _item(item[4]))
 
-            btn_editar = PillButton("Editar", "secondary")
-            btn_editar.clicked.connect(
-                lambda _, pid=pasada_id: self._editar(pid)
+            menu = QMenu(self)
+            menu.addAction(
+                "Editar",
+                lambda checked=False, pid=pasada_id: self._editar(pid),
             )
-            self.tabla.setCellWidget(fila, 4, btn_editar)
-
-            btn_eliminar = PillButton("Eliminar", "danger")
-            btn_eliminar.clicked.connect(
-                lambda _, pid=pasada_id: self._eliminar(pid)
+            accion_eliminar = menu.addAction(
+                "Eliminar",
+                lambda checked=False, pid=pasada_id: self._eliminar(pid),
             )
-            self.tabla.setCellWidget(fila, 5, btn_eliminar)
+            accion_eliminar.setProperty("danger", True)
+            boton_acciones = QPushButton("⋯")
+            boton_acciones.setObjectName("ObjectiveActions")
+            boton_acciones.setToolTip("Acciones de la pasada")
+            boton_acciones.setMenu(menu)
+            self.tabla.setCellWidget(fila, 4, self._centrar_widget(boton_acciones))
 
     @staticmethod
     def _centrar_widget(widget: QWidget) -> QWidget:
