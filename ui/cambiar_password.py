@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QMessageBox
 )
+from PyQt6.QtCore import Qt
 from ui.components import GlassCard, PillButton
 from ui.theme.theme_manager import get_theme_manager
 
@@ -23,6 +24,7 @@ def campo_password_con_ojito(placeholder: str) -> tuple:
     contenedor = QWidget()
     layout = QHBoxLayout(contenedor)
     layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(8)
 
     input_pw = QLineEdit()
     input_pw.setPlaceholderText(placeholder)
@@ -30,12 +32,27 @@ def campo_password_con_ojito(placeholder: str) -> tuple:
     input_pw.setFixedHeight(40)
 
     boton_ojo = PillButton("👁", "ghost")
-    boton_ojo.setFixedSize(40, 40)
+    boton_ojo.setObjectName("PasswordVisibilityToggle")
+    boton_ojo.set_compact_icon()
+    boton_ojo.setFixedSize(48, 40)
     boton_ojo.setCheckable(True)
-    boton_ojo.toggled.connect(
-        lambda checked: input_pw.setEchoMode(
-            QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
+    boton_ojo.setCursor(Qt.CursorShape.PointingHandCursor)
+    boton_ojo.setAccessibleName("Mostrar contraseña")
+    boton_ojo.setToolTip("Mostrar contraseña")
+
+    def actualizar_visibilidad(visible: bool) -> None:
+        input_pw.setEchoMode(
+            QLineEdit.EchoMode.Normal if visible else QLineEdit.EchoMode.Password
         )
+        boton_ojo.setAccessibleName(
+            "Ocultar contraseña" if visible else "Mostrar contraseña"
+        )
+        boton_ojo.setToolTip(
+            "Ocultar contraseña" if visible else "Mostrar contraseña"
+        )
+
+    boton_ojo.toggled.connect(
+        actualizar_visibilidad
     )
 
     layout.addWidget(input_pw)

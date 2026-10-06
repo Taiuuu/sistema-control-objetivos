@@ -34,6 +34,8 @@ class PillButton(QPushButton):
             ),
         }
         background, foreground, hover_bg, hover_fg = colors[self.variant]
+        compact_icon = self.property("compact_icon") is True
+        padding = "0" if compact_icon else f'0 {tokens["spacing_lg"]}'
         pressed_bg = (
             "#064A03"
             if self.variant == "primary"
@@ -45,12 +47,13 @@ class PillButton(QPushButton):
             f"""
             QPushButton {{
                 min-height: {tokens["control_height"]};
-                padding: 0 {tokens["spacing_lg"]};
+                padding: {padding};
                 color: {foreground};
                 background-color: {background};
                 border: 1px solid {tokens["border"] if self.variant in {"secondary", "ghost"} else background};
                 border-radius: {tokens["radius_lg"]};
                 font-weight: 600;
+                {"font-size: " + tokens["font_size_lg"] + ";" if compact_icon else ""}
             }}
             QPushButton:hover {{
                 color: {hover_fg};
@@ -68,6 +71,11 @@ class PillButton(QPushButton):
             }}
             """
         )
+
+    def set_compact_icon(self, compact: bool = True) -> None:
+        """Reduce padding and size the label for an icon-only button."""
+        self.setProperty("compact_icon", compact)
+        self._apply_theme(self._theme_manager.current())
 
 
 class SearchInput(QLineEdit):

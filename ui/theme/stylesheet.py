@@ -10,6 +10,31 @@ def _rgba(color: str, alpha: int) -> str:
     return f"rgba({red}, {green}, {blue}, {alpha})"
 
 
+def generate_date_edit_dropdown_stylesheet(tokens: Mapping[str, str]) -> str:
+    """Estilo del botón calendario, también para selectores con QSS local."""
+    return f"""
+        QDateTimeEdit::down-button {{
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 24px;
+            background-color: {tokens["surface_alt"]};
+            border-left: {tokens["border_width"]} solid {tokens["border"]};
+            border-top-right-radius: {tokens["radius_sm"]};
+            border-bottom-right-radius: {tokens["radius_sm"]};
+        }}
+        QDateTimeEdit::down-button:hover {{
+            background-color: {_rgba(tokens["accent"], 18)};
+        }}
+        QDateTimeEdit::down-arrow {{
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid {tokens["text_secondary"]};
+        }}
+    """
+
+
 def generate_stylesheet(tokens: Mapping[str, str]) -> str:
     """Genera QSS global evitando colores específicos de widgets."""
     return f"""
@@ -118,25 +143,6 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
         QComboBox:disabled, QDateEdit:disabled, QDateTimeEdit:disabled,
         QTimeEdit:disabled, QSpinBox:disabled {{
             color: {tokens["text_disabled"]};
-        }}
-        QDateTimeEdit::down-button {{
-            subcontrol-origin: padding;
-            subcontrol-position: top right;
-            width: 22px;
-            background-color: {tokens["surface_alt"]};
-            border-left: {tokens["border_width"]} solid {tokens["border"]};
-            border-top-right-radius: {tokens["radius_sm"]};
-            border-bottom-right-radius: {tokens["radius_sm"]};
-        }}
-        QDateTimeEdit::down-button:hover {{
-            background-color: {_rgba(tokens["accent"], 18)};
-        }}
-        QDateTimeEdit::down-arrow {{
-            width: 0;
-            height: 0;
-            border-left: 4px solid transparent;
-            border-right: 4px solid transparent;
-            border-top: 5px solid {tokens["text_secondary"]};
         }}
         QCalendarWidget {{
             color: {tokens["text_primary"]};
@@ -383,4 +389,4 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             border: {tokens["border_width"]} solid {tokens["border"]};
             border-radius: {tokens["radius_card"]};
         }}
-    """
+    """ + generate_date_edit_dropdown_stylesheet(tokens)

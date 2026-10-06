@@ -43,6 +43,7 @@ from ui.vista_sincronizacion import VistaSincronizacion
 from ui.configuracion import ConfiguracionDialog
 from ui.animaciones import animar_aparecer, tiene_animacion_activa
 from ui.theme.theme_manager import get_theme_manager
+from ui.theme.stylesheet import generate_date_edit_dropdown_stylesheet
 from ui.theme.tokens import THEMES
 from ui.theme.colors import parse_color
 from services.permisos import tiene_permiso
@@ -959,7 +960,7 @@ class VentanaPrincipal(QWidget):
                 selection-color: {tokens['accent_text']};
                 outline: none;
             }}
-        """
+        """ + generate_date_edit_dropdown_stylesheet(tokens)
 
     def _construir_tabla(self, layout_derecho):
         oscuro = self._oscuro

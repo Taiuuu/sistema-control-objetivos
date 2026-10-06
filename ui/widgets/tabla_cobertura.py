@@ -16,6 +16,7 @@ from database.db import DB_PATH
 from services.reportes import obtener_objetivos_del_dia
 from ui.widgets.badges import BadgeEstado, BadgeNumero
 from ui.theme.colors import parse_color
+from ui.theme.stylesheet import generate_date_edit_dropdown_stylesheet
 from ui.theme.theme_manager import get_theme_manager
 
 
@@ -231,6 +232,7 @@ class TablaCoberturaWidget(QWidget):
         return scroll
 
     def _estilo_input(self, oscuro: bool) -> str:
+        tokens = get_theme_manager().tokens()
         return f"""
             QComboBox, QLineEdit, QDateEdit {{
                 background-color: {p('bg_tabla', oscuro)};
@@ -262,7 +264,7 @@ class TablaCoberturaWidget(QWidget):
                 selection-color: {p('accent_text', oscuro)};
                 outline: none;
             }}
-        """
+        """ + generate_date_edit_dropdown_stylesheet(tokens)
 
     def _estilo_btn_nav(self, oscuro: bool) -> str:
         return f"""

@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QDateEdit,
+    QLineEdit,
     QStyle,
     QStyleOptionSpinBox,
     QWidget,
@@ -30,6 +31,7 @@ from ui.components import (
 from ui.components.calendar import configure_calendar_theme
 from ui.theme.theme_manager import get_theme_manager
 from ui.theme.stylesheet import generate_stylesheet
+from ui.theme.stylesheet import generate_date_edit_dropdown_stylesheet
 from ui.theme.tokens import THEMES
 
 
@@ -104,6 +106,30 @@ def test_module_card_emits_click_and_follows_theme(app, tmp_path, monkeypatch):
     card.close()
 
 
+def test_password_visibility_buttons_have_room_and_toggle_both_fields(app):
+    from ui.login import campo_password_con_ojito as login_password_field
+    from ui.cambiar_password import campo_password_con_ojito as change_password_field
+
+    for create_field in (login_password_field, change_password_field):
+        container, password = create_field("Contraseña")
+        button = container.findChild(PillButton, "PasswordVisibilityToggle")
+
+        assert button is not None
+        assert button.width() == 48
+        assert button.height() == 40
+        assert "padding: 0;" in button.styleSheet()
+        assert password.echoMode() == QLineEdit.EchoMode.Password
+
+        button.click()
+        assert password.echoMode() == QLineEdit.EchoMode.Normal
+        assert button.toolTip() == "Ocultar contraseña"
+
+        button.click()
+        assert password.echoMode() == QLineEdit.EchoMode.Password
+        assert button.toolTip() == "Mostrar contraseña"
+        container.close()
+
+
 def test_date_calendar_tracks_all_theme_tokens(app, tmp_path, monkeypatch):
     manager = get_theme_manager()
     original_theme = manager.current()
@@ -139,6 +165,9 @@ def test_date_calendar_tracks_all_theme_tokens(app, tmp_path, monkeypatch):
         for theme_name, tokens in THEMES.items():
             manager.set_theme(theme_name)
             manager.apply_current()
+            date_edit.setStyleSheet(
+                generate_date_edit_dropdown_stylesheet(tokens)
+            )
             app.processEvents()
             stylesheet = generate_stylesheet(tokens)
             option = QStyleOptionSpinBox()
@@ -164,7 +193,9 @@ def test_date_calendar_tracks_all_theme_tokens(app, tmp_path, monkeypatch):
             assert tokens["text_primary"] in stylesheet
             assert tokens["text_secondary"] in stylesheet
             assert tokens["accent"] in stylesheet
-            assert "QDateTimeEdit::down-button" in stylesheet
+            assert "QDateTimeEdit::down-button" in (
+                generate_date_edit_dropdown_stylesheet(tokens)
+            )
             assert "QCalendarWidget QSpinBox#qt_calendar_yearedit" in stylesheet
             assert arrow_rect.width() >= 22
             assert (
