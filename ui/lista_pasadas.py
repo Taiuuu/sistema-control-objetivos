@@ -504,6 +504,7 @@ class ListaPasadas(QWidget):
         self.tabla.setColumnWidth(4, 90)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.verticalHeader().setVisible(False)
+        self.tabla.verticalHeader().setDefaultSectionSize(42)
         self.tabla.setShowGrid(False)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.horizontalHeader().setStretchLastSection(True)

@@ -97,6 +97,9 @@ def test_stylesheet_covers_global_controls_for_each_theme():
             assert selector in stylesheet
         assert tokens["bg_gradient_start"] in stylesheet
         assert tokens["accent"] in stylesheet
+        assert "QTableWidget::item" in stylesheet
+        assert "padding: 7px 8px;" in stylesheet
+        assert "QTableView::item" in stylesheet
 
 
 def test_theme_manager_persists_visual_and_legacy_preference(tmp_path, monkeypatch):

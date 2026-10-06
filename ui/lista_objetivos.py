@@ -151,7 +151,7 @@ class DialogoEditarObjetivo(QDialog):
                 border-color: {tokens["accent"]};
             }}
             QListWidget::item {{
-                padding: 5px;
+                padding: 7px 8px;
                 border-bottom: 1px solid {rgba(tokens["border"], 45)};
             }}
             QListWidget::item:selected {{
@@ -359,7 +359,7 @@ class ListaObjetivos(QWidget):
             }}
             QTableWidget::item {{
                 border-bottom: 1px solid {rgba(tokens['border'], 45)};
-                padding: 6px 10px;
+                padding: 8px 10px;
             }}
             QTableWidget::item:hover {{
                 background: {rgba(tokens['accent'], 10)};

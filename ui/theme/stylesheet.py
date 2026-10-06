@@ -245,7 +245,7 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             selection-color: {tokens["text_primary"]};
         }}
         QListWidget::item {{
-            padding: {tokens["spacing_xs"]} {tokens["spacing_sm"]};
+            padding: 6px {tokens["spacing_sm"]};
             border-bottom: {tokens["border_width"]} solid {_rgba(tokens["border"], 45)};
         }}
         QListWidget::item:hover, QListWidget::item:selected {{
@@ -278,7 +278,7 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
         }}
         QTableWidget::item {{
             border-bottom: {tokens["border_width"]} solid {_rgba(tokens["border"], 45)};
-            padding: 5px 8px;
+            padding: 7px 8px;
         }}
         QTableWidget::item:hover, QTableWidget::item:selected {{
             color: {tokens["text_primary"]};
@@ -294,7 +294,7 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
         }}
         QTableView::item {{
             border-bottom: {tokens["border_width"]} solid {_rgba(tokens["border"], 45)};
-            padding: 5px 8px;
+            padding: 7px 8px;
         }}
         QTableView::item:hover, QTableView::item:selected {{
             background-color: {_rgba(tokens["accent"], 12)};

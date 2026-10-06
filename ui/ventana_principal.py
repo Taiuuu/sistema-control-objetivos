@@ -1008,7 +1008,7 @@ class VentanaPrincipal(QWidget):
                 selection-background-color: transparent;
             }}
             QTableWidget::item {{
-                padding: 6px 10px;
+                padding: 8px 10px;
                 border-bottom: 1px solid {rgba(tokens['border'], 45)};
                 color: {tokens['text_primary']};
             }}

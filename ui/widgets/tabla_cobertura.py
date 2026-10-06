@@ -323,7 +323,7 @@ class TablaCoberturaWidget(QWidget):
                 selection-background-color: transparent;
             }}
             QTableWidget::item {{
-                padding: 6px 10px;
+                padding: 8px 10px;
                 border-bottom: 1px solid {p('border_light', oscuro)};
                 color: {p('text_primary', oscuro)};
             }}
