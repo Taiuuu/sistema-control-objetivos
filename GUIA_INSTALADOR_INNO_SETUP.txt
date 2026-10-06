@@ -1,4 +1,4 @@
-# Guía de Instalador Inno Setup - VESP Control de Objetivos
+# Guía de Instalador Inno Setup - VESP Organizations
 # =============================================================================
 # Fecha: 2026-05-04
 # Versión: 1.1.0
@@ -6,7 +6,7 @@
 
 ## 📋 INTRODUCCIÓN
 
-Esta guía explica cómo crear y mantener el instalador para VESP Control usando Inno Setup.
+Esta guía explica cómo crear y mantener el instalador para VESP Organizations usando Inno Setup.
 El proyecto ya incluye un script base `scripts/instalador.iss` que puedes usar como punto de partida.
 
 ## 🔧 REQUISITOS PREVIOS
@@ -34,7 +34,7 @@ pip install -r requirements.txt
 
 # 2. Crear el ejecutable con PyInstaller (si no existe)
 # El proyecto ya incluye build/VESP Control/ pero si necesitas recrearlo:
-pyinstaller --onefile --windowed --name "VESP Control" scripts/main.py
+pyinstaller --onefile --windowed --name "VESP Control" --add-data "assets;assets" scripts/main.py
 
 # 3. Verificar que el ejecutable funciona
 # Ejecutar dist/VESP Control/VESP Control.exe
@@ -45,12 +45,12 @@ pyinstaller --onefile --windowed --name "VESP Control" scripts/main.py
 ; scripts/instalador.iss
 #define MyAppName "VESP Control"
 #define MyAppVersion "1.1.0"          ; ← CAMBIAR AQUÍ LA VERSIÓN
-#define MyAppPublisher "V.E.S.P Organizations"
+#define MyAppPublisher "VESP Organizations"
 #define MyAppExeName "VESP Control.exe"
 
 [Setup]
 AppId={{VESP-CONTROL-2024}}
-AppName={#MyAppName}
+AppName=VESP Organizations
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
@@ -104,7 +104,7 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Ejecutar {#MyAppName}"; Flags: 
 - [ ] **Cambiar versión en código**: Actualizar `docs/version.txt`
 - [ ] **Actualizar requirements.txt**: Si hay nuevas dependencias
 - [ ] **Probar la aplicación**: Asegurarse que funciona correctamente
-- [ ] **Crear nuevo ejecutable**: `pyinstaller --onefile --windowed --name "VESP Control" scripts/main.py`
+- [ ] **Crear nuevo ejecutable**: `pyinstaller --onefile --windowed --name "VESP Control" --add-data "assets;assets" scripts/main.py`
 - [ ] **Actualizar changelog**: Documentar cambios en `docs/`
 
 ### Pasos para Nueva Versión:
@@ -151,7 +151,7 @@ begin
   // Verificar si ya está instalada una versión
   if RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#SetupSetting("AppId")}_is1', 'DisplayVersion', ExpandConstant('{app}')) then
   begin
-    if MsgBox('VESP Control ya está instalado. ¿Desea continuar con la instalación?', mbConfirmation, MB_YESNO) = IDNO then
+    if MsgBox('VESP Organizations ya está instalado. ¿Desea continuar con la instalación?', mbConfirmation, MB_YESNO) = IDNO then
     begin
       Result := False;
       Exit;

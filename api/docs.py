@@ -9,7 +9,7 @@ from flask import Flask
 from api.app import app
 
 spec = APISpec(
-    title="VESP Control de Objetivos API",
+    title="VESP Organizations API",
     version="1.0.0",
     openapi_version="3.0.3",
     plugins=[FlaskPlugin(), MarshmallowPlugin()],

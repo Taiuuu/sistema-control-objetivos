@@ -18,7 +18,7 @@ Características:
 - Almacena metadata en JSON para auditoría
 - Limpia automáticamente backups más antiguos que la retención
 
-Autor: VESP Control de Objetivos
+Autor: VESP Organizations
 Versión: 2.0.0
 """
 

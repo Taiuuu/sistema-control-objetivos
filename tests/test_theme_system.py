@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from PyQt6.QtCore import qInstallMessageHandler
 from PyQt6.QtGui import QColor
@@ -22,6 +23,7 @@ def test_all_themes_define_same_complete_token_surface():
     token_keys = {frozenset(tokens) for tokens in THEMES.values()}
 
     assert len(token_keys) == 1
+    assert "glass_border" not in next(iter(token_keys))
     assert {
         "bg_gradient_start",
         "bg_gradient_end",
@@ -52,6 +54,23 @@ def test_all_themes_define_same_complete_token_surface():
         "spacing_md",
         "font_size_md",
     }.issubset(next(iter(token_keys)))
+    assert all(
+        not tokens[key].startswith("rgba(")
+        for tokens in THEMES.values()
+        for key in ("surface", "surface_alt", "border", "card_contrast")
+    )
+
+
+def test_theme_logo_paths_exist_for_every_theme():
+    assert {
+        name: Path(tokens["logo_path"]).name for name, tokens in THEMES.items()
+    } == {
+        "Claro": "vespLogoDarkGreen.svg",
+        "Verde": "vespLogoLight.svg",
+        "Negro": "logo_vesp_transparente.png",
+        "Grafito": "logo_vesp_fondo_oscuro_transparente.png",
+    }
+    assert all(Path(tokens["logo_path"]).is_file() for tokens in THEMES.values())
 
 
 def test_stylesheet_covers_global_controls_for_each_theme():
@@ -94,6 +113,31 @@ def test_theme_manager_persists_visual_and_legacy_preference(tmp_path, monkeypat
     assert manager.available_themes() == ["Claro", "Verde", "Negro", "Grafito"]
 
     manager.set_theme(original_theme)
+
+
+def test_theme_manager_migrates_legacy_mode_preference_idempotently(
+    tmp_path, monkeypatch
+):
+    manager = get_theme_manager()
+    config_file = tmp_path / "tema.json"
+    monkeypatch.setattr(manager, "_config_file", config_file)
+
+    for legacy_name, expected_theme in (("claro", "Claro"), ("oscuro", "Grafito")):
+        config_file.write_text(
+            json.dumps({"tema": legacy_name, "font_size": 14}),
+            encoding="utf-8",
+        )
+
+        assert manager._load_preference() == expected_theme
+        assert json.loads(config_file.read_text(encoding="utf-8")) == {
+            "tema": legacy_name,
+            "font_size": 14,
+            "tema_visual": expected_theme,
+        }
+        assert manager._load_preference() == expected_theme
+
+    config_file.unlink()
+    assert manager._load_preference() == "Grafito"
 
 
 def test_theme_manager_applies_stylesheet_to_application(tmp_path, monkeypatch):

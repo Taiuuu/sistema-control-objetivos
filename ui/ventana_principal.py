@@ -180,12 +180,11 @@ class VentanaPrincipal(QWidget):
     SIDEBAR_EXPANDIDO = 230
     SIDEBAR_COLAPSADO = 56
 
-    def __init__(self, usuario_id=None, rol=None, on_login_exitoso=None, app=None, alternar_tema_fn=None):
+    def __init__(self, usuario_id=None, rol=None, on_login_exitoso=None, app=None):
         self.usuario_id       = usuario_id
         self.rol              = rol
         self.on_login_exitoso = on_login_exitoso
         self.app              = app
-        self.alternar_tema_fn = alternar_tema_fn
         self.zoom_nivel       = 13
         self._sidebar_expandido = True
         self._metricas_colapsadas = False
@@ -193,7 +192,7 @@ class VentanaPrincipal(QWidget):
         self._menu_visible = obtener_menu_usuario(usuario_id)
 
         super().__init__()
-        self.setWindowTitle("VESP · Control de Objetivos")
+        self.setWindowTitle("VESP Organizations")
         self.setWindowFlags(Qt.WindowType.Window)
         self.move(80, 60)
         self.resize(1340, 660)
@@ -220,8 +219,8 @@ class VentanaPrincipal(QWidget):
         if hasattr(self, "logo_label"):
             self.logo_label.setPixmap(
                 QPixmap(ruta_logo).scaled(
-                    36,
-                    36,
+                    145 if self._sidebar_expandido else 36,
+                    145 if self._sidebar_expandido else 36,
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation,
                 )
@@ -229,9 +228,6 @@ class VentanaPrincipal(QWidget):
 
     def _al_cambiar_tema(self, nombre_tema: str) -> None:
         self._oscuro = nombre_tema != "Claro"
-        self.btn_tema.setText(
-            "🌙  Grafito" if nombre_tema == "Claro" else "☀  Claro"
-        )
         self._actualizar_logo_tema(nombre_tema)
         self._refrescar_tema()
 
@@ -353,23 +349,6 @@ class VentanaPrincipal(QWidget):
         fila_logo.addWidget(self.btn_colapsar)
         lay.addLayout(fila_logo)
 
-        self.titulo_lateral = QLabel("V.E.S.P")
-        self.titulo_lateral.setStyleSheet(f"""
-            color: {obtener_color('accent', oscuro)};
-            font-size: 16px;
-            font-weight: 800;
-            letter-spacing: 2px;
-        """)
-        lay.addWidget(self.titulo_lateral)
-
-        self.subtitulo_lateral = QLabel("Organizations")
-        self.subtitulo_lateral.setStyleSheet(f"""
-            color: {obtener_color('text_muted', oscuro)};
-            font-size: 10px;
-            letter-spacing: 1px;
-        """)
-        lay.addWidget(self.subtitulo_lateral)
-
         return self._cabecera_sidebar
 
     def _construir_botones_menu(self):
@@ -489,14 +468,6 @@ class VentanaPrincipal(QWidget):
         fila_zoom.addWidget(self.lbl_zoom, 1)
         fila_zoom.addWidget(self._btn_zoom_mas)
         lay.addLayout(fila_zoom)
-
-        texto_tema = "☀  Claro" if oscuro else "🌙  Grafito"
-        self.btn_tema = QPushButton(texto_tema)
-        self.btn_tema.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_tema.setFixedHeight(34)
-        self.btn_tema.setStyleSheet(self._estilo_btn_tema(oscuro))
-        self.btn_tema.clicked.connect(self._alternar_tema)
-        lay.addWidget(self.btn_tema)
 
         nombre_usuario = obtener_nombre_usuario(self.usuario_id)
         self.usuario_label = QLabel(f"👤  {nombre_usuario}")
@@ -784,7 +755,6 @@ class VentanaPrincipal(QWidget):
         lay.addLayout(title_group)
         lay.addStretch()
 
-        self.lbl_estado_sync = StatusBadge("● En vivo", "ok")
         self._btn_toggle_metricas = QToolButton()
         self._btn_toggle_metricas.setObjectName("ToggleMetrics")
         self._btn_toggle_metricas.setText("⌃")
@@ -794,7 +764,6 @@ class VentanaPrincipal(QWidget):
         self._btn_toggle_metricas.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_toggle_metricas.clicked.connect(self._alternar_metricas)
         lay.addWidget(self._btn_toggle_metricas)
-        lay.addWidget(self.lbl_estado_sync)
         self._header = header
         self._theme_manager.theme_changed.connect(self._estilizar_header)
         self._estilizar_header(self._theme_manager.current())
@@ -1091,54 +1060,6 @@ class VentanaPrincipal(QWidget):
             }}
         """
 
-    # =========================================================================
-    # TEMA — ALTERNAR Y REFRESCAR
-    # =========================================================================
-
-    def _alternar_tema(self) -> None:
-        """
-        Alterna entre tema claro y oscuro globalmente.
-        
-        Actualiza:
-        - Tema general de la aplicación
-        - Todos los componentes de la ventana
-        - Estilos de botones, tabla, y paneles
-        - Persistencia del tema elegido
-        
-        Raises:
-            Loguea errores pero no los propaga para evitar crashes
-        """
-        try:
-            # ✅ Validar que hay callback de tema
-            if not self.alternar_tema_fn or not self.app:
-                from PyQt6.QtWidgets import QMessageBox
-                QMessageBox.warning(self, "Error", "Error al cambiar tema. Intenta nuevamente.")
-                print("⚠️ Error: No hay callback de alternar_tema o app no disponible")
-                return
-            
-            # ✅ Llamar al callback global de tema
-            self.alternar_tema_fn(self.app, self)
-            
-            tema_actual = get_theme_manager().current()
-            
-            # ✅ Loguear cambio
-            try:
-                from services.logger import registrar_accion
-                registrar_accion(
-                    self.usuario_id,
-                    f"Cambió tema a {tema_actual}"
-                )
-            except Exception:
-                pass  # No interrumpir si logging falla
-            
-            print(f"✅ Tema cambiado a: {tema_actual}")
-            
-        except Exception as e:
-            print(f"❌ Error al alternar tema: {e}")
-            import traceback
-            traceback.print_exc()
-            # No lanzar excepción para que la app siga funcionando
-
     def _cerrar_sesion(self):
         """Cierra la sesión actual y regresa a la ventana de login."""
         from services.sesion import cerrar_sesion
@@ -1186,14 +1107,6 @@ class VentanaPrincipal(QWidget):
         self._cabecera_sidebar.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
         self._contenedor_scroll.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
         self._zona_inferior.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
-        self.titulo_lateral.setStyleSheet(f"""
-            color: {obtener_color('accent', oscuro)};
-            font-size: 16px; font-weight: 800; letter-spacing: 2px;
-        """)
-        self.subtitulo_lateral.setStyleSheet(f"""
-            color: {obtener_color('text_muted', oscuro)};
-            font-size: 10px; letter-spacing: 1px;
-        """)
         self.btn_colapsar.setStyleSheet(f"""
             QToolButton {{
                 background: {obtener_color('btn_menu_hover', oscuro)};
@@ -1231,9 +1144,6 @@ class VentanaPrincipal(QWidget):
         self._btn_zoom_menos.setStyleSheet(estilo_mini_btn)
         self._btn_zoom_mas.setStyleSheet(estilo_mini_btn)
         self.lbl_zoom.setStyleSheet(f"color: {obtener_color('text_muted', oscuro)}; font-size: 10px;")
-        texto_tema = "☀  Modo claro" if oscuro else "🌙  Modo oscuro"
-        self.btn_tema.setText(texto_tema)
-        self.btn_tema.setStyleSheet(self._estilo_btn_tema(oscuro))
         self.btn_configuracion.setStyleSheet(self._estilo_btn_tema(oscuro))
         self.btn_configurar_menu.setStyleSheet(self._estilo_btn_tema(oscuro))
         self.btn_logout.setStyleSheet(self._estilo_btn_logout(oscuro))
@@ -1334,11 +1244,9 @@ class VentanaPrincipal(QWidget):
             self._sidebar_expandido = False
             self.btn_colapsar.setText("›")
             self.btn_colapsar.setToolTip("Expandir menú (Ctrl+\\)")
-            self.titulo_lateral.hide()
-            self.subtitulo_lateral.hide()
             self.usuario_label.hide()
-            self.btn_tema.hide()
             self.lbl_zoom.hide()
+            self._actualizar_logo_tema(self._theme_manager.current())
             for b in self._botones_menu:
                 b.colapsar()
         else:
@@ -1346,11 +1254,9 @@ class VentanaPrincipal(QWidget):
             self._sidebar_expandido = True
             self.btn_colapsar.setText("‹")
             self.btn_colapsar.setToolTip("Colapsar menú (Ctrl+\\)")
-            self.titulo_lateral.show()
-            self.subtitulo_lateral.show()
             self.usuario_label.show()
-            self.btn_tema.show()
             self.lbl_zoom.show()
+            self._actualizar_logo_tema(self._theme_manager.current())
             for b in self._botones_menu:
                 b.expandir()
 

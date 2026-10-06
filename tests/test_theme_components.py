@@ -169,8 +169,8 @@ def test_dashboard_table_recolors_existing_rows_without_reloading(app):
         tokens = THEMES["Grafito"]
         assert table.item(0, 0).foreground().color() == QColor(tokens["text_primary"])
         assert table.item(0, 1).foreground().color() == QColor(tokens["text_secondary"])
-        assert table.item(0, 0).background().color().alpha() == 190
-        assert "#BE" in wrapper.styleSheet().upper()
+        assert table.item(0, 0).background().color().alpha() == 255
+        assert "#FF312C2D" in wrapper.styleSheet().upper()
     finally:
         manager._current = original_theme
         table.deleteLater()

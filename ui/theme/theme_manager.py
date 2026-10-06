@@ -132,7 +132,15 @@ class ThemeManager(QObject):
 
         legacy_name = data.get("tema")
         if isinstance(legacy_name, str):
-            return _LEGACY_THEME_NAMES.get(legacy_name.strip().lower(), "Grafito")
+            migrated_name = _LEGACY_THEME_NAMES.get(
+                legacy_name.strip().lower(), "Grafito"
+            )
+            if legacy_name.strip().lower() in _LEGACY_THEME_NAMES:
+                try:
+                    self._save_preference(migrated_name)
+                except OSError as exc:
+                    logging.warning("No se pudo guardar la migración de tema: %s", exc)
+            return migrated_name
         return "Grafito"
 
     def _load_font_size(self) -> int:

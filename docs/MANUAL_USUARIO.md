@@ -1,5 +1,5 @@
 
-# 📖 MANUAL DE USUARIO - VESP Control Objetivos
+# 📖 MANUAL DE USUARIO - VESP Organizations
 
 ## Guía de Inicio Rápido
 
@@ -63,7 +63,7 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 
 ### Configuración
 
-- **Tema**: Botón "☀ Modo claro" / "🌙 Modo oscuro" (arriba derecha)
+- **Tema**: Elegí una opción en Configuración → Temas
 - **Usuarios**: Menú → "Gestionar Usuarios" (solo admin)
 - **Backup**: Menú → "Configuración" → "Hacer Backup"
 
@@ -140,7 +140,7 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 
 ### Cambiar Tema
 
-- Botón arriba derecha: "☀ Modo claro" / "🌙 Modo oscuro"
+- En Configuración, elegí uno de los temas disponibles
 - El tema elegido se guarda automáticamente
 
 ### Validar Índices y Caché
@@ -202,7 +202,7 @@ Si tienes problemas:
 - [ ] Probé crear un objetivo
 - [ ] Probé registrar una pasada
 - [ ] Vi un reporte
-- [ ] Cambié entre tema claro y oscuro
+- [ ] Elegí un tema desde Configuración
 - [ ] Hice un backup manual
 
 ---

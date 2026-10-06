@@ -32,7 +32,7 @@ def exportar_pasadas_excel(datos: list, ruta: str, filtros: dict) -> None:
     ws.title = "Pasadas"
 
     ws.merge_cells("A1:D1")
-    ws["A1"] = "V.E.S.P Organizations - Pasadas filtradas"
+    ws["A1"] = "VESP Organizations - Pasadas filtradas"
     ws["A1"].font = Font(bold=True, size=14)
     ws["A1"].alignment = Alignment(horizontal="center")
     ws.merge_cells("A2:D2")
@@ -69,7 +69,7 @@ def exportar_pasadas_pdf(datos: list, ruta: str, filtros: dict) -> None:
     )
     estilos = getSampleStyleSheet()
     elementos = [
-        Paragraph("<b>V.E.S.P Organizations - Pasadas filtradas</b>", estilos["Title"]),
+        Paragraph("<b>VESP Organizations - Pasadas filtradas</b>", estilos["Title"]),
         Paragraph(
             f"Fecha: {_texto_filtro(filtros.get('fecha'))} | "
             f"Supervisor: {_texto_filtro(filtros.get('supervisor'))} | "
@@ -119,7 +119,7 @@ def exportar_excel(anio: int, mes: int, ruta: str, reporte: dict | None = None, 
 
     try:
         from services.assets import ruta_asset
-        img = XLImage(ruta_asset("assets/vesp.png"))
+        img = XLImage(ruta_asset("assets/logo_vesp_v2_hd_transparente.png"))
         img.width = 80
         img.height = 80
         ws.add_image(img, "A1")
@@ -127,7 +127,7 @@ def exportar_excel(anio: int, mes: int, ruta: str, reporte: dict | None = None, 
         pass
 
     ws.merge_cells("B1:F2")
-    ws["B1"] = "V.E.S.P Organizations - Seguridad Privada"
+    ws["B1"] = "Seguridad Privada"
     ws["B1"].font = Font(bold=True, size=14, color="2E7D32")
     ws["B1"].alignment = Alignment(horizontal="center", vertical="center")
 
@@ -187,12 +187,15 @@ def exportar_pdf(anio: int, mes: int, ruta: str, reporte: dict | None = None, fi
 
     try:
         from services.assets import ruta_asset
-        logo = RLImage(ruta_asset("assets/vesp.png"), width=2.5*cm, height=2.5*cm)
+        logo = RLImage(
+            ruta_asset("assets/logo_vesp_v2_hd_transparente.png"),
+            width=2.5*cm,
+            height=2.5*cm,
+        )
         datos_header = [[
             logo,
             Paragraph(
-                "<b><font color='#2E7D32' size=14>V.E.S.P Organizations</font></b>"
-                "<br/><font size=10>Seguridad Privada</font>",
+                "<b><font color='#2E7D32' size=14>Seguridad Privada</font></b>",
                 estilos["Normal"]
             ),
             Paragraph(
@@ -208,7 +211,7 @@ def exportar_pdf(anio: int, mes: int, ruta: str, reporte: dict | None = None, fi
         ]))
         elementos.append(tabla_header)
     except Exception:
-        elementos.append(Paragraph("<b>V.E.S.P Organizations</b>", estilos["Title"]))
+        elementos.append(Paragraph("<b>VESP Organizations</b>", estilos["Title"]))
 
     elementos.append(Spacer(1, 0.5*cm))
     elementos.append(Paragraph(

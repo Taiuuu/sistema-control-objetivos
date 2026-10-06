@@ -1,11 +1,11 @@
 #define MyAppName "VESP Control"
 #define MyAppVersion "1.0.5"
-#define MyAppPublisher "V.E.S.P Organizations"
+#define MyAppPublisher "VESP Organizations"
 #define MyAppExeName "VESP Control.exe"
 
 [Setup]
 AppId={{VESP-CONTROL-2024}}
-AppName={#MyAppName}
+AppName=VESP Organizations
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}

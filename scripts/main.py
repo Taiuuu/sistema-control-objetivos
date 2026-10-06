@@ -86,11 +86,6 @@ def inicializar_componente(logger: logging.Logger, nombre: str, funcion, *args, 
         return False
 
 
-def alternar_tema(app: QApplication, ventana) -> None:
-    """Atajo temporal entre Claro y Grafito hasta la selección en Configuración."""
-    manager = get_theme_manager()
-    manager.set_theme("Claro" if manager.current() != "Claro" else "Grafito")
-
 def iniciar_app() -> None:
     """
     Inicializa la aplicación con error handling robusto.
@@ -101,7 +96,7 @@ def iniciar_app() -> None:
     """
     # Configurar logging
     logger = configurar_logging()
-    logger.info("🚀 Iniciando VESP Control de Objetivos")
+    logger.info("🚀 Iniciando VESP Organizations")
 
     # Estado de inicialización
     componentes_exitosos = []
@@ -189,7 +184,7 @@ def iniciar_app() -> None:
             iniciar_sesion(usuario_id, rol)
 
             nonlocal ventana_principal
-            ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso, app, alternar_tema)
+            ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso, app)
             ventana_principal.show()
             from ui.animaciones import animar_aparecer
             animar_aparecer(ventana_principal, 180)

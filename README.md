@@ -1,8 +1,8 @@
-# VESP Control de Objetivos
+# VESP Organizations
 
-VESP Control de Objetivos es una aplicación de escritorio para gestionar rondas de seguridad
-privada. Permite registrar pasadas por turno, administrar objetivos, supervisores y equipos,
-generar reportes de cumplimiento e importar recorridos desde Excel.
+VESP Organizations es una aplicación de escritorio para gestionar rondas de seguridad privada.
+Permite registrar pasadas por turno, administrar objetivos, supervisores y equipos, generar
+reportes de cumplimiento e importar recorridos desde Excel.
 
 **Versión actual:** 1.7.4
 **Aplicación principal:** PyQt6 + SQLite
@@ -101,4 +101,4 @@ Las dependencias de desarrollo adicionales se encuentran en `docs/requirements-d
 
 ## Autoría
 
-Taiel Clot - V.E.S.P Organizations SA
+Taiel Clot - VESP Organizations SA

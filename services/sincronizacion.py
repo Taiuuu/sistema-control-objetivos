@@ -20,7 +20,7 @@ Características:
 - Invalidación de caché por patrones
 - Dependencias entre tablas (grafo de actualización)
 
-Autor: VESP Control de Objetivos
+Autor: VESP Organizations
 Versión: 2.0.0
 """
 

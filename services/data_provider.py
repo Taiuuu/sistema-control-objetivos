@@ -12,7 +12,7 @@ Define:
 - Métodos de búsqueda, filtrado y estadísticas
 - Preparación para futuro multi-usuario con sincronización
 
-Autor: VESP Control de Objetivos
+Autor: VESP Organizations
 Versión: 2.0.0
 """
 

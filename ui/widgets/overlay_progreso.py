@@ -1,6 +1,5 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QProgressBar, QVBoxLayout, QWidget
-from ui.components.base import rgba
 from ui.theme.theme_manager import get_theme_manager
 
 
@@ -27,9 +26,14 @@ class OverlayProgreso(QWidget):
 
     def _aplicar_tema(self, theme_name: str) -> None:
         tokens = self._theme_manager.tokens(theme_name)
-        overlay = rgba(tokens["bg_gradient_start"], 224)
         self.setStyleSheet(f"""
-            QWidget#OverlayProgreso {{ background-color: {overlay}; }}
+            QWidget#OverlayProgreso {{
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 {tokens['bg_gradient_start']},
+                    stop: 1 {tokens['bg_gradient_end']}
+                );
+            }}
             QWidget#OverlayProgreso QLabel {{
                 color: {tokens['text_primary']};
                 font-size: {tokens['font_size_lg']};

@@ -44,7 +44,7 @@ register_routes(app)
 def index():
     """Página de bienvenida de la API."""
     return {
-        'message': 'VESP Control de Objetivos API',
+        'message': 'VESP Organizations API',
         'version': '1.0.0',
         'status': 'running',
         'docs': 'Ver README.md para documentación'

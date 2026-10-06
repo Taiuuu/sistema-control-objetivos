@@ -228,7 +228,7 @@ class LoginWindow(QWidget):
         super().__init__()
         self.on_login_exitoso = on_login_exitoso
         self._theme_manager = get_theme_manager()
-        self.setWindowTitle("V.E.S.P Organizations")
+        self.setWindowTitle("VESP Organizations")
         self.setFixedSize(400, 540)
         self.setWindowFlags(
             Qt.WindowType.Window |
@@ -258,12 +258,7 @@ class LoginWindow(QWidget):
         contenido.addWidget(self.logo_label)
         self._theme_manager.theme_changed.connect(self._actualizar_logo_tema)
 
-        # Nombre y subtítulo
-        nombre_label = QLabel("V.E.S.P Organizations")
-        nombre_label.setObjectName("LoginTitle")
-        nombre_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        contenido.addWidget(nombre_label)
-
+        # Subtítulo
         subtitulo = QLabel("Seguridad Privada")
         subtitulo.setObjectName("LoginSubtitle")
         subtitulo.setAlignment(Qt.AlignmentFlag.AlignCenter)

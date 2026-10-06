@@ -134,7 +134,6 @@ class SidebarWidget(QWidget):
     
     # Señales
     boton_presionado = pyqtSignal(str)  # Nombre de la acción
-    tema_clicado = pyqtSignal()
     logout_clicado = pyqtSignal()
     zoom_cambiado = pyqtSignal(int)  # Nuevo nivel de zoom
     
@@ -222,7 +221,7 @@ class SidebarWidget(QWidget):
         fila = QHBoxLayout()
         fila.setContentsMargins(0, 0, 0, 0)
         
-        self._logo_label = ThemeLogo(size=36)
+        self._logo_label = ThemeLogo(size=150)
         
         self._btn_colapsar = QToolButton()
         self._btn_colapsar.setText("‹")
@@ -250,24 +249,6 @@ class SidebarWidget(QWidget):
         fila.addStretch()
         fila.addWidget(self._btn_colapsar)
         lay.addLayout(fila)
-        
-        # Títulos
-        self._titulo = QLabel("V.E.S.P")
-        self._titulo.setStyleSheet(f"""
-            color: {p('accent', oscuro)};
-            font-size: 16px;
-            font-weight: 800;
-            letter-spacing: 2px;
-        """)
-        lay.addWidget(self._titulo)
-        
-        self._subtitulo = QLabel("Organizations")
-        self._subtitulo.setStyleSheet(f"""
-            color: {p('text_muted', oscuro)};
-            font-size: 10px;
-            letter-spacing: 1px;
-        """)
-        lay.addWidget(self._subtitulo)
         
         return cabecera
 
@@ -325,31 +306,6 @@ class SidebarWidget(QWidget):
         fila_zoom.addWidget(self._lbl_zoom, 1)
         fila_zoom.addWidget(self._btn_zoom_mas)
         lay.addLayout(fila_zoom)
-        
-        # Botón tema
-        texto_tema = "☀  Modo claro" if self._oscuro else "🌙  Modo oscuro"
-        self._btn_tema = QPushButton(texto_tema)
-        self._btn_tema.setObjectName("SidebarTheme")
-        self._btn_tema.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._btn_tema.setFixedHeight(34)
-        self._btn_tema.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {p('btn_menu_hover', oscuro)};
-                color: {p('text_secondary', oscuro)};
-                border: 1px solid {p('border', oscuro)};
-                border-radius: 7px;
-                font-size: 11px;
-                padding: 0 10px;
-                text-align: left;
-            }}
-            QPushButton:hover {{
-                background-color: {p('accent', oscuro)};
-                color: {get_theme_manager().tokens()["accent_text"]};
-                border-color: {p('accent', oscuro)};
-            }}
-        """)
-        self._btn_tema.clicked.connect(self.tema_clicado.emit)
-        lay.addWidget(self._btn_tema)
         
         # Usuario
         from services.usuarios import get_username_by_id
@@ -411,10 +367,7 @@ class SidebarWidget(QWidget):
             self._sidebar_expandido = False
             self._btn_colapsar.setText("›")
             self._btn_colapsar.setToolTip("Expandir menú (Ctrl+\\)")
-            self._titulo.hide()
-            self._subtitulo.hide()
             self._usuario_label.hide()
-            self._btn_tema.hide()
             self._lbl_zoom.hide()
             for btn in self._botones.values():
                 btn.colapsar()
@@ -423,10 +376,7 @@ class SidebarWidget(QWidget):
             self._sidebar_expandido = True
             self._btn_colapsar.setText("‹")
             self._btn_colapsar.setToolTip("Colapsar menú (Ctrl+\\)")
-            self._titulo.show()
-            self._subtitulo.show()
             self._usuario_label.show()
-            self._btn_tema.show()
             self._lbl_zoom.show()
             for btn in self._botones.values():
                 btn.expandir()
@@ -461,21 +411,12 @@ class SidebarWidget(QWidget):
                 border-right: 1px solid {tokens['border']};
             }}
             QPushButton#SidebarCollapse, QPushButton#SidebarZoom,
-            QPushButton#SidebarTheme {{
-                background: {tokens['surface_alt']};
-                color: {tokens['text_secondary']};
-                border: 1px solid {tokens['border']};
-                border-radius: {tokens['radius_sm']};
-                padding: 4px 8px;
-            }}
-            QPushButton#SidebarCollapse:hover, QPushButton#SidebarZoom:hover,
-            QPushButton#SidebarTheme:hover {{
+            QPushButton#SidebarCollapse:hover, QPushButton#SidebarZoom:hover {{
                 background: {tokens['accent']};
                 color: {tokens['accent_text']};
                 border-color: {tokens['accent']};
             }}
-            QPushButton#SidebarCollapse:pressed, QPushButton#SidebarZoom:pressed,
-            QPushButton#SidebarTheme:pressed {{
+            QPushButton#SidebarCollapse:pressed, QPushButton#SidebarZoom:pressed {{
                 background: {tokens['accent_hover']};
                 color: {tokens['accent_hover_text']};
             }}
@@ -500,6 +441,3 @@ class SidebarWidget(QWidget):
         """)
         for boton in self._botones.values():
             boton._aplicar_estilo()
-        self._btn_tema.setText(
-            "☀  Modo claro" if oscuro else "🌙  Modo oscuro"
-        )

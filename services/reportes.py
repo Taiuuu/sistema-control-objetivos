@@ -12,7 +12,7 @@ Proporciona funciones para:
 - Consultas de cobertura y estadísticas
 - Análisis de cumplimiento de objetivos
 
-Autor: VESP Control de Objetivos
+Autor: VESP Organizations
 Versión: 2.0.0
 """
 

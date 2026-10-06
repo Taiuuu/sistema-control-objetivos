@@ -34,7 +34,7 @@ class Ayuda(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Ayuda - VESP Control")
+        self.setWindowTitle("Ayuda - VESP Organizations")
         self.setGeometry(300, 300, 700, 600)
         self._theme_manager = get_theme_manager()
 
