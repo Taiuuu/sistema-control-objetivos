@@ -25,11 +25,15 @@ class GlassCard(QFrame):
         shadow: bool = False,
         contrast: bool = False,
         content_margins: int | None = None,
+        background_alpha: int | None = None,
     ):
         super().__init__(parent)
+        if background_alpha is not None and not 0 <= background_alpha <= 255:
+            raise ValueError("La opacidad de fondo debe estar entre 0 y 255.")
         self._theme_manager = get_theme_manager()
         self._shadow_enabled = shadow
         self._contrast = contrast
+        self._background_alpha = background_alpha
         self.setObjectName("ContrastCard" if contrast else "GlassCard")
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.content_layout = QVBoxLayout(self)
@@ -51,6 +55,8 @@ class GlassCard(QFrame):
     def _apply_theme(self, theme_name: str) -> None:
         tokens = self._theme_manager.tokens(theme_name)
         background = tokens["card_contrast"] if self._contrast else tokens["surface"]
+        if self._background_alpha is not None:
+            background = rgba(background, self._background_alpha)
         self.setStyleSheet(
             f"""
             QFrame#{self.objectName()} {{

@@ -186,5 +186,11 @@ class ThemeLogo(QLabel):
         )
         self.setToolTip(f"Logo del tema {theme_name}")
 
+    def set_size(self, size: int) -> None:
+        if isinstance(size, bool) or not isinstance(size, int) or size <= 0:
+            raise ValueError("El tamaño del logo debe ser un entero positivo.")
+        self._size = size
+        self._apply_theme(self._theme_manager.current())
+
 
 __all__ = ["ContrastCard", "KpiCard", "ProgressBarThin", "StatusBadge", "ThemeLogo"]

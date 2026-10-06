@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import (
     QDate, QTimer, QEvent, Qt
 )
-from PyQt6.QtGui import QColor, QPixmap, QIcon, QShortcut, QKeySequence
+from PyQt6.QtGui import QColor, QIcon, QShortcut, QKeySequence
 from services.reportes import obtener_objetivos_del_dia
 from services.queries_tabla import (
     obtener_equipo, obtener_supervisores_de_pasadas, cargar_supervisores
@@ -66,10 +66,10 @@ from ui.components import (
     PillButton,
     SearchInput,
     StatusBadge,
+    ThemeLogo,
 )
-from ui.widgets.estilos import (
-    obtener_color, estilo_separador
-)
+from ui.components.base import rgba
+from ui.widgets.estilos import obtener_color
 
 # =============================================================================
 # UTILIDADES
@@ -78,14 +78,6 @@ from ui.widgets.estilos import (
 def obtener_nombre_usuario(usuario_id: int) -> str:
     """Obtiene el nombre de usuario por ID."""
     return get_username_by_id(usuario_id) or "Usuario"
-
-
-def crear_separador(oscuro: bool) -> QFrame:
-    """Crea un separador visual horizontal."""
-    sep = QFrame()
-    sep.setFrameShape(QFrame.Shape.HLine)
-    sep.setStyleSheet(estilo_separador(oscuro))
-    return sep
 
 
 # =============================================================================
@@ -112,20 +104,24 @@ class BotonMenu(QPushButton):
         self._aplicar_estilo()
 
     def _aplicar_estilo(self):
-        bg_activo   = obtener_color("accent", self._oscuro)
-        text_activo = self._theme_manager.tokens()["accent_text"]
+        tokens = self._theme_manager.tokens()
+        bg_activo = tokens["surface_alt"]
+        text_activo = tokens["text_primary"]
+        border_activo = rgba(tokens["accent"], 112)
         bg_hover    = obtener_color("btn_menu_hover", self._oscuro)
         text_normal = obtener_color("btn_menu_text", self._oscuro)
+        alignment = "left" if self._expandido else "center"
+        padding = "0px 10px" if self._expandido else "0px"
 
         if self._activo:
             self.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {bg_activo};
                     color: {text_activo};
-                    border: none;
-                    border-radius: 8px;
-                    padding: 0px 10px;
-                    text-align: left;
+                    border: 1px solid {border_activo};
+                    border-radius: {tokens['radius_lg']};
+                    padding: {padding};
+                    text-align: {alignment};
                     font-size: 12px;
                     font-weight: 600;
                 }}
@@ -135,19 +131,21 @@ class BotonMenu(QPushButton):
                 QPushButton {{
                     background-color: transparent;
                     color: {text_normal};
-                    border: none;
-                    border-radius: 8px;
-                    padding: 0px 10px;
-                    text-align: left;
+                    border: 1px solid transparent;
+                    border-radius: {tokens['radius_lg']};
+                    padding: {padding};
+                    text-align: {alignment};
                     font-size: 12px;
                 }}
                 QPushButton:hover {{
                     background-color: {bg_hover};
-                    color: {obtener_color("text_primary", self._oscuro)};
+                    color: {tokens['text_primary']};
+                    border-color: {tokens['border']};
                 }}
                 QPushButton:pressed {{
-                    background-color: {bg_activo};
-                    color: {obtener_color('accent_text', self._oscuro)};
+                    background-color: {tokens['surface_alt']};
+                    color: {tokens['text_primary']};
+                    border-color: {border_activo};
                 }}
             """)
 
@@ -164,10 +162,12 @@ class BotonMenu(QPushButton):
         self._expandido = False
         self.setText(f" {self._icono}")
         self.setFixedHeight(38)
+        self._aplicar_estilo()
 
     def expandir(self):
         self._expandido = True
         self.setText(self._texto_completo)
+        self._aplicar_estilo()
 
 
 
@@ -177,8 +177,8 @@ class BotonMenu(QPushButton):
 
 class VentanaPrincipal(QWidget):
 
-    SIDEBAR_EXPANDIDO = 230
-    SIDEBAR_COLAPSADO = 56
+    SIDEBAR_EXPANDIDO = 248
+    SIDEBAR_COLAPSADO = 68
 
     def __init__(self, usuario_id=None, rol=None, on_login_exitoso=None, app=None):
         self.usuario_id       = usuario_id
@@ -200,6 +200,7 @@ class VentanaPrincipal(QWidget):
         self._theme_manager = get_theme_manager()
         self.zoom_nivel = self._theme_manager.font_size()
         self.setWindowIcon(QIcon(THEMES[self._theme_manager.current()]["logo_path"]))
+        self.setObjectName("VentanaPrincipal")
 
         self._oscuro = self._theme_manager.current() != "Claro"
 
@@ -216,15 +217,6 @@ class VentanaPrincipal(QWidget):
     def _actualizar_logo_tema(self, nombre_tema: str) -> None:
         ruta_logo = THEMES[nombre_tema]["logo_path"]
         self.setWindowIcon(QIcon(ruta_logo))
-        if hasattr(self, "logo_label"):
-            self.logo_label.setPixmap(
-                QPixmap(ruta_logo).scaled(
-                    145 if self._sidebar_expandido else 36,
-                    145 if self._sidebar_expandido else 36,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-            )
 
     def _al_cambiar_tema(self, nombre_tema: str) -> None:
         self._oscuro = nombre_tema != "Claro"
@@ -237,13 +229,26 @@ class VentanaPrincipal(QWidget):
 
     def _construir_ui(self):
         layout_raiz = QHBoxLayout(self)
-        layout_raiz.setSpacing(0)
-        layout_raiz.setContentsMargins(0, 0, 0, 0)
+        layout_raiz.setSpacing(12)
+        layout_raiz.setContentsMargins(14, 14, 14, 14)
 
         self._construir_sidebar(layout_raiz)
         self._construir_panel_derecho(layout_raiz)
 
-        self.setObjectName("VentanaPrincipal")
+        self._aplicar_fondo_ventana()
+        self._refrescar_tema_sidebar(self._oscuro)
+
+    def _aplicar_fondo_ventana(self) -> None:
+        tokens = self._theme_manager.tokens()
+        self.setStyleSheet(f"""
+            QWidget#VentanaPrincipal {{
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 {tokens['bg_gradient_start']},
+                    stop: 1 {tokens['bg_gradient_end']}
+                );
+            }}
+        """)
 
     # -------------------------------------------------------------------------
     # SIDEBAR
@@ -252,30 +257,28 @@ class VentanaPrincipal(QWidget):
     def _construir_sidebar(self, layout_raiz):
         oscuro = self._oscuro
 
-        self.panel_lateral = QFrame()
-        self.panel_lateral.setObjectName("PanelLateral")
+        self.panel_lateral = GlassCard(
+            shadow=True,
+            content_margins=0,
+            background_alpha=220,
+        )
         self.panel_lateral.setFixedWidth(self.SIDEBAR_EXPANDIDO)
-        self.panel_lateral.setStyleSheet(f"""
-            QFrame#PanelLateral {{
-                background-color: {obtener_color('bg_sidebar', oscuro)};
-                border-right: 1px solid {obtener_color('border', oscuro)};
-            }}
-        """)
 
-        layout_lateral = QVBoxLayout(self.panel_lateral)
+        layout_lateral = self.panel_lateral.content_layout
         layout_lateral.setSpacing(0)
-        layout_lateral.setContentsMargins(0, 0, 0, 0)
 
         cabecera = self._construir_cabecera_sidebar()
         layout_lateral.addWidget(cabecera)
-        layout_lateral.addWidget(crear_separador(oscuro))
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll_area.setStyleSheet(f"""
-            QScrollArea {{ border: none; background: transparent; }}
+            QScrollArea, QScrollArea QWidget#qt_scrollarea_viewport {{
+                border: none;
+                background: transparent;
+            }}
             QScrollBar:vertical {{
                 width: 4px;
                 background: transparent;
@@ -291,15 +294,16 @@ class VentanaPrincipal(QWidget):
         """)
 
         self._contenedor_scroll = QWidget()
-        self._contenedor_scroll.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
+        self._contenedor_scroll.setStyleSheet("background: transparent;")
         self.layout_scroll = QVBoxLayout(self._contenedor_scroll)
         self.layout_scroll.setSpacing(2)
-        self.layout_scroll.setContentsMargins(8, 8, 8, 8)
+        self.layout_scroll.setContentsMargins(12, 6, 12, 10)
 
         self._botones_menu = []
+        self._secciones_sidebar = []
         self._construir_botones_menu()
 
-        self.layout_scroll.addStretch()
+        self.layout_scroll.addStretch(1)
         scroll_area.setWidget(self._contenedor_scroll)
         layout_lateral.addWidget(scroll_area, 1)
 
@@ -311,16 +315,16 @@ class VentanaPrincipal(QWidget):
     def _construir_cabecera_sidebar(self) -> QWidget:
         oscuro = self._oscuro
         self._cabecera_sidebar = QWidget()
-        self._cabecera_sidebar.setFixedHeight(100)
-        self._cabecera_sidebar.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
+        self._cabecera_sidebar.setFixedHeight(72)
+        self._cabecera_sidebar.setStyleSheet("background: transparent;")
 
-        lay = QVBoxLayout(self._cabecera_sidebar)
-        lay.setContentsMargins(10, 10, 10, 6)
-        lay.setSpacing(2)
+        lay = QHBoxLayout(self._cabecera_sidebar)
+        lay.setContentsMargins(6, 12, 6, 8)
+        lay.setSpacing(0)
 
         self.btn_colapsar = QToolButton()
         self.btn_colapsar.setText("‹")
-        self.btn_colapsar.setFixedSize(24, 24)
+        self.btn_colapsar.setFixedSize(28, 28)
         self.btn_colapsar.setToolTip("Colapsar menú (Ctrl+\\)")
         self.btn_colapsar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_colapsar.setStyleSheet(f"""
@@ -339,26 +343,31 @@ class VentanaPrincipal(QWidget):
         """)
         self.btn_colapsar.clicked.connect(self._toggle_sidebar)
 
-        self.logo_label = QLabel()
-        self._actualizar_logo_tema(self._theme_manager.current())
-
-        fila_logo = QHBoxLayout()
-        fila_logo.setContentsMargins(0, 0, 0, 0)
-        fila_logo.addWidget(self.logo_label)
-        fila_logo.addStretch()
-        fila_logo.addWidget(self.btn_colapsar)
-        lay.addLayout(fila_logo)
+        self.logo_label = ThemeLogo(size=44)
+        lay.addWidget(self.logo_label)
+        lay.addStretch(1)
+        lay.addWidget(self.btn_colapsar)
 
         return self._cabecera_sidebar
 
     def _construir_botones_menu(self):
         oscuro = self._oscuro
 
+        def add_section(title):
+            label = QLabel(title)
+            label.setObjectName("SidebarSectionTitle")
+            label.setStyleSheet(
+                f"color: {obtener_color('text_muted', oscuro)};"
+                " font-size: 9px; font-weight: 700; letter-spacing: 1px;"
+                " padding: 10px 8px 4px; background: transparent;"
+            )
+            self._secciones_sidebar.append(label)
+            self.layout_scroll.addWidget(label)
+
         def add_btn(icono, texto, accion, tooltip_extra="", clave=None):
             b = BotonMenu(icono, texto, oscuro)
             b.setProperty("menu_key", clave or "")
-            if tooltip_extra:
-                b.setToolTip(f"{texto}  {tooltip_extra}")
+            b.setToolTip(f"{texto}  {tooltip_extra}".strip())
             b.clicked.connect(lambda: self._activar_boton(b, accion))
             self._botones_menu.append(b)
             self.layout_scroll.addWidget(b)
@@ -366,26 +375,21 @@ class VentanaPrincipal(QWidget):
                 b.hide()
             return b
 
-        def add_sep():
-            self.layout_scroll.addWidget(crear_separador(oscuro))
-            self.layout_scroll.addSpacing(2)
-
+        add_section("OPERACIÓN")
         self._btn_control   = add_btn("📋", "Control diario",     self._mostrar_dashboard,   "(Ctrl+B)", "control_diario")
         self._btn_pasada    = add_btn("✅", "Registrar pasada",   self.abrir_form_pasada,    "(Ctrl+P)", "registrar_pasada")
         self._btn_turno     = add_btn("🕐", "Registrar turno",    self.abrir_form_turno,     "(Ctrl+T)", "registrar_turno")
 
-        add_sep()
-
+        add_section("GESTIÓN")
         self._btn_add_obj = add_btn("➕", "Agregar objetivo",    self.abrir_form_objetivo,  "(Ctrl+O)", "agregar_objetivo")
         add_btn("📍", "Ver objetivos",       self.abrir_lista_objetivos, clave="ver_objetivos")
         self._btn_add_sup = add_btn("👤", "Agregar supervisor",  self.abrir_form_supervisor, "(Ctrl+S)", "agregar_supervisor")
         add_btn("👥", "Ver supervisores",    self.abrir_lista_supervisores, clave="ver_supervisores")
 
-        add_sep()
-
+        add_section("CONSULTAS")
         add_btn("🔍", "Ver pasadas",         self.abrir_lista_pasadas, clave="ver_pasadas")
-        add_btn("📝", "Notas del día",       self.abrir_notas,              "(Ctrl+N)", "notas")
         add_btn("🏖️", "Feriados",            self.abrir_feriados, clave="feriados")
+        add_btn("📝", "Notas del día",       self.abrir_notas,              "(Ctrl+N)", "notas")
         add_btn("📅", "Reporte mensual",     self.abrir_reporte_mensual,    "(Ctrl+R)", "reporte_mensual")
         add_btn("📅", "Reporte objetivo",    self.abrir_reporte_mensual_objetivo, "(Ctrl+Ñ)", "reporte_objetivo")
         add_btn("💾", "Transferir datos",    self.abrir_transferir_datos, clave="transferir_datos")
@@ -393,16 +397,7 @@ class VentanaPrincipal(QWidget):
         add_btn("❓", "Ayuda",               self.abrir_ayuda,              "(Ctrl+H)", "ayuda")
 
         if tiene_permiso('usuarios.ver'):
-            add_sep()
-            self._lbl_admin = QLabel("  ADMINISTRACIÓN")
-            self._lbl_admin.setStyleSheet(f"""
-                color: {obtener_color('text_muted', oscuro)};
-                font-size: 9px;
-                letter-spacing: 1.2px;
-                font-weight: 600;
-                padding: 4px 0 2px 4px;
-            """)
-            self.layout_scroll.addWidget(self._lbl_admin)
+            add_section("ADMINISTRACIÓN")
             add_btn("⚙️",  "Gestionar usuarios", self.abrir_gestionar_usuarios, clave="gestionar_usuarios")
             add_btn("📜",  "Historial",           self.abrir_logs, clave="logs")
             add_btn("🔧",  "Optimización de BD",  self.abrir_indexacion, clave="optimizacion")
@@ -420,87 +415,63 @@ class VentanaPrincipal(QWidget):
     def _construir_zona_inferior(self) -> QWidget:
         oscuro = self._oscuro
         zona = QWidget()
-        zona.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
+        zona.setObjectName("SidebarFooter")
+        zona.setStyleSheet("background: transparent;")
         lay = QVBoxLayout(zona)
-        lay.setContentsMargins(8, 4, 8, 10)
-        lay.setSpacing(4)
-
-        lay.addWidget(crear_separador(oscuro))
-
-        fila_zoom = QHBoxLayout()
-        fila_zoom.setSpacing(4)
-
-        estilo_mini_btn = f"""
-            QPushButton {{
-                background-color: {obtener_color('btn_menu_hover', oscuro)};
-                color: {obtener_color('text_secondary', oscuro)};
-                border: 1px solid {obtener_color('border', oscuro)};
-                border-radius: 5px;
-                font-size: 11px;
-                min-width: 30px;
-                max-width: 36px;
-                min-height: 26px;
-            }}
-            QPushButton:hover {{
-                background-color: {obtener_color('accent', oscuro)};
-                color: {obtener_color('accent_text', oscuro)};
-                border-color: {obtener_color('accent', oscuro)};
-            }}
-        """
-
-        self._btn_zoom_menos = QPushButton("A−")
-        self._btn_zoom_menos.setToolTip("Reducir zoom (Ctrl+−)")
-        self._btn_zoom_menos.setStyleSheet(estilo_mini_btn)
-        self._btn_zoom_menos.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._btn_zoom_menos.clicked.connect(self._zoom_menos)
-
-        self._btn_zoom_mas = QPushButton("A+")
-        self._btn_zoom_mas.setToolTip("Aumentar zoom (Ctrl+=)")
-        self._btn_zoom_mas.setStyleSheet(estilo_mini_btn)
-        self._btn_zoom_mas.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._btn_zoom_mas.clicked.connect(self._zoom_mas)
-
-        self.lbl_zoom = QLabel(f"{self.zoom_nivel}px")
-        self.lbl_zoom.setStyleSheet(f"color: {obtener_color('text_muted', oscuro)}; font-size: 10px;")
-        self.lbl_zoom.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        fila_zoom.addWidget(self._btn_zoom_menos)
-        fila_zoom.addWidget(self.lbl_zoom, 1)
-        fila_zoom.addWidget(self._btn_zoom_mas)
-        lay.addLayout(fila_zoom)
+        lay.setContentsMargins(12, 8, 12, 12)
+        lay.setSpacing(6)
 
         nombre_usuario = obtener_nombre_usuario(self.usuario_id)
-        self.usuario_label = QLabel(f"👤  {nombre_usuario}")
-        self.usuario_label.setStyleSheet(f"""
-            color: {obtener_color('text_muted', oscuro)};
-            font-size: 10px;
-            padding: 3px 4px;
-            border-radius: 5px;
-            background: {obtener_color('btn_menu_hover', oscuro)};
-        """)
-        self.usuario_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.usuario_label.setWordWrap(True)
-        lay.addWidget(self.usuario_label)
+        nombre_rol = {
+            "admin": "Administrador",
+            "supervisor": "Supervisor",
+            "auditor": "Auditor",
+            "gerente": "Gerente",
+            "operador": "Operador",
+        }.get(str(self.rol or "").casefold(), "Usuario")
+        partes_nombre = nombre_usuario.split()
+        iniciales = (
+            "".join(parte[0] for parte in partes_nombre[:2]).upper()
+            if len(partes_nombre) > 1
+            else nombre_usuario[:2].upper()
+        )
+        self.usuario_chip = QFrame()
+        self.usuario_chip.setObjectName("SidebarUserChip")
+        fila_usuario = QHBoxLayout(self.usuario_chip)
+        fila_usuario.setContentsMargins(8, 8, 8, 8)
+        fila_usuario.setSpacing(8)
 
-        self.btn_configuracion = QPushButton("⚙ Configuración")
+        self.usuario_avatar = QLabel(iniciales)
+        self.usuario_avatar.setObjectName("SidebarUserAvatar")
+        self.usuario_avatar.setFixedSize(34, 34)
+        self.usuario_avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        fila_usuario.addWidget(self.usuario_avatar)
+
+        datos_usuario = QVBoxLayout()
+        datos_usuario.setSpacing(1)
+        self.usuario_nombre = QLabel(nombre_usuario)
+        self.usuario_nombre.setObjectName("SidebarUserName")
+        self.usuario_nombre.setToolTip(nombre_usuario)
+        self.usuario_rol = QLabel(nombre_rol)
+        self.usuario_rol.setObjectName("SidebarUserRole")
+        datos_usuario.addWidget(self.usuario_nombre)
+        datos_usuario.addWidget(self.usuario_rol)
+        fila_usuario.addLayout(datos_usuario, 1)
+        lay.addWidget(self.usuario_chip)
+
+        self.btn_configuracion = QPushButton("⚙  Configuración")
+        self.btn_configuracion.setObjectName("SidebarUtility")
+        self.btn_configuracion.setToolTip("Configuración")
         self.btn_configuracion.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_configuracion.setFixedHeight(30)
-        self.btn_configuracion.setStyleSheet(self._estilo_btn_tema(oscuro))
+        self.btn_configuracion.setFixedHeight(38)
         self.btn_configuracion.clicked.connect(self._abrir_configuracion)
         lay.addWidget(self.btn_configuracion)
 
-        self.btn_configurar_menu = QPushButton("⚙ Configurar menú")
-        self.btn_configurar_menu.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_configurar_menu.setFixedHeight(30)
-        self.btn_configurar_menu.setStyleSheet(self._estilo_btn_tema(oscuro))
-        self.btn_configurar_menu.clicked.connect(self._configurar_menu)
-        lay.addWidget(self.btn_configurar_menu)
-
-        # Botón de cerrar sesión
-        self.btn_logout = QPushButton("🚪 Cerrar sesión")
+        self.btn_logout = QPushButton("🚪  Cerrar sesión")
+        self.btn_logout.setObjectName("SidebarLogout")
+        self.btn_logout.setToolTip("Cerrar sesión")
         self.btn_logout.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_logout.setFixedHeight(34)
-        self.btn_logout.setStyleSheet(self._estilo_btn_logout(oscuro))
+        self.btn_logout.setFixedHeight(38)
         self.btn_logout.clicked.connect(self._cerrar_sesion)
         lay.addWidget(self.btn_logout)
 
@@ -550,42 +521,6 @@ class VentanaPrincipal(QWidget):
             clave = tarjeta.property("menu_key")
             tarjeta.setVisible(self._menu_visible.get(clave, True))
 
-    def _estilo_btn_tema(self, oscuro: bool) -> str:
-        return f"""
-            QPushButton {{
-                background-color: {obtener_color('btn_menu_hover', oscuro)};
-                color: {obtener_color('text_secondary', oscuro)};
-                border: 1px solid {obtener_color('border', oscuro)};
-                border-radius: 7px;
-                font-size: 11px;
-                padding: 0 10px;
-                text-align: left;
-            }}
-            QPushButton:hover {{
-                background-color: {obtener_color('accent', oscuro)};
-                color: {obtener_color('accent_text', oscuro)};
-                border-color: {obtener_color('accent', oscuro)};
-            }}
-        """
-
-    def _estilo_btn_logout(self, oscuro: bool) -> str:
-        tokens = self._theme_manager.tokens()
-        return f"""
-            QPushButton {{
-                background-color: {tokens['danger_button_bg']};
-                color: {tokens['danger_button_text']};
-                border: 1px solid {tokens['danger_button_bg']};
-                border-radius: 7px;
-                font-size: 11px;
-                padding: 0 10px;
-                text-align: center;
-            }}
-            QPushButton:hover {{
-                background-color: {tokens['danger_button_hover']};
-                border-color: {tokens['danger_button_hover']};
-            }}
-        """
-
     # -------------------------------------------------------------------------
     # PANEL DERECHO
     # -------------------------------------------------------------------------
@@ -595,12 +530,9 @@ class VentanaPrincipal(QWidget):
 
         self._panel_derecho = QWidget()
         self._panel_derecho.setObjectName("panelControlObjetivos")
-        tokens = self._theme_manager.tokens()
         self._panel_derecho.setStyleSheet(f"""
             QWidget#panelControlObjetivos {{
-                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
-                    stop: 0 {tokens['bg_gradient_start']},
-                    stop: 1 {tokens['bg_gradient_end']});
+                background: transparent;
             }}
         """)
         layout_derecho = QVBoxLayout(self._panel_derecho)
@@ -1097,60 +1029,87 @@ class VentanaPrincipal(QWidget):
         Args:
             oscuro: Si usar tema oscuro.
         """
-        self.setStyleSheet(f"QWidget#VentanaPrincipal {{ background-color: {obtener_color('bg_main', oscuro)}; }}")
-        self.panel_lateral.setStyleSheet(f"""
-            QFrame#PanelLateral {{
-                background-color: {obtener_color('bg_sidebar', oscuro)};
-                border-right: 1px solid {obtener_color('border', oscuro)};
-            }}
-        """)
-        self._cabecera_sidebar.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
-        self._contenedor_scroll.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
-        self._zona_inferior.setStyleSheet(f"background-color: {obtener_color('bg_sidebar', oscuro)};")
+        tokens = self._theme_manager.tokens()
+        self._aplicar_fondo_ventana()
+        self._cabecera_sidebar.setStyleSheet("background: transparent;")
+        self._contenedor_scroll.setStyleSheet("background: transparent;")
+        self._zona_inferior.setStyleSheet("background: transparent;")
         self.btn_colapsar.setStyleSheet(f"""
             QToolButton {{
-                background: {obtener_color('btn_menu_hover', oscuro)};
-                color: {obtener_color('text_secondary', oscuro)};
-                border: none; border-radius: 5px;
+                background: transparent;
+                color: {tokens['text_secondary']};
+                border: 1px solid transparent;
+                border-radius: {tokens['radius_sm']};
                 font-size: 14px; font-weight: bold;
             }}
             QToolButton:hover {{
-                background: {obtener_color('accent', oscuro)};
-                color: {obtener_color('accent_text', oscuro)};
+                background: {tokens['surface_alt']};
+                color: {tokens['text_primary']};
+                border-color: {tokens['border']};
             }}
         """)
         for b in self._botones_menu:
             b.actualizar_tema(oscuro)
-        if hasattr(self, '_lbl_admin'):
-            self._lbl_admin.setStyleSheet(f"""
-                color: {obtener_color('text_muted', oscuro)};
-                font-size: 9px; letter-spacing: 1.2px;
-                font-weight: 600; padding: 4px 0 2px 4px;
-            """)
-        estilo_mini_btn = f"""
-            QPushButton {{
-                background-color: {obtener_color('btn_menu_hover', oscuro)};
-                color: {obtener_color('text_secondary', oscuro)};
-                border: 1px solid {obtener_color('border', oscuro)};
-                border-radius: 5px; font-size: 11px;
-                min-width: 30px; max-width: 36px; min-height: 26px;
+        for label in self._secciones_sidebar:
+            label.setStyleSheet(
+                f"color: {tokens['text_disabled']}; font-size: 9px;"
+                " font-weight: 700; letter-spacing: 1px;"
+                " padding: 10px 8px 4px; background: transparent;"
+            )
+        self.btn_configuracion.setStyleSheet(f"""
+            QPushButton#SidebarUtility {{
+                background: transparent;
+                color: {tokens['text_secondary']};
+                border: 1px solid transparent;
+                border-radius: {tokens['radius_lg']};
+                padding: 0 10px;
+                text-align: left;
             }}
-            QPushButton:hover {{
-                background-color: {obtener_color('accent', oscuro)};
-                color: {obtener_color('accent_text', oscuro)};
-                border-color: {obtener_color('accent', oscuro)};
+            QPushButton#SidebarUtility:hover {{
+                background: {tokens['surface_alt']};
+                color: {tokens['text_primary']};
+                border-color: {tokens['border']};
             }}
-        """
-        self._btn_zoom_menos.setStyleSheet(estilo_mini_btn)
-        self._btn_zoom_mas.setStyleSheet(estilo_mini_btn)
-        self.lbl_zoom.setStyleSheet(f"color: {obtener_color('text_muted', oscuro)}; font-size: 10px;")
-        self.btn_configuracion.setStyleSheet(self._estilo_btn_tema(oscuro))
-        self.btn_configurar_menu.setStyleSheet(self._estilo_btn_tema(oscuro))
-        self.btn_logout.setStyleSheet(self._estilo_btn_logout(oscuro))
-        self.usuario_label.setStyleSheet(f"""
-            color: {obtener_color('text_muted', oscuro)};
-            font-size: 10px; padding: 3px 4px; border-radius: 5px;
-            background: {obtener_color('btn_menu_hover', oscuro)};
+        """)
+        self.btn_logout.setStyleSheet(f"""
+            QPushButton#SidebarLogout {{
+                background: transparent;
+                color: {tokens['text_secondary']};
+                border: 1px solid transparent;
+                border-radius: {tokens['radius_lg']};
+                padding: 0 10px;
+                text-align: left;
+            }}
+            QPushButton#SidebarLogout:hover {{
+                background: {tokens['danger_button_bg']};
+                color: {tokens['danger_button_text']};
+                border-color: {tokens['danger_button_bg']};
+            }}
+        """)
+        self.usuario_chip.setStyleSheet(f"""
+            QFrame#SidebarUserChip {{
+                background: {tokens['surface_alt']};
+                border: 1px solid {tokens['border']};
+                border-radius: {tokens['radius_lg']};
+            }}
+            QLabel#SidebarUserAvatar {{
+                background: {tokens['accent']};
+                color: {tokens['accent_text']};
+                border-radius: 17px;
+                font-size: 11px;
+                font-weight: 700;
+            }}
+            QLabel#SidebarUserName {{
+                color: {tokens['text_primary']};
+                background: transparent;
+                font-size: 11px;
+                font-weight: 600;
+            }}
+            QLabel#SidebarUserRole {{
+                color: {tokens['text_secondary']};
+                background: transparent;
+                font-size: 9px;
+            }}
         """)
 
     def _refrescar_tema_panel_derecho(self, oscuro: bool) -> None:
@@ -1162,9 +1121,7 @@ class VentanaPrincipal(QWidget):
         tokens = self._theme_manager.tokens()
         self._panel_derecho.setStyleSheet(f"""
             QWidget#panelControlObjetivos {{
-                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
-                    stop: 0 {tokens['bg_gradient_start']},
-                    stop: 1 {tokens['bg_gradient_end']});
+                background: transparent;
             }}
         """)
         self._lbl_titulo_header.setStyleSheet(f"""
@@ -1244,21 +1201,29 @@ class VentanaPrincipal(QWidget):
             self._sidebar_expandido = False
             self.btn_colapsar.setText("›")
             self.btn_colapsar.setToolTip("Expandir menú (Ctrl+\\)")
-            self.usuario_label.hide()
-            self.lbl_zoom.hide()
-            self._actualizar_logo_tema(self._theme_manager.current())
+            self.logo_label.set_size(28)
+            self.usuario_chip.hide()
+            self.btn_configuracion.setText("⚙")
+            self.btn_logout.setText("🚪")
             for b in self._botones_menu:
                 b.colapsar()
+            for label in self._secciones_sidebar:
+                label.hide()
         else:
             self._ajustar_sidebar(self.SIDEBAR_EXPANDIDO)
             self._sidebar_expandido = True
             self.btn_colapsar.setText("‹")
             self.btn_colapsar.setToolTip("Colapsar menú (Ctrl+\\)")
-            self.usuario_label.show()
-            self.lbl_zoom.show()
-            self._actualizar_logo_tema(self._theme_manager.current())
+            self.logo_label.set_size(44)
+            self.usuario_chip.show()
+            self.btn_configuracion.setText("⚙  Configuración")
+            self.btn_logout.setText("🚪  Cerrar sesión")
             for b in self._botones_menu:
                 b.expandir()
+            for label in self._secciones_sidebar:
+                label.show()
+        self.btn_configuracion.setToolTip("Configuración")
+        self.btn_logout.setToolTip("Cerrar sesión")
 
     def _ajustar_sidebar(self, ancho_destino: int) -> None:
         self.panel_lateral.setFixedWidth(ancho_destino)
@@ -1280,8 +1245,6 @@ class VentanaPrincipal(QWidget):
 
     def _sincronizar_tamano_fuente(self, size: int) -> None:
         self.zoom_nivel = size
-        if hasattr(self, "lbl_zoom"):
-            self.lbl_zoom.setText(f"{size}px")
 
     # =========================================================================
     # SINCRONIZACIÓN
