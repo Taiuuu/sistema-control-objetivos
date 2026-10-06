@@ -9,6 +9,7 @@ from ui.components.indicators import (
     StatusBadge,
     ThemeLogo,
 )
+from ui.components.module_card import ModuleCard
 
 __all__ = [
     "GlassCard",
@@ -20,4 +21,5 @@ __all__ = [
     "ContrastCard",
     "CountChip",
     "ThemeLogo",
+    "ModuleCard",
 ]

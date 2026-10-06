@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QDateEdit, QComboBox, QMessageBox,
     QFrame, QLineEdit, QHeaderView, QScrollArea,
     QToolButton, QSizePolicy
-    , QDialog, QDialogButtonBox, QCheckBox, QGridLayout
+    , QDialog, QDialogButtonBox, QCheckBox, QGridLayout, QMenu
 )
 from PyQt6.QtCore import (
     QDate, QTimer, QEvent, Qt
@@ -63,6 +63,7 @@ from ui.components import (
     CountChip,
     GlassCard,
     KpiCard,
+    ModuleCard,
     PillButton,
     SearchInput,
     StatusBadge,
@@ -517,9 +518,7 @@ class VentanaPrincipal(QWidget):
             clave = boton.property("menu_key")
             if clave:
                 boton.setVisible(self._menu_visible.get(clave, True))
-        for tarjeta in self._landing.findChildren(QPushButton, "LandingCard"):
-            clave = tarjeta.property("menu_key")
-            tarjeta.setVisible(self._menu_visible.get(clave, True))
+        self._refrescar_tarjetas_landing()
 
     # -------------------------------------------------------------------------
     # PANEL DERECHO
@@ -545,6 +544,9 @@ class VentanaPrincipal(QWidget):
         self._metricas = self._construir_metricas()
         layout_derecho.addWidget(self._metricas)
 
+        self._landing = self._construir_landing()
+        layout_derecho.insertWidget(2, self._landing, 1)
+
         self._barra_filtros_widget = self._construir_barra_filtros()
         layout_derecho.addWidget(self._barra_filtros_widget)
 
@@ -558,9 +560,6 @@ class VentanaPrincipal(QWidget):
 
         self._construir_tabla(layout_derecho)
 
-        self._landing = self._construir_landing()
-        layout_derecho.insertWidget(1, self._landing, 1)
-
         layout_raiz.addWidget(self._panel_derecho, 1)
 
     def _construir_landing(self) -> QWidget:
@@ -569,39 +568,67 @@ class VentanaPrincipal(QWidget):
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(18)
 
-        titulo = QLabel("¿A dónde querés ir?")
+        titulo = QLabel("Módulos")
         titulo.setObjectName("LandingTitle")
-        subtitulo = QLabel("Elegí un módulo para comenzar")
+        subtitulo = QLabel("Accesos rápidos a las herramientas de trabajo")
         subtitulo.setObjectName("LandingSubtitle")
         layout.addWidget(titulo)
         layout.addWidget(subtitulo)
 
         acciones = [
-            ("control_diario", "📋", "Control diario", self._mostrar_dashboard),
-            ("registrar_pasada", "✅", "Registrar pasada", self.abrir_form_pasada),
-            ("ver_pasadas", "🔍", "Ver pasadas", self.abrir_lista_pasadas),
-            ("reporte_mensual", "📅", "Reporte mensual", self.abrir_reporte_mensual),
-            ("reporte_objetivo", "🎯", "Reporte objetivo", self.abrir_reporte_mensual_objetivo),
-            ("notas", "📝", "Notas del día", self.abrir_notas),
-            ("agregar_objetivo", "➕", "Agregar objetivo", self.abrir_form_objetivo),
-            ("feriados", "🏖", "Feriados", self.abrir_feriados),
+            (
+                "control_diario", "📋", "Control diario",
+                "Revisá la cobertura del día", self._mostrar_dashboard,
+            ),
+            (
+                "registrar_pasada", "✅", "Registrar pasada",
+                "Cargá una nueva pasada", self.abrir_form_pasada,
+            ),
+            (
+                "ver_pasadas", "🔍", "Ver pasadas",
+                "Consultá el historial de pasadas", self.abrir_lista_pasadas,
+            ),
+            (
+                "reporte_mensual", "📅", "Reporte mensual",
+                "Resumen mensual de actividad", self.abrir_reporte_mensual,
+            ),
+            (
+                "reporte_objetivo", "🎯", "Reporte objetivo",
+                "Seguimiento por objetivo", self.abrir_reporte_mensual_objetivo,
+            ),
+            ("notas", "📝", "Notas del día", "Novedades y observaciones", self.abrir_notas),
+            (
+                "agregar_objetivo", "➕", "Agregar objetivo",
+                "Creá un nuevo objetivo", self.abrir_form_objetivo,
+            ),
+            (
+                "feriados", "🏖", "Feriados",
+                "Administrá días no laborables", self.abrir_feriados,
+            ),
         ]
-        grilla = QGridLayout()
-        grilla.setHorizontalSpacing(14)
-        grilla.setVerticalSpacing(14)
-        for indice, (clave, icono, texto, accion) in enumerate(acciones):
-            if not self._menu_visible.get(clave, True):
-                continue
-            tarjeta = QPushButton(f"{icono}\n{texto}")
-            tarjeta.setObjectName("LandingCard")
-            tarjeta.setProperty("menu_key", clave)
-            tarjeta.setMinimumHeight(92)
-            tarjeta.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._landing_grid = QGridLayout()
+        self._landing_grid.setHorizontalSpacing(14)
+        self._landing_grid.setVerticalSpacing(14)
+        self._landing_cards = []
+        for clave, icono, texto, descripcion, accion in acciones:
+            tarjeta = ModuleCard(clave, icono, texto, descripcion, parent=landing)
             tarjeta.clicked.connect(accion)
-            grilla.addWidget(tarjeta, indice // 3, indice % 3)
-        layout.addLayout(grilla)
+            self._landing_cards.append(tarjeta)
+        self._refrescar_tarjetas_landing()
+        layout.addLayout(self._landing_grid)
         layout.addStretch()
         return landing
+
+    def _refrescar_tarjetas_landing(self) -> None:
+        for tarjeta in self._landing_cards:
+            self._landing_grid.removeWidget(tarjeta)
+        indice = 0
+        for tarjeta in self._landing_cards:
+            visible = self._menu_visible.get(tarjeta.property("menu_key"), True)
+            tarjeta.setVisible(visible)
+            if visible:
+                self._landing_grid.addWidget(tarjeta, indice // 3, indice % 3)
+                indice += 1
 
     def _mostrar_dashboard(self) -> None:
         self._landing.hide()
@@ -615,7 +642,7 @@ class VentanaPrincipal(QWidget):
         self.tabla.viewport().update()
 
     def _mostrar_landing_inicial(self) -> None:
-        self._metricas.hide()
+        self._metricas.show()
         self._btn_toggle_metricas.hide()
         self._barra_filtros_widget.hide()
         self._sep_header.hide()
@@ -640,7 +667,7 @@ class VentanaPrincipal(QWidget):
                 valor,
                 icono,
                 shadow=False,
-                contrast=clave == "alertas",
+                contrast=False,
                 compact=True,
             )
             metric.setMinimumWidth(0)
@@ -687,6 +714,18 @@ class VentanaPrincipal(QWidget):
         lay.addLayout(title_group)
         lay.addStretch()
 
+        self._header_user_button = QToolButton()
+        self._header_user_button.setObjectName("HeaderUserChip")
+        nombre_usuario = obtener_nombre_usuario(self.usuario_id)
+        self._header_user_button.setText(f"◉  {nombre_usuario}  ▾")
+        self._header_user_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._header_user_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._user_menu = QMenu(self._header_user_button)
+        self._user_menu.addAction("Configuración", self._abrir_configuracion)
+        self._user_menu.addAction("Cerrar sesión", self._cerrar_sesion)
+        self._header_user_button.setMenu(self._user_menu)
+        lay.addWidget(self._header_user_button)
+
         self._btn_toggle_metricas = QToolButton()
         self._btn_toggle_metricas.setObjectName("ToggleMetrics")
         self._btn_toggle_metricas.setText("⌃")
@@ -709,8 +748,9 @@ class VentanaPrincipal(QWidget):
             f"background: transparent; border-bottom: 1px solid {tokens['border']}; }}"
         )
         self._lbl_titulo_header.setStyleSheet(
-            f"color: {tokens['text_primary']}; font-size: {tokens['font_size_title']}; "
-            "font-weight: 700; background: transparent;"
+            f"color: {tokens['text_primary']}; "
+            f"font-size: {int(tokens['font_size_title'].removesuffix('px')) + 6}px; "
+            "font-weight: 400; background: transparent;"
         )
         self._lbl_subtitulo_header.setStyleSheet(
             f"color: {tokens['text_secondary']}; font-size: {tokens['font_size_sm']}; "
@@ -730,6 +770,40 @@ class VentanaPrincipal(QWidget):
                 color: {tokens["accent_text"]};
                 background: {tokens["accent"]};
                 border-color: {tokens["accent"]};
+            }}
+            """
+        )
+        self._header_user_button.setStyleSheet(
+            f"""
+            QToolButton#HeaderUserChip {{
+                color: {tokens["text_primary"]};
+                background-color: {tokens["surface"]};
+                border: 1px solid {tokens["border"]};
+                border-radius: {tokens["radius_lg"]};
+                padding: 8px 12px;
+                font-weight: 600;
+            }}
+            QToolButton#HeaderUserChip:hover {{
+                background-color: {rgba(tokens["accent"], 10)};
+                border-color: {rgba(tokens["accent"], 150)};
+            }}
+            """
+        )
+        self._user_menu.setStyleSheet(
+            f"""
+            QMenu {{
+                color: {tokens["text_primary"]};
+                background-color: {tokens["surface"]};
+                border: 1px solid {tokens["border"]};
+                padding: 4px;
+            }}
+            QMenu::item {{
+                padding: 7px 22px;
+                border-radius: {tokens["radius_sm"]};
+            }}
+            QMenu::item:selected {{
+                color: {tokens["text_primary"]};
+                background-color: {rgba(tokens["accent"], 18)};
             }}
             """
         )

@@ -16,6 +16,7 @@ from ui.components import (
     ContrastCard,
     GlassCard,
     KpiCard,
+    ModuleCard,
     PillButton,
     ProgressBarThin,
     SearchInput,
@@ -75,6 +76,26 @@ def test_invalid_component_variants_are_rejected(app):
         PillButton("Action", "unknown")
     with pytest.raises(ValueError, match="Estado no válido"):
         StatusBadge("Status", "unknown")
+
+
+def test_module_card_emits_click_and_follows_theme(app, tmp_path, monkeypatch):
+    manager = get_theme_manager()
+    original_theme = manager.current()
+    monkeypatch.setattr(manager, "_config_file", tmp_path / "tema.json")
+    card = ModuleCard("control_diario", "📋", "Control diario", "Revisá la cobertura")
+    activations = []
+    card.clicked.connect(lambda: activations.append(True))
+
+    card._button.click()
+    manager.set_theme("Negro")
+
+    assert activations == [True]
+    assert card.property("menu_key") == "control_diario"
+    assert THEMES["Negro"]["surface"] in card._button.styleSheet()
+    assert THEMES["Negro"]["text_primary"] in card._title.styleSheet()
+
+    manager.set_theme(original_theme)
+    card.close()
 
 
 def test_component_preview_switches_all_components_live(app, tmp_path, monkeypatch):
