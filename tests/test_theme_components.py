@@ -482,6 +482,50 @@ def test_dashboard_metrics_are_compact_and_can_be_collapsed(app):
     app.processEvents()
 
 
+def test_dashboard_metrics_and_table_card_only_show_on_control_view(app):
+    from ui.ventana_principal import VentanaPrincipal
+
+    metrics = QWidget()
+    toggle = QWidget()
+    filters = QWidget()
+    separator = QWidget()
+    table_card = QWidget()
+    table = QWidget()
+    landing = QWidget()
+    panel = QWidget()
+    dashboard = SimpleNamespace(
+        _landing=landing,
+        _metricas=metrics,
+        _metricas_colapsadas=False,
+        _btn_toggle_metricas=toggle,
+        _barra_filtros_widget=filters,
+        _sep_header=separator,
+        _tabla_card=table_card,
+        tabla=SimpleNamespace(
+            show=table.show,
+            hide=table.hide,
+            viewport=lambda: QWidget(),
+        ),
+        cargar_tabla=lambda: None,
+        _panel_derecho=panel,
+    )
+
+    VentanaPrincipal._mostrar_landing_inicial(dashboard)
+    assert metrics.isHidden()
+    assert table_card.isHidden()
+    assert landing.isVisible()
+
+    VentanaPrincipal._mostrar_dashboard(dashboard)
+    assert not metrics.isHidden()
+    assert not table_card.isHidden()
+    assert not table.isHidden()
+    assert landing.isHidden()
+
+    for widget in (metrics, toggle, filters, separator, table_card, table, landing, panel):
+        widget.deleteLater()
+    app.processEvents()
+
+
 def test_dashboard_table_recolors_existing_rows_without_reloading(app):
     from ui.ventana_principal import VentanaPrincipal
 
