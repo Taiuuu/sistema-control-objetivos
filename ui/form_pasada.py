@@ -26,6 +26,7 @@ from services.validaciones import validar_pasada, ErrorValidacion
 from services.validador_horas_limite import validar_hora_turno_nocturno
 from ui.widgets.dialogos import confirmar_mensaje, mostrar_mensaje
 from ui.components import GlassCard, PillButton
+from ui.components.calendar import configure_calendar_theme
 
 # =============================================================================
 # FUNCIONES AUXILIARES
@@ -142,6 +143,7 @@ class FormPasada(QWidget):
 
         self.input_fecha = QDateEdit()
         self.input_fecha.setCalendarPopup(True)
+        configure_calendar_theme(self.input_fecha)
         self.input_fecha.setDate(fecha)
         self.input_fecha.setFixedHeight(34)
 

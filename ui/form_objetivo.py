@@ -13,6 +13,7 @@ from ui.animaciones import animar_entrada
 from models.objetivos import agregar_objetivo
 from services.validaciones import validar_objetivo, ErrorValidacion
 from ui.components import GlassCard, PillButton
+from ui.components.calendar import configure_calendar_theme
 from ui.theme.theme_manager import get_theme_manager
 
 
@@ -49,6 +50,7 @@ class FormObjetivo(QWidget):
         self.input_inicio = QDateEdit()
         self.input_inicio.setDate(QDate.currentDate())
         self.input_inicio.setCalendarPopup(True)
+        configure_calendar_theme(self.input_inicio)
         self.input_inicio.setDisplayFormat("dd/MM/yyyy")
         self.input_inicio.setFixedHeight(34)
 
@@ -62,6 +64,7 @@ class FormObjetivo(QWidget):
         self.input_fin = QDateEdit()
         self.input_fin.setDate(QDate.currentDate())
         self.input_fin.setCalendarPopup(True)
+        configure_calendar_theme(self.input_fin)
         self.input_fin.setDisplayFormat("dd/MM/yyyy")
         self.input_fin.setEnabled(False)
         self.input_fin.setFixedHeight(34)

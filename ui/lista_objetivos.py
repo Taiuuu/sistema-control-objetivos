@@ -24,6 +24,7 @@ from services.sincronizacion import obtener_sincronizador
 from services.sesion import get_rol
 from services.permisos import tiene_permiso
 from ui.components import GlassCard, PillButton, StatusBadge
+from ui.components.calendar import configure_calendar_theme
 from ui.components.base import rgba
 from ui.theme.theme_manager import get_theme_manager
 
@@ -70,6 +71,7 @@ class DialogoEditarObjetivo(QDialog):
         layout.addWidget(QLabel("Fecha inicio:"))
         self.input_inicio = QDateEdit()
         self.input_inicio.setCalendarPopup(True)
+        configure_calendar_theme(self.input_inicio)
         self.input_inicio.setDate(QDate.fromString(objetivo.fecha_inicio, "yyyy-MM-dd"))
         layout.addWidget(self.input_inicio)
 
@@ -87,6 +89,7 @@ class DialogoEditarObjetivo(QDialog):
 
         self.input_fin = QDateEdit()
         self.input_fin.setCalendarPopup(True)
+        configure_calendar_theme(self.input_fin)
         if objetivo.fecha_fin:
             self.input_fin.setDate(QDate.fromString(objetivo.fecha_fin, "yyyy-MM-dd"))
         else:

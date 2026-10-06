@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QDateEdit, QPushButton
 )
 from PyQt6.QtCore import QDate
+from ui.components.calendar import configure_calendar_theme
 from database.db import DB_PATH
 from ui.components import GlassCard, PillButton
 from ui.components.base import wrap_content_in_glass_card
@@ -54,6 +55,7 @@ class VistaLogs(QWidget):
         self.selector_fecha = QDateEdit()
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.setCalendarPopup(True)
+        configure_calendar_theme(self.selector_fecha)
         boton_buscar = PillButton("Buscar", "primary")
         boton_buscar.setObjectName("PrimaryButton")
         boton_buscar.clicked.connect(self._cargar_tabla)

@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QDate, pyqtSignal
 from PyQt6.QtGui import QFont
+from ui.components.calendar import configure_calendar_theme
 import sqlite3
 from database.db import DB_PATH
 from services.reportes import obtener_objetivos_del_dia
@@ -144,6 +145,7 @@ class TablaCoberturaWidget(QWidget):
         self._selector_fecha = QDateEdit()
         self._selector_fecha.setDate(QDate.currentDate())
         self._selector_fecha.setCalendarPopup(True)
+        configure_calendar_theme(self._selector_fecha)
         self._selector_fecha.setFixedWidth(115)
         self._selector_fecha.setStyleSheet(self._estilo_input(oscuro))
         self._selector_fecha.dateChanged.connect(self._on_fecha_cambiada)

@@ -17,6 +17,7 @@ from models.supervisores import (
 )
 from services.sincronizacion import obtener_sincronizador
 from ui.components import GlassCard, PillButton, SearchInput, StatusBadge
+from ui.components.calendar import configure_calendar_theme
 from ui.theme.theme_manager import get_theme_manager
 
 
@@ -44,6 +45,7 @@ class DialogoEditarSupervisor(QDialog):
 
         self.input_alta = QDateEdit()
         self.input_alta.setCalendarPopup(True)
+        configure_calendar_theme(self.input_alta)
         self.input_alta.setDisplayFormat("dd/MM/yyyy")
         if fecha_alta:
             self.input_alta.setDate(QDate.fromString(fecha_alta, "yyyy-MM-dd"))
@@ -53,6 +55,7 @@ class DialogoEditarSupervisor(QDialog):
 
         self.input_baja = QDateEdit()
         self.input_baja.setCalendarPopup(True)
+        configure_calendar_theme(self.input_baja)
         self.input_baja.setDisplayFormat("dd/MM/yyyy")
         self.input_baja.setSpecialValueText("Sin baja")  # cuando está en fecha mínima = sin baja
         self.input_baja.setMinimumDate(QDate(2000, 1, 1))
@@ -292,8 +295,10 @@ class ListaSupervisores(QWidget):
         dialogo.setFixedWidth(280)
         lay = QVBoxLayout(dialogo)
         lay.addWidget(QLabel(f"Seleccioná la fecha de baja de <b>{nombre}</b>:"))
-        date_edit = QDateEdit(QDate.currentDate())
+        date_edit = QDateEdit()
+        date_edit.setDate(QDate.currentDate())
         date_edit.setCalendarPopup(True)
+        configure_calendar_theme(date_edit)
         date_edit.setDisplayFormat("dd/MM/yyyy")
         lay.addWidget(date_edit)
         botones = QDialogButtonBox(

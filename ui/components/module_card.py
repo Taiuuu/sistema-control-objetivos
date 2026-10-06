@@ -22,6 +22,7 @@ class ModuleCard(QWidget):
         super().__init__(parent)
         self.setProperty("menu_key", key)
         self.setMinimumHeight(116)
+        self.setMinimumWidth(240)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         self._button = QPushButton(self)

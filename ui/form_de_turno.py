@@ -12,6 +12,7 @@ from PyQt6.QtCore import QDate, Qt
 from ui.animaciones import animar_entrada
 from models.equipos import guardar_equipo_turno
 from ui.components import GlassCard, PillButton
+from ui.components.calendar import configure_calendar_theme
 
 
 def _cargar_supervisores() -> list:
@@ -37,6 +38,7 @@ class FormTurno(QWidget):
 
         self.input_fecha = QDateEdit()
         self.input_fecha.setCalendarPopup(True)
+        configure_calendar_theme(self.input_fecha)
         self.input_fecha.setDate(QDate.currentDate())
         self.input_fecha.setFixedHeight(34)
 

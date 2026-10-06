@@ -21,6 +21,7 @@ from services.validador_horas_limite import validar_hora_turno_nocturno
 from services.background_task import run_background_task
 from services.exportar import exportar_pasadas_excel, exportar_pasadas_pdf
 from ui.components import GlassCard, PillButton, SearchInput, StatusBadge
+from ui.components.calendar import configure_calendar_theme
 from ui.components.base import wrap_content_in_glass_card
 
 
@@ -399,6 +400,7 @@ class ListaPasadas(QWidget):
 
         self.selector_fecha = QDateEdit()
         self.selector_fecha.setCalendarPopup(True)
+        configure_calendar_theme(self.selector_fecha)
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.dateChanged.connect(self._cargar_tabla)
 

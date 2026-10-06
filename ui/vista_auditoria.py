@@ -18,6 +18,7 @@ from services.auditoria import (
 )
 from services.sesion import get_usuario_id
 from ui.components import StatusBadge
+from ui.components.calendar import configure_calendar_theme
 from ui.components.base import wrap_content_in_glass_card
 
 
@@ -73,6 +74,7 @@ class VistaAuditoria(QWidget):
         self.selector_fecha = QDateEdit()
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.setCalendarPopup(True)
+        configure_calendar_theme(self.selector_fecha)
         self.selector_fecha.dateChanged.connect(self._cargar_datos)
         controles.addWidget(self.selector_fecha)
 

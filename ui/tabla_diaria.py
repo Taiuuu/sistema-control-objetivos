@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QLabel, QPushButton, QDateEdit, QComboBox
 )
 from PyQt6.QtCore import QDate
+from ui.components.calendar import configure_calendar_theme
 from services.reportes import obtener_objetivos_del_dia
 from services.background_task import run_background_task
 from database.db import DB_PATH
@@ -41,6 +42,7 @@ class TablaDiaria(QWidget):
         self.selector_fecha = QDateEdit()
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.setCalendarPopup(True)
+        configure_calendar_theme(self.selector_fecha)
         self.selector_fecha.dateChanged.connect(self.cargar_tabla)  # Auto-reload when date changes
         boton_buscar = PillButton("Buscar", "primary")
         boton_buscar.clicked.connect(self.cargar_tabla)

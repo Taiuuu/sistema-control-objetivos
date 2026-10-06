@@ -14,9 +14,7 @@ from PyQt6.QtWidgets import (
     QToolButton, QSizePolicy
     , QDialog, QDialogButtonBox, QCheckBox, QGridLayout, QMenu
 )
-from PyQt6.QtCore import (
-    QDate, QTimer, QEvent, Qt
-)
+from PyQt6.QtCore import QDate, QTimer, QEvent, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon, QShortcut, QKeySequence
 from services.reportes import obtener_objetivos_del_dia
 from services.queries_tabla import (
@@ -70,6 +68,7 @@ from ui.components import (
     ThemeLogo,
 )
 from ui.components.base import rgba
+from ui.components.calendar import configure_calendar_theme
 from ui.widgets.estilos import obtener_color
 
 # =============================================================================
@@ -170,6 +169,13 @@ class BotonMenu(QPushButton):
         self.setText(self._texto_completo)
         self._aplicar_estilo()
 
+
+class LandingScrollArea(QScrollArea):
+    resized = pyqtSignal()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.resized.emit()
 
 
 # =============================================================================
@@ -546,6 +552,8 @@ class VentanaPrincipal(QWidget):
 
         self._landing = self._construir_landing()
         layout_derecho.insertWidget(2, self._landing, 1)
+        self._refrescar_tarjetas_landing()
+        self._landing.resized.connect(self._refrescar_tarjetas_landing)
 
         self._barra_filtros_widget = self._construir_barra_filtros()
         layout_derecho.addWidget(self._barra_filtros_widget)
@@ -562,9 +570,17 @@ class VentanaPrincipal(QWidget):
 
         layout_raiz.addWidget(self._panel_derecho, 1)
 
-    def _construir_landing(self) -> QWidget:
-        landing = QWidget()
-        layout = QVBoxLayout(landing)
+    def _construir_landing(self) -> LandingScrollArea:
+        landing = LandingScrollArea()
+        landing.setObjectName("LandingScrollArea")
+        landing.setWidgetResizable(True)
+        landing.setFrameShape(QFrame.Shape.NoFrame)
+        landing.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        landing.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+        contenido = QWidget()
+        contenido.setStyleSheet("background: transparent;")
+        layout = QVBoxLayout(contenido)
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(18)
 
@@ -611,15 +627,18 @@ class VentanaPrincipal(QWidget):
         self._landing_grid.setVerticalSpacing(14)
         self._landing_cards = []
         for clave, icono, texto, descripcion, accion in acciones:
-            tarjeta = ModuleCard(clave, icono, texto, descripcion, parent=landing)
+            tarjeta = ModuleCard(clave, icono, texto, descripcion, parent=contenido)
             tarjeta.clicked.connect(accion)
             self._landing_cards.append(tarjeta)
-        self._refrescar_tarjetas_landing()
         layout.addLayout(self._landing_grid)
         layout.addStretch()
+        landing.setWidget(contenido)
         return landing
 
     def _refrescar_tarjetas_landing(self) -> None:
+        columnas = max(1, min(3, self._landing.viewport().width() // 300))
+        for columna in range(3):
+            self._landing_grid.setColumnStretch(columna, 1 if columna < columnas else 0)
         for tarjeta in self._landing_cards:
             self._landing_grid.removeWidget(tarjeta)
         indice = 0
@@ -627,7 +646,9 @@ class VentanaPrincipal(QWidget):
             visible = self._menu_visible.get(tarjeta.property("menu_key"), True)
             tarjeta.setVisible(visible)
             if visible:
-                self._landing_grid.addWidget(tarjeta, indice // 3, indice % 3)
+                self._landing_grid.addWidget(
+                    tarjeta, indice // columnas, indice % columnas
+                )
                 indice += 1
 
     def _mostrar_dashboard(self) -> None:
@@ -714,18 +735,6 @@ class VentanaPrincipal(QWidget):
         lay.addLayout(title_group)
         lay.addStretch()
 
-        self._header_user_button = QToolButton()
-        self._header_user_button.setObjectName("HeaderUserChip")
-        nombre_usuario = obtener_nombre_usuario(self.usuario_id)
-        self._header_user_button.setText(f"◉  {nombre_usuario}  ▾")
-        self._header_user_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._header_user_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self._user_menu = QMenu(self._header_user_button)
-        self._user_menu.addAction("Configuración", self._abrir_configuracion)
-        self._user_menu.addAction("Cerrar sesión", self._cerrar_sesion)
-        self._header_user_button.setMenu(self._user_menu)
-        lay.addWidget(self._header_user_button)
-
         self._btn_toggle_metricas = QToolButton()
         self._btn_toggle_metricas.setObjectName("ToggleMetrics")
         self._btn_toggle_metricas.setText("⌃")
@@ -773,40 +782,6 @@ class VentanaPrincipal(QWidget):
             }}
             """
         )
-        self._header_user_button.setStyleSheet(
-            f"""
-            QToolButton#HeaderUserChip {{
-                color: {tokens["text_primary"]};
-                background-color: {tokens["surface"]};
-                border: 1px solid {tokens["border"]};
-                border-radius: {tokens["radius_lg"]};
-                padding: 8px 12px;
-                font-weight: 600;
-            }}
-            QToolButton#HeaderUserChip:hover {{
-                background-color: {rgba(tokens["accent"], 10)};
-                border-color: {rgba(tokens["accent"], 150)};
-            }}
-            """
-        )
-        self._user_menu.setStyleSheet(
-            f"""
-            QMenu {{
-                color: {tokens["text_primary"]};
-                background-color: {tokens["surface"]};
-                border: 1px solid {tokens["border"]};
-                padding: 4px;
-            }}
-            QMenu::item {{
-                padding: 7px 22px;
-                border-radius: {tokens["radius_sm"]};
-            }}
-            QMenu::item:selected {{
-                color: {tokens["text_primary"]};
-                background-color: {rgba(tokens["accent"], 18)};
-            }}
-            """
-        )
 
     def _construir_barra_filtros(self) -> QWidget:
         oscuro = self._oscuro
@@ -839,6 +814,7 @@ class VentanaPrincipal(QWidget):
         self.selector_fecha = QDateEdit()
         self.selector_fecha.setDate(QDate.currentDate())
         self.selector_fecha.setCalendarPopup(True)
+        configure_calendar_theme(self.selector_fecha)
         self.selector_fecha.setFixedWidth(132)
         self.selector_fecha.setStyleSheet(estilo_input)
 

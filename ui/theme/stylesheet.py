@@ -99,7 +99,8 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             background-color: {_rgba(tokens["accent"], 12)};
             border-color: {tokens["accent"]};
         }}
-        QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox {{
+        QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QDateEdit, QDateTimeEdit,
+        QTimeEdit, QSpinBox {{
             min-height: {tokens["control_height"]};
             padding: 0 {tokens["spacing_sm"]};
             color: {tokens["text_primary"]};
@@ -110,12 +111,94 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             selection-color: {tokens["accent_text"]};
         }}
         QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus,
-        QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus {{
+        QDateEdit:focus, QDateTimeEdit:focus, QTimeEdit:focus, QSpinBox:focus {{
             border-color: {tokens["accent"]};
         }}
         QLineEdit:disabled, QTextEdit:disabled, QPlainTextEdit:disabled,
-        QComboBox:disabled, QDateEdit:disabled, QTimeEdit:disabled, QSpinBox:disabled {{
+        QComboBox:disabled, QDateEdit:disabled, QDateTimeEdit:disabled,
+        QTimeEdit:disabled, QSpinBox:disabled {{
             color: {tokens["text_disabled"]};
+        }}
+        QDateTimeEdit::down-button {{
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 22px;
+            background-color: {tokens["surface_alt"]};
+            border-left: {tokens["border_width"]} solid {tokens["border"]};
+            border-top-right-radius: {tokens["radius_sm"]};
+            border-bottom-right-radius: {tokens["radius_sm"]};
+        }}
+        QDateTimeEdit::down-button:hover {{
+            background-color: {_rgba(tokens["accent"], 18)};
+        }}
+        QDateTimeEdit::down-arrow {{
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid {tokens["text_secondary"]};
+        }}
+        QCalendarWidget {{
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface"]};
+            border: {tokens["border_width"]} solid {tokens["border"]};
+        }}
+        QCalendarWidget QWidget#qt_calendar_navigationbar {{
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface_alt"]};
+        }}
+        QCalendarWidget QToolButton#qt_calendar_prevmonth,
+        QCalendarWidget QToolButton#qt_calendar_nextmonth,
+        QCalendarWidget QToolButton#qt_calendar_monthbutton,
+        QCalendarWidget QToolButton#qt_calendar_yearbutton {{
+            min-width: 28px;
+            min-height: 28px;
+            padding: 2px 6px;
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface_alt"]};
+            border: {tokens["border_width"]} solid transparent;
+            border-radius: {tokens["radius_sm"]};
+            font-weight: 600;
+        }}
+        QCalendarWidget QToolButton#qt_calendar_prevmonth:hover,
+        QCalendarWidget QToolButton#qt_calendar_nextmonth:hover,
+        QCalendarWidget QToolButton#qt_calendar_monthbutton:hover,
+        QCalendarWidget QToolButton#qt_calendar_yearbutton:hover {{
+            background-color: {_rgba(tokens["accent"], 16)};
+            border-color: {tokens["border"]};
+        }}
+        QCalendarWidget QSpinBox#qt_calendar_yearedit {{
+            min-height: 28px;
+            padding: 0 4px;
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface"]};
+            border: {tokens["border_width"]} solid {tokens["border"]};
+            border-radius: {tokens["radius_sm"]};
+            selection-background-color: {tokens["accent"]};
+            selection-color: {tokens["accent_text"]};
+        }}
+        QCalendarWidget QAbstractItemView#qt_calendar_calendarview {{
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface"]};
+            border: none;
+            outline: 0;
+            selection-background-color: {tokens["accent"]};
+            selection-color: {tokens["accent_text"]};
+        }}
+        QCalendarWidget QAbstractItemView#qt_calendar_calendarview::item:hover {{
+            color: {tokens["text_primary"]};
+            background-color: {_rgba(tokens["accent"], 18)};
+        }}
+        QCalendarWidget QAbstractItemView#qt_calendar_calendarview::item:selected {{
+            color: {tokens["accent_text"]};
+            background-color: {tokens["accent"]};
+        }}
+        QCalendarWidget QHeaderView::section {{
+            color: {tokens["text_secondary"]};
+            background-color: {tokens["surface_alt"]};
+            border: none;
+            padding: 4px;
+            font-weight: 600;
         }}
         QComboBox QAbstractItemView {{
             color: {tokens["text_primary"]};
