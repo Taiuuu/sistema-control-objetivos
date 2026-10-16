@@ -184,21 +184,36 @@ def leer_hojas_de_datos(path: str) -> list[str]:
     """Devuelve los nombres de las hojas que son hojas de datos de pasadas.
 
     Se excluye cualquier hoja que no tenga al menos un bloque de encabezado
-    NO/OBJETIVO/TURNO/MOVIL/HORA/SUPERVISOR (p. ej. la hoja "Listado", que
-    es catálogo, u hojas vacías/sobrantes). No se usa el nombre de la hoja
-    para decidir esto.
+    NO/OBJETIVO/TURNO/MOVIL/HORA/SUPERVISOR. El nombre se valida después,
+    para que una hoja de datos con nombre incorrecto no desaparezca del
+    informe de rechazos.
     """
     wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
     try:
         hojas_datos = []
         for nombre in wb.sheetnames:
-            if not _PATRON_HOJA_DATOS.fullmatch(nombre.strip()):
-                logger.info("Hoja excluida del importador: hoja=%s motivo=nombre fuera del patrón de día", nombre)
-                continue
             ws = wb[nombre]
             if _detectar_bloques(ws) is not None:
                 hojas_datos.append(nombre)
         return hojas_datos
+    finally:
+        wb.close()
+
+
+def inspeccionar_archivo(path: str) -> tuple[bool, bool]:
+    """Indica si el libro tiene celdas con contenido y si tiene hojas de datos."""
+    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+    try:
+        tiene_contenido = any(
+            valor is not None
+            for ws in wb.worksheets
+            for fila in ws.iter_rows(values_only=True)
+            for valor in fila
+        )
+        tiene_hojas_de_datos = any(
+            _detectar_bloques(ws) is not None for ws in wb.worksheets
+        )
+        return tiene_contenido, tiene_hojas_de_datos
     finally:
         wb.close()
 
@@ -319,8 +334,6 @@ def leer_pasadas_crudas(path: str, nombre_hoja: str) -> list[PasadaCruda]:
 _PATRON_NOMBRE_HOJA = re.compile(
     r"^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*\(?\s*([A-ZÁÉÍÓÚa-záéíóú]+)\s*\)?\s*$"
 )
-_PATRON_HOJA_DATOS = re.compile(r"^\d{1,2}-\d{1,2} \((D|N)\)$")
-
 # Variantes de turno aceptadas para el nombre de hoja (punto 4 de la
 # especificación). Se mantiene local a este módulo, sin depender todavía
 # de normalizador.normalizar_turno (que se implementa recién en la Fase 5

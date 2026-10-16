@@ -25,7 +25,9 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Optional
+import re
+import unicodedata
+from pathlib import Path
 
 from . import duplicados, matcher, parser
 from .modelos import PasadaNormalizada, Problema, ResultadoAnalisis
@@ -52,37 +54,71 @@ logger = logging.getLogger(__name__)
 
 
 def _construir_pasadas_normalizadas(
-    path: str, anio: int
+    path: str,
+    anio: int,
+    trazabilidad: list[tuple[str, int, int]] | None = None,
 ) -> tuple[list[PasadaNormalizada], list[Problema], int, int]:
     """Devuelve (pasadas_normalizadas, problemas, hojas_encontradas,
     pasadas_detectadas).
 
-    `pasadas_detectadas` cuenta todos los bloques no vacíos. Las filas sin
-    hora o con hora inválida quedan registradas como advertencias y no se
-    convierten en PasadaNormalizada.
+    `pasadas_detectadas` cuenta todos los bloques no vacíos, incluso los
+    rechazados. `trazabilidad` recoge sus coordenadas de hoja/fila/bloque.
     """
     hojas = parser.leer_hojas_de_datos(path)
     problemas: list[Problema] = []
     pasadas_normalizadas: list[PasadaNormalizada] = []
     pasadas_detectadas = 0
+    mes_esperado = _mes_del_nombre_archivo(path)
 
     for hoja in hojas:
         fecha_hoja, turno_hoja, problema_hoja = parser.parsear_nombre_hoja(hoja, anio)
-        if problema_hoja is not None:
-            # No se puede fechar/turnar ninguna pasada de esta hoja: se
-            # reporta el error y se saltea la hoja entera.
-            problemas.append(problema_hoja)
-            logger.error(
-                "Hoja descartada: hoja=%s fila=- bloque=- motivo=%s",
-                hoja,
-                problema_hoja.descripcion,
-            )
-            continue
-
         crudas = parser.leer_pasadas_crudas(path, hoja)
         crudas_no_vacias = [c for c in crudas if not c.esta_vacia()]
         pasadas_detectadas += len(crudas_no_vacias)
+        if trazabilidad is not None:
+            trazabilidad.extend(
+                (cruda.hoja, cruda.fila_excel, cruda.bloque_tabla)
+                for cruda in crudas_no_vacias
+            )
+
+        if problema_hoja is not None:
+            if not crudas_no_vacias:
+                problemas.append(problema_hoja)
+            for cruda in crudas_no_vacias:
+                problemas.append(
+                    Problema(
+                        tipo="error_critico",
+                        descripcion=problema_hoja.descripcion,
+                        hoja=hoja,
+                        objetivo=cruda.objetivo,
+                        fila_excel=cruda.fila_excel,
+                        bloque_tabla=cruda.bloque_tabla,
+                    )
+                )
+            continue
+
+        if mes_esperado is None:
+            mes_esperado = fecha_hoja.month
+
         for cruda in crudas_no_vacias:
+            if fecha_hoja.month != mes_esperado:
+                problemas.append(
+                    Problema(
+                        tipo="error_critico",
+                        descripcion=(
+                            f"Fecha fuera del mes del archivo: la hoja '{hoja}' "
+                            f"corresponde al mes {fecha_hoja.month:02d}, pero se "
+                            f"esperaba el mes {mes_esperado:02d}."
+                        ),
+                        hoja=hoja,
+                        objetivo=cruda.objetivo,
+                        valor_problema=fecha_hoja.isoformat(),
+                        fila_excel=cruda.fila_excel,
+                        bloque_tabla=cruda.bloque_tabla,
+                    )
+                )
+                continue
+
             # --- Fase 4: hora ---------------------------------------------
             resultado_hora = normalizar_hora(cruda.hora)
 
@@ -106,16 +142,15 @@ def _construir_pasadas_normalizadas(
                     )
                     problemas.append(
                         Problema(
-                            tipo="advertencia",
+                            tipo="error_critico",
                             descripcion=(
-                                f"Pasada omitida: {resultado_hora.error}. "
-                                "El supervisor no cargó una hora válida; la pasada "
-                                "queda visible en este informe, pero no se importa."
+                                f"Pasada rechazada: {resultado_hora.error}."
                             ),
                             hoja=hoja,
                             objetivo=cruda.objetivo,
                             valor_problema=cruda.hora,
                             fila_excel=cruda.fila_excel,
+                            bloque_tabla=cruda.bloque_tabla,
                         )
                     )
                     continue
@@ -133,15 +168,15 @@ def _construir_pasadas_normalizadas(
                 # porque hora es obligatoria en PasadaNormalizada.
                 problemas.append(
                     Problema(
-                        tipo="advertencia",
+                        tipo="error_critico",
                         descripcion=(
-                            "Pasada omitida: el supervisor no cargó la hora. "
-                            "La pasada queda visible en este informe, pero "
-                            "no se importa."
+                            "Pasada rechazada: el supervisor no cargó la hora, "
+                            "que es obligatoria para identificar y persistir la pasada."
                         ),
                         hoja=hoja,
                         objetivo=cruda.objetivo,
                         fila_excel=cruda.fila_excel,
+                        bloque_tabla=cruda.bloque_tabla,
                     )
                 )
                 continue
@@ -168,7 +203,9 @@ def _construir_pasadas_normalizadas(
                     cruda.turno, hoja=hoja, objetivo=cruda.objetivo, fila_excel=cruda.fila_excel
                 )
                 if resultado_turno.problema is not None:
+                    resultado_turno.problema.bloque_tabla = cruda.bloque_tabla
                     problemas.append(resultado_turno.problema)
+                    continue
                 turno_celda = resultado_turno.turno
             else:
                 turno_celda = None
@@ -191,6 +228,18 @@ def _construir_pasadas_normalizadas(
                 logger.warning(
                     "Pasada descartada: hoja=%s fila=%d bloque=%d objetivo=%r motivo=turno no resoluble",
                     hoja, cruda.fila_excel, cruda.bloque_tabla, cruda.objetivo,
+                )
+                continue
+
+            if not (cruda.objetivo or "").strip():
+                problemas.append(
+                    Problema(
+                        tipo="error_critico",
+                        descripcion="Pasada rechazada: falta el nombre del objetivo.",
+                        hoja=hoja,
+                        fila_excel=cruda.fila_excel,
+                        bloque_tabla=cruda.bloque_tabla,
+                    )
                 )
                 continue
 
@@ -217,6 +266,18 @@ def _construir_pasadas_normalizadas(
     return pasadas_normalizadas, problemas, len(hojas), pasadas_detectadas
 
 
+def _mes_del_nombre_archivo(path: str) -> int | None:
+    """Busca el mes español en el nombre del archivo sin alterar el Excel."""
+    meses = {
+        "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5,
+        "JUNIO": 6, "JULIO": 7, "AGOSTO": 8, "SEPTIEMBRE": 9,
+        "SETIEMBRE": 9, "OCTUBRE": 10, "NOVIEMBRE": 11, "DICIEMBRE": 12,
+    }
+    nombre = unicodedata.normalize("NFKD", Path(path).stem)
+    nombre = "".join(c for c in nombre if not unicodedata.combining(c)).upper()
+    return next((meses[token] for token in re.findall(r"[A-Z]+", nombre) if token in meses), None)
+
+
 # ---------------------------------------------------------------------------
 # Orquestador principal
 # ---------------------------------------------------------------------------
@@ -233,12 +294,28 @@ def analizar_excel(
     mostrar en la pantalla de revisión."""
 
     # --- Fase 1-5: lectura + normalización -----------------------------
+    trazabilidad: list[tuple[str, int, int]] = []
     try:
         pasadas, problemas, hojas_encontradas, pasadas_detectadas = _construir_pasadas_normalizadas(
-            path, anio
+            path, anio, trazabilidad
         )
     finally:
         parser.liberar_workbook(path)
+
+    if hojas_encontradas == 0:
+        tiene_contenido, _ = parser.inspeccionar_archivo(path)
+        motivo = (
+            "No se encontraron hojas con los encabezados obligatorios "
+            "NO/OBJETIVO/TURNO/MOVIL/HORA/SUPERVISOR."
+            if tiene_contenido
+            else "El archivo Excel está vacío."
+        )
+        return ResultadoAnalisis(
+            problemas=[Problema(tipo="error_critico", descripcion=motivo)],
+            errores_criticos=1,
+            archivo_origen=path,
+            filas_leidas_ids=[],
+        )
 
     # --- Fase 6-7: matching ----------------------------------------------
     objetivos_bd = matcher.obtener_objetivos_bd(conexion_bd)
@@ -274,8 +351,20 @@ def analizar_excel(
                 and matcher.normalizar_nombre(getattr(p, atributo_nombre)) == clave
             ]
             if resultado.tipo == "sugerencias":
-                nombres = ", ".join(nombre_candidato(s) for s in resultado.sugerencias[:3])
-                detalle = f"Sin match exacto. Sugerencias: {nombres}."
+                if resultado.ambiguo:
+                    nombres = ", ".join(
+                        f"{nombre_candidato(s)} (ID:{s.objetivo.id if hasattr(s, 'objetivo') else s.supervisor.id})"
+                        for s in resultado.sugerencias[:3]
+                    )
+                    detalle = (
+                        "Coincidencia ambigua tras normalizar mayúsculas, tildes "
+                        f"y espacios. No se elige automáticamente. Sugerencias: {nombres}."
+                    )
+                else:
+                    nombres = ", ".join(
+                        nombre_candidato(s) for s in resultado.sugerencias[:3]
+                    )
+                    detalle = f"Sin match exacto. Sugerencias: {nombres}."
             else:
                 detalle = "Sin match exacto ni sugerencias cercanas."
             destinos = afectadas or [None]  # no perder el problema si no hay pasada asociada
@@ -321,7 +410,38 @@ def analizar_excel(
 
     errores_criticos = sum(1 for p in problemas if p.tipo == "error_critico")
     advertencias = sum(1 for p in problemas if p.tipo == "advertencia")
-    pasadas_sin_hora = sum("no cargó la hora" in p.descripcion for p in problemas)
+    pasadas_sin_hora = sum(
+        "no cargó la hora" in p.descripcion for p in problemas
+    )
+    filas_rechazadas_ids = sorted({
+        (p.hoja, p.fila_excel, p.bloque_tabla)
+        for p in problemas
+        if p.tipo == "error_critico"
+        and p.hoja is not None
+        and p.fila_excel is not None
+        and p.bloque_tabla is not None
+    })
+    filas_a_insertar = sum(
+        pasada.accion in ("nueva", "actualizar") for pasada in pasadas_tras_dedupe
+    )
+    filas_duplicadas = len(descartadas) + sum(
+        pasada.accion == "omitir" for pasada in pasadas_tras_dedupe
+    )
+    filas_validas_o_duplicadas = (
+        {(p.hoja, p.fila_excel, p.bloque_tabla) for p in descartadas}
+        | {
+            (p.hoja, p.fila_excel, p.bloque_tabla)
+            for p in pasadas_tras_dedupe
+            if p.accion in ("nueva", "actualizar", "omitir")
+        }
+    )
+    # Las pasadas con matching pendiente se cuentan como rechazadas en la
+    # vista previa, hasta que un supervisor confirme una sugerencia.
+    ids_rechazados = (
+        set(filas_rechazadas_ids)
+        | (set(trazabilidad) - filas_validas_o_duplicadas - set(filas_rechazadas_ids))
+    )
+    filas_rechazadas = len(ids_rechazados)
 
     return ResultadoAnalisis(
         pasadas=pasadas_tras_dedupe,
@@ -338,6 +458,17 @@ def analizar_excel(
         pasadas_detectadas=pasadas_detectadas,
         pasadas_sin_hora=pasadas_sin_hora,
         pasadas_duplicadas=len(descartadas),
+        archivo_origen=path,
+        filas_leidas_ids=trazabilidad,
+        filas_rechazadas_ids=filas_rechazadas_ids,
+        filas_a_insertar=filas_a_insertar,
+        filas_duplicadas=filas_duplicadas,
+        filas_rechazadas=filas_rechazadas,
+        mes_archivo=_mes_del_nombre_archivo(path)
+        or next(
+            (pasada.fecha_hoja.month for pasada in pasadas_tras_dedupe),
+            None,
+        ),
     )
 
 
@@ -346,7 +477,10 @@ def generar_resumen_texto(resultado: ResultadoAnalisis) -> str:
     return (
         "ANÁLISIS DEL ARCHIVO\n"
         f"Hojas encontradas: {resultado.hojas_encontradas}\n"
-        f"Pasadas detectadas: {resultado.pasadas_detectadas}\n"
+        f"Filas leídas: {resultado.pasadas_detectadas}\n"
+        f"A insertar/actualizar: {resultado.filas_a_insertar}\n"
+        f"Duplicadas: {resultado.filas_duplicadas}\n"
+        f"Rechazadas: {resultado.filas_rechazadas}\n"
         f"Pasadas sin hora: {resultado.pasadas_sin_hora}\n"
         f"Pasadas nuevas: {resultado.pasadas_nuevas}\n"
         f"Pasadas ya existentes: {resultado.pasadas_omitir + resultado.pasadas_actualizar}\n"
@@ -375,6 +509,9 @@ def generar_reporte_detallado(resultado: ResultadoAnalisis) -> bytes:
     filas_resumen = [
         ("Hojas encontradas", resultado.hojas_encontradas),
         ("Pasadas detectadas", resultado.pasadas_detectadas),
+        ("Filas a insertar/actualizar", resultado.filas_a_insertar),
+        ("Filas duplicadas", resultado.filas_duplicadas),
+        ("Filas rechazadas", resultado.filas_rechazadas),
         ("Pasadas sin hora", resultado.pasadas_sin_hora),
         ("Pasadas nuevas", resultado.pasadas_nuevas),
         ("Pasadas ya existentes", resultado.pasadas_omitir + resultado.pasadas_actualizar),
@@ -393,7 +530,10 @@ def generar_reporte_detallado(resultado: ResultadoAnalisis) -> bytes:
     ws_resumen.column_dimensions["B"].width = 12
 
     ws_problemas = wb.create_sheet("Problemas")
-    columnas = ["Tipo", "Hoja", "Fila Excel", "Objetivo", "Valor", "Descripción"]
+    columnas = [
+        "Severidad", "Tipo", "Hoja", "Fila Excel", "Bloque",
+        "Objetivo", "Valor", "Descripción",
+    ]
     ws_problemas.append(columnas)
     for celda in ws_problemas[1]:
         celda.font = encabezado_font
@@ -401,9 +541,11 @@ def generar_reporte_detallado(resultado: ResultadoAnalisis) -> bytes:
     for p in resultado.problemas:
         ws_problemas.append(
             [
+                p.severidad,
                 p.tipo,
                 p.hoja or "",
                 p.fila_excel if p.fila_excel is not None else "",
+                p.bloque_tabla if p.bloque_tabla is not None else "",
                 p.objetivo or "",
                 str(p.valor_problema) if p.valor_problema is not None else "",
                 p.descripcion,
@@ -432,8 +574,8 @@ def generar_reporte_detallado(resultado: ResultadoAnalisis) -> bytes:
     for col, ancho in zip("ABCDE", [18, 12, 28, 18, 20]):
         ws_horas.column_dimensions[col].width = ancho
 
-    anchos = [16, 14, 10, 24, 20, 70]
-    for col, ancho in zip("ABCDEF", anchos):
+    anchos = [14, 16, 20, 12, 10, 24, 20, 70]
+    for col, ancho in zip("ABCDEFGH", anchos):
         ws_problemas.column_dimensions[col].width = ancho
 
     buffer = io.BytesIO()

@@ -37,7 +37,7 @@ from models.supervisores import listar_supervisores
 from services.logger import registrar_accion
 from services.sesion import get_usuario_id
 
-from services.importador import analizar_excel, confirmar_importacion
+from services.importador import previsualizar_importacion, confirmar_importacion
 from services.importador import reporte as importador_reporte
 from ui.components.base import wrap_content_in_glass_card
 from services.importador.modelos import (
@@ -79,10 +79,17 @@ class DialogoResolverCoincidencias(QDialog):
         es_resolucion_objetivos = "objetivos" in titulo.lower()
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(
+        puede_crear = any(
+            grupo["resultado"].permite_crear_nuevo for grupo in grupos
+        )
+        instrucciones = (
             "Elegí a qué registro existente corresponde cada nombre importado, "
             "o seleccioná 'Crear nuevo'."
-        ))
+            if puede_crear
+            else "Hay nombres ambiguos. Elegí explícitamente el registro por su ID; "
+            "no se seleccionará ninguno automáticamente."
+        )
+        layout.addWidget(QLabel(instrucciones))
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -101,7 +108,15 @@ class DialogoResolverCoincidencias(QDialog):
             completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
             combo.setCompleter(completer)
             combo.addItems(nombres_existentes)
-            combo.addItem(self.OPCION_CREAR)
+            if resultado.permite_crear_nuevo:
+                combo.addItem(self.OPCION_CREAR)
+            if resultado.ambiguo:
+                for candidato in resultado.sugerencias:
+                    entidad = getattr(candidato, "objetivo", None) or getattr(
+                        candidato, "supervisor", None
+                    )
+                    if entidad is not None:
+                        combo.addItem(f"[ID:{entidad.id}] {entidad.nombre}")
             grupos_para_vincular = [otro for otro in grupos if otro is not grupo]
             if es_resolucion_objetivos and grupos_para_vincular:
                 combo.addItem(self.OPCION_VINCULAR)
@@ -110,12 +125,20 @@ class DialogoResolverCoincidencias(QDialog):
             if resultado.tipo == "sugerencias" and resultado.sugerencias:
                 candidato = resultado.sugerencias[0]
                 entidad = getattr(candidato, "objetivo", None) or getattr(candidato, "supervisor", None)
-                mejor_nombre = entidad.nombre if entidad else None
+                if entidad:
+                    mejor_nombre = (
+                        f"[ID:{entidad.id}] {entidad.nombre}"
+                        if resultado.ambiguo
+                        else entidad.nombre
+                    )
 
             line_edit = QLineEdit()
             line_edit.setPlaceholderText("Nombre del nuevo registro")
 
-            if mejor_nombre:
+            if resultado.ambiguo:
+                combo.setCurrentIndex(-1)
+                combo.setCurrentText("")
+            elif mejor_nombre:
                 combo.setCurrentText(mejor_nombre)
             else:
                 combo.setCurrentText(self.OPCION_CREAR)
@@ -185,6 +208,22 @@ class DialogoResolverCoincidencias(QDialog):
 
         for grupo, combo, line_edit, alias, link_combo, grupos_para_vincular in self.controles:
             seleccionado = combo.currentText().strip()
+            resultado = grupo["resultado"]
+            if resultado.ambiguo:
+                sugerencias_por_id = {
+                    f"[ID:{entidad.id}] {entidad.nombre}"
+                    for candidato in resultado.sugerencias
+                    for entidad in (
+                        getattr(candidato, "objetivo", None)
+                        or getattr(candidato, "supervisor", None),
+                    )
+                    if entidad is not None
+                }
+                if seleccionado not in sugerencias_por_id:
+                    raise ValueError(
+                        f"Elegí explícitamente por ID el registro para "
+                        f"'{grupo['nombre_excel']}'."
+                    )
             if seleccionado == self.OPCION_VINCULAR:
                 grupo_objetivo = grupos_para_vincular[link_combo.currentIndex()]
                 combo_objetivo, entrada_objetivo = controles_por_grupo[id(grupo_objetivo)]
@@ -234,7 +273,7 @@ class AnalisisWorker(QObject):
 
     def run(self) -> None:
         try:
-            resultado = analizar_excel(
+            resultado = previsualizar_importacion(
                 self.ruta_archivo,
                 self.anio,
                 self.conexion_bd,
@@ -513,8 +552,8 @@ class ImportarExcel(QWidget):
 
         if criticos:
             self.log.append(
-                f"⚠ Hay {len(criticos)} errores críticos. Corregí el Excel "
-                "original y volvé a analizarlo; no se resuelven desde acá."
+                f"⚠ Hay {len(criticos)} errores de fila: esas pasadas se "
+                "rechazan y se informarán; el resto puede importarse."
             )
 
     def _on_analisis_error(self, mensaje: str) -> None:
@@ -588,7 +627,10 @@ class ImportarExcel(QWidget):
             self.boton_importar.setEnabled(False)
             return
 
-        hay_criticos = any(p.tipo == "error_critico" for p in self.analisis.problemas)
+        hay_criticos = any(
+            p.tipo == "error_critico" and p.fila_excel is None
+            for p in self.analisis.problemas
+        )
         ids_bloqueantes = [i for i, p in enumerate(self.analisis.problemas) if p.tipo == "para_revisar"]
         pendientes = (
             self.resoluciones.pendientes_bloqueantes(ids_bloqueantes)
@@ -660,6 +702,9 @@ class ImportarExcel(QWidget):
         self.log.append(f"✓ Pasadas nuevas: {resultado.get('pasadas_nuevas', 0)}")
         self.log.append(f"✓ Pasadas actualizadas: {resultado.get('pasadas_actualizadas', 0)}")
         self.log.append(f"✓ Pasadas omitidas: {resultado.get('pasadas_omitidas', 0)}")
+        self.log.append(f"✓ Filas leídas: {resultado.get('filas_leidas', 0)}")
+        self.log.append(f"✓ Filas duplicadas: {resultado.get('filas_duplicadas', 0)}")
+        self.log.append(f"✓ Filas rechazadas: {resultado.get('filas_rechazadas', 0)}")
         self.log.append(f"✓ Objetivos creados: {resultado.get('objetivos_creados', 0)}")
         self.log.append(f"✓ Supervisores creados: {resultado.get('supervisores_creados', 0)}")
 

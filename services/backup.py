@@ -21,7 +21,8 @@ from services.exceptions import BackupError, NoHayEspacioBackup, BackupCorruptoE
 
 logger = logging.getLogger("vesp.backup")
 MOTIVOS_VALIDOS = {
-    "diario", "pre_importacion", "pre_borrado_mes", "pre_restauracion", "manual"
+    "diario", "pre_importacion", "pre_migracion", "pre_borrado_mes",
+    "pre_restauracion", "manual"
 }
 TABLAS_PRINCIPALES = ("pasadas", "objetivos", "supervisores", "usuarios")
 PATRON_BACKUP = re.compile(r"^vesp_(\d{8}_\d{6})_([a-z_]+?)(?:_\d+)?\.db$")
@@ -217,6 +218,7 @@ def limpiar_backups(ahora: dt.datetime | None = None) -> None:
     preservar_diarios = {item["path"] for item in diarios[:14]}
     edades = {
         "pre_importacion": 90,
+        "pre_migracion": 90,
         "pre_borrado_mes": 90,
         "manual": 90,
         "pre_restauracion": 30,

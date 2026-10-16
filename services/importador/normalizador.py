@@ -78,6 +78,30 @@ def normalizar_hora(valor_crudo: Any) -> ResultadoHora:
             return ResultadoHora(None, False, None)
 
         texto = texto.strip("'\"").strip()
+        am_pm = re.fullmatch(
+            r"(\d{1,2})(?:\s*[:,;.]\s*(\d{1,2}))?\s*(AM|PM)",
+            texto,
+            flags=re.IGNORECASE,
+        )
+        if am_pm:
+            hora = int(am_pm.group(1))
+            minuto = int(am_pm.group(2) or 0)
+            if not 1 <= hora <= 12:
+                return ResultadoHora(
+                    None,
+                    False,
+                    f"Hora '{valor_crudo}' inválida para formato AM/PM (hora esperada entre 1 y 12)",
+                )
+            if not 0 <= minuto <= 59:
+                return ResultadoHora(
+                    None,
+                    False,
+                    f"Hora '{valor_crudo}' inválida (minutos fuera de rango 00-59)",
+                )
+            hora = hora % 12 + (12 if am_pm.group(3).upper() == "PM" else 0)
+            return ResultadoHora(datetime.time(hora, minuto), True, None)
+
+        texto = re.sub(r"(?i)\s*HS$", "", texto).strip()
         partes = re.fullmatch(r"(\d{1,2})\s*[:,;.]\s*(\d{1,2});?", texto)
         if partes:
             return _validar_y_construir(
@@ -86,8 +110,6 @@ def normalizar_hora(valor_crudo: Any) -> ResultadoHora:
 
         texto = texto.replace(";", ":")
         hora_incompleta = bool(re.fullmatch(r"\d{1,2}:\s*", texto))
-        texto = re.sub(r"(?i)(?<=\d)\s*[A-Za-z]+\s*$", "", texto)
-
         if ":" in texto:
             resultado = _normalizar_desde_hhmm(texto, valor_crudo)
             if hora_incompleta and resultado.error is None:
@@ -186,7 +208,7 @@ def _validar_y_construir(hora: int, minuto: int, original: Any) -> ResultadoHora
         )
     if not (0 <= minuto <= 59):
         return ResultadoHora(
-            None, False, f"Hora '{original}' inválida (fuera de rango 00-23)"
+            None, False, f"Hora '{original}' inválida (minutos fuera de rango 00-59)"
         )
     return ResultadoHora(datetime.time(hora, minuto), True, None)
 

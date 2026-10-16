@@ -9,6 +9,7 @@ from .modelos import (
 
 __all__ = [
     "analizar_excel",
+    "previsualizar_importacion",
     "confirmar_importacion",
     "PasadaCruda",
     "PasadaNormalizada",
@@ -25,6 +26,21 @@ def analizar_excel(
 ) -> ResultadoAnalisis:
 
     return reporte.analizar_excel(
+        path,
+        anio,
+        conexion_bd,
+        forzar_sobrescritura=forzar_sobrescritura,
+    )
+
+
+def previsualizar_importacion(
+    path,
+    anio,
+    conexion_bd,
+    forzar_sobrescritura: bool = False,
+) -> ResultadoAnalisis:
+    """Ejecuta el dry-run del importador; no escribe en SQLite."""
+    return analizar_excel(
         path,
         anio,
         conexion_bd,

@@ -306,6 +306,86 @@ def _check_ambiguedad_movil_supervisor(
     return problemas
 
 
+def _check_mismo_horario_en_objetivos_distintos(
+    pasadas: Iterable[PasadaNormalizada],
+) -> list[Problema]:
+    por_instante: dict[tuple[object, time], dict[str, PasadaNormalizada]] = defaultdict(dict)
+    for pasada in pasadas:
+        objetivo = (
+            str(pasada.objetivo_id)
+            if pasada.objetivo_id is not None
+            else " ".join((pasada.objetivo_nombre or "").upper().split())
+        )
+        if objetivo:
+            por_instante[(pasada.fecha_operativa, pasada.hora)][objetivo] = pasada
+
+    problemas: list[Problema] = []
+    for (fecha, hora), objetivos in por_instante.items():
+        if len(objetivos) < 2:
+            continue
+        primera = next(iter(objetivos.values()))
+        problemas.append(
+            Problema(
+                tipo="advertencia",
+                descripcion=(
+                    f"Hay pasadas a la misma hora ({hora:%H:%M}) en "
+                    f"{len(objetivos)} objetivos distintos para {fecha:%d/%m/%Y}. "
+                    "Verificá que la distancia permita el recorrido; el Excel "
+                    "no incluye coordenadas para comprobarla."
+                ),
+                hoja=primera.hoja,
+                objetivo=", ".join(sorted(p.objetivo_nombre for p in objetivos.values())),
+                fila_excel=primera.fila_excel,
+                bloque_tabla=primera.bloque_tabla,
+            )
+        )
+    return problemas
+
+
+def _check_orden_cronologico_dudoso(
+    pasadas: Iterable[PasadaNormalizada],
+) -> list[Problema]:
+    por_hoja: dict[str, list[PasadaNormalizada]] = defaultdict(list)
+    for pasada in pasadas:
+        por_hoja[pasada.hoja].append(pasada)
+
+    problemas: list[Problema] = []
+    for hoja, grupo in por_hoja.items():
+        ordenadas = sorted(grupo, key=lambda pasada: (pasada.fila_excel, pasada.bloque_tabla))
+        hubo_cruce_medianoche = False
+        anterior: PasadaNormalizada | None = None
+        for pasada in ordenadas:
+            if anterior is not None and pasada.hora < anterior.hora:
+                cruce_nocturno = (
+                    pasada.turno_hoja == "N"
+                    and not hubo_cruce_medianoche
+                    and anterior.hora.hour >= 18
+                    and pasada.hora.hour < 12
+                )
+                if cruce_nocturno:
+                    hubo_cruce_medianoche = True
+                else:
+                    problemas.append(
+                        Problema(
+                            tipo="advertencia",
+                            descripcion=(
+                                f"Orden cronológico dudoso en la hoja '{hoja}': "
+                                f"la hora {pasada.hora:%H:%M} (fila {pasada.fila_excel}) "
+                                f"es anterior a {anterior.hora:%H:%M} "
+                                f"(fila {anterior.fila_excel}). Se importa, pero "
+                                "conviene verificar el orden de carga."
+                            ),
+                            hoja=hoja,
+                            objetivo=pasada.objetivo_nombre,
+                            valor_problema=pasada.hora.strftime("%H:%M"),
+                            fila_excel=pasada.fila_excel,
+                            bloque_tabla=pasada.bloque_tabla,
+                        )
+                    )
+            anterior = pasada
+    return problemas
+
+
 # ---------------------------------------------------------------------------
 # Punto de entrada
 # ---------------------------------------------------------------------------
@@ -314,7 +394,7 @@ def validar(
     pasadas_normalizadas: list[PasadaNormalizada],
     contexto: Optional[dict] = None,
 ) -> list[Problema]:
-    """Corre los 5 checks de negocio sobre las pasadas ya normalizadas.
+    """Corre las validaciones de negocio sobre las pasadas ya normalizadas.
 
     `contexto` es opcional y solo se usa hoy para pisar los rangos horarios
     por turno vía contexto["rangos_horarios_por_turno"] = {"D": (time, time), "N": (time, time)}.
@@ -324,4 +404,7 @@ def validar(
     problemas += _check_datos_parciales_movil_supervisor(pasadas_normalizadas)
     problemas += _check_hora_fuera_de_rango(pasadas_normalizadas, contexto)
     problemas += _check_bloque_tabla_incorrecto(pasadas_normalizadas)
+    problemas += _check_ambiguedad_movil_supervisor(pasadas_normalizadas)
+    problemas += _check_mismo_horario_en_objetivos_distintos(pasadas_normalizadas)
+    problemas += _check_orden_cronologico_dudoso(pasadas_normalizadas)
     return problemas

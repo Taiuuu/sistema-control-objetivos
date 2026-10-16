@@ -272,13 +272,13 @@ def test_schema_version_se_crea_una_sola_vez(tmp_path, monkeypatch):
     db_module.crear_base_datos()
     with sqlite3.connect(ruta) as conexion:
         fecha_original = conexion.execute(
-            "SELECT fecha_aplicacion FROM schema_version WHERE version = 1"
+            "SELECT fecha_aplicacion FROM schema_version WHERE version = 2"
         ).fetchone()[0]
     db_module.crear_base_datos()
 
     with sqlite3.connect(ruta) as conexion:
         filas = conexion.execute("SELECT version, fecha_aplicacion FROM schema_version").fetchall()
-    assert filas == [(1, fecha_original)]
+    assert filas == [(2, fecha_original)]
 
 
 def test_conexion_aplica_pragmas_y_exporta_csv_con_bom(base_segura, tmp_path, monkeypatch):

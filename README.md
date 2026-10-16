@@ -17,6 +17,35 @@ reportes de cumplimiento e importar recorridos desde Excel.
 - Auditoría de operaciones, copias de seguridad automáticas y restauración/fábrica.
 - Feriados, notas diarias, sincronización y notificaciones según la configuración instalada.
 
+### Integridad de la importación VESP
+
+La pantalla **Importar desde Excel** analiza el archivo en modo de vista previa, sin
+escribir en SQLite. El resumen concilia las filas leídas entre filas a insertar/actualizar,
+duplicadas y rechazadas; el informe descargable incluye severidad, hoja, fila, bloque,
+motivo y sugerencias para devolverlo a supervisión.
+
+Se aceptan horas `HH:MM` y los separadores alternativos `HH.MM` y `HH;MM`, horas
+numéricas como `8`, formatos incompletos como `8:5` y sufijos `AM/PM`.
+Una hora imposible, una fecha de hoja inválida, una fila sin objetivo o una fecha fuera
+del mes indicado en el nombre del archivo se rechazan con su posición en el Excel.
+Las advertencias —por ejemplo una hora normalizada, orden horario dudoso o dos objetivos
+distintos con una pasada a la misma hora— no bloquean las demás filas. Como el formato
+actual no contiene coordenadas, el importador advierte sobre coincidencias horarias en
+objetivos distintos y deja la verificación de distancia a supervisión.
+
+Los nombres se comparan en mayúsculas, sin tildes y con espacios colapsados. Las colisiones
+normalizadas no se resuelven por orden ni por similitud: se rechazan hasta corregir o
+seleccionar un registro sin ambigüedad. Si el nombre del archivo no contiene un mes español
+reconocible, se toma el mes de la primera hoja de datos válida y se comprueba que las demás
+hojas pertenezcan a ese mismo mes.
+
+La clave natural de SQLite es objetivo + fecha operativa + hora (minuto) + supervisor;
+el turno no altera la identidad de una pasada. La migración respalda la base antes de
+archivar copias previas repetidas (conserva la de menor ID y guarda las demás en
+`pasadas_duplicados_migracion`) y crea un índice único. Cada confirmación crea un backup
+previo y ejecuta altas, cambios y auditoría en una única transacción; una conciliación
+fallida revierte todas las escrituras.
+
 ## Requisitos
 
 - Python 3.10 o superior.
@@ -118,6 +147,9 @@ python -m pytest
 ```
 
 Las dependencias de desarrollo adicionales se encuentran en `docs/requirements-dev.txt`.
+La prueba dorada del importador usa el Excel real de septiembre de 2026 que está en la
+raíz del proyecto y crea un catálogo temporal a partir de los nombres presentes en ese mes;
+no requiere mantener una lista fija de objetivos ni un JSON esperado aparte.
 
 ## Estructura
 

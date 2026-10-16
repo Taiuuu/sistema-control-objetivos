@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import logging
 import csv
+import sqlite3
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
@@ -406,7 +407,7 @@ def _validar_analisis(
     errores_criticos = [
         (i, p)
         for i, p in enumerate(problemas)
-        if p.tipo == "error_critico"
+        if p.tipo == "error_critico" and p.fila_excel is None
     ]
 
     if errores_criticos:
@@ -451,32 +452,36 @@ def _buscar_objetivo_por_nombre(
     conexion_bd,
     nombre: str,
 ):
-    return conexion_bd.execute(
-        """
-        SELECT id, nombre
-        FROM objetivos
-        WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?))
-        ORDER BY id
-        LIMIT 1
-        """,
-        (nombre,),
-    ).fetchone()
+    clave = normalizar_nombre(nombre)
+    coincidencias = [
+        fila for fila in conexion_bd.execute("SELECT id, nombre FROM objetivos")
+        if normalizar_nombre(fila[1]) == clave
+    ]
+    if len(coincidencias) > 1:
+        ids = ", ".join(str(fila[0]) for fila in coincidencias)
+        raise ValueError(
+            f"El objetivo '{nombre}' coincide con varios registros normalizados "
+            f"(IDs: {ids}); se debe corregir la ambigüedad antes de importar."
+        )
+    return coincidencias[0] if coincidencias else None
 
 
 def _buscar_supervisor_por_nombre(
     conexion_bd,
     nombre: str,
 ):
-    return conexion_bd.execute(
-        """
-        SELECT id, nombre
-        FROM supervisores
-        WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?))
-        ORDER BY id
-        LIMIT 1
-        """,
-        (nombre,),
-    ).fetchone()
+    clave = normalizar_nombre(nombre)
+    coincidencias = [
+        fila for fila in conexion_bd.execute("SELECT id, nombre FROM supervisores")
+        if normalizar_nombre(fila[1]) == clave
+    ]
+    if len(coincidencias) > 1:
+        ids = ", ".join(str(fila[0]) for fila in coincidencias)
+        raise ValueError(
+            f"El supervisor '{nombre}' coincide con varios registros normalizados "
+            f"(IDs: {ids}); se debe corregir la ambigüedad antes de importar."
+        )
+    return coincidencias[0] if coincidencias else None
 
 
 # ============================================================================
@@ -727,6 +732,17 @@ def _resolver_nombre_match(
         registro.valor_despues or ""
     ).strip()
 
+    entidad_id_elegida = None
+    if nombre_elegido.startswith("[ID:"):
+        prefijo, separador, nombre = nombre_elegido.partition("] ")
+        if not separador:
+            raise ValueError("La sugerencia de matching tiene un ID inválido.")
+        try:
+            entidad_id_elegida = int(prefijo[4:])
+        except ValueError as error:
+            raise ValueError("La sugerencia de matching tiene un ID inválido.") from error
+        nombre_elegido = nombre.strip()
+
     if nombre_elegido.startswith("(nuevo)"):
         nombre_elegido = (
             nombre_elegido[len("(nuevo)"):]
@@ -745,10 +761,18 @@ def _resolver_nombre_match(
 
     if _es_matching_objetivo(problema):
 
-        existente = _buscar_objetivo_por_nombre(
-            conexion_bd,
-            nombre_elegido,
+        existente = (
+            conexion_bd.execute(
+                "SELECT id, nombre FROM objetivos WHERE id = ?",
+                (entidad_id_elegida,),
+            ).fetchone()
+            if entidad_id_elegida is not None
+            else _buscar_objetivo_por_nombre(conexion_bd, nombre_elegido)
         )
+        if existente and normalizar_nombre(existente[1]) != normalizar_nombre(nombre_elegido):
+            raise ValueError(
+                "El objetivo sugerido cambió desde el análisis; volvé a analizar el Excel."
+            )
 
         if existente:
             if registro.tipo == "crear_alias":
@@ -791,10 +815,18 @@ def _resolver_nombre_match(
 
     if _es_matching_supervisor(problema):
 
-        existente = _buscar_supervisor_por_nombre(
-            conexion_bd,
-            nombre_elegido,
+        existente = (
+            conexion_bd.execute(
+                "SELECT id, nombre FROM supervisores WHERE id = ?",
+                (entidad_id_elegida,),
+            ).fetchone()
+            if entidad_id_elegida is not None
+            else _buscar_supervisor_por_nombre(conexion_bd, nombre_elegido)
         )
+        if existente and normalizar_nombre(existente[1]) != normalizar_nombre(nombre_elegido):
+            raise ValueError(
+                "El supervisor sugerido cambió desde el análisis; volvé a analizar el Excel."
+            )
 
         if existente:
             return (
@@ -1136,10 +1168,22 @@ def _aplicar_resoluciones_a_pasadas(
 def _obtener_pasada_existente(
     conexion_bd,
     pasada: PasadaNormalizada,
+    solo_clave_natural: bool = False,
 ):
-
+    filtro_supervisor = (
+        "AND COALESCE(supervisor_id, -1) = COALESCE(?, -1)"
+        if solo_clave_natural
+        else ""
+    )
+    parametros = [
+        _valor_sql(pasada.fecha_operativa),
+        pasada.objetivo_id,
+        pasada.hora.strftime("%H:%M"),
+    ]
+    if solo_clave_natural:
+        parametros.append(pasada.supervisor_id)
     return conexion_bd.execute(
-        """
+        f"""
         SELECT
             id,
             fecha,
@@ -1150,23 +1194,14 @@ def _obtener_pasada_existente(
             notas,
             fecha_operativa
         FROM pasadas
-        WHERE fecha = ?
-          AND hora = ?
-          AND turno = ?
+        WHERE fecha_operativa = ?
           AND objetivo_id = ?
+          AND substr(hora, 1, 5) = ?
+          {filtro_supervisor}
         ORDER BY id
         LIMIT 1
         """,
-        (
-            _valor_sql(
-                pasada.fecha_calendario
-            ),
-            _valor_sql(
-                pasada.hora
-            ),
-            turno_para_sistema(pasada.turno),
-            pasada.objetivo_id,
-        ),
+        tuple(parametros),
     ).fetchone()
 
 
@@ -1252,7 +1287,7 @@ def _actualizar_pasada(
             _valor_sql(
                 pasada.hora
             ),
-            pasada.turno,
+            turno_para_sistema(pasada.turno),
             pasada.objetivo_id,
             pasada.supervisor_id,
             "",
@@ -1296,15 +1331,13 @@ def _persistir_pasadas(
             )
             continue
 
-        # Una pasada sin objetivo resuelto queda sin acción y se omite sin
-        # interrumpir la importación del resto del archivo.
         if accion is None:
-            omitidas += 1
-            logger.warning(
-                "Pasada omitida: hoja=%s fila=%d bloque=%d objetivo=%r motivo=objetivo sin matching resuelto",
-                pasada.hoja, pasada.fila_excel, pasada.bloque_tabla, pasada.objetivo_nombre,
+            raise ValueError(
+                "La pasada no tiene una acción de persistencia; se aborta para "
+                f"no clasificarla silenciosamente como duplicada. "
+                f"Hoja={pasada.hoja}, fila={pasada.fila_excel}, "
+                f"bloque={pasada.bloque_tabla}."
             )
-            continue
 
         # --------------------------------------------------------------
         # NUEVA
@@ -1312,11 +1345,8 @@ def _persistir_pasadas(
 
         if accion == "nueva":
 
-            existente = (
-                _obtener_pasada_existente(
-                    conexion_bd,
-                    pasada,
-                )
+            existente = _obtener_pasada_existente(
+                conexion_bd, pasada, solo_clave_natural=True
             )
 
             if existente:
@@ -1327,10 +1357,19 @@ def _persistir_pasadas(
                 )
                 continue
 
-            id_nueva = _insertar_pasada(
-                conexion_bd,
-                pasada,
-            )
+            try:
+                id_nueva = _insertar_pasada(conexion_bd, pasada)
+            except sqlite3.IntegrityError:
+                if _obtener_pasada_existente(
+                    conexion_bd, pasada, solo_clave_natural=True
+                ):
+                    omitidas += 1
+                    logger.info(
+                        "Pasada omitida por conflicto de clave natural: hoja=%s fila=%d bloque=%d",
+                        pasada.hoja, pasada.fila_excel, pasada.bloque_tabla,
+                    )
+                    continue
+                raise
 
             nuevas += 1
 
@@ -1601,54 +1640,6 @@ def confirmar_importacion_completa(
             "transacción activa."
         )
 
-    # ------------------------------------------------------------------
-    # 2. Cantidades iniciales
-    # ------------------------------------------------------------------
-
-    cantidad_nuevas = sum(
-        1
-        for pasada in analisis.pasadas
-        if pasada.accion == "nueva"
-    )
-
-    cantidad_actualizar = sum(
-        1
-        for pasada in analisis.pasadas
-        if pasada.accion == "actualizar"
-    )
-
-    cantidad_omitir = sum(
-        1
-        for pasada in analisis.pasadas
-        if pasada.accion in ("omitir", None)
-    )
-
-    # ------------------------------------------------------------------
-    # 3. Archivo completamente procesado
-    # ------------------------------------------------------------------
-
-    if (
-        cantidad_nuevas == 0
-        and cantidad_actualizar == 0
-    ):
-
-        return {
-            "pasadas_importadas": 0,
-            "pasadas_nuevas": 0,
-            "pasadas_actualizadas": 0,
-            "pasadas_omitidas": cantidad_omitir,
-            "objetivos_creados": 0,
-            "supervisores_creados": 0,
-            "correcciones": 0,
-            "total": len(
-                analisis.pasadas
-            ),
-            "mensaje": (
-                "Este archivo ya fue procesado. "
-                "No hay nuevas pasadas para importar."
-            ),
-        }
-
     archivo_origen = getattr(
         analisis, "archivo_origen", getattr(analisis, "nombre_archivo", "desconocido")
     )
@@ -1659,18 +1650,6 @@ def confirmar_importacion_completa(
                          archivo_origen)
         raise
 
-    # ------------------------------------------------------------------
-    # 4. Cantidad de entidades antes de la transacción
-    # ------------------------------------------------------------------
-
-    objetivos_antes = conexion_bd.execute(
-        "SELECT COUNT(*) FROM objetivos"
-    ).fetchone()[0]
-
-    supervisores_antes = conexion_bd.execute(
-        "SELECT COUNT(*) FROM supervisores"
-    ).fetchone()[0]
-
     try:
 
         # ==============================================================
@@ -1678,6 +1657,12 @@ def confirmar_importacion_completa(
         # ==============================================================
 
         conexion_bd.execute("BEGIN")
+        objetivos_antes = conexion_bd.execute(
+            "SELECT COUNT(*) FROM objetivos"
+        ).fetchone()[0]
+        supervisores_antes = conexion_bd.execute(
+            "SELECT COUNT(*) FROM supervisores"
+        ).fetchone()[0]
 
         # --------------------------------------------------------------
         # 5. Matching / altas
@@ -1723,6 +1708,19 @@ def confirmar_importacion_completa(
             usuario,
         )
 
+        filas_leidas = analisis.pasadas_detectadas
+        filas_insertadas = nuevas + actualizadas
+        filas_duplicadas = analisis.pasadas_duplicadas + omitidas
+        filas_rechazadas = len(set(analisis.filas_rechazadas_ids))
+        conciliacion = filas_insertadas + filas_duplicadas + filas_rechazadas
+        if conciliacion != filas_leidas:
+            raise RuntimeError(
+                "Falló la conciliación de importación: "
+                f"leídas={filas_leidas}, insertadas={filas_insertadas}, "
+                f"duplicadas={filas_duplicadas}, rechazadas={filas_rechazadas}. "
+                "Se revierte toda la transacción."
+            )
+
         # --------------------------------------------------------------
         # 8. Auditoría de correcciones
         # --------------------------------------------------------------
@@ -1767,6 +1765,19 @@ def confirmar_importacion_completa(
             "pasadas_nuevas": nuevas,
             "pasadas_actualizadas": actualizadas,
             "pasadas_omitidas": omitidas,
+            "filas_leidas": filas_leidas,
+            "filas_insertadas": filas_insertadas,
+            "filas_duplicadas": filas_duplicadas,
+            "filas_rechazadas": filas_rechazadas,
+            "advertencias": sum(
+                problema.severidad == "advertencia"
+                for problema in analisis.problemas
+            ),
+            "resultado": (
+                "completo_con_rechazos"
+                if filas_rechazadas
+                else "completo"
+            ),
             "objetivos_creados": (
                 objetivos_creados
             ),
@@ -1775,7 +1786,7 @@ def confirmar_importacion_completa(
             ),
             "correcciones": correcciones,
             "total": len(
-                analisis.pasadas
+                analisis.filas_leidas_ids
             ),
         }
 
@@ -1797,6 +1808,13 @@ def confirmar_importacion_completa(
                     "accion": (
                         "Importación completa"
                     ),
+                    "archivo": archivo_origen,
+                    "resultado": resumen["resultado"],
+                    "filas_leidas": filas_leidas,
+                    "filas_insertadas": filas_insertadas,
+                    "filas_duplicadas": filas_duplicadas,
+                    "filas_rechazadas": filas_rechazadas,
+                    "advertencias": resumen["advertencias"],
                     "cantidad_pasadas_importadas": (
                         nuevas
                     ),
@@ -1828,9 +1846,10 @@ def confirmar_importacion_completa(
         # --------------------------------------------------------------
 
         resumen["mensaje"] = (
-            f"Se importaron {nuevas} pasadas, "
-            f"se actualizaron {actualizadas} y "
-            f"se omitieron {omitidas} ya existentes."
+            f"Se procesaron {filas_leidas} filas: "
+            f"{filas_insertadas} insertadas/actualizadas, "
+            f"{filas_duplicadas} duplicadas y "
+            f"{filas_rechazadas} rechazadas."
         )
 
         try:
@@ -1866,8 +1885,32 @@ def confirmar_importacion_completa(
 
         logger.exception(
             "Importación fallida archivo=%s filas=%s",
-            archivo_origen, len(analisis.pasadas),
+            archivo_origen, analisis.pasadas_detectadas,
         )
+        try:
+            registrar_auditoria(
+                {
+                    "usuario": usuario,
+                    "tipo_operacion": "IMPORTACION_COMPLETA",
+                    "tabla": None,
+                    "registro_id": None,
+                    "estado": "FALLIDO",
+                    "valores_nuevos": {
+                        "archivo": archivo_origen,
+                        "filas_leidas": analisis.pasadas_detectadas,
+                        "resultado": "fallido_revertido",
+                    },
+                    "detalles": "La importación fue revertida íntegramente.",
+                },
+                conexion_bd,
+            )
+            conexion_bd.commit()
+        except Exception:
+            logger.exception(
+                "No se pudo registrar el resultado fallido de la importación de %s",
+                archivo_origen,
+            )
+            conexion_bd.rollback()
         raise
 
 

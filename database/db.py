@@ -9,12 +9,13 @@ import bcrypt
 import logging
 import threading
 import weakref
+import json
 from core.configuracion import DB_PATH
 
 
 DB_PATH = str(DB_PATH)
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 logger = logging.getLogger(__name__)
 
 
@@ -126,6 +127,7 @@ def verificar_integridad(ruta: str | None = None) -> tuple[bool, list[str]]:
 
 
 def crear_base_datos() -> None:
+    _respaldar_duplicados_naturales_antes_de_migrar()
     conexion = conectar()
     cursor = conexion.cursor()
 
@@ -288,6 +290,7 @@ def crear_base_datos() -> None:
 
     migrar_objetivos_campos(cursor)
     migrar_pasadas_campos(cursor)
+    migrar_clave_natural_pasadas(cursor)
     _crear_admin_si_no_existe(cursor)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS schema_version (
@@ -308,6 +311,145 @@ def crear_base_datos() -> None:
 # =============================================================================
 # MIGRACIONES
 # =============================================================================
+
+def _respaldar_duplicados_naturales_antes_de_migrar() -> None:
+    """Respalda la BD antes de archivar duplicados que impiden el índice único."""
+    if not os.path.exists(DB_PATH):
+        return
+
+    conexion = _sqlite3_connect_original(DB_PATH)
+    try:
+        tabla = conexion.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='pasadas'"
+        ).fetchone()
+        if not tabla:
+            return
+        columnas = {
+            fila[1] for fila in conexion.execute("PRAGMA table_info(pasadas)")
+        }
+        requeridas = {"id", "objetivo_id", "fecha", "hora", "supervisor_id"}
+        if not requeridas.issubset(columnas):
+            return
+        fecha_expr = (
+            "COALESCE(fecha_operativa, fecha)"
+            if "fecha_operativa" in columnas
+            else "fecha"
+        )
+        duplicados = conexion.execute(
+            f"""
+            SELECT 1
+            FROM pasadas
+            WHERE objetivo_id IS NOT NULL
+              AND {fecha_expr} IS NOT NULL
+              AND hora IS NOT NULL
+            GROUP BY objetivo_id, {fecha_expr}, substr(hora, 1, 5),
+                     COALESCE(supervisor_id, -1)
+            HAVING COUNT(*) > 1
+            LIMIT 1
+            """
+        ).fetchone()
+    finally:
+        conexion.close()
+
+    if duplicados:
+        from services.backup import crear_backup
+
+        conexion_respaldo = _sqlite3_connect_original(DB_PATH)
+        try:
+            crear_backup("pre_migracion", conexion_origen=conexion_respaldo)
+        finally:
+            conexion_respaldo.close()
+
+
+def migrar_clave_natural_pasadas(cursor: sqlite3.Cursor) -> int:
+    """Archiva copias históricas duplicadas y establece unicidad natural."""
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS pasadas_duplicados_migracion (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pasada_original_id INTEGER NOT NULL,
+            pasada_conservada_id INTEGER NOT NULL,
+            datos_originales TEXT NOT NULL,
+            fecha_archivo TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    duplicados = cursor.execute(
+        """
+        SELECT objetivo_id, fecha_operativa, substr(hora, 1, 5),
+               COALESCE(supervisor_id, -1), MIN(id)
+        FROM pasadas
+        WHERE objetivo_id IS NOT NULL
+          AND fecha_operativa IS NOT NULL
+          AND hora IS NOT NULL
+        GROUP BY objetivo_id, fecha_operativa, substr(hora, 1, 5),
+                 COALESCE(supervisor_id, -1)
+        HAVING COUNT(*) > 1
+        """
+    ).fetchall()
+    archivadas = 0
+    nombres_columnas = [
+        fila[1] for fila in cursor.execute("PRAGMA table_info(pasadas)")
+    ]
+    for objetivo_id, fecha, hora, supervisor_id, id_conservado in duplicados:
+        ids_duplicados = cursor.execute(
+            """
+            SELECT id
+            FROM pasadas
+            WHERE objetivo_id = ?
+              AND fecha_operativa = ?
+              AND substr(hora, 1, 5) = ?
+              AND COALESCE(supervisor_id, -1) = ?
+              AND id <> ?
+            ORDER BY id
+            """,
+            (objetivo_id, fecha, hora, supervisor_id, id_conservado),
+        ).fetchall()
+        for (id_duplicado,) in ids_duplicados:
+            fila = cursor.execute(
+                "SELECT * FROM pasadas WHERE id = ?", (id_duplicado,)
+            ).fetchone()
+            datos = dict(zip(nombres_columnas, fila))
+            cursor.execute(
+                """
+                INSERT INTO pasadas_duplicados_migracion (
+                    pasada_original_id, pasada_conservada_id, datos_originales
+                ) VALUES (?, ?, ?)
+                """,
+                (
+                    id_duplicado,
+                    id_conservado,
+                    json.dumps(datos, ensure_ascii=False, default=str),
+                ),
+            )
+            cursor.execute("DELETE FROM pasadas WHERE id = ?", (id_duplicado,))
+            archivadas += 1
+        logger.warning(
+            "Migración de identidad de pasadas: clave duplicada objetivo=%s fecha=%s hora=%s supervisor=%s; se conserva id=%s y se archivan %s registros",
+            objetivo_id,
+            fecha,
+            hora,
+            supervisor_id,
+            id_conservado,
+            len(ids_duplicados),
+        )
+
+    cursor.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_pasadas_clave_natural
+        ON pasadas (
+            objetivo_id,
+            fecha_operativa,
+            substr(hora, 1, 5),
+            COALESCE(supervisor_id, -1)
+        )
+        WHERE objetivo_id IS NOT NULL
+          AND fecha_operativa IS NOT NULL
+          AND hora IS NOT NULL
+        """
+    )
+    return archivadas
+
 
 def migrar_feriados() -> None:
     """Crea la tabla de feriados si no existe para bases de datos antiguas."""

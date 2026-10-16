@@ -35,6 +35,7 @@ import difflib
 import logging
 import re
 import sqlite3
+import unicodedata
 from datetime import date
 from typing import Any, Optional
 
@@ -48,8 +49,6 @@ from .modelos import (
     SupervisorBD,
 )
 
-_TABLA_TILDES = str.maketrans("ÁÉÍÓÚáéíóú", "AEIOUaeiou")
-
 _UMBRAL_SUGERENCIA = 0.5
 _MAX_SUGERENCIAS = 5
 logger = logging.getLogger(__name__)
@@ -58,7 +57,10 @@ logger = logging.getLogger(__name__)
 def _normalizar_nombre(nombre: str) -> str:
     """Mayúsculas, sin tildes, espacios colapsados. Base de comparación
     tanto para el match exacto como para calcular similitud."""
-    texto = (nombre or "").translate(_TABLA_TILDES).strip().upper()
+    texto = unicodedata.normalize("NFKD", nombre or "")
+    texto = "".join(
+        caracter for caracter in texto if not unicodedata.combining(caracter)
+    ).upper()
     texto = " ".join(texto.split())
     # Solo elimina puntos de grupos compuestos por letras individuales:
     # C.A.M. -> CAM. Los puntos de otras partes del nombre se conservan.
@@ -249,6 +251,20 @@ def matchear_objetivo(
             nombre_excel,
             [obj.id for obj in coincidencias_exactas],
         )
+        return ResultadoMatchObjetivo(
+            nombre_excel=nombre_excel,
+            tipo="sugerencias",
+            sugerencias=[
+                SugerenciaObjetivo(
+                    objetivo=objetivo,
+                    similitud=1.0,
+                    coincide_sufijo=True,
+                )
+                for objetivo in coincidencias_exactas[:_MAX_SUGERENCIAS]
+            ],
+            permite_crear_nuevo=False,
+            ambiguo=True,
+        )
 
     candidatos: list[SugerenciaObjetivo] = []
     for obj in objetivos_bd:
@@ -292,14 +308,39 @@ def matchear_supervisor(
     supervisores_bd = _supervisores_como_modelos(supervisores_bd)
     nombre_norm = _normalizar_nombre(nombre_excel)
 
-    for sup in supervisores_bd:
-        if _normalizar_supervisor(sup.nombre) == _normalizar_supervisor(nombre_excel):
-            return ResultadoMatchSupervisor(
-                nombre_excel=nombre_excel,
-                tipo="exacto",
-                supervisor_exacto=sup,
-                permite_crear_nuevo=False,
-            )
+    coincidencias_exactas = [
+        supervisor
+        for supervisor in supervisores_bd
+        if _normalizar_supervisor(supervisor.nombre)
+        == _normalizar_supervisor(nombre_excel)
+    ]
+    if len(coincidencias_exactas) == 1:
+        return ResultadoMatchSupervisor(
+            nombre_excel=nombre_excel,
+            tipo="exacto",
+            supervisor_exacto=coincidencias_exactas[0],
+            permite_crear_nuevo=False,
+        )
+    if len(coincidencias_exactas) > 1:
+        logger.warning(
+            "Matching ambiguo: nombre=%r motivo=colisión de clave normalizada supervisores=%s",
+            nombre_excel,
+            [supervisor.id for supervisor in coincidencias_exactas],
+        )
+        return ResultadoMatchSupervisor(
+            nombre_excel=nombre_excel,
+            tipo="sugerencias",
+            sugerencias=[
+                SugerenciaSupervisor(
+                    supervisor=supervisor,
+                    similitud=1.0,
+                    coincide_sufijo=True,
+                )
+                for supervisor in coincidencias_exactas[:_MAX_SUGERENCIAS]
+            ],
+            permite_crear_nuevo=False,
+            ambiguo=True,
+        )
 
     candidatos: list[SugerenciaSupervisor] = []
     for sup in supervisores_bd:

@@ -9,12 +9,13 @@ from __future__ import annotations
 
 from itertools import groupby
 import logging
-from typing import Any
 
 try:
     from .modelos import PasadaNormalizada
+    from .matcher import normalizar_nombre
 except ImportError:
     from modelos import PasadaNormalizada
+    from matcher import normalizar_nombre
 
 
 logger = logging.getLogger(__name__)
@@ -26,49 +27,38 @@ logger = logging.getLogger(__name__)
 
 def _clave_pasada(p: PasadaNormalizada) -> tuple:
     """
-    Clave principal de una pasada dentro del Excel.
+    Clave natural de una pasada:
+    fecha_operativa + hora + objetivo + supervisor.
 
-    Una pasada se identifica por:
-        fecha_operativa + turno + objetivo_id + hora
-
-    El supervisor NO forma parte de la identidad principal porque puede
-    cambiar posteriormente y una pasada existente puede requerir actualización.
+    El turno no forma parte de la clave: una hora concreta de un objetivo
+    y supervisor no debe duplicarse por una discrepancia de turno.
     """
     objetivo = p.objetivo_id
     if objetivo is None:
-        objetivo = " ".join((p.objetivo_nombre or "").strip().upper().split())
+        objetivo = (
+            "nombre",
+            normalizar_nombre(p.objetivo_nombre or ""),
+        )
+    else:
+        objetivo = ("id", str(objetivo))
 
     return (
         p.fecha_operativa,
-        p.turno,
         objetivo,
         p.hora,
-    )
-
-
-def _clave_ordenamiento(p: PasadaNormalizada) -> tuple:
-    """Devuelve una clave total para ordenar pasadas con objetivo sin resolver."""
-    return (
-        p.fecha_operativa,
-        p.turno,
-        p.objetivo_id is None,
-        p.objetivo_id if p.objetivo_id is not None else 0,
-        p.hora,
+        _clave_supervisor(p),
     )
 
 
 def _clave_pasada_sql(p: PasadaNormalizada) -> tuple:
     """
-    Misma clave que _clave_pasada(), pero convertida a tipos compatibles
-    con sqlite3.
-
-    SQLite guarda fecha_operativa y hora como TEXT en este proyecto.
+    Clave natural SQL; supervisor NULL se representa con -1.
     """
     return (
         p.fecha_operativa.isoformat(),
-        p.turno,
         p.objetivo_id,
         p.hora.strftime("%H:%M"),
+        p.supervisor_id if p.supervisor_id is not None else -1,
     )
 
 
@@ -86,7 +76,7 @@ def _clave_supervisor(p: PasadaNormalizada) -> tuple:
     if p.supervisor_id is not None:
         return ("id", p.supervisor_id)
 
-    nombre = (p.supervisor_nombre or "").strip().upper()
+    nombre = normalizar_nombre(p.supervisor_nombre or "")
     return ("nombre", nombre)
 
 
@@ -100,17 +90,8 @@ def detectar_duplicados_internos(
     """
     Detecta duplicados dentro del mismo archivo importado.
 
-    Agrupa por:
-        fecha_operativa + turno + objetivo_id + hora
-
-    Dentro de cada grupo:
-
-    - Si todas las pasadas tienen el mismo supervisor:
-      se consideran duplicados reales y se conserva una sola.
-
-    - Si existen supervisores diferentes:
-      se conservan todas, porque pueden representar móviles/supervisores
-      distintos registrados a la misma hora.
+    Agrupa por la clave natural, incluyendo supervisor. Si dos registros
+    de la misma clave aparecen en el Excel, se conserva la primera fila.
 
     La pasada conservada en caso de duplicado es siempre la que tenga
     menor fila_excel, preservando la primera aparición del Excel.
@@ -132,51 +113,30 @@ def detectar_duplicados_internos(
     # del Excel sea siempre la que se conserve.
     ordenadas = sorted(
         pasadas,
-        key=lambda p: (
-            _clave_ordenamiento(p),
-            p.fila_excel,
-        ),
+        key=lambda p: (_clave_pasada(p), p.fila_excel),
     )
 
-    for _clave, grupo_iter in groupby(
+    for _, grupo_iter in groupby(
         ordenadas,
         key=_clave_pasada,
     ):
         grupo = list(grupo_iter)
 
-        # No hay posibilidad de duplicado.
         if len(grupo) == 1:
             finales.append(grupo[0])
             continue
 
-        supervisores = {
-            _clave_supervisor(p)
-            for p in grupo
-        }
-
-        # Mismo supervisor repetido:
-        # conservar primera fila y descartar las demás.
-        if len(supervisores) == 1:
-            grupo_ordenado = sorted(
-                grupo,
-                key=lambda p: p.fila_excel,
+        grupo_ordenado = sorted(grupo, key=lambda p: p.fila_excel)
+        finales.append(grupo_ordenado[0])
+        descartadas.extend(grupo_ordenado[1:])
+        for descartada in grupo_ordenado[1:]:
+            logger.warning(
+                "Pasada descartada por duplicado: hoja=%s fila=%d bloque=%d objetivo=%r motivo=misma fecha operativa, hora, objetivo y supervisor",
+                descartada.hoja,
+                descartada.fila_excel,
+                descartada.bloque_tabla,
+                descartada.objetivo_nombre,
             )
-
-            finales.append(grupo_ordenado[0])
-            descartadas.extend(grupo_ordenado[1:])
-            for descartada in grupo_ordenado[1:]:
-                logger.warning(
-                    "Pasada descartada por duplicado: hoja=%s fila=%d bloque=%d objetivo=%r motivo=misma fecha, turno, objetivo, hora y supervisor",
-                    descartada.hoja,
-                    descartada.fila_excel,
-                    descartada.bloque_tabla,
-                    descartada.objetivo_nombre,
-                )
-            continue
-
-        # Supervisores distintos:
-        # no se consideran duplicados.
-        finales.extend(grupo)
 
     return finales, descartadas
 
@@ -193,20 +153,17 @@ def detectar_pasadas_existentes(
     """
     Detecta cuáles de las pasadas importadas ya existen en la base.
 
-    Identidad de una pasada:
-        fecha_operativa + turno + objetivo_id + hora
-
-    El supervisor es un dato secundario:
+    Clave natural:
+        fecha_operativa + objetivo_id + hora + supervisor_id
 
     - Si la pasada no existe:
         accion = "nueva"
 
-    - Si existe y el supervisor coincide:
+    - Si existe con la clave natural:
         accion = "omitir"
 
-    - Si existe y el supervisor difiere:
-        accion = "actualizar" si forzar_sobrescritura=True
-        accion = "omitir" en caso contrario
+    - Si existe con otro supervisor, solo se sobrescribe cuando se pidió
+      explícitamente forzar_sobrescritura.
 
     Las pasadas sin objetivo_id NO se consultan contra la base.
     Se devuelven dentro de las nuevas para no perderlas, pero su
@@ -251,14 +208,11 @@ def detectar_pasadas_existentes(
     # Construir claves únicas para evitar parámetros SQL duplicados.
     # -------------------------------------------------------------------------
 
-    claves_sql = {
-        _clave_pasada_sql(p)
-        for p in pasadas_consultables
-    }
+    claves_sql = {_clave_pasada_sql(p) for p in pasadas_consultables}
 
     # SQLite soporta comparaciones por tuplas:
     #
-    # (fecha_operativa, turno, objetivo_id, hora) IN ((?, ?, ?, ?), ...)
+    # (fecha_operativa, objetivo_id, hora, supervisor_id) IN ((?, ?, ?, ?), ...)
     #
     # Los valores se aplanan para pasarlos como parámetros.
     placeholders = ", ".join(
@@ -278,16 +232,15 @@ def detectar_pasadas_existentes(
         f"""
         SELECT
             fecha_operativa,
-            turno,
             objetivo_id,
-            strftime('%H:%M', hora),
-            supervisor_id
+            substr(hora, 1, 5),
+            COALESCE(supervisor_id, -1)
         FROM pasadas
         WHERE (
             fecha_operativa,
-            turno,
             objetivo_id,
-            strftime('%H:%M', hora)
+            substr(hora, 1, 5),
+            COALESCE(supervisor_id, -1)
         ) IN ({placeholders})
         """,
         parametros,
@@ -297,25 +250,25 @@ def detectar_pasadas_existentes(
 
     # Mapa:
     #
-    # (fecha_operativa, turno, objetivo_id, hora)
-    #       ->
-    # supervisor_id existente
-    #
-    supervisor_bd_por_clave: dict[tuple, Any] = {
-        (
-            fecha_operativa,
-            turno,
-            objetivo_id,
-            hora,
-        ): supervisor_id
-        for (
-            fecha_operativa,
-            turno,
-            objetivo_id,
-            hora,
-            supervisor_id,
-        ) in filas_bd
-    }
+    claves_naturales_bd = {tuple(fila) for fila in filas_bd}
+    claves_con_fecha_hora_objetivo = set()
+    if forzar_sobrescritura:
+        cursor.execute(
+            f"""
+            SELECT DISTINCT fecha_operativa, objetivo_id, substr(hora, 1, 5)
+            FROM pasadas
+            WHERE (fecha_operativa, objetivo_id, substr(hora, 1, 5))
+            IN ({", ".join("(?, ?, ?)" for _ in claves_sql)})
+            """,
+            [
+                valor
+                for fecha, objetivo_id, hora, _ in claves_sql
+                for valor in (fecha, objetivo_id, hora)
+            ],
+        )
+        claves_con_fecha_hora_objetivo = {
+            tuple(fila) for fila in cursor.fetchall()
+        }
 
     # -------------------------------------------------------------------------
     # Clasificar cada pasada.
@@ -327,25 +280,21 @@ def detectar_pasadas_existentes(
         # -----------------------------------------------------
         # No existe todavía.
         # -----------------------------------------------------
-        if clave not in supervisor_bd_por_clave:
-            pasada.accion = "nueva"
-            nuevas.append(pasada)
+        if clave not in claves_naturales_bd:
+            clave_sin_supervisor = clave[:3]
+            if forzar_sobrescritura and clave_sin_supervisor in claves_con_fecha_hora_objetivo:
+                pasada.accion = "actualizar"
+                existentes.append(pasada)
+            else:
+                pasada.accion = "nueva"
+                nuevas.append(pasada)
             continue
 
         # -----------------------------------------------------
         # Ya existe.
         # -----------------------------------------------------
 
-        supervisor_id_bd = supervisor_bd_por_clave[clave]
-
-        supervisor_difiere = (
-            supervisor_id_bd != pasada.supervisor_id
-        )
-
-        if supervisor_difiere and forzar_sobrescritura:
-            pasada.accion = "actualizar"
-        else:
-            pasada.accion = "omitir"
+        pasada.accion = "omitir"
 
         existentes.append(pasada)
 

@@ -34,6 +34,7 @@ from typing import Any, Literal, Optional
 # ============================================================================
 
 TipoProblema = Literal["error_critico", "advertencia", "para_revisar"]
+SeveridadProblema = Literal["error", "advertencia"]
 
 TipoMatch = Literal["exacto", "sugerencias", "no_reconocido"]
 
@@ -81,6 +82,13 @@ class Problema:
     valor_problema: Optional[Any] = None
     fila_excel: Optional[int] = None
     bloque_tabla: Optional[int] = None
+    severidad: Optional[SeveridadProblema] = None
+
+    def __post_init__(self) -> None:
+        if self.severidad is None:
+            self.severidad = (
+                "advertencia" if self.tipo == "advertencia" else "error"
+            )
 
 
 # ============================================================================
@@ -209,6 +217,7 @@ class ResultadoMatchObjetivo:
     nombre_sugerido_nuevo: Optional[str] = None
 
     fecha_inicio_sugerida: Optional[date] = None
+    ambiguo: bool = False
 
 
 # ============================================================================
@@ -247,6 +256,7 @@ class ResultadoMatchSupervisor:
     permite_crear_nuevo: bool = True
 
     nombre_sugerido_nuevo: Optional[str] = None
+    ambiguo: bool = False
 
 
 # ============================================================================
@@ -316,6 +326,21 @@ class ResultadoAnalisis:
     archivo_origen: str | None = None
     """Ruta del archivo de origen para trazabilidad al confirmar la importación."""
 
+    filas_rechazadas: int = 0
+    """Filas no importables por datos inválidos o matching todavía no resuelto."""
+
+    filas_a_insertar: int = 0
+    """Filas nuevas o actualizables; warnings no las excluyen."""
+
+    filas_duplicadas: int = 0
+    """Duplicados del Excel o registros ya presentes en SQLite."""
+
+    mes_archivo: int | None = None
+
+    filas_leidas_ids: list[tuple[str, int, int]] = field(default_factory=list)
+
+    filas_rechazadas_ids: list[tuple[str, int, int]] = field(default_factory=list)
+
     # ------------------------------------------------------------------
     # Estado derivado
     # ------------------------------------------------------------------
@@ -323,7 +348,10 @@ class ResultadoAnalisis:
     @property
     def puede_continuar(self) -> bool:
         return (
-            self.errores_criticos == 0
+            not any(
+                problema.severidad == "error" and problema.fila_excel is None
+                for problema in self.problemas
+            )
             and self.objetivos_para_revisar == 0
             and self.supervisores_para_revisar == 0
         )
