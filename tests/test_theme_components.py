@@ -442,7 +442,6 @@ def test_main_sidebar_navigation_is_grouped_and_admin_links_keep_permission_gate
         "abrir_gestionar_usuarios",
         "abrir_logs",
         "abrir_indexacion",
-        "abrir_validaciones",
         "abrir_auditoria",
         "abrir_sincronizacion",
     )
@@ -464,6 +463,7 @@ def test_main_sidebar_navigation_is_grouped_and_admin_links_keep_permission_gate
         assert "Agregar objetivo" in button_names
         assert "Ver supervisores" in button_names
         assert "Feriados" in button_names
+        assert "Validaciones BD" not in button_names
         assert "Gestionar usuarios" not in button_names
 
         owner._botones_menu.clear()

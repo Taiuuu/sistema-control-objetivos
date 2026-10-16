@@ -8,9 +8,11 @@ from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_sse import sse
 from api.routes import register_routes
+from dotenv import load_dotenv
 import os
+
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -21,6 +23,9 @@ if not jwt_secret:
         'Falta la variable de entorno VESP_JWT_SECRET. Definila en .env antes de iniciar la API.'
     )
 app.config["JWT_SECRET_KEY"] = jwt_secret
+app.config["SSE_PUBLISH_TOKEN"] = os.environ.get(
+    "VESP_SSE_PUBLISH_TOKEN", "Mosconi2795"
+)
 jwt = JWTManager(app)
 
 # Rate limiting
@@ -30,9 +35,10 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"]
 )
 
-# SSE para notificaciones
-app.config['REDIS_URL'] = 'redis://localhost:6379/0'  # Opcional, usar memoria por defecto
-app.register_blueprint(sse, url_prefix='/api/stream')
+# SSE usa Redis como transporte de eventos.
+app.config['REDIS_URL'] = os.environ.get(
+    'VESP_REDIS_URL', 'redis://localhost:6379/0'
+)
 
 # CORS para desarrollo
 CORS(app)

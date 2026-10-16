@@ -153,3 +153,59 @@ class TestRateLimiting:
         
         # Debe ser 401 o 429 (Too Many Requests)
         assert response.status_code in [401, 429]
+
+
+class TestSSEAPI:
+    """Tests para publicación de eventos SSE protegida."""
+
+    def test_event_stream_requiere_jwt(self, api_client):
+        response = api_client.get('/api/sse/events')
+
+        assert response.status_code == 401
+
+    def test_publish_sse_requiere_token(self, api_client, monkeypatch):
+        monkeypatch.setitem(
+            api_client.application.config, 'SSE_PUBLISH_TOKEN', 'test-sse-token'
+        )
+        response = api_client.post('/api/sse/publish', json={'event': 'change'})
+
+        assert response.status_code == 401
+
+    def test_publish_sse_acepta_token_y_objeto_json(
+        self, api_client, monkeypatch
+    ):
+        from api.routes import sse as sse_routes
+
+        monkeypatch.setitem(
+            api_client.application.config, 'SSE_PUBLISH_TOKEN', 'test-sse-token'
+        )
+        published = []
+        monkeypatch.setattr(
+            sse_routes.sse,
+            'publish',
+            lambda data, type: published.append((data, type))
+        )
+
+        response = api_client.post(
+            '/api/sse/publish',
+            json={'event': 'change'},
+            headers={'Authorization': 'Bearer test-sse-token'}
+        )
+
+        assert response.status_code == 200
+        assert response.get_json() == {'status': 'ok'}
+        assert published == [({'event': 'change'}, 'data_change')]
+
+    def test_publish_sse_rechaza_json_que_no_sea_objeto(
+        self, api_client, monkeypatch
+    ):
+        monkeypatch.setitem(
+            api_client.application.config, 'SSE_PUBLISH_TOKEN', 'test-sse-token'
+        )
+        response = api_client.post(
+            '/api/sse/publish',
+            json=['invalid'],
+            headers={'Authorization': 'Bearer test-sse-token'}
+        )
+
+        assert response.status_code == 400

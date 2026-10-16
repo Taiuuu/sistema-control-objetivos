@@ -200,7 +200,6 @@ class Ayuda(QWidget):
         • Comprobar que el supervisor esté registrado<br><br>
         <b>Si persiste el problema:</b><br>
         • Revisa los logs del sistema (Vista → Logs)<br>
-        • Verifica la validación de datos (Vista → Validaciones)<br>
         • Contacta al administrador si es necesario
         """)
         texto5.setWordWrap(True)

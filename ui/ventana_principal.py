@@ -38,7 +38,6 @@ from ui.transferir_datos import TransferirDatos
 from ui.importar_excel import ImportarExcel
 from ui.feriados import VistaFeriados
 from ui.vista_auditoria import VistaAuditoria
-from ui.vista_validaciones import VistaValidaciones
 from ui.vista_indexacion import VistaIndexacion
 from ui.vista_sincronizacion import VistaSincronizacion
 from ui.configuracion import ConfiguracionDialog
@@ -412,7 +411,6 @@ class VentanaPrincipal(QWidget):
             add_btn("⚙️",  "Gestionar usuarios", self.abrir_gestionar_usuarios, clave="gestionar_usuarios")
             add_btn("📜",  "Historial",           self.abrir_logs, clave="logs")
             add_btn("🔧",  "Optimización de BD",  self.abrir_indexacion, clave="optimizacion")
-            add_btn("🛡️",  "Validaciones BD",     self.abrir_validaciones, clave="validaciones")
             add_btn("🔎",  "Auditoría detallada", self.abrir_auditoria, clave="auditoria")
             add_btn("🔄",  "Sincronización",      self.abrir_sincronizacion, clave="sincronizacion")
 
@@ -499,7 +497,6 @@ class VentanaPrincipal(QWidget):
         checks = {}
         etiquetas = {
             "auditoria": "Auditoría detallada",
-            "validaciones": "Validaciones BD",
             "sincronizacion": "Sincronización",
             "optimizacion": "Optimización de BD",
             "ver_pasadas": "Ver pasadas",
@@ -1801,16 +1798,6 @@ class VentanaPrincipal(QWidget):
         )
         ventana.setWindowTitle("Optimización de Índices y Rendimiento")
         ventana.setGeometry(100, 100, 1200, 700)
-
-
-    def abrir_validaciones(self) -> None:
-        ventana = self._abrir_ventana(
-            'validaciones',
-            VistaValidaciones,
-            self.usuario_id
-        )
-        ventana.setWindowTitle("Validaciones e Integridad de BD")
-        ventana.setGeometry(100, 100, 1000, 600)
 
 
     def abrir_ayuda(self) -> None:

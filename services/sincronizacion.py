@@ -25,11 +25,13 @@ Versión: 2.0.0
 """
 
 import logging
+import os
 import threading
 from datetime import datetime
 from typing import Dict, List, Callable, Optional, Tuple, Any
 
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
+from dotenv import load_dotenv
 
 try:
     import requests
@@ -41,6 +43,7 @@ from .config_app import sync_remoto_habilitado
 
 # Configurar logger
 logger = logging.getLogger(__name__)
+load_dotenv()
 
 
 # =============================================================================
@@ -72,6 +75,7 @@ OPERACIONES_VALIDAS = {'INSERT', 'UPDATE', 'DELETE'}
 # URL de la API para SSE (local development)
 API_SSE_URL = "http://127.0.0.1:5000/api/sse/publish"
 API_SSE_TIMEOUT = 1  # segundos
+API_SSE_TOKEN = os.environ.get("VESP_SSE_PUBLISH_TOKEN", "Mosconi2795")
 
 
 # =============================================================================
@@ -224,12 +228,18 @@ class SincronizadorDatos(QObject):
                     'operacion': operacion,
                     'datos': datos
                 }
-                requests.post(API_SSE_URL, json=payload, timeout=API_SSE_TIMEOUT)
+                respuesta = requests.post(
+                    API_SSE_URL,
+                    json=payload,
+                    headers={"Authorization": f"Bearer {API_SSE_TOKEN}"},
+                    timeout=API_SSE_TIMEOUT
+                )
+                respuesta.raise_for_status()
                 logger.debug(f"SSE enviado para {tabla}/{operacion}")
             except requests.exceptions.Timeout:
                 logger.debug("SSE timeout (API no disponible)")
-            except Exception as e:
-                logger.debug(f"SSE error: {e}")
+            except requests.exceptions.RequestException:
+                logger.exception("No se pudo enviar el evento SSE.")
         
         thread = threading.Thread(target=_post, daemon=True)
         thread.start()

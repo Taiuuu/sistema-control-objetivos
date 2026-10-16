@@ -24,7 +24,6 @@ MENU_POR_DEFECTO = {
     "gestionar_usuarios": True,
     "logs": True,
     "optimizacion": True,
-    "validaciones": True,
     "auditoria": True,
     "sincronizacion": True,
 }

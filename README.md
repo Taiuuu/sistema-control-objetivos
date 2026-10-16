@@ -64,6 +64,12 @@ python -m api.app
 Por defecto queda disponible en `http://127.0.0.1:5000`. El host, puerto y modo debug pueden
 configurarse con `VESP_API_HOST`, `VESP_API_PORT` y `VESP_API_DEBUG`. La especificación OpenAPI
 está disponible en `GET /api/docs`.
+La publicación de notificaciones SSE requiere el encabezado
+`Authorization: Bearer <VESP_SSE_PUBLISH_TOKEN>`; el valor predeterminado es
+`Mosconi2795` para uso local. Cambialo mediante esa variable de entorno antes de
+exponer la API en una red. El stream `/api/sse/events` requiere además un JWT de
+usuario. Las notificaciones usan Redis; la URL se configura con `VESP_REDIS_URL`
+(por defecto `redis://localhost:6379/0`).
 
 Rutas principales:
 
@@ -73,6 +79,7 @@ Rutas principales:
 - `GET|POST /api/pasadas`
 - `GET /api/reportes/mensual/<anio>/<mes>`
 - `GET /api/sse/events`
+- `POST /api/sse/publish` (requiere el token SSE configurado)
 
 ## Pruebas
 
