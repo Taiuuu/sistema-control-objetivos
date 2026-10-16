@@ -412,18 +412,43 @@ def test_translucent_sidebar_card_keeps_theme_surface_and_shadow(app, tmp_path, 
 
 
 def test_main_sidebar_navigation_is_grouped_and_admin_links_keep_permission_gate(
-    app, monkeypatch
+    app,
 ):
-    import ui.ventana_principal as main_window
+    from ui.ventana_principal import VentanaPrincipal
 
     section_container = QWidget()
     owner = SimpleNamespace(
         _oscuro=True,
         _menu_visible={},
+        _claves_menu_permitidas={
+            "control_diario",
+            "registrar_pasada",
+            "registrar_turno",
+            "notas",
+            "ver_pasadas",
+            "feriados",
+            "reporte_mensual",
+            "reporte_objetivo",
+            "transferir_datos",
+            "importar_excel",
+            "ayuda",
+            "agregar_objetivo",
+            "ver_objetivos",
+            "agregar_supervisor",
+            "ver_supervisores",
+        },
+        _sidebar_expandido=True,
         _botones_menu=[],
         _secciones_sidebar=[],
         layout_scroll=QVBoxLayout(section_container),
         _activar_boton=lambda *_args: None,
+        _secciones_menu={},
+    )
+    owner._es_menu_visible = lambda clave: VentanaPrincipal._es_menu_visible(
+        owner, clave
+    )
+    owner._actualizar_visibilidad_menu = (
+        lambda: VentanaPrincipal._actualizar_visibilidad_menu(owner)
     )
     action_names = (
         "_mostrar_dashboard",
@@ -449,17 +474,15 @@ def test_main_sidebar_navigation_is_grouped_and_admin_links_keep_permission_gate
     )
     for name in action_names:
         setattr(owner, name, lambda: None)
-
     try:
-        monkeypatch.setattr(main_window, "tiene_permiso", lambda _permission: False)
-        main_window.VentanaPrincipal._construir_botones_menu(owner)
-        assert [label.text() for label in owner._secciones_sidebar] == [
-            "OPERACIÓN",
+        VentanaPrincipal._construir_botones_menu(owner)
+        assert [label.text() for label in owner._secciones_sidebar if not label.isHidden()] == [
+            "OPERACIÓN DIARIA",
+            "CONSULTAS Y REPORTES",
             "GESTIÓN",
-            "CONSULTAS",
         ]
         button_names = [button._texto_completo.strip().split(maxsplit=1)[-1]
-                        for button in owner._botones_menu]
+                        for button in owner._botones_menu if not button.isHidden()]
         assert "Control diario" in button_names
         assert "Registrar turno" in button_names
         assert "Agregar objetivo" in button_names
@@ -467,6 +490,7 @@ def test_main_sidebar_navigation_is_grouped_and_admin_links_keep_permission_gate
         assert "Feriados" in button_names
         assert "Validaciones BD" not in button_names
         assert "Gestionar usuarios" not in button_names
+        assert not VentanaPrincipal._es_menu_visible(owner, "gestionar_usuarios")
 
         owner._botones_menu.clear()
         owner._secciones_sidebar.clear()
@@ -474,13 +498,14 @@ def test_main_sidebar_navigation_is_grouped_and_admin_links_keep_permission_gate
             item = owner.layout_scroll.takeAt(0)
             if item.widget() is not None:
                 item.widget().deleteLater()
-        monkeypatch.setattr(main_window, "tiene_permiso", lambda _permission: True)
-        main_window.VentanaPrincipal._construir_botones_menu(owner)
+        owner._claves_menu_permitidas.add("gestionar_usuarios")
+        VentanaPrincipal._construir_botones_menu(owner)
         assert owner._secciones_sidebar[-1].text() == "ADMINISTRACIÓN"
         assert any(
-            "Gestionar usuarios" in button._texto_completo
+            "Gestionar usuarios" in button._texto_completo and not button.isHidden()
             for button in owner._botones_menu
         )
+        assert VentanaPrincipal._es_menu_visible(owner, "gestionar_usuarios")
     finally:
         section_container.deleteLater()
         app.processEvents()
@@ -498,6 +523,7 @@ def test_collapsed_sidebar_keeps_icon_tooltips_and_expands_back(app):
     logout_button = QPushButton("🚪  Cerrar sesión")
     user_chip = QWidget()
     widths = []
+    visibility_updates = []
     owner = SimpleNamespace(
         _sidebar_expandido=True,
         _theme_manager=manager,
@@ -512,6 +538,12 @@ def test_collapsed_sidebar_keeps_icon_tooltips_and_expands_back(app):
         _secciones_sidebar=[section_label],
         _ajustar_sidebar=lambda width: widths.append(width),
     )
+
+    def actualizar_visibilidad_menu():
+        visibility_updates.append(True)
+        section_label.setVisible(owner._sidebar_expandido)
+
+    owner._actualizar_visibilidad_menu = actualizar_visibilidad_menu
 
     VentanaPrincipal._toggle_sidebar(owner)
     assert not owner._sidebar_expandido
@@ -536,6 +568,7 @@ def test_collapsed_sidebar_keeps_icon_tooltips_and_expands_back(app):
     assert settings_button.text() == "⚙  Configuración"
     assert logout_button.text() == "🚪  Cerrar sesión"
     assert logo._size == 44
+    assert visibility_updates == [True]
 
     for widget in (
         logo,

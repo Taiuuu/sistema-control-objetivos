@@ -85,6 +85,12 @@ Rutas principales:
 
 ## Pruebas
 
+Para instalar las dependencias de desarrollo y cobertura:
+
+```bash
+python -m pip install -r docs/requirements-dev.txt
+```
+
 ```bash
 python -m pytest
 ```
