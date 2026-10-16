@@ -21,7 +21,7 @@ class ModuleCard(QWidget):
     ):
         super().__init__(parent)
         self.setProperty("menu_key", key)
-        self.setMinimumHeight(116)
+        self.setMinimumHeight(124)
         self.setMinimumWidth(240)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
@@ -45,7 +45,7 @@ class ModuleCard(QWidget):
         text_layout.setSpacing(4)
         self._title = QLabel(title)
         self._description = QLabel(description)
-        self._description.setWordWrap(False)
+        self._description.setWordWrap(True)
         self._description.setSizePolicy(
             QSizePolicy.Policy.Ignored,
             QSizePolicy.Policy.Preferred,

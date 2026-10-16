@@ -175,14 +175,14 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             border-color: {tokens["sidebar_active_bg"]};
         }}
         QPushButton#PrimaryButton {{
-            color: #FFFFFF;
-            background-color: #0A6506;
-            border-color: #0A6506;
+            color: {tokens["accent_text"]};
+            background-color: {tokens["accent"]};
+            border-color: {tokens["accent"]};
         }}
         QPushButton#PrimaryButton:hover {{
-            color: #FFFFFF;
-            background-color: #075704;
-            border-color: #075704;
+            color: {tokens["accent_hover_text"]};
+            background-color: {tokens["accent_hover"]};
+            border-color: {tokens["accent_hover"]};
         }}
         QPushButton#DangerButton {{
             color: {tokens["danger"]};

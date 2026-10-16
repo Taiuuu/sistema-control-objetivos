@@ -387,7 +387,8 @@ class ListaPasadas(QWidget):
         super().__init__()
 
         self.setWindowTitle("Listado de Pasadas")
-        self.resize(900, 500)
+        self.resize(900, 560)
+        self.setMinimumSize(560, 360)
 
         layout = QVBoxLayout()
         card = GlassCard()
@@ -497,17 +498,19 @@ class ListaPasadas(QWidget):
             "Acciones"
         ])
 
-        self.tabla.setColumnWidth(0, 90)
-        self.tabla.setColumnWidth(1, 100)
-        self.tabla.setColumnWidth(2, 250)
-        self.tabla.setColumnWidth(3, 180)
-        self.tabla.setColumnWidth(4, 90)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.verticalHeader().setVisible(False)
         self.tabla.verticalHeader().setDefaultSectionSize(42)
         self.tabla.setShowGrid(False)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.tabla.horizontalHeader().setStretchLastSection(True)
+        self.tabla.setWordWrap(True)
+        header = self.tabla.horizontalHeader()
+        header.setMinimumSectionSize(58)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        for columna in (0, 1, 4):
+            header.setSectionResizeMode(
+                columna, QHeaderView.ResizeMode.ResizeToContents
+            )
         self.tabla.setSortingEnabled(True)
 
         card_layout.addWidget(self.tabla)
@@ -577,6 +580,8 @@ class ListaPasadas(QWidget):
             boton_acciones.setToolTip("Acciones de la pasada")
             boton_acciones.setMenu(menu)
             self.tabla.setCellWidget(fila, 4, self._centrar_widget(boton_acciones))
+
+        self.tabla.resizeRowsToContents()
 
     @staticmethod
     def _centrar_widget(widget: QWidget) -> QWidget:

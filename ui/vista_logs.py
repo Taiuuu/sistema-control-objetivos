@@ -6,7 +6,7 @@
 import sqlite3
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QTableWidget, QTableWidgetItem, QDateEdit, QPushButton
+    QTableWidget, QTableWidgetItem, QDateEdit, QPushButton, QHeaderView
 )
 from PyQt6.QtCore import QDate
 from ui.components.calendar import configure_calendar_theme
@@ -46,7 +46,8 @@ class VistaLogs(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Historial de acciones")
-        self.setGeometry(200, 200, 700, 400)
+        self.resize(850, 520)
+        self.setMinimumSize(500, 320)
 
         layout = QVBoxLayout()
 
@@ -68,10 +69,14 @@ class VistaLogs(QWidget):
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(4)
         self.tabla.setHorizontalHeaderLabels(["Fecha", "Hora", "Usuario", "Acción"])
-        self.tabla.setColumnWidth(0, 100)
-        self.tabla.setColumnWidth(1, 80)
-        self.tabla.setColumnWidth(2, 120)
-        self.tabla.setColumnWidth(3, 350)
+        header = self.tabla.horizontalHeader()
+        header.setMinimumSectionSize(56)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        for columna in (0, 1):
+            header.setSectionResizeMode(
+                columna, QHeaderView.ResizeMode.ResizeToContents
+            )
+        self.tabla.setWordWrap(True)
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
@@ -87,3 +92,4 @@ class VistaLogs(QWidget):
         for i, l in enumerate(logs):
             for j, valor in enumerate(l):
                 self.tabla.setItem(i, j, QTableWidgetItem(str(valor)))
+        self.tabla.resizeRowsToContents()

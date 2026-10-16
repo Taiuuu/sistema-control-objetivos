@@ -374,8 +374,8 @@ class ReporteObjetivo(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Reporte por objetivo")
-        self.resize(1000, 600)
-        self.setMinimumSize(720, 440)
+        self.resize(1000, 680)
+        self.setMinimumSize(560, 360)
         self._objetivos = []   # lista de (id, nombre)
         self._datos = None     # último reporte generado
 
@@ -457,13 +457,15 @@ class ReporteObjetivo(QWidget):
         self.tabla.setHorizontalHeaderLabels(
             ["Fecha", "Día", "Diurno", "Nocturno", "Estado"]
         )
-        self.tabla.setColumnWidth(0, 110)
-        self.tabla.setColumnWidth(1, 60)
-        self.tabla.setColumnWidth(2, 150)  # Más ancho para nombres de supervisores
-        self.tabla.setColumnWidth(3, 150)  # Más ancho para nombres de supervisores
-        self.tabla.setColumnWidth(4, 120)
-        self.tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        header = self.tabla.horizontalHeader()
+        header.setMinimumSectionSize(58)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        for columna in (0, 1, 4):
+            header.setSectionResizeMode(
+                columna, QHeaderView.ResizeMode.ResizeToContents
+            )
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.tabla.setWordWrap(True)
         layout.addWidget(self.tabla)
 
         # --- Resumen ---
@@ -561,6 +563,7 @@ class ReporteObjetivo(QWidget):
                 i, 4, StatusBadge(d["estado"], estado_status)
             )
 
+        self.tabla.resizeRowsToContents()
         self.tabla.setUpdatesEnabled(True)
 
         self.resumen_label.setText(

@@ -1,7 +1,8 @@
 import sys
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QTableWidget, QTableWidgetItem, QLabel, QPushButton, QDateEdit, QComboBox
+    QTableWidget, QTableWidgetItem, QLabel, QPushButton, QDateEdit, QComboBox,
+    QHeaderView
 )
 from PyQt6.QtCore import QDate
 from ui.components.calendar import configure_calendar_theme
@@ -31,7 +32,8 @@ class TablaDiaria(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Control diario de objetivos")
-        self.setGeometry(200, 200, 700, 400)
+        self.resize(760, 560)
+        self.setMinimumSize(480, 320)
 
         layout = QVBoxLayout()
         card = GlassCard()
@@ -55,14 +57,14 @@ class TablaDiaria(QWidget):
         self.tabla = QTableWidget()
         self.tabla.setColumnCount(4)
         self.tabla.setHorizontalHeaderLabels(["Objetivo", "Pasadas", "Estado", "Acción"])
-        self.tabla.setColumnWidth(0, 250)
-        self.tabla.setColumnWidth(1, 80)
-        self.tabla.setColumnWidth(2, 80)
-        self.tabla.setColumnWidth(3, 120)
-        self.tabla.setMinimumSize(600, 200)
+        self.tabla.setMinimumSize(0, 120)
         self.tabla.setShowGrid(False)
         self.tabla.setAlternatingRowColors(False)
-        self.tabla.horizontalHeader().setStretchLastSection(True)
+        header = self.tabla.horizontalHeader()
+        header.setMinimumSectionSize(56)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         card_layout.addWidget(self.tabla)
 
         layout.addWidget(card)

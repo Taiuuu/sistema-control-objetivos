@@ -9,7 +9,9 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
+    QWidget,
 )
 
 from ui.theme.theme_manager import get_theme_manager
@@ -158,10 +160,14 @@ class ConfiguracionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Configuración")
-        self.setMinimumWidth(620)
+        ancho_disponible = max(420, parent.width() - 32) if parent else 620
+        alto_disponible = max(340, parent.height() - 48) if parent else 500
+        self.setMinimumSize(min(420, ancho_disponible), min(340, alto_disponible))
+        self.resize(min(620, ancho_disponible), min(480, alto_disponible))
         self._manager = get_theme_manager()
 
-        root = QVBoxLayout(self)
+        contenido = QWidget()
+        root = QVBoxLayout(contenido)
         root.setContentsMargins(24, 22, 24, 24)
         root.setSpacing(16)
 
@@ -207,6 +213,15 @@ class ConfiguracionDialog(QDialog):
         close_button = QPushButton("Cerrar")
         close_button.clicked.connect(self.accept)
         root.addWidget(close_button, 0, Qt.AlignmentFlag.AlignRight)
+
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setWidget(contenido)
+        layout_principal = QVBoxLayout(self)
+        layout_principal.setContentsMargins(0, 0, 0, 0)
+        layout_principal.addWidget(scroll)
 
         self.decrease_font_button.clicked.connect(lambda: self._change_font_size(-1))
         self.increase_font_button.clicked.connect(lambda: self._change_font_size(1))

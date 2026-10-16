@@ -6,7 +6,7 @@ from PyQt6.QtCore import Qt, QTimer, QThreadPool
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QTabWidget, QTableWidget, QTableWidgetItem, QMessageBox,
-    QGroupBox, QTextEdit, QProgressBar, QComboBox
+    QGroupBox, QTextEdit, QProgressBar, QComboBox, QHeaderView
 )
 from PyQt6.QtGui import QFont
 from services.db_analyzer import AnalisisBD
@@ -25,6 +25,7 @@ class VistaIndexacion(QWidget):
         self.usuario_actual = usuario_actual
         self.analizador = AnalisisBD()
         self._tarea_optimizacion = None
+        self.setMinimumSize(560, 360)
         self.init_ui()
         self.actualizar_datos()
 
@@ -92,11 +93,13 @@ class VistaIndexacion(QWidget):
         self.tabla_stats.setHorizontalHeaderLabels(
             ["Tabla", "Filas", "Tamaño (MB)", "Índices", "Estado"]
         )
-        self.tabla_stats.setColumnWidth(0, 150)
-        self.tabla_stats.setColumnWidth(1, 100)
-        self.tabla_stats.setColumnWidth(2, 120)
-        self.tabla_stats.setColumnWidth(3, 80)
-        self.tabla_stats.setColumnWidth(4, 100)
+        header = self.tabla_stats.horizontalHeader()
+        header.setMinimumSectionSize(56)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        for columna in (1, 2, 3, 4):
+            header.setSectionResizeMode(
+                columna, QHeaderView.ResizeMode.ResizeToContents
+            )
 
         stats_layout.addWidget(self.tabla_stats)
         group_stats.setLayout(stats_layout)
@@ -137,10 +140,11 @@ class VistaIndexacion(QWidget):
         self.tabla_indices.setHorizontalHeaderLabels(
             ["Nombre", "Columnas", "Único", "Tamaño Est. (KB)"]
         )
-        self.tabla_indices.setColumnWidth(0, 250)
-        self.tabla_indices.setColumnWidth(1, 250)
-        self.tabla_indices.setColumnWidth(2, 80)
-        self.tabla_indices.setColumnWidth(3, 120)
+        header = self.tabla_indices.horizontalHeader()
+        header.setMinimumSectionSize(56)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
 
         layout.addWidget(self.tabla_indices)
 
@@ -168,11 +172,11 @@ class VistaIndexacion(QWidget):
         self.tabla_recomendaciones.setHorizontalHeaderLabels(
             ["Tabla", "Columnas", "Razón", "Impacto %", "Acción"]
         )
-        self.tabla_recomendaciones.setColumnWidth(0, 100)
-        self.tabla_recomendaciones.setColumnWidth(1, 200)
-        self.tabla_recomendaciones.setColumnWidth(2, 250)
-        self.tabla_recomendaciones.setColumnWidth(3, 80)
-        self.tabla_recomendaciones.setColumnWidth(4, 150)
+        header = self.tabla_recomendaciones.horizontalHeader()
+        header.setMinimumSectionSize(56)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
 
         layout.addWidget(self.tabla_recomendaciones)
 

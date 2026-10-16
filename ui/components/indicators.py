@@ -1,7 +1,8 @@
 """Indicadores, tarjetas KPI y logo reactivos al tema."""
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout
 
 from ui.components.base import GlassCard, connect_theme, rgba, style_label
@@ -171,19 +172,17 @@ class ThemeLogo(QLabel):
         connect_theme(self, self._apply_theme)
 
     def _apply_theme(self, theme_name: str) -> None:
-        logo = QPixmap(self._theme_manager.tokens(theme_name)["logo_path"])
+        ratio = self.devicePixelRatioF()
+        physical_size = round(self._size * ratio)
+        logo = QIcon(
+            self._theme_manager.tokens(theme_name)["logo_path"]
+        ).pixmap(QSize(physical_size, physical_size))
         if logo.isNull():
             self.clear()
             self.setToolTip(f"No se pudo cargar el logo para el tema {theme_name}.")
             return
-        self.setPixmap(
-            logo.scaled(
-                self._size,
-                self._size,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-        )
+        logo.setDevicePixelRatio(ratio)
+        self.setPixmap(logo)
         self.setToolTip(f"Logo del tema {theme_name}")
 
     def set_size(self, size: int) -> None:

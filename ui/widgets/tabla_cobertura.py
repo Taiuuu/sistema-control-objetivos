@@ -90,22 +90,20 @@ class TablaCoberturaWidget(QWidget):
             "Estado"
         ])
         
-        # Anchos de columna
-        self._tabla.setColumnWidth(0, 210)
-        self._tabla.setColumnWidth(1, 155)
-        self._tabla.setColumnWidth(2, 95)
-        self._tabla.setColumnWidth(3, 155)
-        self._tabla.setColumnWidth(4, 95)
-        self._tabla.setColumnWidth(5, 145)
-        
         self._tabla.setAlternatingRowColors(False)
         self._tabla.setSortingEnabled(True)
         self._tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._tabla.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._tabla.setShowGrid(False)
         self._tabla.verticalHeader().setVisible(False)
-        self._tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self._tabla.horizontalHeader().setStretchLastSection(True)
+        header = self._tabla.horizontalHeader()
+        header.setMinimumSectionSize(58)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        for columna in (2, 4):
+            header.setSectionResizeMode(
+                columna, QHeaderView.ResizeMode.ResizeToContents
+            )
+        self._tabla.setWordWrap(True)
         self._tabla.verticalHeader().setDefaultSectionSize(44)
         
         self._aplicar_estilo_tabla()
@@ -147,7 +145,7 @@ class TablaCoberturaWidget(QWidget):
         self._selector_fecha.setDate(QDate.currentDate())
         self._selector_fecha.setCalendarPopup(True)
         configure_calendar_theme(self._selector_fecha)
-        self._selector_fecha.setFixedWidth(115)
+        self._selector_fecha.setMinimumWidth(105)
         self._selector_fecha.setStyleSheet(self._estilo_input(oscuro))
         self._selector_fecha.dateChanged.connect(self._on_fecha_cambiada)
         
@@ -169,13 +167,13 @@ class TablaCoberturaWidget(QWidget):
         # Filtros
         self._filtro_turno = QComboBox()
         self._filtro_turno.addItems(["Todos los turnos", "diurno", "nocturno"])
-        self._filtro_turno.setFixedWidth(140)
+        self._filtro_turno.setMinimumWidth(120)
         self._filtro_turno.setStyleSheet(self._estilo_input(oscuro))
         self._filtro_turno.currentTextChanged.connect(self.filtros_cambiados.emit)
         
         self._filtro_supervisor = QComboBox()
         self._filtro_supervisor.addItem("Todos los supervisores", None)
-        self._filtro_supervisor.setFixedWidth(170)
+        self._filtro_supervisor.setMinimumWidth(140)
         self._filtro_supervisor.setStyleSheet(self._estilo_input(oscuro))
         self._cargar_supervisores()
         self._filtro_supervisor.currentTextChanged.connect(self.filtros_cambiados.emit)
@@ -185,14 +183,14 @@ class TablaCoberturaWidget(QWidget):
             "Todos", "Pasaron los dos", "No pasó nadie",
             "No pasó día", "No pasó noche"
         ])
-        self._filtro_estado.setFixedWidth(155)
+        self._filtro_estado.setMinimumWidth(125)
         self._filtro_estado.setStyleSheet(self._estilo_input(oscuro))
         self._filtro_estado.currentTextChanged.connect(self.filtros_cambiados.emit)
         
         # Buscador
         self._buscador = QLineEdit()
         self._buscador.setPlaceholderText("🔍  Buscar objetivo...")
-        self._buscador.setFixedWidth(170)
+        self._buscador.setMinimumWidth(130)
         self._buscador.setStyleSheet(self._estilo_input(oscuro))
         self._buscador.textChanged.connect(self.filtros_cambiados.emit)
         

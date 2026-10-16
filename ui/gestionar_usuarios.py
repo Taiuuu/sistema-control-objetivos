@@ -77,7 +77,8 @@ class GestionarUsuarios(QWidget):
         super().__init__()
 
         self.setWindowTitle("Gestionar usuarios")
-        self.setGeometry(300, 300, 550, 400)
+        self.resize(720, 520)
+        self.setMinimumSize(520, 360)
 
         layout = QVBoxLayout()
 
@@ -127,10 +128,12 @@ class GestionarUsuarios(QWidget):
             "Acciones"
         ])
 
-        self.tabla.setColumnWidth(0, 150)
-        self.tabla.setColumnWidth(1, 130)
-        self.tabla.setColumnWidth(2, 110)
-        self.tabla.setColumnWidth(3, 220)
+        header = self.tabla.horizontalHeader()
+        header.setMinimumSectionSize(58)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
 
         layout.addWidget(self.tabla)
 

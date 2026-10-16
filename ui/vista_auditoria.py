@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTableWidget, QTableWidgetItem, QDateEdit, QComboBox,
     QPushButton, QMessageBox, QTextEdit, QTabWidget,
-    QSplitter, QFileDialog
+    QSplitter, QFileDialog, QHeaderView, QScrollArea, QFrame
 )
 from PyQt6.QtCore import QDate, Qt
 from services.auditoria import (
@@ -41,8 +41,8 @@ class VistaAuditoria(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Auditoría del Sistema")
-        self.setGeometry(200, 200, 1200, 800)
-        self.setMinimumSize(900, 600)
+        self.resize(1100, 760)
+        self.setMinimumSize(560, 360)
 
         layout_principal = QVBoxLayout(self)
         layout_principal.setSpacing(12)
@@ -54,7 +54,8 @@ class VistaAuditoria(QWidget):
         layout_principal.addWidget(titulo)
 
         # Controles de filtrado
-        controles = QHBoxLayout()
+        controles_widget = QWidget()
+        controles = QHBoxLayout(controles_widget)
 
         # Filtro por tipo de vista
         self.combo_vista = QComboBox()
@@ -101,7 +102,18 @@ class VistaAuditoria(QWidget):
         btn_exportar.clicked.connect(self._exportar_auditoria)
         controles.addWidget(btn_exportar)
 
-        layout_principal.addLayout(controles)
+        scroll_controles = QScrollArea()
+        scroll_controles.setWidgetResizable(True)
+        scroll_controles.setFixedHeight(62)
+        scroll_controles.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_controles.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        scroll_controles.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        scroll_controles.setWidget(controles_widget)
+        layout_principal.addWidget(scroll_controles)
 
         # Tabs para diferentes vistas
         self.tabs = QTabWidget()
@@ -113,14 +125,10 @@ class VistaAuditoria(QWidget):
             "Fecha/Hora", "Usuario", "Operación", "Tabla",
             "Reg. ID", "Detalles", "Estado", "Ver Cambios"
         ])
-        self.tabla_auditoria.setColumnWidth(0, 150)
-        self.tabla_auditoria.setColumnWidth(1, 120)
-        self.tabla_auditoria.setColumnWidth(2, 100)
-        self.tabla_auditoria.setColumnWidth(3, 100)
-        self.tabla_auditoria.setColumnWidth(4, 80)
-        self.tabla_auditoria.setColumnWidth(5, 200)
-        self.tabla_auditoria.setColumnWidth(6, 80)
-        self.tabla_auditoria.setColumnWidth(7, 100)
+        header = self.tabla_auditoria.horizontalHeader()
+        header.setMinimumSectionSize(48)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.tabla_auditoria.setWordWrap(True)
         self.tabla_auditoria.setAlternatingRowColors(True)
         self.tabs.addTab(self.tabla_auditoria, "Registros")
 
@@ -223,7 +231,7 @@ class VistaAuditoria(QWidget):
                 self.tabla_auditoria.setItem(i, 2, QTableWidgetItem(tipo_op))
                 self.tabla_auditoria.setItem(i, 3, QTableWidgetItem(tabla))
                 self.tabla_auditoria.setItem(i, 4, QTableWidgetItem(reg_id))
-                self.tabla_auditoria.setItem(i, 5, QTableWidgetItem(str(detalles)[:50]))
+                self.tabla_auditoria.setItem(i, 5, QTableWidgetItem(str(detalles)))
                 
                 badge_estado = StatusBadge(
                     estado, "ok" if estado == "EXITOSO" else "danger"
@@ -237,6 +245,8 @@ class VistaAuditoria(QWidget):
 
             except Exception as e:
                 print(f"Error mostrando registro {i}: {e}")
+
+        self.tabla_auditoria.resizeRowsToContents()
 
     def _mostrar_cambios(self, registro: tuple) -> None:
         """Muestra los detalles de cambios de un registro."""

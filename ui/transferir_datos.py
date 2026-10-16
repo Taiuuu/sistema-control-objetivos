@@ -25,7 +25,8 @@ class TransferirDatos(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Transferir datos entre PCs")
-        self.setGeometry(300, 300, 500, 400)
+        self.resize(620, 560)
+        self.setMinimumSize(440, 360)
         self._theme_manager = get_theme_manager()
 
         layout = QVBoxLayout(self)

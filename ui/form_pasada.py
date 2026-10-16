@@ -16,7 +16,9 @@ from PyQt6.QtWidgets import (
     QDateEdit,
     QTimeEdit,
     QMessageBox,
-    QSizePolicy
+    QSizePolicy,
+    QScrollArea,
+    QFrame,
 )
 from PyQt6.QtCore import QDate, QTime, pyqtSignal, Qt
 
@@ -135,7 +137,7 @@ class FormPasada(QWidget):
         global _ultimo_turno
 
         self.setWindowTitle("Registrar pasada")
-        self.setMinimumSize(420, 420)
+        self.setMinimumSize(360, 360)
         self.setWindowFlag(Qt.WindowType.Window)
         self.setObjectName("FormPasada")
 
@@ -204,7 +206,12 @@ class FormPasada(QWidget):
         layout_principal.setSpacing(16)
         layout_principal.addWidget(self._titulo)
         layout_principal.addWidget(self._subtitulo)
-        layout_principal.addWidget(card)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(card)
+        layout_principal.addWidget(scroll, 1)
 
         self.setLayout(layout_principal)
 

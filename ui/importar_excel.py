@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QFrame,
     QSpinBox,
     QTextEdit,
     QVBoxLayout,
@@ -277,7 +278,8 @@ class ImportarExcel(QWidget):
         super().__init__()
         self.setObjectName("ImportarExcel")
         self.setWindowTitle("Importar desde Excel")
-        self.setGeometry(200, 200, 900, 700)
+        self.resize(900, 700)
+        self.setMinimumSize(560, 400)
         self._theme_manager = get_theme_manager()
 
         self.ruta_archivo: Optional[str] = None
@@ -289,7 +291,8 @@ class ImportarExcel(QWidget):
         self._import_thread = None
         self._import_worker = None
 
-        layout = QVBoxLayout(self)
+        contenido = QWidget()
+        layout = QVBoxLayout(contenido)
 
         titulo = QLabel("Importar datos desde Excel")
         titulo.setObjectName("ImportTitle")
@@ -299,6 +302,7 @@ class ImportarExcel(QWidget):
         fila_archivo = QHBoxLayout()
         self.label_archivo = QLabel("Ningún archivo seleccionado")
         self.label_archivo.setObjectName("ImportFileLabel")
+        self.label_archivo.setWordWrap(True)
         boton_archivo = QPushButton("Seleccionar Excel")
         boton_archivo.clicked.connect(self._seleccionar_archivo)
         fila_archivo.addWidget(self.label_archivo)
@@ -348,7 +352,7 @@ class ImportarExcel(QWidget):
         self.lista_errores = QListWidget()
         self.lista_errores.setVisible(False)
         self.lista_errores.setObjectName("ImportErrors")
-        self.lista_errores.setMinimumHeight(120)
+        self.lista_errores.setMinimumHeight(80)
         layout.addWidget(self.lista_errores)
 
         self.boton_descargar_informe = QPushButton("Descargar informe detallado")
@@ -366,8 +370,16 @@ class ImportarExcel(QWidget):
         self.log = QTextEdit()
         self.log.setObjectName("ImportLog")
         self.log.setReadOnly(True)
-        self.log.setMinimumHeight(140)
+        self.log.setMinimumHeight(80)
         layout.addWidget(self.log)
+
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(contenido)
+        layout_principal = QVBoxLayout(self)
+        layout_principal.addWidget(scroll)
 
         self.overlay_progreso = OverlayProgreso(self)
         self._theme_manager.theme_changed.connect(self._aplicar_tema)

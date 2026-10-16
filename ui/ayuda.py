@@ -35,7 +35,8 @@ class Ayuda(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Ayuda - VESP Organizations")
-        self.setGeometry(300, 300, 700, 600)
+        self.resize(760, 620)
+        self.setMinimumSize(520, 360)
         self._theme_manager = get_theme_manager()
 
         layout = QVBoxLayout(self)
@@ -105,8 +106,12 @@ class Ayuda(QWidget):
         tabla = QTableWidget()
         tabla.setColumnCount(2)
         tabla.setHorizontalHeaderLabels(["Atajo", "Acción"])
-        tabla.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        tabla.setColumnWidth(0, 120)
+        tabla.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.ResizeToContents
+        )
+        tabla.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.Stretch
+        )
         tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         tabla.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         tabla.verticalHeader().setVisible(False)

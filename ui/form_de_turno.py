@@ -6,7 +6,8 @@
 from services.cache import obtener_supervisores_cache
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
-    QPushButton, QComboBox, QDateEdit, QMessageBox, QSizePolicy
+    QPushButton, QComboBox, QDateEdit, QMessageBox, QSizePolicy,
+    QScrollArea, QFrame
 )
 from PyQt6.QtCore import QDate, Qt
 from ui.animaciones import animar_entrada
@@ -27,7 +28,7 @@ class FormTurno(QWidget):
         self._tiene_tercero = False
 
         self.setWindowTitle("Registrar turno")
-        self.setMinimumSize(420, 420)
+        self.setMinimumSize(360, 360)
 
         self._titulo = QLabel("Registrar equipo de turno")
         self._titulo.setObjectName("TituloPrincipal")
@@ -111,7 +112,14 @@ class FormTurno(QWidget):
         layout_principal.setSpacing(14)
         layout_principal.addWidget(self._titulo)
         layout_principal.addWidget(self._subtitulo)
-        layout_principal.addWidget(card)
+        self._area_desplazamiento = QScrollArea()
+        self._area_desplazamiento.setWidgetResizable(True)
+        self._area_desplazamiento.setFrameShape(QFrame.Shape.NoFrame)
+        self._area_desplazamiento.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self._area_desplazamiento.setWidget(card)
+        layout_principal.addWidget(self._area_desplazamiento, 1)
 
         self.setLayout(layout_principal)
         animar_entrada(self)
@@ -128,13 +136,12 @@ class FormTurno(QWidget):
         self._tiene_tercero = True
         self._fila_sup3.setVisible(True)
         self.btn_agregar_sup3.setVisible(False)
-        self.setFixedHeight(400)
+        self._area_desplazamiento.ensureWidgetVisible(self._fila_sup3)
 
     def _ocultar_sup3(self) -> None:
         self._tiene_tercero = False
         self._fila_sup3.setVisible(False)
         self.btn_agregar_sup3.setVisible(True)
-        self.setFixedHeight(320)
 
     def _guardar(self) -> None:
         fecha = self.input_fecha.date().toString("yyyy-MM-dd")

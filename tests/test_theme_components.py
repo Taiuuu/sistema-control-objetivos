@@ -59,7 +59,8 @@ def test_components_follow_theme_changes(app, tmp_path, monkeypatch):
 
     assert THEMES["Negro"]["surface"] in card.styleSheet()
     assert THEMES["Negro"]["card_contrast"] in contrast_card.styleSheet()
-    assert "#0A6506" in button.styleSheet()
+    assert THEMES["Negro"]["accent"] in button.styleSheet()
+    assert THEMES["Negro"]["accent_text"] in button.styleSheet()
     assert THEMES["Negro"]["text_primary"] in search.styleSheet()
     assert THEMES["Negro"]["success"] in badge.styleSheet()
     assert THEMES["Negro"]["accent"] in progress.styleSheet()
@@ -274,7 +275,8 @@ def test_objectives_screen_uses_glass_card_and_single_branded_primary(
 
     assert window.findChild(GlassCard) is not None
     assert window.boton_agregar is not None
-    assert "#0A6506" in window.boton_agregar.styleSheet()
+    assert THEMES["Negro"]["accent"] in window.boton_agregar.styleSheet()
+    assert THEMES["Negro"]["accent_text"] in window.boton_agregar.styleSheet()
     assert "QTableWidget::item:hover" in window.styleSheet()
     assert len(window.tablas) == 3
 

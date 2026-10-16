@@ -23,7 +23,12 @@ class PillButton(QPushButton):
     def _apply_theme(self, theme_name: str) -> None:
         tokens = self._theme_manager.tokens(theme_name)
         colors = {
-            "primary": ("#0A6506", "#FFFFFF", "#075704", "#FFFFFF"),
+            "primary": (
+                tokens["accent"],
+                tokens["accent_text"],
+                tokens["accent_hover"],
+                tokens["accent_hover_text"],
+            ),
             "secondary": (tokens["surface_alt"], tokens["text_primary"], tokens["surface"], tokens["text_primary"]),
             "ghost": ("transparent", tokens["text_primary"], tokens["surface_alt"], tokens["text_primary"]),
             "danger": (
@@ -37,7 +42,7 @@ class PillButton(QPushButton):
         compact_icon = self.property("compact_icon") is True
         padding = "0" if compact_icon else f'0 {tokens["spacing_lg"]}'
         pressed_bg = (
-            "#064A03"
+            tokens["accent_hover"]
             if self.variant == "primary"
             else tokens["danger_button_bg"]
             if self.variant == "danger"

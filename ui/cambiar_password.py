@@ -8,7 +8,7 @@ import bcrypt
 from database.db import DB_PATH
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QMessageBox
+    QLineEdit, QPushButton, QMessageBox, QScrollArea, QFrame
 )
 from PyQt6.QtCore import Qt
 from ui.components import GlassCard, PillButton
@@ -99,7 +99,8 @@ class CambiarPassword(QWidget):
         self.usuario_id = usuario_id
         self.on_completado = on_completado
         self.setWindowTitle("Cambiar contraseña")
-        self.setFixedSize(380, 420)
+        self.resize(380, 420)
+        self.setMinimumSize(320, 360)
         self._theme_manager = get_theme_manager()
 
         layout = QVBoxLayout(self)
@@ -134,7 +135,12 @@ class CambiarPassword(QWidget):
         boton_guardar.clicked.connect(self._guardar)
         contenido.addWidget(boton_guardar)
 
-        layout.addWidget(card)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(card)
+        layout.addWidget(scroll)
         self._theme_manager.theme_changed.connect(self._aplicar_tema)
         self._aplicar_tema(self._theme_manager.current())
 

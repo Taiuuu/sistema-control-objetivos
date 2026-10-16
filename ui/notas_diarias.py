@@ -55,7 +55,8 @@ class NotasDiarias(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Notas del día")
-        self.setGeometry(300, 300, 500, 450)
+        self.resize(620, 560)
+        self.setMinimumSize(420, 360)
 
         layout = QVBoxLayout()
 

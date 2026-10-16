@@ -5,7 +5,7 @@
 
 import sqlite3
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QLabel,
+    QWidget, QVBoxLayout, QFormLayout, QLabel, QScrollArea,
     QLineEdit, QPushButton, QCheckBox, QDateEdit, QMessageBox, QFrame, QComboBox
 )
 from PyQt6.QtCore import QDate, Qt
@@ -34,7 +34,7 @@ class FormObjetivo(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Agregar objetivo")
-        self.setMinimumSize(440, 520)
+        self.setMinimumSize(360, 400)
         self._theme_manager = get_theme_manager()
 
         self._titulo = QLabel("Agregar objetivo")
@@ -112,7 +112,12 @@ class FormObjetivo(QWidget):
         layout_principal.setSpacing(14)
         layout_principal.addWidget(self._titulo)
         layout_principal.addWidget(self._subtitulo)
-        layout_principal.addWidget(card)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(card)
+        layout_principal.addWidget(scroll, 1)
 
         self._theme_manager.theme_changed.connect(self._aplicar_tema)
         self._aplicar_tema(self._theme_manager.current())
@@ -131,22 +136,22 @@ class FormObjetivo(QWidget):
         self.boton_guardar.setStyleSheet(
             f"""
             QPushButton {{
-                color: #FFFFFF;
-                background-color: #0A6506;
-                border: 1px solid #0A6506;
+                color: {tokens['accent_text']};
+                background-color: {tokens['accent']};
+                border: 1px solid {tokens['accent']};
                 border-radius: {tokens['radius_lg']};
                 padding: 0 16px;
                 min-height: 42px;
                 font-weight: 600;
             }}
             QPushButton:hover {{
-                color: #FFFFFF;
-                background-color: #075704;
-                border-color: #075704;
+                color: {tokens['accent_hover_text']};
+                background-color: {tokens['accent_hover']};
+                border-color: {tokens['accent_hover']};
             }}
             QPushButton:pressed {{
-                color: #FFFFFF;
-                background-color: #064A03;
+                color: {tokens['accent_hover_text']};
+                background-color: {tokens['accent_hover']};
             }}
             """
         )

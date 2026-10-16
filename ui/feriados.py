@@ -6,7 +6,7 @@ from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGridLayout
+    QGridLayout, QScrollArea, QFrame
 )
 from PyQt6.QtCore import Qt, QDate
 
@@ -26,15 +26,16 @@ class VistaFeriados(QWidget):
         super().__init__()
         self._theme_manager = get_theme_manager()
         self.setWindowTitle("Feriados")
-        self.resize(860, 620)
+        self.resize(820, 620)
+        self.setMinimumSize(500, 420)
 
         self._fecha_actual = QDate.currentDate()
         self._mes_actual = self._fecha_actual.month()
         self._anio_actual = self._fecha_actual.year()
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(16)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
 
         cabecera = QHBoxLayout()
         self._titulo = QLabel("Gestión visual de feriados")
@@ -57,11 +58,20 @@ class VistaFeriados(QWidget):
         self._lbl_mes.setObjectName("Mes")
         layout.addWidget(self._lbl_mes)
 
-        calendario_card = GlassCard(shadow=True)
+        calendario_card = GlassCard(shadow=True, content_margins=10)
         self._calendario = QGridLayout()
-        self._calendario.setSpacing(8)
+        self._calendario.setSpacing(4)
+        for columna in range(7):
+            self._calendario.setColumnStretch(columna, 1)
         calendario_card.add_layout(self._calendario)
-        layout.addWidget(calendario_card, 1)
+        scroll_calendario = QScrollArea()
+        scroll_calendario.setWidgetResizable(True)
+        scroll_calendario.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_calendario.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        scroll_calendario.setWidget(calendario_card)
+        layout.addWidget(scroll_calendario, 1)
 
         self._estado = StatusBadge(
             "Hacé clic en un día para agregar o quitar un feriado.", "info"
@@ -128,7 +138,7 @@ class VistaFeriados(QWidget):
             boton = QPushButton(str(offset))
             boton.setObjectName("HolidayDay")
             boton.setCursor(Qt.CursorShape.PointingHandCursor)
-            boton.setFixedHeight(64)
+            boton.setMinimumHeight(34)
             fecha_str = fecha.toString("yyyy-MM-dd")
             boton.setProperty("feriado", fecha_str in self._feriados_mes)
             boton.clicked.connect(lambda checked=False, f=fecha_str: self._alternar_feriado(f))
@@ -136,7 +146,7 @@ class VistaFeriados(QWidget):
 
         for _ in range(42 - (dias_en_mes + inicio_columna)):
             placeholder = QLabel("")
-            placeholder.setFixedHeight(64)
+            placeholder.setMinimumHeight(34)
             self._calendario.addWidget(placeholder, fila + 1, 0)
 
     def _formatear_mes(self) -> str:

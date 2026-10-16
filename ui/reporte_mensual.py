@@ -32,8 +32,8 @@ class ReporteMensual(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Reporte mensual")
-        self.resize(1000, 560)
-        self.setMinimumSize(720, 440)
+        self.resize(1000, 680)
+        self.setMinimumSize(560, 360)
 
         layout = QVBoxLayout()
 
@@ -106,13 +106,14 @@ class ReporteMensual(QWidget):
             "Objetivo", "Días esperados", "Días con pasada",
             "Días sin pasada", "Cumplimiento", "Estado"
         ])
-        self.tabla.setColumnWidth(0, 220)
-        self.tabla.setColumnWidth(1, 110)
-        self.tabla.setColumnWidth(2, 120)
-        self.tabla.setColumnWidth(3, 120)
-        self.tabla.setColumnWidth(4, 100)
-        self.tabla.setColumnWidth(5, 100)
-        self.tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        header = self.tabla.horizontalHeader()
+        header.setMinimumSectionSize(58)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        for columna in (1, 2, 3, 4, 5):
+            header.setSectionResizeMode(
+                columna, QHeaderView.ResizeMode.ResizeToContents
+            )
+        self.tabla.setWordWrap(True)
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
@@ -170,6 +171,7 @@ class ReporteMensual(QWidget):
             )
             self.tabla.setCellWidget(i, 5, StatusBadge(estado, status))
 
+        self.tabla.resizeRowsToContents()
         self.tabla.setUpdatesEnabled(True)
         self.estado_label.setText(
             f"Reporte generado — Cumplimiento total: {resultados['cumplimiento_total']:.1f}%"

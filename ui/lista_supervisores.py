@@ -132,7 +132,8 @@ class ListaSupervisores(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Listado de supervisores")
-        self.setGeometry(200, 200, 900, 520)
+        self.resize(900, 560)
+        self.setMinimumSize(520, 360)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(12, 12, 12, 12)
@@ -168,10 +169,6 @@ class ListaSupervisores(QWidget):
         self.tabla.setHorizontalHeaderLabels([
             "Nombre", "Fecha alta", "Fecha baja", "Estado", "Acciones"
         ])
-        self.tabla.setColumnWidth(0, 180)
-        self.tabla.setColumnWidth(1, 95)
-        self.tabla.setColumnWidth(2, 95)
-        self.tabla.setColumnWidth(3, 80)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.verticalHeader().setVisible(False)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -179,7 +176,13 @@ class ListaSupervisores(QWidget):
         self.tabla.setAlternatingRowColors(False)
         self.tabla.setMouseTracking(True)
         self.tabla.viewport().setMouseTracking(True)
-        self.tabla.horizontalHeader().setStretchLastSection(True)
+        header = self.tabla.horizontalHeader()
+        header.setMinimumSectionSize(58)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        for columna in (1, 2, 3, 4):
+            header.setSectionResizeMode(
+                columna, QHeaderView.ResizeMode.ResizeToContents
+            )
         self.tabla.setSortingEnabled(True)
         card_layout.addWidget(self.tabla)
 

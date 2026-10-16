@@ -8,7 +8,7 @@ import sqlite3
 from typing import Optional, Callable
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QLabel,
     QPushButton, QDateEdit, QComboBox, QMessageBox,
     QFrame, QLineEdit, QHeaderView, QScrollArea,
@@ -204,9 +204,19 @@ class VentanaPrincipal(QWidget):
         super().__init__()
         self.setWindowTitle("VESP Organizations")
         self.setWindowFlags(Qt.WindowType.Window)
-        self.move(80, 60)
-        self.resize(1340, 660)
         self.setMinimumSize(720, 440)
+        pantalla = QApplication.primaryScreen()
+        if pantalla:
+            area = pantalla.availableGeometry()
+            self.resize(
+                min(1340, max(720, int(area.width() * 0.92))),
+                min(760, max(440, int(area.height() * 0.9))),
+            )
+            geometria = self.frameGeometry()
+            geometria.moveCenter(area.center())
+            self.move(geometria.topLeft())
+        else:
+            self.resize(1100, 700)
         self._theme_manager = get_theme_manager()
         self.zoom_nivel = self._theme_manager.font_size()
         self.setWindowIcon(QIcon(THEMES[self._theme_manager.current()]["logo_path"]))
@@ -215,6 +225,8 @@ class VentanaPrincipal(QWidget):
         self._oscuro = self._theme_manager.current() != "Claro"
 
         self._construir_ui()
+        if self.width() < 1100:
+            self._toggle_sidebar()
         self._theme_manager.theme_changed.connect(self._al_cambiar_tema)
         self._theme_manager.font_size_changed.connect(self._sincronizar_tamano_fuente)
         self.cargar_tabla()
@@ -973,21 +985,20 @@ class VentanaPrincipal(QWidget):
             "Equipo nocturno", "Pasadas noche", "Estado"
         ])
 
-        self.tabla.setColumnWidth(0, 210)
-        self.tabla.setColumnWidth(1, 155)
-        self.tabla.setColumnWidth(2, 95)
-        self.tabla.setColumnWidth(3, 155)
-        self.tabla.setColumnWidth(4, 95)
-        self.tabla.setColumnWidth(5, 145)
-
         self.tabla.setAlternatingRowColors(False)
         self.tabla.setSortingEnabled(True)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.tabla.setShowGrid(False)
         self.tabla.verticalHeader().setVisible(False)
-        self.tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.tabla.horizontalHeader().setStretchLastSection(True)
+        header = self.tabla.horizontalHeader()
+        header.setMinimumSectionSize(58)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        for columna in (2, 4):
+            header.setSectionResizeMode(
+                columna, QHeaderView.ResizeMode.ResizeToContents
+            )
+        self.tabla.setWordWrap(True)
         self.tabla.verticalHeader().setDefaultSectionSize(44)
 
         self.tabla.setStyleSheet(self._estilo_tabla(oscuro))
@@ -1420,6 +1431,11 @@ class VentanaPrincipal(QWidget):
     def resizeEvent(self, evento):
         self._registrar_actividad()
         super().resizeEvent(evento)
+        if hasattr(self, "panel_lateral"):
+            if self.width() < 980 and self._sidebar_expandido:
+                self._toggle_sidebar()
+            elif self.width() > 1120 and not self._sidebar_expandido:
+                self._toggle_sidebar()
 
     def cerrar_por_inactividad(self):
         hacer_backup()
@@ -1546,6 +1562,7 @@ class VentanaPrincipal(QWidget):
         for i, fila in enumerate(filas):
             self._poblar_fila(i, fila, equipo_dia, equipo_noche)
 
+        self.tabla.resizeRowsToContents()
         self.tabla.setUpdatesEnabled(True)
         self.tabla.setSortingEnabled(sorting_enabled)
         self.tabla.update()
@@ -1707,6 +1724,7 @@ class VentanaPrincipal(QWidget):
             if on_close:
                 ventana.destroyed.connect(on_close)
 
+            self._ajustar_y_centrar_ventana(ventana)
             ventana.show()
             if not tiene_animacion_activa(ventana):
                 animar_aparecer(ventana, 180)
@@ -1715,6 +1733,28 @@ class VentanaPrincipal(QWidget):
             ventana.activateWindow()
 
         return ventana
+
+    def _ajustar_y_centrar_ventana(self, ventana: QWidget) -> None:
+        pantalla = self.screen() or QApplication.primaryScreen()
+        if pantalla is None:
+            return
+
+        area = pantalla.availableGeometry().adjusted(16, 16, -16, -16)
+        ancho_maximo = max(320, min(area.width(), self.width()))
+        alto_maximo = max(260, min(area.height(), self.height()))
+        minimo = ventana.minimumSize()
+        ventana.setMinimumSize(
+            min(minimo.width(), ancho_maximo),
+            min(minimo.height(), alto_maximo),
+        )
+        ancho = min(max(ventana.width(), ventana.minimumWidth()), ancho_maximo)
+        alto = min(max(ventana.height(), ventana.minimumHeight()), alto_maximo)
+        ventana.resize(ancho, alto)
+
+        centro = self.frameGeometry().center()
+        x = max(area.left(), min(centro.x() - ancho // 2, area.right() - ancho + 1))
+        y = max(area.top(), min(centro.y() - alto // 2, area.bottom() - alto + 1))
+        ventana.move(x, y)
 
 
     def abrir_form_objetivo(self) -> None:
@@ -1797,7 +1837,6 @@ class VentanaPrincipal(QWidget):
             self.usuario_id
         )
         ventana.setWindowTitle("Optimización de Índices y Rendimiento")
-        ventana.setGeometry(100, 100, 1200, 700)
 
 
     def abrir_ayuda(self) -> None:
@@ -1818,7 +1857,6 @@ class VentanaPrincipal(QWidget):
             self.usuario_id
         )
         ventana.setWindowTitle("Monitoreo de Sincronización de Datos")
-        ventana.setGeometry(100, 100, 1200, 700)
 
 
     def abrir_importar_excel(self) -> None:

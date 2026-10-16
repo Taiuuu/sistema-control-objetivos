@@ -6,7 +6,8 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QTabWidget, QTableWidget, QTableWidgetItem, QMessageBox,
-    QGroupBox, QTextEdit, QScrollArea, QListWidget, QListWidgetItem
+    QGroupBox, QTextEdit, QScrollArea, QListWidget, QListWidgetItem,
+    QHeaderView
 )
 from PyQt6.QtGui import QFont
 from services.sincronizacion import obtener_sincronizador, conectar_modulo
@@ -25,6 +26,7 @@ class VistaSincronizacion(QWidget):
         self.usuario_actual = usuario_actual
         self.sincronizador = obtener_sincronizador()
         self.historial_eventos = []
+        self.setMinimumSize(560, 360)
         self.init_ui()
         self.conectar_senales()
         self.actualizar_datos()
@@ -120,9 +122,10 @@ class VistaSincronizacion(QWidget):
         self.tabla_modulos = QTableWidget()
         self.tabla_modulos.setColumnCount(3)
         self.tabla_modulos.setHorizontalHeaderLabels(["Módulo", "Estado", "Última Actividad"])
-        self.tabla_modulos.setColumnWidth(0, 200)
-        self.tabla_modulos.setColumnWidth(1, 100)
-        self.tabla_modulos.setColumnWidth(2, 200)
+        header = self.tabla_modulos.horizontalHeader()
+        header.setMinimumSectionSize(56)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
 
         modulos_layout.addWidget(self.tabla_modulos)
         group_modulos.setLayout(modulos_layout)

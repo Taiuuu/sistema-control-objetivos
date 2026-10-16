@@ -56,7 +56,10 @@ class DialogoEditarObjetivo(QDialog):
         super().__init__(parent)
         self.objetivo_id = objetivo.id
         self.setWindowTitle("Editar objetivo")
-        self.setFixedSize(440, 620)
+        ancho = min(440, max(360, parent.width() - 32)) if parent else 440
+        alto = min(620, max(380, parent.height() - 48)) if parent else 620
+        self.resize(ancho, alto)
+        self.setMinimumSize(min(360, ancho), min(380, alto))
         self._theme_manager = get_theme_manager()
 
         card = GlassCard()
@@ -190,14 +193,14 @@ class DialogoEditarObjetivo(QDialog):
                 border-color: {tokens["accent"]};
             }}
             QPushButton#EditObjectivePrimary {{
-                color: #FFFFFF;
-                background-color: #0A6506;
-                border: 1px solid #0A6506;
+                color: {tokens["accent_text"]};
+                background-color: {tokens["accent"]};
+                border: 1px solid {tokens["accent"]};
             }}
             QPushButton#EditObjectivePrimary:hover {{
-                color: #FFFFFF;
-                background-color: #075704;
-                border-color: #075704;
+                color: {tokens["accent_hover_text"]};
+                background-color: {tokens["accent_hover"]};
+                border-color: {tokens["accent_hover"]};
             }}
             """
         )
@@ -267,7 +270,8 @@ class ListaObjetivos(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Listado de objetivos")
-        self.setGeometry(200, 200, 950, 400)
+        self.resize(950, 560)
+        self.setMinimumSize(560, 360)
         self._theme_manager = get_theme_manager()
 
         layout = QVBoxLayout(self)
@@ -326,18 +330,22 @@ class ListaObjetivos(QWidget):
     def _configurar_tabla(self, tabla: QTableWidget) -> None:
         tabla.setColumnCount(6)
         tabla.setHorizontalHeaderLabels(["Nombre", "Inicio", "Fin", "Días", "Estado", "Acciones"])
-        for columna, ancho in enumerate((220, 100, 100, 180, 170, 85)):
-            tabla.setColumnWidth(columna, ancho)
         tabla.setShowGrid(False)
         tabla.setAlternatingRowColors(False)
         tabla.setMouseTracking(True)
         tabla.viewport().setMouseTracking(True)
         tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         tabla.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        tabla.setWordWrap(True)
         tabla.verticalHeader().setVisible(False)
         tabla.verticalHeader().setDefaultSectionSize(48)
-        tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        tabla.horizontalHeader().setStretchLastSection(True)
+        header = tabla.horizontalHeader()
+        header.setMinimumSectionSize(58)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        for columna in (1, 2, 5):
+            header.setSectionResizeMode(
+                columna, QHeaderView.ResizeMode.ResizeToContents
+            )
 
     def _aplicar_tema(self, theme_name: str) -> None:
         tokens = self._theme_manager.tokens(theme_name)
@@ -450,22 +458,22 @@ class ListaObjetivos(QWidget):
             self.boton_agregar.setStyleSheet(
                 f"""
                 QPushButton {{
-                    color: #FFFFFF;
-                    background-color: #0A6506;
-                    border: 1px solid #0A6506;
+                    color: {tokens['accent_text']};
+                    background-color: {tokens['accent']};
+                    border: 1px solid {tokens['accent']};
                     border-radius: {tokens['radius_lg']};
                     padding: 0 16px;
                     min-height: 38px;
                     font-weight: 600;
                 }}
                 QPushButton:hover {{
-                    color: #FFFFFF;
-                    background-color: #075704;
-                    border-color: #075704;
+                    color: {tokens['accent_hover_text']};
+                    background-color: {tokens['accent_hover']};
+                    border-color: {tokens['accent_hover']};
                 }}
                 QPushButton:pressed {{
-                    color: #FFFFFF;
-                    background-color: #064A03;
+                    color: {tokens['accent_hover_text']};
+                    background-color: {tokens['accent_hover']};
                 }}
                 """
             )
@@ -481,6 +489,7 @@ class ListaObjetivos(QWidget):
             seleccionados = [obj for obj in objetivos if filtros[clave](obj)]
             tabla.setRowCount(len(seleccionados))
             self._llenar_tabla(tabla, seleccionados)
+            tabla.resizeRowsToContents()
 
     def _llenar_tabla(self, tabla: QTableWidget, objetivos: list[Objetivo]) -> None:
         for i, o in enumerate(objetivos):
@@ -522,6 +531,9 @@ class ListaObjetivos(QWidget):
         self._form_objetivo = FormObjetivo()
         self._form_objetivo.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self._form_objetivo.destroyed.connect(self._cargar_tabla)
+        geometria = self._form_objetivo.frameGeometry()
+        geometria.moveCenter(self.frameGeometry().center())
+        self._form_objetivo.move(geometria.topLeft())
         self._form_objetivo.show()
 
     @staticmethod

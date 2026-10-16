@@ -11,8 +11,8 @@ import hashlib
 from pathlib import Path
 from collections import defaultdict
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QLabel,
-    QLineEdit, QPushButton, QMessageBox, QHBoxLayout
+    QApplication, QWidget, QVBoxLayout, QLabel, QScrollArea,
+    QLineEdit, QPushButton, QMessageBox, QHBoxLayout, QFrame
 )
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
@@ -245,7 +245,6 @@ class LoginWindow(QWidget):
         self.on_login_exitoso = on_login_exitoso
         self._theme_manager = get_theme_manager()
         self.setWindowTitle("VESP Organizations")
-        self.setFixedSize(400, 540)
         self.setWindowFlags(
             Qt.WindowType.Window |
             Qt.WindowType.WindowTitleHint |
@@ -255,21 +254,27 @@ class LoginWindow(QWidget):
         pantalla = QApplication.primaryScreen()
         if pantalla:
             area = pantalla.availableGeometry()
+            ancho = min(400, max(320, int(area.width() * 0.9)))
+            alto = min(540, max(400, int(area.height() * 0.9)))
+            self.setFixedSize(ancho, alto)
             self.move(
                 area.center().x() - self.width() // 2,
                 area.center().y() - self.height() // 2,
             )
+        else:
+            self.setFixedSize(400, 540)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(22, 22, 22, 22)
         card = GlassCard(shadow=True, content_margins=24)
         contenido = QVBoxLayout()
         contenido.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        contenido.setSpacing(15)
+        contenido.setSpacing(12)
         card.add_layout(contenido)
 
         # Logo
-        self.logo_label = ThemeLogo(size=144)
+        logo_size = min(144, max(96, int(self.height() * 0.27)))
+        self.logo_label = ThemeLogo(size=logo_size)
         self._actualizar_logo_tema(self._theme_manager.current())
         contenido.addWidget(self.logo_label)
         self._theme_manager.theme_changed.connect(self._actualizar_logo_tema)
@@ -313,7 +318,13 @@ class LoginWindow(QWidget):
         contenido.addWidget(boton_entrar)
 
         contenido.addSpacing(10)
-        layout.addWidget(card)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setWidget(card)
+        layout.addWidget(scroll)
         animar_entrada(self)
 
     def _actualizar_logo_tema(self, nombre_tema: str) -> None:
@@ -400,6 +411,9 @@ class LoginWindow(QWidget):
         """Abre la pantalla de cambio de contraseña obligatorio."""
         from ui.cambiar_password import CambiarPassword
         self.cambiar_pw = CambiarPassword(usuario_id, lambda: self._login_post_cambio(usuario_id))
+        geometria = self.cambiar_pw.frameGeometry()
+        geometria.moveCenter(self.frameGeometry().center())
+        self.cambiar_pw.move(geometria.topLeft())
         self.cambiar_pw.show()
 
     def _login_post_cambio(self, usuario_id: int) -> None:
