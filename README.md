@@ -53,6 +53,28 @@ En el primer inicio se crea o actualiza la base SQLite local, se ejecutan las mi
 abre la pantalla de login. Las credenciales iniciales son `admin` / `0000`; el cambio de
 contraseña es obligatorio en el primer acceso.
 
+### Copias de seguridad y recuperación
+
+La ruta de la base se configura con `VESP_DB_PATH`; si no se define, VESP conserva la
+ubicación histórica `~/VESP Control/seguridad.db`. Junto a la base crea `data/backups/`,
+`data/logs/` y `data/exports_seguridad/`. La carpeta `data/` contiene datos locales y no se
+versiona.
+
+VESP crea un backup diario y una copia previa verificada antes de importar, borrar un mes o
+ejecutar las migraciones de arranque. En Configuración → Copias de seguridad se puede crear
+una copia manual, elegir una carpeta externa sincronizada y restaurar una copia verificada.
+También se puede configurar la carpeta externa con `VESP_BACKUP_EXTERNAL_PATH`.
+
+Si la interfaz no arranca, listá y restaurá copias desde una consola:
+
+```bash
+python scripts/restaurar_backup.py
+python scripts/restaurar_backup.py --restaurar 1
+```
+
+El script muestra las copias verificadas y solicita escribir `RESTAURAR` antes de reemplazar
+la base. Los errores y operaciones de recuperación quedan registrados en `data/logs/vesp.log`.
+
 ### API REST independiente
 
 La API requiere `VESP_JWT_SECRET` y se inicia desde la raíz del proyecto:

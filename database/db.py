@@ -6,30 +6,123 @@
 import sqlite3
 import os
 import bcrypt
+import logging
+import threading
+import weakref
+from core.configuracion import DB_PATH
 
 
-_env_db = os.environ.get("VESP_DB_PATH") or os.environ.get("TEST_DB_PATH")
-DB_PATH = _env_db if _env_db else os.path.join(os.path.expanduser("~"), "VESP Control", "seguridad.db")
+DB_PATH = str(DB_PATH)
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+SCHEMA_VERSION = 1
+logger = logging.getLogger(__name__)
 
 
 def configurar_conexion_sqlite(conexion: sqlite3.Connection) -> sqlite3.Connection:
-    """Activa integridad referencial y modo WAL en la conexión."""
+    """Aplica siempre los límites de concurrencia e integridad de la app."""
     conexion.execute("PRAGMA foreign_keys=ON")
     conexion.execute("PRAGMA journal_mode=WAL")
+    # NORMAL equilibra durabilidad y rendimiento; los commits confirmados se
+    # recuperan mediante WAL y evita el costo de sincronizar cada escritura.
+    conexion.execute("PRAGMA synchronous=NORMAL")
+    conexion.execute("PRAGMA busy_timeout=5000")
     return conexion
 
 _sqlite3_connect_original = sqlite3.connect
+_conexiones_abiertas: weakref.WeakSet[sqlite3.Connection] = weakref.WeakSet()
+_conexiones_lock = threading.RLock()
+
+
+class _ConexionSeguida(sqlite3.Connection):
+    """Permite cerrar conexiones abiertas antes de reemplazar la base."""
+
+    __slots__ = ("__weakref__",)
+
+    def close(self) -> None:
+        try:
+            super().close()
+        except Exception:
+            raise
+        else:
+            with _conexiones_lock:
+                _conexiones_abiertas.discard(self)
 
 def _sqlite3_connect_with_pragmas(*args, **kwargs):
+    kwargs.setdefault("factory", _ConexionSeguida)
     conexion = _sqlite3_connect_original(*args, **kwargs)
-    return configurar_conexion_sqlite(conexion)
+    with _conexiones_lock:
+        _conexiones_abiertas.add(conexion)
+    try:
+        return configurar_conexion_sqlite(conexion)
+    except Exception:
+        conexion.close()
+        raise
 
 sqlite3.connect = _sqlite3_connect_with_pragmas
 
 
+def cerrar_todas_las_conexiones() -> None:
+    """Cierra las conexiones de la app antes de reemplazar el archivo SQLite."""
+    with _conexiones_lock:
+        conexiones = tuple(_conexiones_abiertas)
+    errores = []
+    for conexion in conexiones:
+        try:
+            conexion.close()
+        except sqlite3.Error as error:
+            errores.append(error)
+            logger.exception("No se pudo cerrar una conexión SQLite")
+    if errores:
+        raise RuntimeError(
+            f"No se pudieron cerrar {len(errores)} conexión(es) SQLite"
+        ) from errores[0]
+
+
+def cerrar_conexiones_de(ruta: str | os.PathLike[str]) -> None:
+    """Cierra solo las conexiones que mantienen abierto el archivo indicado."""
+    objetivo = os.path.normcase(os.path.abspath(ruta))
+    with _conexiones_lock:
+        conexiones = tuple(_conexiones_abiertas)
+    for conexion in conexiones:
+        try:
+            rutas = conexion.execute("PRAGMA database_list").fetchall()
+            if any(
+                nombre and os.path.normcase(os.path.abspath(nombre)) == objetivo
+                for _, _, nombre in rutas
+            ):
+                conexion.close()
+        except sqlite3.Error:
+            logger.exception("No se pudo identificar una conexión SQLite abierta")
+
+
 def conectar() -> sqlite3.Connection:
     return sqlite3.connect(DB_PATH)
+
+
+def verificar_integridad(ruta: str | None = None) -> tuple[bool, list[str]]:
+    """Ejecuta las comprobaciones SQLite sin modificar el contenido."""
+    try:
+        conexion = sqlite3.connect(ruta or DB_PATH)
+    except sqlite3.DatabaseError as error:
+        logger.exception("No se pudo abrir la base para comprobar su integridad")
+        return False, [f"integrity_check: {error}"]
+    try:
+        resultado = [
+            fila[0] for fila in conexion.execute("PRAGMA integrity_check").fetchall()
+        ]
+        claves_foraneas = conexion.execute("PRAGMA foreign_key_check").fetchall()
+        errores = []
+        if resultado != ["ok"]:
+            errores.extend(f"integrity_check: {mensaje}" for mensaje in resultado)
+        if claves_foraneas:
+            errores.extend(
+                f"foreign_key_check: tabla={fila[0]} fila={fila[1]} "
+                f"referencia={fila[2]}"
+                for fila in claves_foraneas
+            )
+        return not errores, errores
+    finally:
+        conexion.close()
 
 
 def crear_base_datos() -> None:
@@ -196,6 +289,16 @@ def crear_base_datos() -> None:
     migrar_objetivos_campos(cursor)
     migrar_pasadas_campos(cursor)
     _crear_admin_si_no_existe(cursor)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER PRIMARY KEY,
+            fecha_aplicacion TEXT NOT NULL
+        )
+    """)
+    cursor.execute(
+        "INSERT OR IGNORE INTO schema_version (version, fecha_aplicacion) VALUES (?, date('now'))",
+        (SCHEMA_VERSION,),
+    )
 
     conexion.commit()
     conexion.close()
@@ -225,9 +328,11 @@ def migrar_feriados() -> None:
         if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
             print("ℹ️ Tabla feriados ya existe")
         else:
+            logger.exception("Error en migración de feriados")
             print(f"⚠️ Error en migración feriados: {e}")
             conexion.rollback()
     except Exception as e:
+        logger.exception("Error inesperado en migrar_feriados")
         print(f"❌ Error inesperado en migrar_feriados: {e}")
         conexion.rollback()
     finally:
@@ -253,9 +358,11 @@ def migrar_supervisor3() -> None:
         if "duplicate column" in str(e).lower():
             print("ℹ️ Columna supervisor3_id ya existe")
         else:
+            logger.exception("Error en migración supervisor3")
             print(f"⚠️ Error en migración supervisor3: {e}")
             conexion.rollback()
     except Exception as e:
+        logger.exception("Error inesperado en migrar_supervisor3")
         print(f"❌ Error inesperado en migrar_supervisor3: {e}")
         conexion.rollback()
     finally:
@@ -282,9 +389,11 @@ def migrar_supervisores_alta_baja() -> None:
             if "duplicate column" in str(e).lower():
                 print(f"ℹ️ Columna {columna_def.split()[0]} ya existe")
             else:
+                logger.exception("Error en migración de columna %s", columna_def)
                 print(f"⚠️ Error en migración {columna_def}: {e}")
                 conexion.rollback()
         except Exception as e:
+            logger.exception("Error inesperado en migración de columna %s", columna_def)
             print(f"❌ Error inesperado en migración: {e}")
             conexion.rollback()
 
@@ -318,9 +427,11 @@ def migrar_usuarios_activo() -> None:
         if "duplicate column" in str(e).lower():
             print("ℹ️ Columna activo ya existe")
         else:
+            logger.exception("Error en migración usuarios_activo")
             print(f"⚠️ Error en migración usuarios_activo: {e}")
             conexion.rollback()
     except Exception as e:
+        logger.exception("Error inesperado en migrar_usuarios_activo")
         print(f"❌ Error inesperado en migrar_usuarios_activo: {e}")
         conexion.rollback()
     finally:

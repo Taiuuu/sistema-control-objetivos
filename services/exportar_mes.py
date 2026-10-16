@@ -8,6 +8,10 @@ import sqlite3
 import calendar
 import datetime
 from database.db import DB_PATH
+from services.backup import crear_backup
+import logging
+
+logger = logging.getLogger("vesp.exportar_mes")
 
 
 def exportar_mes_json(anio: int, mes: int, ruta: str) -> None:
@@ -96,63 +100,91 @@ def importar_mes_json(ruta: str) -> str:
     ultimo_dia = f"{anio}-{mes:02d}-{calendar.monthrange(anio, mes)[1]:02d}"
 
     conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
+    importacion_confirmada = False
+    try:
+        crear_backup("pre_importacion", conexion_origen=conexion)
+        cursor = conexion.cursor()
+        conexion.execute("BEGIN")
 
-    obj_id_map = {}
-    for o in datos.get("objetivos", []):
-        cursor.execute("SELECT id FROM objetivos WHERE nombre = ?", (o["nombre"],))
-        row = cursor.fetchone()
-        if row:
-            obj_id_map[o["id"]] = row[0]
-        else:
-            cursor.execute("""
-                INSERT INTO objetivos (nombre, fecha_inicio, fecha_fin, dias_semana)
-                VALUES (?, ?, ?, ?)
-            """, (o["nombre"], o.get("fecha_inicio"), o.get("fecha_fin"), o.get("dias_semana", "1,2,3,4,5")))
-            obj_id_map[o["id"]] = cursor.lastrowid
+        obj_id_map = {}
+        for o in datos.get("objetivos", []):
+            cursor.execute("SELECT id FROM objetivos WHERE nombre = ?", (o["nombre"],))
+            row = cursor.fetchone()
+            if row:
+                obj_id_map[o["id"]] = row[0]
+            else:
+                cursor.execute("""
+                    INSERT INTO objetivos (nombre, fecha_inicio, fecha_fin, dias_semana)
+                    VALUES (?, ?, ?, ?)
+                """, (o["nombre"], o.get("fecha_inicio"), o.get("fecha_fin"),
+                      o.get("dias_semana", "1,2,3,4,5")))
+                obj_id_map[o["id"]] = cursor.lastrowid
 
-    sup_id_map = {}
-    for s in datos.get("supervisores", []):
-        cursor.execute("SELECT id FROM supervisores WHERE nombre = ?", (s["nombre"],))
-        row = cursor.fetchone()
-        if row:
-            sup_id_map[s["id"]] = row[0]
-        else:
-            cursor.execute("INSERT INTO supervisores (nombre) VALUES (?)", (s["nombre"],))
-            sup_id_map[s["id"]] = cursor.lastrowid
+        sup_id_map = {}
+        for s in datos.get("supervisores", []):
+            cursor.execute("SELECT id FROM supervisores WHERE nombre = ?", (s["nombre"],))
+            row = cursor.fetchone()
+            if row:
+                sup_id_map[s["id"]] = row[0]
+            else:
+                cursor.execute("INSERT INTO supervisores (nombre) VALUES (?)", (s["nombre"],))
+                sup_id_map[s["id"]] = cursor.lastrowid
 
-    cursor.execute("DELETE FROM pasadas WHERE fecha >= ? AND fecha <= ?", (primer_dia, ultimo_dia))
-    pasadas_importadas = 0
-    for p in datos.get("pasadas", []):
-        obj_local = obj_id_map.get(p["objetivo_id"])
-        sup_local = sup_id_map.get(p["supervisor_id"])
-        if obj_local and sup_local:
-            cursor.execute("""
-                INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id)
-                VALUES (?, ?, ?, ?, ?)
-            """, (p["fecha"], p.get("hora"), p["turno"], obj_local, sup_local))
-            pasadas_importadas += 1
+        cursor.execute("DELETE FROM pasadas WHERE fecha >= ? AND fecha <= ?",
+                       (primer_dia, ultimo_dia))
+        pasadas_importadas = 0
+        for p in datos.get("pasadas", []):
+            obj_local = obj_id_map.get(p["objetivo_id"])
+            sup_local = sup_id_map.get(p["supervisor_id"])
+            if obj_local and sup_local:
+                cursor.execute("""
+                    INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (p["fecha"], p.get("hora"), p["turno"], obj_local, sup_local))
+                pasadas_importadas += 1
 
-    cursor.execute("DELETE FROM equipos WHERE fecha >= ? AND fecha <= ?", (primer_dia, ultimo_dia))
-    equipos_importados = 0
-    for e in datos.get("equipos", []):
-        sup1_local = sup_id_map.get(e["supervisor1_id"])
-        sup2_local = sup_id_map.get(e["supervisor2_id"])
-        if sup1_local and sup2_local:
-            cursor.execute("""
-                INSERT INTO equipos (fecha, turno, supervisor1_id, supervisor2_id)
-                VALUES (?, ?, ?, ?)
-            """, (e["fecha"], e["turno"], sup1_local, sup2_local))
-            equipos_importados += 1
+        cursor.execute("DELETE FROM equipos WHERE fecha >= ? AND fecha <= ?",
+                       (primer_dia, ultimo_dia))
+        equipos_importados = 0
+        for e in datos.get("equipos", []):
+            sup1_local = sup_id_map.get(e["supervisor1_id"])
+            sup2_local = sup_id_map.get(e["supervisor2_id"])
+            if sup1_local and sup2_local:
+                cursor.execute("""
+                    INSERT INTO equipos (fecha, turno, supervisor1_id, supervisor2_id)
+                    VALUES (?, ?, ?, ?)
+                """, (e["fecha"], e["turno"], sup1_local, sup2_local))
+                equipos_importados += 1
 
-    cursor.execute("DELETE FROM notas WHERE fecha >= ? AND fecha <= ?", (primer_dia, ultimo_dia))
-    notas_importadas = 0
-    for n in datos.get("notas", []):
-        cursor.execute("INSERT INTO notas (fecha, nota) VALUES (?, ?)", (n["fecha"], n["nota"]))
-        notas_importadas += 1
-
-    conexion.commit()
-    conexion.close()
+        cursor.execute("DELETE FROM notas WHERE fecha >= ? AND fecha <= ?",
+                       (primer_dia, ultimo_dia))
+        notas_importadas = 0
+        for n in datos.get("notas", []):
+            cursor.execute("INSERT INTO notas (fecha, nota) VALUES (?, ?)",
+                           (n["fecha"], n["nota"]))
+            notas_importadas += 1
+        conexion.commit()
+        importacion_confirmada = True
+        try:
+            from services.importador.importacion import _exportar_pasadas_seguridad
+            _exportar_pasadas_seguridad(conexion, datos.get("pasadas", []))
+        except Exception as error_exportacion:
+            logger.exception(
+                "Importación JSON confirmada pero falló el CSV de seguridad"
+            )
+            raise RuntimeError(
+                "La importación quedó confirmada, pero no se generó el CSV "
+                f"de seguridad: {error_exportacion}"
+            ) from error_exportacion
+        logger.info("Importación JSON archivo=%s filas=%s resultado=correcto",
+                    ruta, pasadas_importadas)
+    except Exception:
+        if not importacion_confirmada:
+            conexion.rollback()
+            logger.exception("Importación JSON fallida archivo=%s", ruta)
+        raise
+    finally:
+        conexion.close()
 
     periodo_str = datetime.date(anio, mes, 1).strftime("%B %Y")
     return (

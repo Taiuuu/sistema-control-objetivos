@@ -7,6 +7,9 @@ from PyQt6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QTimer, pyqtSignal, QObject
 from typing import Callable, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class NotificadorDesktop(QObject):
@@ -27,6 +30,7 @@ class NotificadorDesktop(QObject):
             icon_path = ruta_asset("assets/VESP_logo_blanco.png")
             icon = QIcon(icon_path)
         except Exception:
+            logger.exception("No se pudo cargar el ícono de notificaciones")
             icon = QIcon()
         
         self.tray_icon = QSystemTrayIcon()

@@ -240,6 +240,7 @@ class AnalisisWorker(QObject):
                 self.conexion_bd,
                 forzar_sobrescritura=self.forzar_sobrescritura,
             )
+            resultado.archivo_origen = self.ruta_archivo
             self.finished.emit(resultado)
         except Exception as exc:
             self.error.emit(str(exc))

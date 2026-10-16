@@ -10,10 +10,15 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QPushButton,
     QDateEdit, QTimeEdit, QComboBox, QMessageBox, QDialog,
     QSpinBox, QLineEdit, QFileDialog, QMenu, QHeaderView
+    , QInputDialog
 )
 from PyQt6.QtCore import QDate, QTime
 
 from database.db import DB_PATH
+from services.operaciones_seguras import (
+    eliminar_pasadas_mes,
+    obtener_vista_previa_borrado_mes,
+)
 from services.sincronizacion import obtener_sincronizador
 from services.sesion import get_rol
 from services.validador_horas_limite import validar_hora_turno_nocturno
@@ -90,36 +95,39 @@ def _eliminar_pasada(pasada_id: int) -> None:
 
 def _eliminar_pasadas_por_fecha(fecha: str) -> int:
     conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
+    try:
+        from services.backup import crear_backup
+        crear_backup("manual", conexion_origen=conexion)
+        conexion.execute("BEGIN")
+        cursor = conexion.execute("DELETE FROM pasadas WHERE fecha = ?", (fecha,))
+        eliminadas = cursor.rowcount
+        conexion.commit()
+        return eliminadas
+    except Exception:
+        conexion.rollback()
+        import logging
+        logging.getLogger(__name__).exception(
+            "No se pudieron eliminar las pasadas del día %s", fecha
+        )
+        raise
+    finally:
+        conexion.close()
 
-    cursor.execute("DELETE FROM pasadas WHERE fecha = ?", (fecha,))
-    eliminadas = cursor.rowcount
 
-    conexion.commit()
-    conexion.close()
-    return eliminadas
-
-
-def _eliminar_pasadas_por_mes(año: int, mes: int) -> int:
+def _eliminar_pasadas_por_mes(año: int, mes: int, confirmacion: str) -> int:
     conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
+    try:
+        return eliminar_pasadas_mes(conexion, año, mes, confirmacion)
+    finally:
+        conexion.close()
 
-    # Calcular primer y último día del mes
-    from datetime import date
-    import calendar
-    
-    primer_dia = date(año, mes, 1)
-    ultimo_dia = date(año, mes, calendar.monthrange(año, mes)[1])
-    
-    cursor.execute(
-        "DELETE FROM pasadas WHERE fecha >= ? AND fecha <= ?",
-        (primer_dia.strftime('%Y-%m-%d'), ultimo_dia.strftime('%Y-%m-%d'))
-    )
-    eliminadas = cursor.rowcount
 
-    conexion.commit()
-    conexion.close()
-    return eliminadas
+def _vista_previa_pasadas_mes(año: int, mes: int) -> dict:
+    conexion = sqlite3.connect(DB_PATH)
+    try:
+        return obtener_vista_previa_borrado_mes(conexion, año, mes)
+    finally:
+        conexion.close()
 
 
 def _obtener_info_pasada(pasada_id: int):
@@ -654,7 +662,15 @@ class ListaPasadas(QWidget):
         if respuesta != QMessageBox.StandardButton.Yes:
             return
 
-        eliminadas = _eliminar_pasadas_por_fecha(fecha)
+        try:
+            eliminadas = _eliminar_pasadas_por_fecha(fecha)
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "No se borraron las pasadas",
+                f"No se pudo crear la copia previa o completar el borrado:\n{error}",
+            )
+            return
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id
 
@@ -687,17 +703,42 @@ class ListaPasadas(QWidget):
         ]
         mes_nombre = meses_nombres[mes_idx]
 
+        try:
+            vista = _vista_previa_pasadas_mes(año, mes)
+        except Exception as error:
+            QMessageBox.critical(self, "Error", f"No se pudo preparar la vista previa:\n{error}")
+            return
+
         respuesta = QMessageBox.question(
             self,
             "Confirmar eliminación masiva",
-            f"¿Seguro que querés eliminar TODAS las pasadas de {mes_nombre} {año}?",
+            f"Se eliminarán {vista['cantidad']} pasadas de {mes_nombre} {año}.\n"
+            f"Rango encontrado: {vista['fecha_desde'] or 'sin fechas'} a "
+            f"{vista['fecha_hasta'] or 'sin fechas'}.\n\n¿Continuar?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
         if respuesta != QMessageBox.StandardButton.Yes:
             return
 
-        eliminadas = _eliminar_pasadas_por_mes(año, mes)
+        confirmacion, aceptada = QInputDialog.getText(
+            self,
+            "Confirmación requerida",
+            f"Escribí {vista['mes']} para confirmar el borrado:",
+        )
+        if not aceptada or confirmacion != vista["mes"]:
+            QMessageBox.warning(self, "Borrado cancelado", "La confirmación no coincide.")
+            return
+
+        try:
+            eliminadas = _eliminar_pasadas_por_mes(año, mes, confirmacion)
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "No se borraron las pasadas",
+                f"No se pudo crear/verificar la copia previa o completar el borrado:\n{error}",
+            )
+            return
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id
 

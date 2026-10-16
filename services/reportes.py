@@ -16,9 +16,9 @@ Autor: VESP Organizations
 Versión: 2.0.0
 """
 
-import logging
 import datetime
 import calendar
+import logging
 from collections import defaultdict
 from typing import List, Dict, Optional, Tuple, Any
 
@@ -28,7 +28,6 @@ from .exceptions import (
     ReporteError, FechaInvalidaReporte, DatosInsuficientesReporte
 )
 
-# Configurar logger
 logger = logging.getLogger(__name__)
 
 
@@ -99,6 +98,7 @@ def _objetivo_corresponde_a_fecha(fecha: str, dias_semana_str: str) -> bool:
         return _obtener_dia_semana(fecha) in dias
 
     except Exception:
+        logger.exception("No se pudieron evaluar los días activos del objetivo")
         return False
 
 

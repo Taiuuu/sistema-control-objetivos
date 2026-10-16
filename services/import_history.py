@@ -1,6 +1,9 @@
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict, List
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_HISTORY_PATH = Path.home() / "VESP Control" / "import_history.json"
@@ -24,7 +27,8 @@ def obtener_historial() -> List[Dict[str, Any]]:
             datos = json.load(archivo)
             if isinstance(datos, list):
                 return datos
-    except Exception:
+    except (OSError, json.JSONDecodeError):
+        logger.exception("No se pudo leer el historial local de importaciones")
         return []
 
     return []

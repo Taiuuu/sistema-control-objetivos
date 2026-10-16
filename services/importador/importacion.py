@@ -27,9 +27,12 @@ from __future__ import annotations
 
 import json
 import logging
+import csv
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
+from core.configuracion import EXPORTS_DIR
+from services.backup import crear_backup
 from .modelos import (
     PasadaNormalizada,
     Problema,
@@ -48,6 +51,65 @@ from .duplicados import detectar_pasadas_existentes
 
 DIAS_RETENCION_HISTORICO = 10
 logger = logging.getLogger(__name__)
+
+
+def _exportar_pasadas_seguridad(conexion_bd, pasadas) -> None:
+    """Exporta los meses tocados tras el commit como CSV legible en Excel."""
+    meses = set()
+    for pasada in pasadas:
+        if isinstance(pasada, dict):
+            fecha = (
+                pasada.get("fecha_operativa")
+                or pasada.get("fecha_calendario")
+                or pasada.get("fecha")
+            )
+        else:
+            fecha = getattr(pasada, "fecha_operativa", None) or getattr(
+                pasada, "fecha_calendario", None
+            )
+        if isinstance(fecha, datetime):
+            fecha = fecha.date()
+        if isinstance(fecha, date):
+            meses.add(fecha.strftime("%Y-%m"))
+        elif isinstance(fecha, str) and len(fecha) >= 7:
+            meses.add(fecha[:7])
+    if not meses:
+        return
+
+    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    for mes in sorted(meses):
+        cursor = conexion_bd.execute(
+            """
+            SELECT p.*, o.nombre AS objetivo, s.nombre AS supervisor
+            FROM pasadas p
+            LEFT JOIN objetivos o ON o.id = p.objetivo_id
+            LEFT JOIN supervisores s ON s.id = p.supervisor_id
+            WHERE COALESCE(p.fecha_operativa, p.fecha) LIKE ?
+            ORDER BY p.fecha, p.hora
+            """,
+            (f"{mes}%",),
+        )
+        filas = cursor.fetchall()
+        columnas = [columna[0] for columna in cursor.description]
+        destino = EXPORTS_DIR / f"pasadas_{mes}.csv"
+        with destino.open("w", newline="", encoding="utf-8-sig") as archivo:
+            escritor = csv.writer(archivo)
+            escritor.writerow(columnas)
+            escritor.writerows(filas)
+        logger.info("CSV de seguridad exportado mes=%s filas=%s ruta=%s",
+                    mes, len(filas), destino)
+
+    hoy = datetime.now().date()
+    indice_mes = hoy.year * 12 + hoy.month - 1 - 11
+    año_limite, mes_limite = divmod(indice_mes, 12)
+    limite = f"{año_limite:04d}-{mes_limite + 1:02d}"
+    for archivo in EXPORTS_DIR.glob("pasadas_*.csv"):
+        try:
+            mes_archivo = archivo.stem.removeprefix("pasadas_")
+            if mes_archivo < limite:
+                archivo.unlink()
+        except OSError:
+            logger.exception("No se pudo aplicar retención al CSV %s", archivo)
 
 
 # ============================================================================
@@ -89,6 +151,7 @@ def _serializar(valor: Any) -> str:
                 default=str,
             )
         except Exception:
+            logger.exception("No se pudo serializar un valor de auditoría")
             return str(valor)
 
     return str(valor)
@@ -1586,6 +1649,16 @@ def confirmar_importacion_completa(
             ),
         }
 
+    archivo_origen = getattr(
+        analisis, "archivo_origen", getattr(analisis, "nombre_archivo", "desconocido")
+    )
+    try:
+        crear_backup("pre_importacion", conexion_origen=conexion_bd)
+    except Exception:
+        logger.exception("Importación abortada: falló el backup previo de %s",
+                         archivo_origen)
+        raise
+
     # ------------------------------------------------------------------
     # 4. Cantidad de entidades antes de la transacción
     # ------------------------------------------------------------------
@@ -1760,6 +1833,24 @@ def confirmar_importacion_completa(
             f"se omitieron {omitidas} ya existentes."
         )
 
+        try:
+            _exportar_pasadas_seguridad(conexion_bd, analisis.pasadas)
+            logger.info(
+                "Importación completada archivo=%s filas=%s resultado=correcto",
+                archivo_origen, nuevas + actualizadas,
+            )
+        except Exception as error_exportacion:
+            logger.exception(
+                "Importación confirmada pero falló CSV de seguridad; "
+                "archivo=%s filas=%s",
+                archivo_origen, nuevas + actualizadas,
+            )
+            resumen["error_exportacion_seguridad"] = str(error_exportacion)
+            resumen["mensaje"] += (
+                " La importación quedó confirmada, pero falló la exportación "
+                "de seguridad; consultá el log."
+            )
+
         return resumen
 
     except Exception:
@@ -1773,6 +1864,10 @@ def confirmar_importacion_completa(
         except Exception:
             logger.exception("Falló el rollback; se propagará el error original.")
 
+        logger.exception(
+            "Importación fallida archivo=%s filas=%s",
+            archivo_origen, len(analisis.pasadas),
+        )
         raise
 
 

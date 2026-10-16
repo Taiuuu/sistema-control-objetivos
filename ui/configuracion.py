@@ -8,6 +8,10 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QFileDialog,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -15,6 +19,10 @@ from PyQt6.QtWidgets import (
 )
 
 from ui.theme.theme_manager import get_theme_manager
+from core.configuracion import (
+    establecer_ruta_backup_externo,
+    obtener_ruta_backup_externo,
+)
 
 
 class ThemeSelectionCard(QFrame):
@@ -196,6 +204,36 @@ class ConfiguracionDialog(QDialog):
             )
         root.addWidget(self.customize_menu_button)
 
+        backup_title = QLabel("Copias de seguridad")
+        backup_title.setStyleSheet(
+            "font-size: 16px; font-weight: 700; background: transparent;"
+        )
+        root.addWidget(backup_title)
+        backup_description = QLabel(
+            "Las copias verificadas permiten recuperar la base de datos. "
+            "La copia externa es opcional."
+        )
+        backup_description.setWordWrap(True)
+        root.addWidget(backup_description)
+        backup_buttons = QHBoxLayout()
+        self.create_backup_button = QPushButton("Crear copia ahora")
+        self.create_backup_button.clicked.connect(self._crear_backup)
+        self.external_backup_button = QPushButton("Elegir ruta de copia externa")
+        self.external_backup_button.clicked.connect(self._elegir_ruta_externa)
+        backup_buttons.addWidget(self.create_backup_button)
+        backup_buttons.addWidget(self.external_backup_button)
+        root.addLayout(backup_buttons)
+        self.external_backup_path = QLabel()
+        self.external_backup_path.setWordWrap(True)
+        root.addWidget(self.external_backup_path)
+        self.backup_list = QListWidget()
+        self.backup_list.setMinimumHeight(110)
+        root.addWidget(self.backup_list)
+        self.restore_backup_button = QPushButton("Restaurar copia seleccionada")
+        self.restore_backup_button.clicked.connect(self._restaurar_backup)
+        root.addWidget(self.restore_backup_button)
+        self._actualizar_backups()
+
         appearance_title = QLabel("Apariencia")
         appearance_title.setStyleSheet("font-size: 16px; font-weight: 700; background: transparent;")
         root.addWidget(appearance_title)
@@ -250,6 +288,90 @@ class ConfiguracionDialog(QDialog):
         self._manager.theme_changed.connect(self._apply_theme)
         self._apply_theme(self._manager.current())
         self._show_font_size(self._manager.font_size())
+        self._actualizar_ruta_externa()
+
+    def _actualizar_ruta_externa(self) -> None:
+        ruta = obtener_ruta_backup_externo()
+        self.external_backup_path.setText(
+            f"Copia externa: {ruta if ruta else 'No configurada'}"
+        )
+
+    def _actualizar_backups(self) -> None:
+        from services.backup import listar_backups
+
+        self.backup_list.clear()
+        for copia in listar_backups():
+            estado = "verificado" if copia["verificado"] else "NO verificado"
+            fila = QListWidgetItem(
+                f"{copia['fecha']:%d-%m-%Y %H:%M:%S} · {copia['motivo']} · "
+                f"{copia['tamaño'] / (1024 * 1024):.2f} MB · {estado}"
+            )
+            fila.setData(Qt.ItemDataRole.UserRole, str(copia["path"]))
+            fila.setData(Qt.ItemDataRole.UserRole + 1, copia["verificado"])
+            self.backup_list.addItem(fila)
+
+    def _crear_backup(self) -> None:
+        from services.backup import crear_backup
+
+        try:
+            ruta = crear_backup("manual")
+        except Exception as error:
+            QMessageBox.critical(self, "No se creó la copia", str(error))
+            return
+        self._actualizar_backups()
+        QMessageBox.information(self, "Copia creada", f"Copia verificada:\n{ruta}")
+
+    def _elegir_ruta_externa(self) -> None:
+        ruta = QFileDialog.getExistingDirectory(
+            self, "Elegir carpeta sincronizada para copias"
+        )
+        if not ruta:
+            return
+        try:
+            establecer_ruta_backup_externo(ruta)
+        except OSError as error:
+            QMessageBox.critical(
+                self, "No se guardó la ruta externa", str(error)
+            )
+            return
+        self._actualizar_ruta_externa()
+
+    def _restaurar_backup(self) -> None:
+        fila = self.backup_list.currentItem()
+        if fila is None or not fila.data(Qt.ItemDataRole.UserRole + 1):
+            QMessageBox.warning(
+                self, "Copia no disponible", "Seleccioná una copia verificada."
+            )
+            return
+        ruta = fila.data(Qt.ItemDataRole.UserRole)
+        respuesta = QMessageBox.question(
+            self,
+            "Confirmar restauración",
+            "La base actual será reemplazada. ¿Querés continuar?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if respuesta != QMessageBox.StandardButton.Yes:
+            return
+        confirmacion, aceptada = QInputDialog.getText(
+            self,
+            "Segunda confirmación",
+            "Escribí RESTAURAR para reemplazar la base:",
+        )
+        if not aceptada or confirmacion != "RESTAURAR":
+            QMessageBox.information(self, "Restauración cancelada", "No se modificó la base.")
+            return
+        from services.backup import restaurar_backup
+
+        try:
+            restaurar_backup(ruta)
+        except Exception as error:
+            QMessageBox.critical(self, "No se restauró la copia", str(error))
+            return
+        QMessageBox.information(
+            self,
+            "Restauración completada",
+            "La copia fue restaurada. Cerrá y volvé a abrir VESP para refrescar todas las vistas.",
+        )
 
     def _change_font_size(self, delta: int) -> None:
         next_size = self._manager.font_size() + delta

@@ -101,12 +101,16 @@ class TestErrorHandlingCritico:
         mock_login_window = MagicMock()
         mock_login.return_value = mock_login_window
 
-        # No debe lanzar SystemExit (debe continuar)
-        try:
-            iniciar_app()
-        except SystemExit as e:
-            # Si sale, debe ser con código 0 (normal)
-            assert e.code == 0
+        # Aislar el archivo de base para no abrir ni migrar datos reales.
+        with tempfile.TemporaryDirectory() as directorio_temporal:
+            with patch(
+                "scripts.main.DB_PATH",
+                os.path.join(directorio_temporal, "prueba.db"),
+            ):
+                try:
+                    iniciar_app()
+                except SystemExit as e:
+                    assert e.code == 0
 
     def test_mostrar_error_critico_fallback(self):
         """Mostrar error crítico debe funcionar incluso sin Qt - test mejorado."""

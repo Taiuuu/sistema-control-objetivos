@@ -6,8 +6,11 @@
 import hashlib
 import json
 import os
+import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 PALETAS_UI = {
@@ -331,6 +334,7 @@ def obtener_tema_actual() -> str:
         manager = obtener_tema_manager()
         return manager.tema_actual
     except Exception:
+        logger.exception("No se pudo determinar el tema actual; se usa el tema oscuro")
         return 'oscuro'
 
 def obtener_tema() -> Dict[str, Any]:

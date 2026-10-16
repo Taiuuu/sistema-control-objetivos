@@ -34,6 +34,7 @@ from __future__ import annotations
 import difflib
 import logging
 import re
+import sqlite3
 from datetime import date
 from typing import Any, Optional
 
@@ -199,7 +200,9 @@ def obtener_objetivos_bd(conexion_bd) -> list[ObjetivoBD]:
     objetivos = [ObjetivoBD(id=fila[0], nombre=fila[1]) for fila in cursor.fetchall()]
     try:
         cursor.execute("SELECT objetivo_id, nombre_alias FROM objetivos_aliases")
-    except Exception:
+    except sqlite3.OperationalError:
+        # Bases anteriores a la migración pueden no tener la tabla de alias.
+        logger.info("Tabla objetivos_aliases todavía no disponible")
         return objetivos
     por_id = {objetivo.id: objetivo for objetivo in objetivos}
     for objetivo_id, alias in cursor.fetchall():

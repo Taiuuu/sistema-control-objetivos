@@ -313,6 +313,9 @@ class ResultadoAnalisis:
     pasadas_duplicadas: int = 0
     """Cantidad de pasadas descartadas por duplicados.detectar_duplicados_internos()."""
 
+    archivo_origen: str | None = None
+    """Ruta del archivo de origen para trazabilidad al confirmar la importación."""
+
     # ------------------------------------------------------------------
     # Estado derivado
     # ------------------------------------------------------------------
