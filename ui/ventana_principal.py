@@ -48,13 +48,17 @@ logger = logging.getLogger(__name__)
 from ui.theme.stylesheet import generate_date_edit_dropdown_stylesheet
 from ui.theme.tokens import THEMES
 from ui.theme.colors import parse_color
-from services.permisos import tiene_permiso
+from services.permisos import obtener_permisos_rol
 from services.backup import hacer_backup
 from services.logger import registrar_accion
 from services.assets import ruta_asset
 from services.sincronizacion import obtener_sincronizador
 from services.usuarios import get_username_by_id
-from services.menu_config import obtener_menu_usuario, guardar_menu_usuario
+from services.menu_config import (
+    obtener_claves_menu_permitidas,
+    obtener_menu_usuario,
+    guardar_menu_usuario,
+)
 from services.sesion import actualizar_actividad_sesion, cerrar_sesion, TIEMPO_INACTIVIDAD_MAXIMA
 from database.db import DB_PATH
 
@@ -200,6 +204,9 @@ class VentanaPrincipal(QWidget):
         self._metricas_colapsadas = False
         self._boton_activo      = None
         self._menu_visible = obtener_menu_usuario(usuario_id)
+        self._claves_menu_permitidas = obtener_claves_menu_permitidas(
+            rol, obtener_permisos_rol(str(rol or "").casefold())
+        )
 
         super().__init__()
         self.setWindowTitle("VESP Organizations")
@@ -374,6 +381,7 @@ class VentanaPrincipal(QWidget):
 
     def _construir_botones_menu(self):
         oscuro = self._oscuro
+        self._secciones_menu = {}
 
         def add_section(title):
             label = QLabel(title)
@@ -385,46 +393,101 @@ class VentanaPrincipal(QWidget):
             )
             self._secciones_sidebar.append(label)
             self.layout_scroll.addWidget(label)
+            self._secciones_menu[label] = []
+            return label
 
-        def add_btn(icono, texto, accion, tooltip_extra="", clave=None):
+        def add_btn(icono, texto, accion, tooltip_extra="", clave=None, seccion=None):
             b = BotonMenu(icono, texto, oscuro)
             b.setProperty("menu_key", clave or "")
             b.setToolTip(f"{texto}  {tooltip_extra}".strip())
             b.clicked.connect(lambda: self._activar_boton(b, accion))
             self._botones_menu.append(b)
             self.layout_scroll.addWidget(b)
-            if clave and not self._menu_visible.get(clave, True):
+            if seccion:
+                self._secciones_menu[seccion].append(b)
+            if clave and not self._es_menu_visible(clave):
                 b.hide()
             return b
 
-        add_section("OPERACIÓN")
-        self._btn_control   = add_btn("📋", "Control diario",     self._mostrar_dashboard,   "(Ctrl+B)", "control_diario")
-        self._btn_pasada    = add_btn("✅", "Registrar pasada",   self.abrir_form_pasada,    "(Ctrl+P)", "registrar_pasada")
-        self._btn_turno     = add_btn("🕐", "Registrar turno",    self.abrir_form_turno,     "(Ctrl+T)", "registrar_turno")
+        operacion = add_section("OPERACIÓN DIARIA")
+        self._btn_control = add_btn(
+            "📋", "Control diario", self._mostrar_dashboard, "(Ctrl+B)",
+            "control_diario", operacion,
+        )
+        self._btn_pasada = add_btn(
+            "✅", "Registrar pasada", self.abrir_form_pasada, "(Ctrl+P)",
+            "registrar_pasada", operacion,
+        )
+        self._btn_turno = add_btn(
+            "🕐", "Registrar turno", self.abrir_form_turno, "(Ctrl+T)",
+            "registrar_turno", operacion,
+        )
+        add_btn(
+            "📝", "Notas del día", self.abrir_notas, "(Ctrl+N)",
+            "notas", operacion,
+        )
 
-        add_section("GESTIÓN")
-        self._btn_add_obj = add_btn("➕", "Agregar objetivo",    self.abrir_form_objetivo,  "(Ctrl+O)", "agregar_objetivo")
-        add_btn("📍", "Ver objetivos",       self.abrir_lista_objetivos, clave="ver_objetivos")
-        self._btn_add_sup = add_btn("👤", "Agregar supervisor",  self.abrir_form_supervisor, "(Ctrl+S)", "agregar_supervisor")
-        add_btn("👥", "Ver supervisores",    self.abrir_lista_supervisores, clave="ver_supervisores")
+        consultas = add_section("CONSULTAS Y REPORTES")
+        add_btn("🔍", "Ver pasadas", self.abrir_lista_pasadas, clave="ver_pasadas", seccion=consultas)
+        add_btn("🏖️", "Feriados", self.abrir_feriados, clave="feriados", seccion=consultas)
+        add_btn(
+            "📅", "Reporte mensual", self.abrir_reporte_mensual, "(Ctrl+R)",
+            "reporte_mensual", consultas,
+        )
+        add_btn(
+            "📅", "Reporte objetivo", self.abrir_reporte_mensual_objetivo, "(Ctrl+Ñ)",
+            "reporte_objetivo", consultas,
+        )
+        add_btn("💾", "Transferir datos", self.abrir_transferir_datos, clave="transferir_datos", seccion=consultas)
+        add_btn("📥", "Importar Excel", self.abrir_importar_excel, clave="importar_excel", seccion=consultas)
+        add_btn("❓", "Ayuda", self.abrir_ayuda, "(Ctrl+H)", "ayuda", consultas)
 
-        add_section("CONSULTAS")
-        add_btn("🔍", "Ver pasadas",         self.abrir_lista_pasadas, clave="ver_pasadas")
-        add_btn("🏖️", "Feriados",            self.abrir_feriados, clave="feriados")
-        add_btn("📝", "Notas del día",       self.abrir_notas,              "(Ctrl+N)", "notas")
-        add_btn("📅", "Reporte mensual",     self.abrir_reporte_mensual,    "(Ctrl+R)", "reporte_mensual")
-        add_btn("📅", "Reporte objetivo",    self.abrir_reporte_mensual_objetivo, "(Ctrl+Ñ)", "reporte_objetivo")
-        add_btn("💾", "Transferir datos",    self.abrir_transferir_datos, clave="transferir_datos")
-        add_btn("📥", "Importar Excel",      self.abrir_importar_excel, clave="importar_excel")
-        add_btn("❓", "Ayuda",               self.abrir_ayuda,              "(Ctrl+H)", "ayuda")
+        gestion = add_section("GESTIÓN")
+        self._btn_add_obj = add_btn(
+            "➕", "Agregar objetivo", self.abrir_form_objetivo, "(Ctrl+O)",
+            "agregar_objetivo", gestion,
+        )
+        add_btn(
+            "📍", "Ver objetivos", self.abrir_lista_objetivos,
+            clave="ver_objetivos", seccion=gestion,
+        )
+        self._btn_add_sup = add_btn(
+            "👤", "Agregar supervisor", self.abrir_form_supervisor, "(Ctrl+S)",
+            "agregar_supervisor", gestion,
+        )
+        add_btn(
+            "👥", "Ver supervisores", self.abrir_lista_supervisores,
+            clave="ver_supervisores", seccion=gestion,
+        )
 
-        if tiene_permiso('usuarios.ver'):
-            add_section("ADMINISTRACIÓN")
-            add_btn("⚙️",  "Gestionar usuarios", self.abrir_gestionar_usuarios, clave="gestionar_usuarios")
-            add_btn("📜",  "Historial",           self.abrir_logs, clave="logs")
-            add_btn("🔧",  "Optimización de BD",  self.abrir_indexacion, clave="optimizacion")
-            add_btn("🔎",  "Auditoría detallada", self.abrir_auditoria, clave="auditoria")
-            add_btn("🔄",  "Sincronización",      self.abrir_sincronizacion, clave="sincronizacion")
+        administracion = add_section("ADMINISTRACIÓN")
+        add_btn(
+            "⚙️", "Gestionar usuarios", self.abrir_gestionar_usuarios,
+            clave="gestionar_usuarios", seccion=administracion,
+        )
+        add_btn("📜", "Historial", self.abrir_logs, clave="logs", seccion=administracion)
+        add_btn("🔧", "Optimización de BD", self.abrir_indexacion, clave="optimizacion", seccion=administracion)
+        add_btn("🔎", "Auditoría detallada", self.abrir_auditoria, clave="auditoria", seccion=administracion)
+        add_btn("🔄", "Sincronización", self.abrir_sincronizacion, clave="sincronizacion", seccion=administracion)
+        self._actualizar_visibilidad_menu()
+
+    def _es_menu_visible(self, clave: str) -> bool:
+        return (
+            clave in self._claves_menu_permitidas
+            and self._menu_visible.get(clave, True)
+        )
+
+    def _actualizar_visibilidad_menu(self) -> None:
+        for boton in self._botones_menu:
+            clave = boton.property("menu_key")
+            boton.setVisible(not clave or self._es_menu_visible(clave))
+        for seccion, botones in self._secciones_menu.items():
+            seccion.setVisible(
+                self._sidebar_expandido
+                and any(not boton.isHidden() for boton in botones)
+            )
+        if hasattr(self, "_landing_cards"):
+            self._refrescar_tarjetas_landing()
 
     def _activar_boton(self, btn: BotonMenu, accion):
         if self._boton_activo and self._boton_activo is not btn:
@@ -508,15 +571,30 @@ class VentanaPrincipal(QWidget):
         layout = QVBoxLayout(dialogo)
         checks = {}
         etiquetas = {
-            "auditoria": "Auditoría detallada",
-            "sincronizacion": "Sincronización",
-            "optimizacion": "Optimización de BD",
+            "control_diario": "Control diario",
+            "registrar_pasada": "Registrar pasada",
+            "registrar_turno": "Registrar turno",
+            "agregar_objetivo": "Agregar objetivo",
+            "ver_objetivos": "Ver objetivos",
+            "agregar_supervisor": "Agregar supervisor",
+            "ver_supervisores": "Ver supervisores",
             "ver_pasadas": "Ver pasadas",
+            "notas": "Notas del día",
+            "feriados": "Feriados",
             "reporte_mensual": "Reporte mensual",
             "reporte_objetivo": "Reporte objetivo",
-            "notas": "Notas del día",
+            "transferir_datos": "Transferir datos",
+            "importar_excel": "Importar Excel",
+            "ayuda": "Ayuda",
+            "gestionar_usuarios": "Gestionar usuarios",
+            "logs": "Historial",
+            "optimizacion": "Optimización de BD",
+            "auditoria": "Auditoría detallada",
+            "sincronizacion": "Sincronización",
         }
         for clave, etiqueta in etiquetas.items():
+            if clave not in self._claves_menu_permitidas:
+                continue
             check = QCheckBox(etiqueta)
             check.setChecked(self._menu_visible.get(clave, True))
             checks[clave] = check
@@ -533,11 +611,7 @@ class VentanaPrincipal(QWidget):
             return
         self._menu_visible.update({clave: check.isChecked() for clave, check in checks.items()})
         guardar_menu_usuario(self.usuario_id, self._menu_visible)
-        for boton in self._botones_menu:
-            clave = boton.property("menu_key")
-            if clave:
-                boton.setVisible(self._menu_visible.get(clave, True))
-        self._refrescar_tarjetas_landing()
+        self._actualizar_visibilidad_menu()
 
     # -------------------------------------------------------------------------
     # PANEL DERECHO
@@ -656,7 +730,7 @@ class VentanaPrincipal(QWidget):
             self._landing_grid.removeWidget(tarjeta)
         indice = 0
         for tarjeta in self._landing_cards:
-            visible = self._menu_visible.get(tarjeta.property("menu_key"), True)
+            visible = self._es_menu_visible(tarjeta.property("menu_key"))
             tarjeta.setVisible(visible)
             if visible:
                 self._landing_grid.addWidget(
@@ -871,7 +945,7 @@ class VentanaPrincipal(QWidget):
         self.buscador.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.buscador.textChanged.connect(self.cargar_tabla)
 
-        self._btn_filtros = PillButton("Filtros", "secondary")
+        self._btn_filtros = PillButton("Más filtros", "secondary")
         self._btn_filtros.setCheckable(True)
         self._btn_filtros.setFixedWidth(100)
         self._btn_filtros.toggled.connect(self._alternar_panel_filtros)
@@ -891,8 +965,6 @@ class VentanaPrincipal(QWidget):
         panel_filtros_layout = QHBoxLayout(self._panel_filtros)
         panel_filtros_layout.setContentsMargins(0, 4, 0, 0)
         panel_filtros_layout.setSpacing(8)
-        panel_filtros_layout.addWidget(lbl_turno)
-        panel_filtros_layout.addWidget(self.filtro_turno)
         panel_filtros_layout.addWidget(lbl_sup)
         panel_filtros_layout.addWidget(self.filtro_supervisor)
         panel_filtros_layout.addWidget(lbl_estado)
@@ -914,6 +986,8 @@ class VentanaPrincipal(QWidget):
         fila.addWidget(self._boton_sig)
         fila.addSpacing(4)
         fila.addWidget(self.buscador)
+        fila.addWidget(lbl_turno)
+        fila.addWidget(self.filtro_turno)
         fila.addWidget(self._btn_filtros)
         fila.addWidget(self._btn_filtrar)
         tokens = self._theme_manager.tokens()
@@ -934,7 +1008,7 @@ class VentanaPrincipal(QWidget):
 
     def _alternar_panel_filtros(self, visible: bool) -> None:
         self._panel_filtros.setVisible(visible)
-        self._btn_filtros.setText("Ocultar filtros" if visible else "Filtros")
+        self._btn_filtros.setText("Menos filtros" if visible else "Más filtros")
         self._barra_filtros_widget.setFixedHeight(132 if visible else 78)
         self._contenido_filtros.adjustSize()
         self._barra_filtros_widget.updateGeometry()
@@ -1290,8 +1364,7 @@ class VentanaPrincipal(QWidget):
             self.btn_logout.setText("🚪  Cerrar sesión")
             for b in self._botones_menu:
                 b.expandir()
-            for label in self._secciones_sidebar:
-                label.show()
+            self._actualizar_visibilidad_menu()
         self.btn_configuracion.setToolTip("Configuración")
         self.btn_logout.setToolTip("Cerrar sesión")
 

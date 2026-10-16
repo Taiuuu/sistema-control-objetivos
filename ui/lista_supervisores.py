@@ -313,6 +313,16 @@ class ListaSupervisores(QWidget):
         lay.addWidget(botones)
         if dialogo.exec() == QDialog.DialogCode.Accepted:
             fecha_baja = date_edit.date().toString("yyyy-MM-dd")
+            confirmar = QMessageBox.question(
+                self,
+                "Confirmar baja",
+                f"¿Dar de baja a <b>{nombre}</b> desde el "
+                f"{date_edit.date().toString('dd/MM/yyyy')}? "
+                "El supervisor quedará inactivo y podrá reactivarse luego.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if confirmar != QMessageBox.StandardButton.Yes:
+                return
             dar_de_baja_supervisor(sup_id, fecha_baja)
             from services.logger import registrar_accion
             from services.sesion import get_usuario_id

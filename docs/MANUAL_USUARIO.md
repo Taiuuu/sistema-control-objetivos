@@ -37,11 +37,12 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 
 ## 📋 FUNCIONES PRINCIPALES
 
-### Dashboard
+### Control diario
 
-- **Ubicación**: Menú principal (botón "Dashboard")
+- **Ubicación**: Menú principal → "Control diario"
 - **Qué ves**: Resumen de objetivos, equipos, supervisores
 - **Para qué**: Vista general del estado del sistema
+- **Filtros**: Fecha, búsqueda y turno están visibles; supervisor y estado se encuentran en "Más filtros"
 
 ### Objetivos
 
@@ -63,9 +64,9 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 
 ### Configuración
 
-- **Tema**: Elegí una opción en Configuración → Temas
-- **Usuarios**: Menú → "Gestionar Usuarios" (solo admin)
-- **Backup**: Menú → "Configuración" → "Hacer Backup"
+- **Tema y tamaño de letra**: Abrí "Configuración" desde la parte inferior del menú
+- **Módulos visibles**: En "Configuración" → "Personalizar módulos", ocultá o recuperá accesos disponibles para tu rol
+- **Administración**: Las opciones de usuarios, historial, auditoría y sincronización aparecen según los permisos del rol
 
 ---
 
@@ -145,7 +146,7 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 
 ### Validar Índices y Caché
 
-- Menú → "Configuración" → "Ver Índices" o "Ver Caché"
+- Menú → "Administración" → "Optimización de BD" (solo admin)
 - Estos son herramientas avanzadas
 
 ---

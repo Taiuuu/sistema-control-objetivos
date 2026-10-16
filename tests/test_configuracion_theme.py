@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QWidget
 
 from ui.configuracion import ConfiguracionDialog, ThemeSelectionCard
 from ui.theme.theme_manager import get_theme_manager
@@ -76,4 +76,23 @@ def test_font_controls_respect_manager_limits(app, tmp_path, monkeypatch):
     assert not dialog.increase_font_button.isEnabled()
 
     manager.set_font_size(original_size)
+    dialog.close()
+
+
+def test_menu_customization_is_available_from_configuration(app):
+    class Parent(QWidget):
+        def __init__(self):
+            super().__init__()
+            self.menu_opened = False
+
+        def _configurar_menu(self):
+            self.menu_opened = True
+
+    parent = Parent()
+    dialog = ConfiguracionDialog(parent)
+
+    assert dialog.customize_menu_button.isEnabled()
+    dialog.customize_menu_button.click()
+    assert parent.menu_opened
+
     dialog.close()

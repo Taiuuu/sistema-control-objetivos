@@ -28,6 +28,47 @@ MENU_POR_DEFECTO = {
     "sincronizacion": True,
 }
 
+MENU_PERMISOS = {
+    "control_diario": ("objetivos.ver", "pasadas.ver"),
+    "registrar_pasada": ("pasadas.crear",),
+    "registrar_turno": ("equipos.crear",),
+    "agregar_objetivo": ("objetivos.crear",),
+    "ver_objetivos": ("objetivos.ver",),
+    "agregar_supervisor": ("supervisores.crear",),
+    "ver_supervisores": ("supervisores.ver",),
+    "ver_pasadas": ("pasadas.ver",),
+    "notas": ("notas.ver",),
+    "reporte_mensual": ("reportes.ver",),
+    "reporte_objetivo": ("reportes.ver",),
+    "gestionar_usuarios": ("usuarios.ver",),
+    "logs": ("config.logs",),
+    "auditoria": ("auditoria.ver",),
+    "sincronizacion": ("config.sincronizacion",),
+}
+
+MENU_ROLES = {
+    "optimizacion": frozenset({"admin"}),
+    "transferir_datos": frozenset({"admin"}),
+    "importar_excel": frozenset({"admin", "supervisor"}),
+}
+
+
+def obtener_claves_menu_permitidas(rol: str | None, permisos: set[str]) -> set[str]:
+    """Devuelve módulos visibles según permisos existentes y su rol."""
+    rol_normalizado = (rol or "").casefold()
+    return {
+        clave
+        for clave in MENU_POR_DEFECTO
+        if (
+            not MENU_PERMISOS.get(clave)
+            or any(permiso in permisos for permiso in MENU_PERMISOS[clave])
+        )
+        and (
+            clave not in MENU_ROLES
+            or rol_normalizado in MENU_ROLES[clave]
+        )
+    }
+
 
 def obtener_menu_usuario(usuario_id: int | None) -> dict[str, bool]:
     if not usuario_id:

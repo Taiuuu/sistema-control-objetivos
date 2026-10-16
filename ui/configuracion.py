@@ -155,7 +155,7 @@ class ThemeSelectionCard(QFrame):
 
 
 class ConfiguracionDialog(QDialog):
-    """Preferencias de apariencia con selector de temas y tamaño de letra."""
+    """Preferencias de apariencia y navegación."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -174,6 +174,27 @@ class ConfiguracionDialog(QDialog):
         title = QLabel("Configuración")
         title.setStyleSheet("font-size: 22px; font-weight: 700; background: transparent;")
         root.addWidget(title)
+
+        navigation_title = QLabel("Navegación")
+        navigation_title.setStyleSheet(
+            "font-size: 16px; font-weight: 700; background: transparent;"
+        )
+        root.addWidget(navigation_title)
+        navigation_description = QLabel(
+            "Elegí qué módulos querés mantener visibles en el menú."
+        )
+        navigation_description.setWordWrap(True)
+        root.addWidget(navigation_description)
+        self.customize_menu_button = QPushButton("Personalizar módulos")
+        self.customize_menu_button.setAccessibleName("Personalizar módulos del menú")
+        if parent and hasattr(parent, "_configurar_menu"):
+            self.customize_menu_button.clicked.connect(parent._configurar_menu)
+        else:
+            self.customize_menu_button.setEnabled(False)
+            self.customize_menu_button.setToolTip(
+                "La personalización del menú requiere una sesión iniciada."
+            )
+        root.addWidget(self.customize_menu_button)
 
         appearance_title = QLabel("Apariencia")
         appearance_title.setStyleSheet("font-size: 16px; font-weight: 700; background: transparent;")
