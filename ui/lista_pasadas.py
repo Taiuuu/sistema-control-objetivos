@@ -9,8 +9,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTableWidget, QTableWidgetItem, QPushButton,
     QDateEdit, QTimeEdit, QComboBox, QMessageBox, QDialog,
-    QSpinBox, QLineEdit, QFileDialog
-    , QMenu
+    QSpinBox, QLineEdit, QFileDialog, QMenu, QHeaderView
 )
 from PyQt6.QtCore import QDate, QTime
 

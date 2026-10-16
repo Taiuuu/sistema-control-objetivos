@@ -1843,20 +1843,26 @@ class VentanaPrincipal(QWidget):
 
 
     def abrir_form_pasada(self) -> None:
-        self._abrir_ventana(
+        ventana = self._abrir_ventana(
             'form_pasada',
             FormPasada,
             fecha_inicial=self.selector_fecha.date().toString("yyyy-MM-dd"),
             on_close=self.cargar_tabla
         )
+        if not getattr(ventana, "_refresca_tabla_al_registrar", False):
+            ventana.pasada_registrada.connect(self.cargar_tabla)
+            ventana._refresca_tabla_al_registrar = True
 
 
     def abrir_form_turno(self) -> None:
-        self._abrir_ventana(
+        ventana = self._abrir_ventana(
             'form_turno',
             FormTurno,
             on_close=self.cargar_tabla
         )
+        if not getattr(ventana, "_refresca_tabla_al_registrar", False):
+            ventana.turno_registrado.connect(self.cargar_tabla)
+            ventana._refresca_tabla_al_registrar = True
 
 
     def abrir_lista_objetivos(self) -> None:

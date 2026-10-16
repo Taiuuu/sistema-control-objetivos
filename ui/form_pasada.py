@@ -42,8 +42,8 @@ def _cargar_objetivos(fecha: str = None) -> list:
     if not fecha:
         fecha = QDate.currentDate().toString("yyyy-MM-dd")
 
+    conexion = sqlite3.connect(DB_PATH)
     try:
-        conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
         cursor.execute("""
             SELECT o.id, o.nombre
@@ -61,20 +61,15 @@ def _cargar_objetivos(fecha: str = None) -> list:
             )
             ORDER BY o.nombre
         """, (fecha, fecha, fecha, fecha))
-        objetivos_filtrados = cursor.fetchall()
+        return cursor.fetchall()
+    finally:
         conexion.close()
-
-    except Exception as e:
-        print("Error cargando objetivos:", e)
-        return []
-
-    return objetivos_filtrados
 
 
 def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
     """Retorna supervisores asignados al turno."""
+    conexion = sqlite3.connect(DB_PATH)
     try:
-        conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
 
         cursor.execute("""
@@ -104,17 +99,9 @@ def _cargar_supervisores_del_turno(fecha: str, turno: str) -> list:
             fecha, turno,
             fecha, turno
         ))
-
-        supervisores = cursor.fetchall()
+        return cursor.fetchall()
+    finally:
         conexion.close()
-
-        if supervisores:
-            return supervisores
-
-    except Exception as e:
-        print("Error cargando supervisores:", e)
-
-    return []
 
 # =============================================================================
 # MEMORIA DEL ÚLTIMO TURNO
@@ -236,23 +223,39 @@ class FormPasada(QWidget):
 
         # Objetivos
         self.input_objetivo.clear()
-
-        objetivos = _cargar_objetivos(fecha)
-
-        for obj in objetivos:
-            self.input_objetivo.addItem(obj[1], obj[0])
-
-        # Supervisores
         self.input_supervisor.clear()
 
-        supervisores = _cargar_supervisores_del_turno(fecha, turno)
+        try:
+            objetivos = _cargar_objetivos(fecha)
+            supervisores = _cargar_supervisores_del_turno(fecha, turno)
+        except sqlite3.Error as error:
+            logger.exception("No se pudieron cargar los datos para registrar la pasada.")
+            self.input_objetivo.addItem("Error al cargar objetivos", None)
+            self.input_supervisor.addItem("Error al cargar supervisores", None)
+            self.input_objetivo.setToolTip(str(error))
+            self.input_supervisor.setToolTip(str(error))
+            return
 
-        for sup in supervisores:
-            if len(sup) >= 3:
-                label = f"Sup {sup[2]} - {sup[1]}"
-            else:
-                label = sup[1]
-            self.input_supervisor.addItem(label, sup[0])
+        if objetivos:
+            for obj in objetivos:
+                self.input_objetivo.addItem(obj[1], obj[0])
+        else:
+            self.input_objetivo.addItem(
+                "No hay objetivos activos en esta fecha", None
+            )
+
+        # Supervisores
+        if supervisores:
+            for sup in supervisores:
+                if len(sup) >= 3:
+                    label = f"Sup {sup[2]} - {sup[1]}"
+                else:
+                    label = sup[1]
+                self.input_supervisor.addItem(label, sup[0])
+        else:
+            self.input_supervisor.addItem(
+                "Registrá primero el equipo de este turno", None
+            )
 
     # =========================================================================
     # GUARDAR

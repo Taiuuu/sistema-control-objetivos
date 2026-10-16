@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QComboBox, QDateEdit, QMessageBox, QSizePolicy,
     QScrollArea, QFrame
 )
-from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtCore import QDate, Qt, pyqtSignal
 from ui.animaciones import animar_entrada
 from models.equipos import guardar_equipo_turno
 from ui.components import GlassCard, PillButton
@@ -21,6 +21,8 @@ def _cargar_supervisores() -> list:
 
 
 class FormTurno(QWidget):
+
+    turno_registrado = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -59,9 +61,19 @@ class FormTurno(QWidget):
         self.input_sup3.setFixedHeight(34)
         self._poblar_combo(self.input_sup3)
 
+        if len(self._supervisores) >= 2:
+            self.input_sup2.setCurrentIndex(1)
+        if len(self._supervisores) >= 3:
+            self.input_sup3.setCurrentIndex(2)
+
         self.btn_agregar_sup3 = PillButton("＋  Agregar supervisor", "secondary")
         self.btn_agregar_sup3.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_agregar_sup3.setFixedHeight(34)
+        if len(self._supervisores) < 3:
+            self.btn_agregar_sup3.setEnabled(False)
+            self.btn_agregar_sup3.setToolTip(
+                "Se necesitan al menos tres supervisores para agregar un tercero."
+            )
         self.btn_agregar_sup3.clicked.connect(self._mostrar_sup3)
 
         self.btn_quitar_sup3 = PillButton("✕ Quitar", "ghost")
@@ -87,6 +99,16 @@ class FormTurno(QWidget):
         self.boton_guardar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.boton_guardar.setFixedHeight(42)
         self.boton_guardar.clicked.connect(self._guardar)
+        if len(self._supervisores) < 2:
+            self.boton_guardar.setEnabled(False)
+            self._estado_supervisores = QLabel(
+                "Se necesitan al menos dos supervisores. "
+                "Agregalos desde la sección Gestión."
+            )
+            self._estado_supervisores.setObjectName("Subtitulo")
+            self._estado_supervisores.setWordWrap(True)
+        else:
+            self._estado_supervisores = None
 
         form_layout = QFormLayout()
         form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -105,6 +127,8 @@ class FormTurno(QWidget):
         card_layout.addLayout(form_layout)
         card_layout.addWidget(self.btn_agregar_sup3)
         card_layout.addWidget(self._fila_sup3)
+        if self._estado_supervisores is not None:
+            card_layout.addWidget(self._estado_supervisores)
         card_layout.addWidget(self.boton_guardar)
 
         layout_principal = QVBoxLayout(self)
@@ -126,6 +150,10 @@ class FormTurno(QWidget):
 
     def _poblar_combo(self, combo: QComboBox) -> None:
         combo.clear()
+        if not self._supervisores:
+            combo.addItem("No hay supervisores para seleccionar", None)
+            return
+
         for s in self._supervisores:
             if hasattr(s, "id") and hasattr(s, "nombre"):
                 combo.addItem(s.nombre, s.id)
@@ -167,5 +195,6 @@ class FormTurno(QWidget):
         except Exception as error:
             QMessageBox.critical(self, "Error", f"No se pudo guardar el turno: {error}")
             return
+        self.turno_registrado.emit()
         QMessageBox.information(self, "Listo", "Turno registrado correctamente.")
         self.close()
