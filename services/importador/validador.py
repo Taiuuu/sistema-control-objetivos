@@ -22,8 +22,8 @@ Lo que sí valida este módulo, con los datos que ya trae PasadaNormalizada:
 
   1. Objetivo sin nombre.
   2. Datos parciales inconsistentes: móvil sin supervisor, o supervisor sin móvil.
-  3. Hora fuera del rango horario esperado para el turno (D: 07:00-19:00,
-     N: 19:00-07:00, configurable vía `contexto`).
+  3. Hora fuera de la ventana general de los ciclos (D: 07:00-20:00,
+     N: 19:00-08:00, configurable vía `contexto`).
   4. Posible pasada en bloque de tabla incorrecto: dentro de una misma fila
      original, un bloque vacío seguido de un bloque no vacío más a la derecha.
      Requiere que PasadaNormalizada exponga un identificador de fila original
@@ -47,10 +47,10 @@ from .modelos import PasadaNormalizada, Problema
 # Configuración de rangos horarios por turno (punto 3)
 # ---------------------------------------------------------------------------
 
-# Turno D: 06:30 a 20:30 (varía por supervisor; el check es de orden
+# Turno D: 06:30 a 20:30 (cubre ambos horarios y tolerancias; el check es de orden
 # "regla de dedo" para detectar errores groseros, no un horario rígido de
 # producción).
-# Turno N: 18:30 a 08:30 (cruza medianoche).
+# Turno N: 18:30 a 08:30 (cubre ambos horarios y tolerancias).
 _RANGO_HORARIO_DEFAULT: dict[str, tuple[time, time]] = {
     "D": (time(6, 30), time(20, 30)),
     "N": (time(18, 30), time(8, 30)),

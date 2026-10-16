@@ -34,6 +34,7 @@ from typing import Any
 
 from core.configuracion import EXPORTS_DIR
 from services.backup import crear_backup
+from services.calculo_pasadas import mes_de_fecha_turno
 from .modelos import (
     PasadaNormalizada,
     Problema,
@@ -71,9 +72,11 @@ def _exportar_pasadas_seguridad(conexion_bd, pasadas) -> None:
         if isinstance(fecha, datetime):
             fecha = fecha.date()
         if isinstance(fecha, date):
-            meses.add(fecha.strftime("%Y-%m"))
+            anio, mes = mes_de_fecha_turno(fecha)
+            meses.add(f"{anio:04d}-{mes:02d}")
         elif isinstance(fecha, str) and len(fecha) >= 7:
-            meses.add(fecha[:7])
+            anio, mes = mes_de_fecha_turno(date.fromisoformat(fecha[:10]))
+            meses.add(f"{anio:04d}-{mes:02d}")
     if not meses:
         return
 

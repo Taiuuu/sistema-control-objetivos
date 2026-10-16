@@ -23,6 +23,12 @@ from dataclasses import dataclass
 
 from database.gestor_db import gestor_db
 from services.cache import cache_global
+from services.calculo_pasadas import (
+    fecha_de_turno,
+    fecha_hora_de_registro,
+    hora_corresponde_a_turno,
+    normalizar_turno,
+)
 from .exceptions import DataProviderError
 
 # Configurar logger
@@ -238,7 +244,7 @@ class SQLiteDataProvider(DataProvider):
             params = []
             
             if fecha:
-                query += " WHERE p.fecha = ?"
+                query += " WHERE COALESCE(p.fecha_operativa, p.fecha) = ?"
                 params.append(fecha)
             
             query += " ORDER BY p.fecha DESC, p.hora DESC LIMIT 100"
@@ -283,6 +289,16 @@ class SQLiteDataProvider(DataProvider):
             DataProviderError: Si hay error en inserción.
         """
         try:
+            turno = normalizar_turno(pasada.turno)
+            hora = fecha_hora_de_registro(pasada.fecha, pasada.hora).time()
+            if not hora_corresponde_a_turno(hora, turno):
+                raise ValueError(
+                    f"La hora {pasada.hora} no corresponde al turno {turno}"
+                )
+            fecha_operativa = fecha_de_turno(
+                fecha_hora_de_registro(pasada.fecha, pasada.hora),
+                turno,
+            ).isoformat()
             with gestor_db.transaction() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
@@ -290,8 +306,9 @@ class SQLiteDataProvider(DataProvider):
                        (fecha, hora, turno, supervisor_id, objetivo_id, notas, fecha_operativa)
                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
                     (pasada.fecha, pasada.hora, pasada.turno, pasada.supervisor_id,
-                     pasada.objetivo_id, pasada.notas, pasada.fecha_operativa)
+                     pasada.objetivo_id, pasada.notas, fecha_operativa)
                 )
+            pasada.fecha_operativa = fecha_operativa
             logger.info(f"Pasada creada para objetivo {pasada.objetivo_id}")
             return True
         except Exception as e:
@@ -385,10 +402,14 @@ class SQLiteDataProvider(DataProvider):
             offset = (pagina - 1) * por_pagina
             
             if fecha:
-                count_query = "SELECT COUNT(*) FROM pasadas WHERE fecha = ?"
+                count_query = (
+                    "SELECT COUNT(*) FROM pasadas "
+                    "WHERE COALESCE(fecha_operativa, fecha) = ?"
+                )
                 data_query = """SELECT id, fecha, hora, turno, supervisor_id, objetivo_id,
                                        notas, fecha_operativa FROM pasadas
-                                WHERE fecha = ? ORDER BY fecha DESC, hora DESC
+                                WHERE COALESCE(fecha_operativa, fecha) = ?
+                                ORDER BY fecha DESC, hora DESC
                                 LIMIT ? OFFSET ?"""
                 count_params = (fecha,)
                 data_params = (fecha, por_pagina, offset)
@@ -514,7 +535,10 @@ class SQLiteDataProvider(DataProvider):
             DataProviderError: Si hay error en consulta.
         """
         try:
-            query = "SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?"
+            query = (
+                "SELECT COUNT(*) FROM pasadas "
+                "WHERE COALESCE(fecha_operativa, fecha) = ? AND objetivo_id = ?"
+            )
             params = [fecha, objetivo_id]
             
             if turno:
@@ -545,7 +569,7 @@ class SQLiteDataProvider(DataProvider):
                         SUM(CASE WHEN turno IN ('Mañana', 'Tarde', 'Completo') THEN 1 ELSE 0 END) as dia,
                         SUM(CASE WHEN turno IN ('Noche', 'Completo') THEN 1 ELSE 0 END) as noche
                        FROM pasadas
-                       WHERE fecha = ? AND objetivo_id = ?"""
+                       WHERE COALESCE(fecha_operativa, fecha) = ? AND objetivo_id = ?"""
             
             resultado = gestor_db.ejecutar(query, (fecha, objetivo_id))
             
@@ -586,8 +610,10 @@ class SQLiteDataProvider(DataProvider):
             query = """SELECT
                         (SELECT COUNT(*) FROM objetivos) as total_objetivos,
                         (SELECT COUNT(*) FROM supervisores WHERE fecha_baja IS NULL) as supervisores,
-                        (SELECT COUNT(*) FROM pasadas WHERE fecha = date('now')) as hoy,
-                        (SELECT COUNT(*) FROM pasadas WHERE fecha >= date('now', '-7 days')) as semana"""
+                        (SELECT COUNT(*) FROM pasadas
+                         WHERE COALESCE(fecha_operativa, fecha) = date('now')) as hoy,
+                        (SELECT COUNT(*) FROM pasadas
+                         WHERE COALESCE(fecha_operativa, fecha) >= date('now', '-7 days')) as semana"""
             
             resultado = gestor_db.ejecutar(query)
             

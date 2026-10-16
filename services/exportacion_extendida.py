@@ -6,8 +6,9 @@
 import sqlite3
 import json
 import csv
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from database.db import DB_PATH
+from services.calculo_pasadas import rango_datetime_de_mes
 
 
 def exportar_pasadas_csv(anio: int, mes: int, ruta: str) -> None:
@@ -15,11 +16,11 @@ def exportar_pasadas_csv(anio: int, mes: int, ruta: str) -> None:
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     
-    # Rango del mes
-    from calendar import monthrange
-    total_dias = monthrange(anio, mes)[1]
-    fecha_inicio = f"{anio}-{mes:02d}-01"
-    fecha_fin = f"{anio}-{mes:02d}-{total_dias:02d}"
+    rango_inicio, rango_fin = rango_datetime_de_mes(
+        anio, mes, turno_noche_cruza=True
+    )
+    fecha_inicio = rango_inicio.date().isoformat()
+    fecha_fin = (rango_fin.date() - timedelta(days=1)).isoformat()
     
     cursor.execute("""
         SELECT COALESCE(p.fecha_operativa, p.fecha), p.hora, p.turno, o.nombre, s.nombre
@@ -75,10 +76,11 @@ def exportar_supervisor_mes_csv(supervisor_id: int, anio: int, mes: int, ruta: s
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
     
-    from calendar import monthrange
-    total_dias = monthrange(anio, mes)[1]
-    fecha_inicio = f"{anio}-{mes:02d}-01"
-    fecha_fin = f"{anio}-{mes:02d}-{total_dias:02d}"
+    rango_inicio, rango_fin = rango_datetime_de_mes(
+        anio, mes, turno_noche_cruza=True
+    )
+    fecha_inicio = rango_inicio.date().isoformat()
+    fecha_fin = (rango_fin.date() - timedelta(days=1)).isoformat()
     
     # Obtener nombre del supervisor
     cursor.execute("SELECT nombre FROM supervisores WHERE id = ?", (supervisor_id,))
@@ -87,11 +89,12 @@ def exportar_supervisor_mes_csv(supervisor_id: int, anio: int, mes: int, ruta: s
     
     # Obtener pasadas
     cursor.execute("""
-        SELECT p.fecha, p.hora, p.turno, o.nombre
+        SELECT COALESCE(p.fecha_operativa, p.fecha), p.hora, p.turno, o.nombre
         FROM pasadas p
         JOIN objetivos o ON p.objetivo_id = o.id
-        WHERE p.supervisor_id = ? AND p.fecha BETWEEN ? AND ?
-        ORDER BY p.fecha, p.hora
+        WHERE p.supervisor_id = ?
+          AND COALESCE(p.fecha_operativa, p.fecha) BETWEEN ? AND ?
+        ORDER BY COALESCE(p.fecha_operativa, p.fecha), p.hora
     """, (supervisor_id, fecha_inicio, fecha_fin))
     
     pasadas = cursor.fetchall()
@@ -135,14 +138,14 @@ def exportar_base_completa_json(ruta: str) -> None:
     ]
     
     # Último mes de pasadas
-    from datetime import date
     hoy = date.today()
+    fecha_inicio = (hoy - timedelta(days=30)).isoformat()
     cursor.execute("""
         SELECT p.fecha, p.hora, p.turno, p.objetivo_id, p.supervisor_id
         FROM pasadas p
-        WHERE p.fecha >= date('now', '-30 days')
+        WHERE COALESCE(p.fecha_operativa, p.fecha) >= ?
         ORDER BY p.fecha DESC, p.hora
-    """)
+    """, (fecha_inicio,))
     pasadas_recientes = [
         {
             'fecha': r[0],

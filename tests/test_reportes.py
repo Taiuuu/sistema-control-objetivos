@@ -59,6 +59,52 @@ class TestGenerarReporteMensual:
                 porcentaje = ((objetivo['dias_esperados'] - objetivo['dias_sin_control']) / objetivo['dias_esperados']) * 100
                 assert objetivo['cumplimiento'] == round(porcentaje, 1)
 
+    def test_reporte_objetivo_y_exportacion_comparten_conteo_mensual(
+        self, db_initialized, test_objetivo, admin_user, test_supervisor, monkeypatch
+    ):
+        fecha_turno = "2026-10-30"
+        conexion = sqlite3.connect(db_initialized)
+        conexion.execute(
+            """
+            INSERT INTO pasadas
+                (fecha, hora, turno, objetivo_id, supervisor_id, fecha_operativa)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "2026-10-31",
+                "02:00",
+                "nocturno",
+                test_objetivo["id"],
+                test_supervisor["id"],
+                fecha_turno,
+            ),
+        )
+        conexion.commit()
+        conexion.close()
+
+        import ui.reporte_objetivo as reporte_objetivo
+        from services.exportar import _obtener_datos_reporte
+
+        monkeypatch.setattr(reporte_objetivo, "DB_PATH", db_initialized)
+        reporte_mensual = generar_reporte_mensual(2026, 10)
+        por_objetivo = reporte_objetivo.calcular_reporte_objetivo(
+            2026, 10, test_objetivo["id"]
+        )
+        exportacion = _obtener_datos_reporte(2026, 10, reporte_mensual)
+
+        objetivo_mensual = next(
+            fila
+            for fila in reporte_mensual["objetivos"]
+            if fila["id"] == test_objetivo["id"]
+        )
+        assert objetivo_mensual["dias_con_pasada"] == 1
+        assert por_objetivo["resumen"]["dias_con_noche"] == 1
+        assert exportacion[0][1:] == (
+            objetivo_mensual["dias_con_pasada"],
+            objetivo_mensual["dias_sin_pasada"],
+            objetivo_mensual["cumplimiento_porcentaje"],
+        )
+
 
 class TestObtenerObjetivoDelDia:
     """Tests para obtención de objetivos del día."""

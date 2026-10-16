@@ -46,6 +46,12 @@ archivar copias previas repetidas (conserva la de menor ID y guarda las demás e
 previo y ejecuta altas, cambios y auditoría en una única transacción; una conciliación
 fallida revierte todas las escrituras.
 
+Los turnos operan en dos ciclos coordinados: DIA 07:00–19:00 con NOCHE 19:00–07:00,
+o DIA 08:00–20:00 con NOCHE 20:00–08:00. La hora no basta para distinguir los turnos
+en sus intervalos superpuestos; se respeta el turno informado. Las pasadas NOCHE
+anteriores a las 08:00 se atribuyen a la fecha de turno del día anterior. Ver
+[las reglas de cálculo](docs/reglas_de_calculo.md).
+
 ## Requisitos
 
 - Python 3.10 o superior.

@@ -7,6 +7,7 @@ import sqlite3
 import re
 from typing import Optional, Tuple
 from database.db import DB_PATH, conectar
+from services.calculo_pasadas import fecha_de_turno, fecha_hora_de_registro
 
 
 class ErrorValidacion(Exception):
@@ -248,6 +249,9 @@ def validar_pasada_no_duplicada(
         from datetime import datetime, timedelta
 
         hora_nueva = datetime.strptime(hora, "%H:%M:%S")
+        fecha_turno = fecha_de_turno(
+            fecha_hora_de_registro(fecha, hora), turno
+        ).isoformat()
         ventana_desde = (hora_nueva - timedelta(minutes=minutos_minimos)).strftime("%H:%M:%S")
         ventana_hasta = (hora_nueva + timedelta(minutes=minutos_minimos)).strftime("%H:%M:%S")
 
@@ -256,10 +260,14 @@ def validar_pasada_no_duplicada(
 
         query = """
             SELECT id FROM pasadas
-            WHERE fecha = ? AND objetivo_id = ? AND turno = ? AND supervisor_id = ?
+            WHERE COALESCE(fecha_operativa, fecha) = ?
+              AND objetivo_id = ? AND turno = ? AND supervisor_id = ?
             AND hora BETWEEN ? AND ?
         """
-        params = [fecha, objetivo_id, turno, supervisor_id, ventana_desde, ventana_hasta]
+        params = [
+            fecha_turno, objetivo_id, turno, supervisor_id,
+            ventana_desde, ventana_hasta,
+        ]
 
         if excluir_id:
             query += " AND id != ?"

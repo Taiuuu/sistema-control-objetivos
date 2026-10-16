@@ -290,25 +290,17 @@ class FormPasada(QWidget):
             mostrar_mensaje(self, "Error de validación", str(e), "warning")
             return
 
-        # Validar horas límite (07:00-07:59) para turnos nocturnos
+        # La hora no determina el turno cuando los ciclos se superponen.
         es_valida, sugerencia = validar_hora_turno_nocturno(fecha, hora, turno)
         
-        if not es_valida and sugerencia and sugerencia.get('tipo') == 'hora_limite':
-            respuesta = confirmar_mensaje(
+        if not es_valida:
+            mostrar_mensaje(
                 self,
-                "Hora límite de turno nocturno",
-                f"{sugerencia['razon']}\n\n"
-                f"Hora actual: {hora}\n"
-                f"Fecha actual: {fecha}\n"
-                f"{sugerencia['pregunta']}",
+                "Horario inválido",
+                sugerencia["razon"],
+                "warning",
             )
-
-            if respuesta:
-                fecha = sugerencia['fecha_sugerida']
-                mostrar_mensaje(self, "Fecha ajustada", f"La pasada se registrará con fecha: {fecha}\n"
-                                "(Correspondiente al turno nocturno anterior)", "success")
-            else:
-                mostrar_mensaje(self, "Fecha mantenida", f"La pasada se registrará en la fecha: {fecha}")
+            return
 
         try:
             registrar_turno(

@@ -17,6 +17,13 @@ from PyQt6.QtCore import Qt
 from services.background_task import run_background_task
 from services.exportar import exportar_excel, exportar_pdf
 from services.reportes import objetivo_corresponde, clasificar_cumplimiento
+from services.calculo_pasadas import (
+    fecha_de_turno,
+    fecha_hora_desde_fecha_turno,
+    indexar_pasadas_por_objetivo,
+    normalizar_turno,
+    rango_datetime_de_mes,
+)
 from database.db import DB_PATH
 from services.queries_tabla import cargar_supervisores
 from ui.components import StatusBadge
@@ -63,26 +70,60 @@ def calcular_reporte_objetivo(
     )
     periodos = cursor.fetchall()
 
+    rango_inicio, rango_fin = rango_datetime_de_mes(
+        anio, mes, turno_noche_cruza=True
+    )
+    fecha_inicio_turno = rango_inicio.date().isoformat()
+    fecha_fin_turno = (
+        rango_fin.date() - datetime.timedelta(days=1)
+    ).isoformat()
     cursor.execute(
         """
-        SELECT COALESCE(p.fecha_operativa, p.fecha) AS fecha,
-               p.turno, s.nombre
+        SELECT COALESCE(p.fecha_operativa, p.fecha) AS fecha_turno,
+               p.hora, p.turno, p.objetivo_id,
+               p.supervisor_id, s.nombre
         FROM pasadas p
         JOIN supervisores s ON p.supervisor_id = s.id
         WHERE COALESCE(p.fecha_operativa, p.fecha) BETWEEN ? AND ?
           AND p.objetivo_id = ?
           AND (? IS NULL OR p.supervisor_id = ?)
-        ORDER BY fecha, p.turno, s.nombre
+        ORDER BY p.fecha, p.hora, p.turno, s.nombre
         """,
-        (f"{anio}-{mes:02d}-01", f"{anio}-{mes:02d}-{total_dias:02d}", objetivo_id,
-         supervisor_id, supervisor_id),
+        (
+            fecha_inicio_turno,
+            fecha_fin_turno,
+            objetivo_id,
+            supervisor_id,
+            supervisor_id,
+        ),
     )
-    pasadas_por_fecha = {}
-    for fecha_pasada, turno_pasada, supervisor in cursor.fetchall():
-        turno_pasada = {"D": "diurno", "N": "nocturno"}.get(turno_pasada, turno_pasada)
-        pasadas_por_fecha.setdefault(fecha_pasada, {"diurno": [], "nocturno": []})
-        if turno_pasada in ("diurno", "nocturno"):
-            pasadas_por_fecha[fecha_pasada][turno_pasada].append(supervisor)
+    filas_pasadas = cursor.fetchall()
+    registros_pasadas = [
+        {
+            "fecha_hora": fecha_hora_desde_fecha_turno(
+                fila[0], fila[1], fila[2]
+            ),
+            "turno": fila[2],
+            "objetivo_id": fila[3],
+            "supervisor_id": fila[4],
+        }
+        for fila in filas_pasadas
+    ]
+    fechas_pasadas = indexar_pasadas_por_objetivo(
+        registros_pasadas, anio, mes, supervisor_id
+    ).get(objetivo_id, {"diurno": set(), "nocturno": set()})
+    nombres_por_fecha_turno = {}
+    for fila in filas_pasadas:
+        fecha_hora = fecha_hora_desde_fecha_turno(
+            fila[0], fila[1], fila[2]
+        )
+        turno_pasada = normalizar_turno(fila[2])
+        fecha_pasada = fecha_de_turno(fecha_hora, turno_pasada)
+        if (fecha_pasada.year, fecha_pasada.month) != (anio, mes):
+            continue
+        nombres_por_fecha_turno.setdefault(
+            (fecha_pasada, turno_pasada), []
+        ).append(fila[5])
 
     NOMBRES_DIA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
@@ -111,19 +152,23 @@ def calcular_reporte_objetivo(
         dias_esperados += 1
         nombre_dia = NOMBRES_DIA[fecha_dt.weekday()]
 
-        pasadas_fecha = pasadas_por_fecha.get(fecha, {"diurno": [], "nocturno": []})
-        supervisores_dia_nombres = pasadas_fecha["diurno"]
+        fecha_objetivo = fecha_dt.date()
+        supervisores_dia_nombres = nombres_por_fecha_turno.get(
+            (fecha_objetivo, "diurno"), []
+        )
         diurno_texto = "✔" if supervisores_dia_nombres else "✘"
         if supervisores_dia_nombres:
             diurno_texto = ", ".join(supervisores_dia_nombres)
 
-        supervisores_noche_nombres = pasadas_fecha["nocturno"]
+        supervisores_noche_nombres = nombres_por_fecha_turno.get(
+            (fecha_objetivo, "nocturno"), []
+        )
         nocturno_texto = "✔" if supervisores_noche_nombres else "✘"
         if supervisores_noche_nombres:
             nocturno_texto = ", ".join(supervisores_noche_nombres)
 
-        tuvo_dia = len(supervisores_dia_nombres) > 0
-        tuvo_noche = len(supervisores_noche_nombres) > 0
+        tuvo_dia = fecha_objetivo in fechas_pasadas["diurno"]
+        tuvo_noche = fecha_objetivo in fechas_pasadas["nocturno"]
 
         if tuvo_dia:
             dias_con_dia += 1

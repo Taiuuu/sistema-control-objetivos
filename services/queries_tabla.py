@@ -10,7 +10,10 @@ from database.gestor_db import gestor_db, con_cache
 # =============================================================================
 
 def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_id: int = None) -> int:
-    query = 'SELECT COUNT(*) FROM pasadas WHERE fecha = ? AND objetivo_id = ?'
+    query = (
+        'SELECT COUNT(*) FROM pasadas '
+        'WHERE COALESCE(fecha_operativa, fecha) = ? AND objetivo_id = ?'
+    )
     params = [fecha, objetivo_id]
     
     if turno:
@@ -147,7 +150,7 @@ def obtener_pasadas_fecha_rango(fecha_inicio: str, fecha_fin: str, objetivo_id: 
         FROM pasadas p
         JOIN objetivos o ON p.objetivo_id = o.id
         JOIN supervisores s ON p.supervisor_id = s.id
-        WHERE p.fecha BETWEEN ? AND ?
+        WHERE COALESCE(p.fecha_operativa, p.fecha) BETWEEN ? AND ?
     """
     params = [fecha_inicio, fecha_fin]
     
@@ -169,7 +172,8 @@ def obtener_estado_cobertura_dia(fecha: str) -> dict:
             COALESCE(SUM(CASE WHEN p.turno = 'nocturno' THEN 1 ELSE 0 END), 0) as pasadas_nocturno,
             COUNT(DISTINCT p.supervisor_id) as supervisores
         FROM objetivos o
-        LEFT JOIN pasadas p ON o.id = p.objetivo_id AND p.fecha = ?
+        LEFT JOIN pasadas p ON o.id = p.objetivo_id
+            AND COALESCE(p.fecha_operativa, p.fecha) = ?
         WHERE o.fecha_fin IS NULL OR o.fecha_fin >= ?
         GROUP BY o.id, o.nombre
         ORDER BY o.nombre
@@ -201,7 +205,8 @@ def batch_contar_pasadas(fecha: str, objetivo_ids: list[int]) -> dict:
     query = f"""
         SELECT objetivo_id, COUNT(*) as total
         FROM pasadas
-        WHERE fecha = ? AND objetivo_id IN ({placeholders})
+        WHERE COALESCE(fecha_operativa, fecha) = ?
+          AND objetivo_id IN ({placeholders})
         GROUP BY objetivo_id
     """
     
@@ -220,7 +225,7 @@ def obtener_resumen_diario(fecha: str) -> dict:
             COUNT(CASE WHEN turno = 'diurno' THEN 1 END) as pasadas_diurno,
             COUNT(CASE WHEN turno = 'nocturno' THEN 1 END) as pasadas_nocturno
         FROM pasadas
-        WHERE fecha = ?
+        WHERE COALESCE(fecha_operativa, fecha) = ?
     """
     
     resultados = gestor_db.ejecutar(query, (fecha,))

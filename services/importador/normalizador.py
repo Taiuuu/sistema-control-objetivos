@@ -16,6 +16,10 @@ from decimal import Decimal, InvalidOperation
 from datetime import date, time
 from typing import Any, NamedTuple, Optional
 
+from services.calculo_pasadas import (
+    fecha_calendario_de_turno,
+    fecha_de_turno,
+)
 from .modelos import Problema
 
 # ---------------------------------------------------------------------------
@@ -334,50 +338,17 @@ def resolver_turno_con_prioridad(
 # pasada de ese turno pertenece a la fecha operativa en la que comenzó el
 # turno (la fecha de la hoja).
 #
-# Los turnos nocturnos observados arrancan a las 19:00 o a las 20:00 según
-# el día, y terminan a las 07:00 u 08:00 del día siguiente. Para no atarse
-# a un horario de inicio exacto (que varía), se usa el mediodía (12:00)
-# como umbral: toda hora anterior a las 12:00 se interpreta como
-# madrugada del día siguiente; toda hora desde las 12:00 en adelante se
-# interpreta como parte de la noche de la fecha de la hoja. Esto cubre
-# ambos horarios de inicio reales (19:00 y 20:00) sin ambigüedad, ya que
-# no hay pasadas nocturnas esperables entre el mediodía y las 19:00.
-
-_UMBRAL_MADRUGADA = time(12, 0)
-
-
 def determinar_fecha_operativa_y_calendario(
     fecha_hoja: date, turno: str, hora: Optional[time]
 ) -> tuple[date, date]:
-    """Determina la fecha operativa y la fecha calendario de una pasada.
-
-    - Turno "D": fecha_operativa = fecha_calendario = fecha_hoja.
-    - Turno "N": fecha_operativa = fecha_hoja siempre.
-      fecha_calendario = fecha_hoja si la hora es >= 12:00 (noche de la
-      fecha de la hoja), o fecha_hoja + 1 día si la hora es < 12:00
-      (madrugada del día siguiente).
-
-    Si `hora` es None (no debería ocurrir para una pasada real, ya que
-    sin hora no hay pasada), se asume fecha_calendario = fecha_hoja como
-    valor por defecto conservador.
-
-    `turno` debe venir ya normalizado ("D" o "N"); un valor distinto
-    levanta ValueError, ya que esta función no es responsable de manejar
-    turnos inválidos (eso se resuelve antes, con normalizar_turno).
-    """
+    """Asigna fecha de turno y fecha calendario desde la fecha indicada por la hoja."""
     if turno not in ("D", "N"):
-        raise ValueError(
-            f"Turno '{turno}' inválido: se esperaba 'D' o 'N' ya normalizado."
-        )
-
-    if turno == "D":
-        return fecha_hoja, fecha_hoja
-
-    # Turno "N"
+        raise ValueError(f"Turno '{turno}' inválido: se esperaba 'D' o 'N'.")
     if hora is None:
         return fecha_hoja, fecha_hoja
 
-    if hora >= _UMBRAL_MADRUGADA:
-        return fecha_hoja, fecha_hoja
-
-    return fecha_hoja, fecha_hoja + datetime.timedelta(days=1)
+    fecha_calendario = fecha_calendario_de_turno(fecha_hoja, hora, turno)
+    fecha_operativa = fecha_de_turno(
+        datetime.datetime.combine(fecha_calendario, hora), turno
+    )
+    return fecha_operativa, fecha_calendario

@@ -20,7 +20,7 @@ def contar_pasadas(fecha, objetivo_id):
     cursor = conexion.cursor()
     cursor.execute('''
         SELECT COUNT(*) FROM pasadas
-        WHERE fecha = ? AND objetivo_id = ?
+        WHERE COALESCE(fecha_operativa, fecha) = ? AND objetivo_id = ?
     ''', (fecha, objetivo_id))
     resultado = cursor.fetchone()[0]
     conexion.close()
@@ -87,7 +87,9 @@ class TablaDiaria(QWidget):
         conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
         cursor.execute(
-            "SELECT objetivo_id, COUNT(*) FROM pasadas WHERE fecha = ? GROUP BY objetivo_id",
+            """SELECT objetivo_id, COUNT(*) FROM pasadas
+               WHERE COALESCE(fecha_operativa, fecha) = ?
+               GROUP BY objetivo_id""",
             (fecha,),
         )
         pasadas = dict(cursor.fetchall())

@@ -1554,9 +1554,9 @@ class VentanaPrincipal(QWidget):
         cursor = conexion.cursor()
         query = """
             SELECT objetivo_id, turno, COUNT(*)
-            FROM pasadas WHERE (fecha_operativa = ? OR fecha = ?)
+            FROM pasadas WHERE COALESCE(fecha_operativa, fecha) = ?
         """
-        params = [fecha, fecha]
+        params = [fecha]
         if supervisor_id:
             query += " AND supervisor_id = ?"
             params.append(supervisor_id)

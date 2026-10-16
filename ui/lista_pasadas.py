@@ -54,7 +54,7 @@ def _cargar_pasadas(
         FROM pasadas p
         JOIN objetivos o ON p.objetivo_id = o.id
         JOIN supervisores s ON p.supervisor_id = s.id
-        WHERE p.fecha = ?
+        WHERE COALESCE(p.fecha_operativa, p.fecha) = ?
     """
     params = [fecha]
 
@@ -99,7 +99,10 @@ def _eliminar_pasadas_por_fecha(fecha: str) -> int:
         from services.backup import crear_backup
         crear_backup("manual", conexion_origen=conexion)
         conexion.execute("BEGIN")
-        cursor = conexion.execute("DELETE FROM pasadas WHERE fecha = ?", (fecha,))
+        cursor = conexion.execute(
+            "DELETE FROM pasadas WHERE COALESCE(fecha_operativa, fecha) = ?",
+            (fecha,),
+        )
         eliminadas = cursor.rowcount
         conexion.commit()
         return eliminadas
@@ -337,22 +340,16 @@ class DialogoEditarPasada(QDialog):
         objetivo_nombre = self.input_objetivo.currentText()
         supervisor_nombre = self.input_supervisor.currentText()
 
-        # Validar horas límite (07:00-07:59) para turnos nocturnos
+        # La hora no determina el turno cuando los ciclos se superponen.
         es_valida, sugerencia = validar_hora_turno_nocturno(fecha, hora, turno)
         
-        if not es_valida and sugerencia and sugerencia.get('tipo') == 'hora_limite':
-            respuesta = QMessageBox.question(
+        if not es_valida:
+            QMessageBox.warning(
                 self,
-                "⚠️ Hora límite de turno nocturno",
-                f"{sugerencia['razon']}\n\n"
-                f"Hora actual: {hora}\n"
-                f"Fecha actual: {fecha}\n"
-                f"{sugerencia['pregunta']}",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                "Horario inválido",
+                sugerencia["razon"],
             )
-            
-            if respuesta == QMessageBox.StandardButton.Yes:
-                fecha = sugerencia['fecha_sugerida']
+            return
 
         _actualizar_pasada(
             self.pasada_id,

@@ -1,10 +1,10 @@
 # =============================================================================
-# VESP Organizations - Validador de Horas Límite de Turno Nocturno
-# Detecta horas críticas (07:00-07:59) y sugiere correcciones
+# VESP Organizations - Validador de horarios de turno
 # =============================================================================
 
 import datetime
 from typing import Tuple, Optional
+from services.calculo_pasadas import hora_corresponde_a_turno
 
 
 def _parsear_hora(hora: str) -> datetime.time:
@@ -23,9 +23,11 @@ def validar_hora_turno_nocturno(
     turno: str
 ) -> Tuple[bool, Optional[dict]]:
     """
-    Valida si una pasada nocturna está en el rango correcto.
+    Valida si la hora pertenece a alguno de los ciclos compatibles con el
+    turno declarado.
     
-    Detecta horas límite (07:00-07:59) y sugiere mover al día anterior.
+    DIA admite 07:00-20:00 y NOCHE 19:00-08:00, con los extremos superiores
+    excluidos. Las horas compartidas se resuelven con el turno declarado.
     
     Args:
         fecha: Fecha en formato YYYY-MM-DD
@@ -36,53 +38,30 @@ def validar_hora_turno_nocturno(
         Tupla (es_valida, sugerencia_dict)
         - es_valida: bool - True si está en rango válido
         - sugerencia_dict: dict con:
-            - 'tipo': 'hora_limite'
-            - 'fecha_sugerida': fecha del día anterior
-            - 'razon': explicación
-            - 'pregunta': texto de la pregunta
+            - Si la hora es válida para NOCHE, retorna (True, None).
+            - Si no, retorna una sugerencia de tipo 'hora_invalida'.
     
     Ejemplos:
         >>> validar_hora_turno_nocturno("2026-04-21", "07:12", "nocturno")
-        (False, {
-            'tipo': 'hora_limite',
-            'fecha_sugerida': '2026-04-20',
-            'razon': 'Hora fuera del rango nocturno estándar (00:00-06:59)',
-            'pregunta': '¿Deseas mover esta pasada al 20/04/2026?'
-        })
+        (True, None)  # Ciclo NOCHE 20:00-08:00
         
         >>> validar_hora_turno_nocturno("2026-04-21", "03:00", "nocturno")
         (True, None)  # Válida, está en 00:00-06:59
     """
     
-    if turno != 'nocturno':
-        return True, None
-    
     try:
-        fecha_obj = datetime.datetime.strptime(fecha, "%Y-%m-%d").date()
+        datetime.datetime.strptime(fecha, "%Y-%m-%d")
         hora_obj = _parsear_hora(hora)
         
-        # Rango válido: 00:00-06:59:59
-        if datetime.time(0, 0) <= hora_obj <= datetime.time(6, 59, 59):
+        if hora_corresponde_a_turno(hora_obj, turno):
             return True, None
-        
-        # Rango límite: 07:00-07:59:59
-        if datetime.time(7, 0) <= hora_obj < datetime.time(8, 0):
-            fecha_anterior = fecha_obj - datetime.timedelta(days=1)
-            
-            return False, {
-                'tipo': 'hora_limite',
-                'fecha_actual': fecha,
-                'fecha_sugerida': fecha_anterior.strftime("%Y-%m-%d"),
-                'hora': hora,
-                'razon': 'Esta pasada se registró a las 7+ AM, que típicamente corresponde al turno nocturno anterior',
-                'pregunta': f'¿Pertenece este registro al turno nocturno del {fecha_anterior.strftime("%d/%m/%Y")}?'
-            }
-        
-        # Fuera de rango completamente
+
         return False, {
             'tipo': 'hora_invalida',
             'hora': hora,
-            'razon': f'Hora {hora} está fuera del rango de turno nocturno (19:00-23:59 o 00:00-07:59)'
+            'razon': f'Hora {hora} no corresponde al turno {turno}. '
+                     'DIA admite 07:00-19:59 o NOCHE 19:00-07:59, '
+                     'segun el ciclo que figure en el registro.'
         }
         
     except Exception as e:
@@ -104,28 +83,15 @@ def sugerir_fecha_operativa(fecha: str, hora: str, turno: str) -> str:
         Fecha operativa en formato YYYY-MM-DD
     """
     
-    if turno == 'diurno':
-        return fecha
-    
-    fecha_obj = datetime.datetime.strptime(fecha, "%Y-%m-%d").date()
     hora_obj = _parsear_hora(hora)
-    
-    # Nocturno 19:00-23:59 → mismo día
-    if datetime.time(19, 0) <= hora_obj <= datetime.time(23, 59, 59):
-        return fecha
-    
-    # Nocturno 00:00-07:59 → día anterior (incluyendo horas límite)
-    if datetime.time(0, 0) <= hora_obj < datetime.time(8, 0):
-        fecha_anterior = fecha_obj - datetime.timedelta(days=1)
-        return fecha_anterior.strftime("%Y-%m-%d")
-    
-    # Si está fuera de rango, retornar fecha actual
-    return fecha
+    fecha_obj = datetime.datetime.strptime(fecha, "%Y-%m-%d").date()
+    return fecha_de_turno(
+        datetime.datetime.combine(fecha_obj, hora_obj), turno
+    ).isoformat()
 
 
 # Constantes para rangos
-RANGO_NOCTURNO_TEMPRANO = (datetime.time(0, 0), datetime.time(6, 59, 59))  # Nocturno madrugada
-RANGO_NOCTURNO_LIMITE = (datetime.time(7, 0), datetime.time(7, 59, 59))     # Horas límite (necesita validación)
+RANGO_NOCTURNO_TEMPRANO = (datetime.time(0, 0), datetime.time(7, 59, 59))  # Nocturno madrugada
 RANGO_NOCTURNO_NOCHE = (datetime.time(19, 0), datetime.time(23, 59, 59))    # Nocturno noche
 
-RANGO_DIURNO = (datetime.time(7, 0), datetime.time(18, 59, 59))  # Diurno
+RANGO_DIURNO = (datetime.time(7, 0), datetime.time(19, 59, 59))  # DIA: 07-19 o 08-20 según supervisor

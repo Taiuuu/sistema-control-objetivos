@@ -9,6 +9,11 @@ import calendar
 import datetime
 from database.db import DB_PATH
 from services.backup import crear_backup
+from services.calculo_pasadas import (
+    fecha_hora_desde_fecha_turno,
+    mes_de_pasada,
+    rango_datetime_de_mes,
+)
 import logging
 
 logger = logging.getLogger("vesp.exportar_mes")
@@ -18,19 +23,33 @@ def exportar_mes_json(anio: int, mes: int, ruta: str) -> None:
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
 
+    rango_inicio, rango_fin = rango_datetime_de_mes(
+        anio, mes, turno_noche_cruza=True
+    )
     primer_dia = f"{anio}-{mes:02d}-01"
     ultimo_dia = f"{anio}-{mes:02d}-{calendar.monthrange(anio, mes)[1]:02d}"
+    fecha_fin_turno = (
+        rango_fin.date() - datetime.timedelta(days=1)
+    ).isoformat()
 
     cursor.execute("""
         SELECT p.id, p.fecha, p.hora, p.turno, p.objetivo_id, p.supervisor_id,
-               o.nombre, s.nombre
+               o.nombre, s.nombre, COALESCE(p.fecha_operativa, p.fecha)
         FROM pasadas p
         JOIN objetivos o ON p.objetivo_id = o.id
         JOIN supervisores s ON p.supervisor_id = s.id
-        WHERE p.fecha >= ? AND p.fecha <= ?
+        WHERE COALESCE(p.fecha_operativa, p.fecha) BETWEEN ? AND ?
         ORDER BY p.fecha, p.hora
-    """, (primer_dia, ultimo_dia))
-    pasadas_raw = cursor.fetchall()
+    """, (rango_inicio.date().isoformat(), fecha_fin_turno))
+    pasadas_candidatas = cursor.fetchall()
+    pasadas_raw = [
+        pasada
+        for pasada in pasadas_candidatas
+        if mes_de_pasada(
+            fecha_hora_desde_fecha_turno(pasada[8], pasada[2], pasada[3]),
+            pasada[3],
+        ) == (anio, mes)
+    ]
 
     cursor.execute("""
         SELECT e.fecha, e.turno, e.supervisor1_id, e.supervisor2_id,

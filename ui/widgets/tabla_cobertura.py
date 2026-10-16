@@ -18,6 +18,11 @@ from ui.widgets.badges import BadgeEstado, BadgeNumero
 from ui.theme.colors import parse_color
 from ui.theme.stylesheet import generate_date_edit_dropdown_stylesheet
 from ui.theme.theme_manager import get_theme_manager
+from services.calculo_pasadas import (
+    contar_pasadas_por_objetivo_en_fecha,
+    fecha_hora_desde_fecha_turno,
+)
+from datetime import date
 
 
 def p(key: str, oscuro: bool) -> str:
@@ -457,29 +462,46 @@ class TablaCoberturaWidget(QWidget):
     def _obtener_pasadas_por_turno(self, fecha: str, supervisor_id: int = None) -> tuple:
         """Retorna diccionarios de pasadas por objetivo y turno."""
         conexion = sqlite3.connect(DB_PATH)
+        conexion.row_factory = sqlite3.Row
         cursor = conexion.cursor()
         
-        query = "SELECT objetivo_id, turno, COUNT(*) FROM pasadas WHERE COALESCE(fecha_operativa, fecha) = ?"
+        query = """
+            SELECT COALESCE(fecha_operativa, fecha) AS fecha_turno,
+                   hora, turno, objetivo_id, supervisor_id
+            FROM pasadas
+            WHERE COALESCE(fecha_operativa, fecha) = ?
+        """
         params = [fecha]
         
         if supervisor_id:
             query += " AND supervisor_id = ?"
             params.append(supervisor_id)
-        
-        query += " GROUP BY objetivo_id, turno"
         cursor.execute(query, params)
-        
+
+        pasadas = [
+            {
+                "fecha_hora": fecha_hora_desde_fecha_turno(
+                    fila["fecha_turno"], fila["hora"], fila["turno"]
+                ),
+                "turno": fila["turno"],
+                "objetivo_id": fila["objetivo_id"],
+                "supervisor_id": fila["supervisor_id"],
+            }
+            for fila in cursor.fetchall()
+        ]
+        conexion.close()
+
         pasadas_dia = {}
         pasadas_noche = {}
-        
-        for obj_id, turno, count in cursor.fetchall():
-            turno = {"D": "diurno", "N": "nocturno"}.get(turno, turno)
-            if turno == "diurno":
-                pasadas_dia[obj_id] = count
-            elif turno == "nocturno":
-                pasadas_noche[obj_id] = count
-        
-        conexion.close()
+        fecha_turno = date.fromisoformat(fecha)
+        for obj_id in {pasada["objetivo_id"] for pasada in pasadas}:
+            pasadas_dia[obj_id] = contar_pasadas_por_objetivo_en_fecha(
+                pasadas, obj_id, fecha_turno, "diurno"
+            )
+            pasadas_noche[obj_id] = contar_pasadas_por_objetivo_en_fecha(
+                pasadas, obj_id, fecha_turno, "nocturno"
+            )
+
         return pasadas_dia, pasadas_noche
 
     def _obtener_equipo(self, fecha: str, turno: str) -> str:

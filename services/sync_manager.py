@@ -11,6 +11,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 import threading
 from services.data_provider import get_data_provider, Pasada
+from services.calculo_pasadas import fecha_de_turno
 from services.gestor_turnos import GestorTurnos
 from services.config_app import sync_remoto_habilitado, ruta_sync_queue
 
@@ -148,10 +149,14 @@ class SyncManager:
             raise ValueError(f"Formato de hora inválido: {hora}")
 
         if validar_turno:
-            fecha_operativa_obj = GestorTurnos.calcular_fecha_operativa(fecha_obj, hora_obj, turno)
-            fecha_operativa = fecha_operativa_obj.strftime("%Y-%m-%d")
+            fecha_operativa_obj = GestorTurnos.calcular_fecha_operativa(
+                fecha_obj, hora_obj, turno
+            )
         else:
-            fecha_operativa = fecha
+            fecha_operativa_obj = fecha_de_turno(
+                datetime.combine(fecha_obj, hora_obj), turno
+            )
+        fecha_operativa = fecha_operativa_obj.strftime("%Y-%m-%d")
 
         pasada_data = {
             'fecha': fecha,

@@ -4,6 +4,7 @@
 # =============================================================================
 
 import logging
+import datetime
 from typing import List, Optional
 
 from database.gestor_db import gestor_db
@@ -24,7 +25,12 @@ from .validators import (
     validar_hora,
     validar_id
 )
-from services.logica_turnos import calcular_turno_y_fecha_operativa
+from services.calculo_pasadas import (
+    fecha_de_turno,
+    fecha_hora_desde_fecha_turno,
+    hora_corresponde_a_turno,
+    normalizar_turno,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +58,19 @@ def registrar_turno(
         supervisor_id = validar_id(supervisor_id, "supervisor_id")
         hora = validar_hora(hora)
 
-        turno_calculado, fecha_operativa = calcular_turno_y_fecha_operativa(fecha, hora)
+        turno_calculado = normalizar_turno(turno)
+        hora_obj = datetime.time.fromisoformat(hora)
+        if not hora_corresponde_a_turno(hora_obj, turno_calculado):
+            raise ValidationError(
+                "hora", f"{hora} no corresponde al turno {turno_calculado}"
+            )
+        fecha_operativa = fecha_de_turno(
+            datetime.datetime.combine(
+                datetime.date.fromisoformat(fecha),
+                hora_obj,
+            ),
+            turno_calculado,
+        )
 
         # Verificación de duplicado usando turno real calculado
         if _pasada_ya_existe(fecha_operativa.strftime("%Y-%m-%d"), objetivo_id, supervisor_id, turno_calculado, hora):
@@ -63,14 +81,15 @@ def registrar_turno(
 
             cursor.execute("""
                 INSERT INTO pasadas
-                (fecha, hora, turno, objetivo_id, supervisor_id)
-                VALUES (?, ?, ?, ?, ?)
+                (fecha, hora, turno, objetivo_id, supervisor_id, fecha_operativa)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 fecha_operativa.strftime("%Y-%m-%d"),
                 hora,
                 turno_calculado,
                 objetivo_id,
-                supervisor_id
+                supervisor_id,
+                fecha_operativa.strftime("%Y-%m-%d"),
             ))
 
             pasada_id = cursor.lastrowid
@@ -121,7 +140,7 @@ def listar_turnos_del_dia(fecha: str) -> List[Pasada]:
         resultados = gestor_db.ejecutar("""
             SELECT id, fecha, hora, turno, objetivo_id, supervisor_id
             FROM pasadas
-            WHERE fecha = ?
+            WHERE COALESCE(fecha_operativa, fecha) = ?
             ORDER BY hora ASC
         """, (fecha,))
 
@@ -260,9 +279,19 @@ def actualizar_pasada(
 
         nueva_hora = validar_hora(hora) if hora else pasada.hora
 
-        turno_calculado, fecha_operativa = calcular_turno_y_fecha_operativa(
-            pasada.fecha,
-            nueva_hora
+        turno_calculado = normalizar_turno(pasada.turno)
+        if not hora_corresponde_a_turno(
+            datetime.time.fromisoformat(nueva_hora), turno_calculado
+        ):
+            raise ValidationError(
+                "hora",
+                f"{nueva_hora} no corresponde al turno {turno_calculado}",
+            )
+        fecha_operativa = fecha_de_turno(
+            fecha_hora_desde_fecha_turno(
+                pasada.fecha, nueva_hora, turno_calculado
+            ),
+            turno_calculado,
         )
 
         with gestor_db.transaction() as conn:
@@ -270,11 +299,12 @@ def actualizar_pasada(
 
             cursor.execute("""
                 UPDATE pasadas
-                SET hora = ?, turno = ?, fecha = ?
+                SET hora = ?, turno = ?, fecha = ?, fecha_operativa = ?
                 WHERE id = ?
             """, (
                 nueva_hora,
                 turno_calculado,
+                fecha_operativa.strftime("%Y-%m-%d"),
                 fecha_operativa.strftime("%Y-%m-%d"),
                 pasada_id
             ))
@@ -293,6 +323,8 @@ def actualizar_pasada(
 
         return pasada
 
+    except ValidationError:
+        raise
     except Exception as e:
         logger.error(f"Error actualizando pasada: {e}")
         raise DatabaseError("UPDATE", str(e))
@@ -320,7 +352,7 @@ def _pasada_ya_existe(
         query = """
             SELECT 1
             FROM pasadas
-            WHERE fecha = ?
+            WHERE COALESCE(fecha_operativa, fecha) = ?
               AND objetivo_id = ?
               AND supervisor_id = ?
               AND turno = ?

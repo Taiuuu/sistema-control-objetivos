@@ -1,0 +1,206 @@
+{
+  "estado_verificacion": "SIN VERIFICAR: revisar a mano antes de confiar",
+  "fuente": "../CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx",
+  "periodo": {
+    "anio": 2026,
+    "mes": 10
+  },
+  "conteo_por_objetivo": {
+    "BARRIO CORTIJO RUTA 202": {
+      "diurno": 11,
+      "nocturno": 16
+    },
+    "BARRIO CORTIJO RUTA 8": {
+      "diurno": 10,
+      "nocturno": 14
+    },
+    "BARRIO EL FLORIDO": {
+      "diurno": 9,
+      "nocturno": 8
+    },
+    "BARRIO JARDINES DE SARAVI": {
+      "diurno": 10,
+      "nocturno": 7
+    },
+    "BARRIO PASEO ARRICAU": {
+      "diurno": 7,
+      "nocturno": 7
+    },
+    "BARRIO SOLAR AZUL": {
+      "diurno": 10,
+      "nocturno": 7
+    },
+    "CAM": {
+      "diurno": 14,
+      "nocturno": 10
+    },
+    "CAMPO RUSO": {
+      "diurno": 11,
+      "nocturno": 10
+    },
+    "CASA CULTURA Y ARTE": {
+      "diurno": 8,
+      "nocturno": 12
+    },
+    "CDI VILLA DE MAYO": {
+      "diurno": 9,
+      "nocturno": 7
+    },
+    "CEMENTERIO MUNICIPAL": {
+      "diurno": 14,
+      "nocturno": 9
+    },
+    "CENTRO DE ADICCIONES": {
+      "diurno": 13,
+      "nocturno": 9
+    },
+    "CENTRO INTEGRAL DE LA MUJER": {
+      "diurno": 10,
+      "nocturno": 8
+    },
+    "CENTRO MUNICIPAL DE ESTUDIOS": {
+      "diurno": 14,
+      "nocturno": 7
+    },
+    "CONCEJO DELIBERANTE (HCD)": {
+      "diurno": 11,
+      "nocturno": 13
+    },
+    "CORRALON GARITA": {
+      "diurno": 10,
+      "nocturno": 16
+    },
+    "CORRALON PORTON": {
+      "diurno": 12,
+      "nocturno": 13
+    },
+    "GRANJA P1": {
+      "diurno": 11,
+      "nocturno": 13
+    },
+    "GRANJA P2": {
+      "diurno": 7,
+      "nocturno": 10
+    },
+    "HOSPITAL VETERINARIO": {
+      "diurno": 13,
+      "nocturno": 8
+    },
+    "OBRA ALEM": {
+      "diurno": 3,
+      "nocturno": 8
+    },
+    "OBRA BRASIL": {
+      "diurno": 3,
+      "nocturno": 4
+    },
+    "OBRA CANGALLO": {
+      "diurno": 3,
+      "nocturno": 4
+    },
+    "OBRA CONESA": {
+      "diurno": 5,
+      "nocturno": 7
+    },
+    "OBRA ESTOMBA": {
+      "diurno": 4,
+      "nocturno": 6
+    },
+    "OBRA GENERAL RODRIGUEZ": {
+      "diurno": 1,
+      "nocturno": 2
+    },
+    "OBRA MEDRANO": {
+      "diurno": 4,
+      "nocturno": 14
+    },
+    "OBRA MERLO 1003 P2": {
+      "diurno": 1,
+      "nocturno": 4
+    },
+    "OBRA MERLO P1": {
+      "diurno": 0,
+      "nocturno": 1
+    },
+    "OBRA OMBU": {
+      "diurno": 1,
+      "nocturno": 0
+    },
+    "OBRA OMBU GRAND BOURG": {
+      "diurno": 4,
+      "nocturno": 1
+    },
+    "OBRA POLONIA": {
+      "diurno": 3,
+      "nocturno": 9
+    },
+    "OBRA POTOSI": {
+      "diurno": 5,
+      "nocturno": 7
+    },
+    "OBRA SESQUICENTENARIO": {
+      "diurno": 3,
+      "nocturno": 6
+    },
+    "OBRA TORTUGUITAS": {
+      "diurno": 4,
+      "nocturno": 8
+    },
+    "OBRA VILLA DE MAYO": {
+      "diurno": 5,
+      "nocturno": 3
+    },
+    "OBRADOR URUGUAY": {
+      "diurno": 10,
+      "nocturno": 8
+    },
+    "Obra merlo P1": {
+      "diurno": 1,
+      "nocturno": 0
+    },
+    "PALACIO MUNICIPAL": {
+      "diurno": 11,
+      "nocturno": 14
+    },
+    "PLANTA ASFALTICA": {
+      "diurno": 2,
+      "nocturno": 1
+    },
+    "PLANTA ASFÁLTICA": {
+      "diurno": 1,
+      "nocturno": 1
+    },
+    "POLIDEPORTIVO 9 DE JUIO": {
+      "diurno": 7,
+      "nocturno": 1
+    },
+    "POLIDEPORTIVO A. SOURDEAUX": {
+      "diurno": 8,
+      "nocturno": 9
+    },
+    "POLIDEPORTIVO BRAIAN TOLEDO": {
+      "diurno": 10,
+      "nocturno": 12
+    },
+    "POLIDEPORTIVO CRIM": {
+      "diurno": 15,
+      "nocturno": 6
+    },
+    "POLIDEPORTIVO GRAND BOURG": {
+      "diurno": 14,
+      "nocturno": 9
+    },
+    "POLIDEPORTIVO MARADONA": {
+      "diurno": 7,
+      "nocturno": 8
+    },
+    "POLIDEPORTIVO TIERRAS ALTAS": {
+      "diurno": 12,
+      "nocturno": 10
+    },
+    "Planta asfáltica": {
+      "diurno": 1,
+      "nocturno": 0
+    }
+  }
+}

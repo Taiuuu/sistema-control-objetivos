@@ -10,6 +10,13 @@ from wsgiref.simple_server import make_server, WSGIRequestHandler, WSGIServer
 from socketserver import ThreadingMixIn
 from database.db import DB_PATH
 from services.reportes import obtener_objetivos_del_dia
+from services.calculo_pasadas import (
+    contar_pasadas_por_objetivo_en_fecha,
+    fecha_de_turno,
+    fecha_hora_desde_fecha_turno,
+    hora_corresponde_a_turno,
+    normalizar_turno,
+)
 
 
 class ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
@@ -54,19 +61,37 @@ def _parse_request_body(env):
 
 def contar_pasadas(fecha: str, objetivo_id: int, turno: str = None, supervisor_id: int = None) -> int:
     conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-    query = "SELECT COUNT(*) FROM pasadas WHERE COALESCE(fecha_operativa, fecha) = ? AND objetivo_id = ?"
+    query = (
+        "SELECT COALESCE(fecha_operativa, fecha) AS fecha_turno, "
+        "hora, turno, objetivo_id, supervisor_id "
+        "FROM pasadas WHERE COALESCE(fecha_operativa, fecha) = ? "
+        "AND objetivo_id = ?"
+    )
     params = [fecha, objetivo_id]
-    if turno:
-        query += " AND turno = ?"
-        params.append({"D": "diurno", "N": "nocturno"}.get(turno, turno))
     if supervisor_id:
         query += " AND supervisor_id = ?"
         params.append(supervisor_id)
-    cursor.execute(query, params)
-    resultado = cursor.fetchone()[0]
-    conexion.close()
-    return resultado
+    try:
+        filas = conexion.execute(query, params).fetchall()
+        registros = [
+            {
+                "fecha_hora": fecha_hora_desde_fecha_turno(
+                    fila[0], fila[1], fila[2]
+                ),
+                "turno": fila[2],
+                "objetivo_id": fila[3],
+                "supervisor_id": fila[4],
+            }
+            for fila in filas
+        ]
+        return contar_pasadas_por_objetivo_en_fecha(
+            registros,
+            objetivo_id,
+            datetime.date.fromisoformat(fecha),
+            turno,
+        )
+    finally:
+        conexion.close()
 
 
 def obtener_estado_detallado(fecha: str, objetivo_id: int) -> dict:
@@ -94,11 +119,20 @@ def _insertar_pasada(data: dict) -> dict:
 
     conexion = sqlite3.connect(DB_PATH)
     cursor = conexion.cursor()
-    turno = {"D": "diurno", "N": "nocturno"}.get(data["turno"], data["turno"])
+    turno = normalizar_turno(data["turno"])
+    fecha_hora = fecha_hora_de_registro(data["fecha"], data["hora"])
+    if not hora_corresponde_a_turno(fecha_hora.time(), turno):
+        conexion.close()
+        return {
+            "error": f"La hora {data['hora']} no corresponde al turno {turno}"
+        }
+    fecha_operativa = fecha_de_turno(
+        fecha_hora, turno
+    ).isoformat()
     cursor.execute(
         "INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id, fecha_operativa) VALUES (?, ?, ?, ?, ?, ?)",
         (
-            data["fecha"],
+            fecha_operativa,
             data["hora"],
             turno,
             int(data["objetivo_id"]),

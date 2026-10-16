@@ -23,6 +23,11 @@ from collections import defaultdict
 from typing import List, Dict, Optional, Tuple, Any
 
 from database.gestor_db import gestor_db
+from services.calculo_pasadas import (
+    fecha_hora_desde_fecha_turno,
+    indexar_pasadas_por_objetivo,
+    rango_datetime_de_mes,
+)
 from services.feriados import es_feriado
 from .exceptions import (
     ReporteError, FechaInvalidaReporte, DatosInsuficientesReporte
@@ -244,7 +249,7 @@ def generar_reporte_diario(fecha: str) -> Dict[str, Any]:
             FROM pasadas p
             JOIN objetivos o ON p.objetivo_id = o.id
             JOIN supervisores s ON p.supervisor_id = s.id
-            WHERE p.fecha = ?
+            WHERE COALESCE(p.fecha_operativa, p.fecha) = ?
             ORDER BY p.hora, p.turno
         """
         
@@ -336,8 +341,13 @@ def generar_reporte_mensual(
         _validar_ano_mes(anio, mes)
         
         total_dias = calendar.monthrange(anio, mes)[1]
-        fecha_inicio = f"{anio}-{mes:02d}-01"
-        fecha_fin = f"{anio}-{mes:02d}-{total_dias:02d}"
+        rango_inicio, rango_fin = rango_datetime_de_mes(
+            anio, mes, turno_noche_cruza=True
+        )
+        fecha_inicio_turno = rango_inicio.date().isoformat()
+        fecha_fin_turno = (
+            rango_fin.date() - datetime.timedelta(days=1)
+        ).isoformat()
         
         # Obtener todos los objetivos
         objetivos = gestor_db.ejecutar(
@@ -366,22 +376,39 @@ def generar_reporte_mensual(
         
         # Obtener todas las pasadas del mes en una sola query (optimización)
         query_pasadas = """
-            SELECT COALESCE(fecha_operativa, fecha) AS fecha, objetivo_id, COUNT(*) as total
+            SELECT COALESCE(fecha_operativa, fecha) AS fecha_turno,
+                   hora, turno, objetivo_id, supervisor_id
             FROM pasadas
             WHERE COALESCE(fecha_operativa, fecha) BETWEEN ? AND ?
               AND (? IS NULL OR supervisor_id = ?)
-              AND (? IS NULL OR turno = ?)
-            GROUP BY fecha, objetivo_id
         """
         pasadas_raw = gestor_db.ejecutar(
             query_pasadas,
-            (fecha_inicio, fecha_fin, supervisor_id, supervisor_id, turno, turno),
+            (
+                fecha_inicio_turno,
+                fecha_fin_turno,
+                supervisor_id,
+                supervisor_id,
+            ),
         )
-        
-        # Indexar pasadas por objetivo y fecha
-        pasadas_por_objetivo = defaultdict(set)
-        for p in pasadas_raw:
-            pasadas_por_objetivo[p['objetivo_id']].add(p['fecha'])
+        registros_pasadas = [
+            {
+                "fecha_hora": fecha_hora_desde_fecha_turno(
+                    p["fecha_turno"], p["hora"], p["turno"]
+                ),
+                "turno": p["turno"],
+                "objetivo_id": p["objetivo_id"],
+                "supervisor_id": p["supervisor_id"],
+            }
+            for p in pasadas_raw
+        ]
+        indexado_por_turno = indexar_pasadas_por_objetivo(
+            registros_pasadas, anio, mes, supervisor_id, turno
+        )
+        pasadas_por_objetivo = {
+            objetivo_id: fechas["diurno"] | fechas["nocturno"]
+            for objetivo_id, fechas in indexado_por_turno.items()
+        }
         
         reporte = {
             'anio': anio,
@@ -428,7 +455,7 @@ def generar_reporte_mensual(
                 dias_esperados += 1
                 
                 # Verificar si hay pasada para este día
-                if fecha in pasadas_por_objetivo[obj_id]:
+                if fecha_dt.date() in pasadas_por_objetivo.get(obj_id, set()):
                     dias_con_pasada += 1
             
             # Calcular cumplimiento

@@ -3,10 +3,15 @@
 # Módulo de generación de gráficos y estadísticas OPTIMIZADO
 # =============================================================================
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from collections import defaultdict
 from database.gestor_db import gestor_db
 from services.cache import cache_global
+from services.calculo_pasadas import (
+    mes_de_fecha_turno,
+    normalizar_turno,
+    rango_datetime_de_mes,
+)
 
 
 @cache_global.auto_cache(ttl=300)
@@ -92,93 +97,84 @@ def obtener_cumplimiento_por_objetivo(anio: int, mes: int) -> list:
 
 @cache_global.auto_cache(ttl=600)
 def obtener_promedio_cumplimiento_mensual(anio: int) -> list:
-    """
-    Retorna promedio de cumplimiento por mes del año.
-    OPTIMIZADO: 1 sola query con todos los meses.
-    """
-    from calendar import monthrange
-    
-    # UNA SOLA QUERY para todo el año
+    """Retorna el promedio mensual usando fechas de turno persistidas."""
     query = """
-        SELECT 
-            strftime('%m', fecha) as mes,
-            COUNT(DISTINCT objetivo_id) as objetivos,
-            COUNT(*) as total_pasadas
+        SELECT COALESCE(fecha_operativa, fecha) AS fecha_turno
         FROM pasadas
-        WHERE strftime('%Y', fecha) = ?
-        GROUP BY strftime('%m', fecha)
-        ORDER BY mes
+        WHERE COALESCE(fecha_operativa, fecha) BETWEEN ? AND ?
     """
-    
-    resultados = gestor_db.ejecutar(query, (str(anio),))
-    
-    # Indexar por mes
-    datos_mes = {r['mes']: {'objetivos': r['objetivos'], 'pasadas': r['total_pasadas']} for r in resultados}
-    
-    # Obtener objetivos activos
+    resultados = gestor_db.ejecutar(
+        query, (f"{anio:04d}-01-01", f"{anio:04d}-12-31")
+    )
+    datos_mes = {}
+    for resultado in resultados:
+        _, mes = mes_de_fecha_turno(date.fromisoformat(resultado['fecha_turno']))
+        mes_str = f"{mes:02d}"
+        datos_mes[mes_str] = datos_mes.get(mes_str, 0) + 1
+
     objetivos = gestor_db.ejecutar("SELECT id, nombre, dias_semana FROM objetivos")
-    
+    nombres_meses = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ]
     datos = []
     for mes in range(1, 13):
-        mes_str = f"{mes:02d}"
-        datos_m = datos_mes.get(mes_str, {'objetivos': 0, 'pasadas': 0})
-        
-        # Calcular días esperados por objetivo
+        pasadas_mes = datos_mes.get(f"{mes:02d}", 0)
         dias_esperados = 0
         dias_controlados = 0
-        
-        for obj in objetivos:
-            dias_semana = [int(d) for d in obj['dias_semana'].split(",") if d.strip()]
+        for objetivo in objetivos:
+            dias_semana = [
+                int(dia) for dia in (objetivo['dias_semana'] or '').split(',')
+                if dia.strip()
+            ]
             dias_esperados += len(dias_semana)
-            # Aproximación: si hay pasadas, se controló
-            if datos_m['pasadas'] > 0:
-                dias_controlados += min(len(dias_semana), datos_m['pasadas'])
-        
-        promedio = (dias_controlados / dias_esperados * 100) if dias_esperados > 0 else 0
-        
+            if pasadas_mes > 0:
+                dias_controlados += min(len(dias_semana), pasadas_mes)
+        promedio = (
+            dias_controlados / dias_esperados * 100
+            if dias_esperados > 0 else 0
+        )
         datos.append({
             'mes': mes,
-            'mes_nombre': [
-                'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-            ][mes - 1],
-            'promedio': round(promedio, 1)
+            'mes_nombre': nombres_meses[mes - 1],
+            'promedio': round(promedio, 1),
         })
-    
     return datos
 
 
 @cache_global.auto_cache(ttl=600)
 def obtener_distribucion_turnos_mes(anio: int, mes: int) -> dict:
     """Retorna distribución de pasadas por turno en el mes."""
-    from calendar import monthrange
-    total_dias = monthrange(anio, mes)[1]
-    fecha_inicio = f"{anio}-{mes:02d}-01"
-    fecha_fin = f"{anio}-{mes:02d}-{total_dias:02d}"
+    rango_inicio, rango_fin = rango_datetime_de_mes(
+        anio, mes, turno_noche_cruza=True
+    )
+    fecha_inicio = rango_inicio.date().isoformat()
+    fecha_fin = (rango_fin.date() - timedelta(days=1)).isoformat()
     
     # UNA SOLA QUERY
     query = """
         SELECT turno, COUNT(*) as total
         FROM pasadas
-        WHERE fecha BETWEEN ? AND ?
+        WHERE COALESCE(fecha_operativa, fecha) BETWEEN ? AND ?
         GROUP BY turno
     """
     
     resultados = gestor_db.ejecutar(query, (fecha_inicio, fecha_fin))
     
-    return {
-        'diurno': next((r['total'] for r in resultados if r['turno'] == 'diurno'), 0),
-        'nocturno': next((r['total'] for r in resultados if r['turno'] == 'nocturno'), 0)
-    }
+    distribucion = {'diurno': 0, 'nocturno': 0}
+    for resultado in resultados:
+        distribucion[normalizar_turno(resultado['turno'])] += resultado['total']
+    return distribucion
 
 
 @cache_global.auto_cache(ttl=600)
 def obtener_top_supervisores(anio: int, mes: int, limite: int = 10) -> list:
     """Retorna los supervisores con más pasadas en el mes."""
-    from calendar import monthrange
-    total_dias = monthrange(anio, mes)[1]
-    fecha_inicio = f"{anio}-{mes:02d}-01"
-    fecha_fin = f"{anio}-{mes:02d}-{total_dias:02d}"
+    rango_inicio, rango_fin = rango_datetime_de_mes(
+        anio, mes, turno_noche_cruza=True
+    )
+    fecha_inicio = rango_inicio.date().isoformat()
+    fecha_fin = (rango_fin.date() - timedelta(days=1)).isoformat()
     
     # UNA SOLA QUERY con JOIN
     query = """
@@ -189,7 +185,7 @@ def obtener_top_supervisores(anio: int, mes: int, limite: int = 10) -> list:
             COUNT(DISTINCT p.objetivo_id) as objetivos
         FROM supervisores s
         LEFT JOIN pasadas p ON s.id = p.supervisor_id 
-            AND p.fecha BETWEEN ? AND ?
+            AND COALESCE(p.fecha_operativa, p.fecha) BETWEEN ? AND ?
         WHERE s.fecha_baja IS NULL
         GROUP BY s.id, s.nombre
         ORDER BY total_pasadas DESC
