@@ -56,7 +56,10 @@ class AnalisisBD:
                     cursor.execute(
                         f"PRAGMA index_info({_quoted_identifier(idx_name)})"
                     )
-                    columnas = [row[2] for row in cursor.fetchall()]
+                    columnas = [
+                        row[2] if row[2] is not None else "(expresión)"
+                        for row in cursor.fetchall()
+                    ]
                     indices.append({
                         "nombre": idx_name,
                         "columnas": columnas,

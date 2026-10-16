@@ -465,17 +465,15 @@ def migrar_feriados() -> None:
         """)
         cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_feriados_fecha ON feriados(fecha)")
         conexion.commit()
-        print("✅ Migración feriados completada")
+        logger.info("Migración feriados completada")
     except sqlite3.OperationalError as e:
         if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
-            print("ℹ️ Tabla feriados ya existe")
+            logger.info("La tabla feriados ya existe")
         else:
             logger.exception("Error en migración de feriados")
-            print(f"⚠️ Error en migración feriados: {e}")
             conexion.rollback()
-    except Exception as e:
+    except Exception:
         logger.exception("Error inesperado en migrar_feriados")
-        print(f"❌ Error inesperado en migrar_feriados: {e}")
         conexion.rollback()
     finally:
         conexion.close()
@@ -495,17 +493,15 @@ def migrar_supervisor3() -> None:
             "ALTER TABLE equipos ADD COLUMN supervisor3_id INTEGER REFERENCES supervisores(id)"
         )
         conexion.commit()
-        print("✅ Migración supervisor3 completada")
+        logger.info("Migración supervisor3 completada")
     except sqlite3.OperationalError as e:
         if "duplicate column" in str(e).lower():
-            print("ℹ️ Columna supervisor3_id ya existe")
+            logger.info("La columna supervisor3_id ya existe")
         else:
             logger.exception("Error en migración supervisor3")
-            print(f"⚠️ Error en migración supervisor3: {e}")
             conexion.rollback()
-    except Exception as e:
+    except Exception:
         logger.exception("Error inesperado en migrar_supervisor3")
-        print(f"❌ Error inesperado en migrar_supervisor3: {e}")
         conexion.rollback()
     finally:
         conexion.close()
@@ -529,18 +525,19 @@ def migrar_supervisores_alta_baja() -> None:
             migraciones_completadas.append(columna_def.split()[0])
         except sqlite3.OperationalError as e:
             if "duplicate column" in str(e).lower():
-                print(f"ℹ️ Columna {columna_def.split()[0]} ya existe")
+                logger.info("La columna %s ya existe", columna_def.split()[0])
             else:
                 logger.exception("Error en migración de columna %s", columna_def)
-                print(f"⚠️ Error en migración {columna_def}: {e}")
                 conexion.rollback()
-        except Exception as e:
+        except Exception:
             logger.exception("Error inesperado en migración de columna %s", columna_def)
-            print(f"❌ Error inesperado en migración: {e}")
             conexion.rollback()
 
     if migraciones_completadas:
-        print(f"✅ Migraciones completadas: {', '.join(migraciones_completadas)}")
+        logger.info(
+            "Migraciones de columnas completadas: %s",
+            ", ".join(migraciones_completadas),
+        )
 
     conexion.close()
 
@@ -564,17 +561,15 @@ def migrar_usuarios_activo() -> None:
         # Marcar todos los usuarios existentes como activos
         cursor.execute("UPDATE usuarios SET activo = 1 WHERE activo IS NULL")
         conexion.commit()
-        print("✅ Migración usuarios_activo completada")
+        logger.info("Migración usuarios_activo completada")
     except sqlite3.OperationalError as e:
         if "duplicate column" in str(e).lower():
-            print("ℹ️ Columna activo ya existe")
+            logger.info("La columna activo ya existe")
         else:
             logger.exception("Error en migración usuarios_activo")
-            print(f"⚠️ Error en migración usuarios_activo: {e}")
             conexion.rollback()
-    except Exception as e:
+    except Exception:
         logger.exception("Error inesperado en migrar_usuarios_activo")
-        print(f"❌ Error inesperado en migrar_usuarios_activo: {e}")
         conexion.rollback()
     finally:
         conexion.close()

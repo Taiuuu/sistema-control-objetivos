@@ -25,6 +25,19 @@ def test_crear_indice_valida_y_crea_el_indice(analyzer):
     assert any(index["nombre"] == "idx_sample_value" for index in indices)
 
 
+def test_reporte_maneja_indices_con_expresiones(analyzer):
+    connection = sqlite3.connect(db_module.DB_PATH)
+    connection.execute(
+        "CREATE INDEX idx_sample_lower_value ON sample (lower(value))"
+    )
+    connection.commit()
+    connection.close()
+
+    report = analyzer.generar_reporte()
+
+    assert "(expresión)" in report
+
+
 @pytest.mark.parametrize(
     ("table", "index"),
     [
