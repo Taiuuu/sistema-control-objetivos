@@ -366,7 +366,7 @@ class TablaCoberturaWidget(QWidget):
         """Carga la lista de supervisores en el filtro."""
         conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
-        cursor.execute('SELECT id, nombre FROM supervisores WHERE activo = 1')
+        cursor.execute('SELECT id, nombre FROM supervisores WHERE fecha_baja IS NULL')
         for sid, nombre in cursor.fetchall():
             self._filtro_supervisor.addItem(nombre, sid)
         conexion.close()

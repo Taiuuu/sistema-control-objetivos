@@ -24,7 +24,7 @@ class NotificadorDesktop(QObject):
         """Inicializa el ícono en la bandeja del sistema."""
         try:
             from services.assets import ruta_asset
-            icon_path = ruta_asset("assets/vesp.png")
+            icon_path = ruta_asset("assets/VESP_logo_blanco.png")
             icon = QIcon(icon_path)
         except Exception:
             icon = QIcon()

@@ -200,7 +200,7 @@ class SQLiteDataProvider(DataProvider):
         """
         try:
             rows = gestor_db.ejecutar(
-                """SELECT id, nombre, activo FROM supervisores 
+                """SELECT id, nombre, (fecha_baja IS NULL) AS activo FROM supervisores
                    WHERE fecha_baja IS NULL ORDER BY nombre"""
             )
             return [
@@ -481,7 +481,7 @@ class SQLiteDataProvider(DataProvider):
         """
         try:
             rows = gestor_db.ejecutar(
-                """SELECT id, nombre, activo FROM supervisores
+                """SELECT id, nombre, (fecha_baja IS NULL) AS activo FROM supervisores
                    WHERE nombre LIKE ? LIMIT 50""",
                 (f"%{texto}%",)
             )

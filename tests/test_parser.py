@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import openpyxl
+import pytest
 
 from services.importador.parser import leer_pasadas_crudas
 from services.importador.reporte import _construir_pasadas_normalizadas
@@ -81,6 +82,8 @@ def test_lee_tres_bloques_normaliza_objetivo_y_corta_observaciones(tmp_path: Pat
 
 def test_excel_agosto_conserva_todas_las_pasadas_reales():
     ruta = Path(__file__).parents[1] / "CONTROL RECORRIDOS AGOSTO 2026 (2).xlsx"
+    if not ruta.is_file():
+        pytest.skip(f"Falta el Excel de referencia externo: {ruta.name}")
 
     pasadas, problemas, hojas, detectadas = _construir_pasadas_normalizadas(
         str(ruta), 2026
