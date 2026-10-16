@@ -62,14 +62,23 @@ def create_objetivo():
         return jsonify({'error': 'Permiso denegado'}), 403
 
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'error': 'Se requiere un objeto JSON'}), 400
+
         nombre = data.get('nombre')
         fecha_inicio = data.get('fecha_inicio') or datetime.date.today().isoformat()
         fecha_fin = data.get('fecha_fin')
         dias_semana = data.get('dias_semana', '1,2,3,4,5')
 
-        if not nombre:
+        if not isinstance(nombre, str) or not nombre.strip():
             return jsonify({'error': 'Nombre requerido'}), 400
+        if (
+            not isinstance(fecha_inicio, str)
+            or not isinstance(dias_semana, str)
+            or (fecha_fin is not None and not isinstance(fecha_fin, str))
+        ):
+            return jsonify({'error': 'Los campos deben ser texto'}), 400
 
         creado = agregar_objetivo(nombre, fecha_inicio, dias_semana, fecha_fin)
         return jsonify(_objetivo_a_dict(creado)), 201
@@ -85,7 +94,10 @@ def update_objetivo(id):
         return jsonify({'error': 'Permiso denegado'}), 403
 
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'error': 'Se requiere un objeto JSON'}), 400
+
         nombre = data.get('nombre')
         fecha_inicio = data.get('fecha_inicio')
         fecha_fin = data.get('fecha_fin')
@@ -93,6 +105,14 @@ def update_objetivo(id):
 
         if not nombre or not fecha_inicio or not dias_semana:
             return jsonify({'error': 'Nombre, fecha_inicio y dias_semana requeridos'}), 400
+        if (
+            not isinstance(nombre, str)
+            or not nombre.strip()
+            or not isinstance(fecha_inicio, str)
+            or not isinstance(dias_semana, str)
+            or (fecha_fin is not None and not isinstance(fecha_fin, str))
+        ):
+            return jsonify({'error': 'Los campos deben ser texto'}), 400
 
         actualizado = actualizar_objetivo(id, nombre, fecha_inicio, dias_semana, fecha_fin)
         return jsonify(_objetivo_a_dict(actualizado)), 200

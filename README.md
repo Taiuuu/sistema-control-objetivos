@@ -74,7 +74,9 @@ copy .env.example .env         # Windows
 
 Antes de usar la aplicación o la API, reemplazar en `.env` los valores de ejemplo de
 `VESP_JWT_SECRET` y `VESP_ENCRYPTION_KEY` por secretos propios. El resto de las variables es
-opcional y está documentado en `.env.example`.
+opcional y está documentado en `.env.example`. Para iniciar la API también es obligatorio
+definir `VESP_SSE_PUBLISH_TOKEN` con un secreto propio; la API no tiene un valor
+predeterminado para esta variable.
 
 ## Uso
 
@@ -112,7 +114,8 @@ la base. Los errores y operaciones de recuperación quedan registrados en `data/
 
 ### API REST independiente
 
-La API requiere `VESP_JWT_SECRET` y se inicia desde la raíz del proyecto:
+La API requiere `VESP_JWT_SECRET` y `VESP_SSE_PUBLISH_TOKEN`, definidos en `.env` o en el
+entorno, y se inicia desde la raíz del proyecto:
 
 ```bash
 python -m api.app
@@ -124,10 +127,9 @@ está disponible en `GET /api/docs`.
 El rate limiting usa almacenamiento en memoria por defecto; para que los límites se compartan
 entre procesos, configurá `VESP_RATE_LIMIT_STORAGE_URI` con una URL Redis.
 La publicación de notificaciones SSE requiere el encabezado
-`Authorization: Bearer <VESP_SSE_PUBLISH_TOKEN>`; el valor predeterminado es
-`Mosconi2795` para uso local. Cambialo mediante esa variable de entorno antes de
-exponer la API en una red. El stream `/api/sse/events` requiere además un JWT de
-usuario. Las notificaciones usan Redis; la URL se configura con `VESP_REDIS_URL`
+`Authorization: Bearer <VESP_SSE_PUBLISH_TOKEN>`. Definí un token secreto propio antes de
+iniciar la API; no hay un valor predeterminado. El stream `/api/sse/events` requiere además
+un JWT de usuario. Las notificaciones usan Redis; la URL se configura con `VESP_REDIS_URL`
 (por defecto `redis://localhost:6379/0`).
 
 Rutas principales:

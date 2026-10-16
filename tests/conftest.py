@@ -7,8 +7,10 @@ import sqlite3
 import os
 import tempfile
 import shutil
+import logging
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("VESP_JWT_SECRET", "test-secret-only-32-bytes-long!!")
@@ -36,18 +38,18 @@ def test_db():
             try:
                 gd.cerrar_conexion()
             except Exception:
-                pass
+                logger.debug("No se pudo cerrar gestor_db durante el teardown.", exc_info=True)
             try:
                 from database import db as db_module
                 try:
                     db_module.gestor_db.cerrar_conexion()
                 except Exception:
-                    pass
+                    logger.debug("No se pudo cerrar la conexión SQLite durante el teardown.", exc_info=True)
             except Exception:
-                pass
+                logger.debug("No se pudo importar el gestor para cerrar conexiones.", exc_info=True)
             gc.collect()
         except Exception:
-            pass
+            logger.debug("Falló el cierre preventivo de conexiones de prueba.", exc_info=True)
 
         # Reintentar rmtree hasta 3 veces
         import time
@@ -62,7 +64,7 @@ def test_db():
             try:
                 shutil.rmtree(temp_dir)
             except Exception:
-                pass
+                logger.warning("No se pudo limpiar el directorio temporal %s.", temp_dir, exc_info=True)
 
 
 @pytest.fixture
@@ -78,7 +80,7 @@ def db_initialized(test_db):
     try:
         gestor_db_module.gestor_db.cerrar_conexion()
     except Exception:
-        pass
+        logger.debug("No se pudo cerrar la conexión previa de prueba.", exc_info=True)
 
     original_path = db_module.DB_PATH
     db_module.DB_PATH = test_db
@@ -92,7 +94,7 @@ def db_initialized(test_db):
     try:
         gestor_db_module.gestor_db.cerrar_conexion()
     except Exception:
-        pass
+        logger.debug("No se pudo cerrar la conexión de prueba al terminar.", exc_info=True)
     db_module.DB_PATH = original_path
 
 

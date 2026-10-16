@@ -75,7 +75,7 @@ OPERACIONES_VALIDAS = {'INSERT', 'UPDATE', 'DELETE'}
 # URL de la API para SSE (local development)
 API_SSE_URL = "http://127.0.0.1:5000/api/sse/publish"
 API_SSE_TIMEOUT = 1  # segundos
-API_SSE_TOKEN = os.environ.get("VESP_SSE_PUBLISH_TOKEN", "Mosconi2795")
+API_SSE_TOKEN = os.environ.get("VESP_SSE_PUBLISH_TOKEN")
 
 
 # =============================================================================
@@ -221,6 +221,12 @@ class SincronizadorDatos(QObject):
             operacion: Operación realizada.
             datos: Datos del cambio.
         """
+        if not API_SSE_TOKEN:
+            logger.warning(
+                "No se envía el evento SSE: VESP_SSE_PUBLISH_TOKEN no está definido."
+            )
+            return
+
         def _post():
             try:
                 payload = {

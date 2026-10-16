@@ -23,9 +23,13 @@ if not jwt_secret:
         'Falta la variable de entorno VESP_JWT_SECRET. Definila en .env antes de iniciar la API.'
     )
 app.config["JWT_SECRET_KEY"] = jwt_secret
-app.config["SSE_PUBLISH_TOKEN"] = os.environ.get(
-    "VESP_SSE_PUBLISH_TOKEN", "Mosconi2795"
-)
+sse_publish_token = os.environ.get("VESP_SSE_PUBLISH_TOKEN")
+if not sse_publish_token or not sse_publish_token.strip():
+    raise RuntimeError(
+        "Falta la variable de entorno VESP_SSE_PUBLISH_TOKEN. "
+        "Definila en .env antes de iniciar la API."
+    )
+app.config["SSE_PUBLISH_TOKEN"] = sse_publish_token
 jwt = JWTManager(app)
 
 # Rate limiting

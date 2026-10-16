@@ -6,8 +6,11 @@
 
 import sqlite3
 import datetime
+import logging
 from database.db import DB_PATH
 from services.logger import registrar_accion
+
+logger = logging.getLogger(__name__)
 
 
 def _parsear_hora(hora: str) -> datetime.time:
@@ -158,8 +161,10 @@ def corregir_horas_limite():
                 usuario_id=None,
                 accion=f"CORRECCIÓN_HORAS_LÍMITE: {len(cambios)} registros movidos a fecha operativa anterior"
             )
-        except:
-            pass
+        except Exception:
+            logger.exception(
+                "No se pudo registrar en auditoría la corrección de horas límite."
+            )
         
         print(f"\n✅ Corrección completada exitosamente!")
         print(f"   {len(cambios)} pasadas movidas")

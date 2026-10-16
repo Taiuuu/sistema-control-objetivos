@@ -51,12 +51,20 @@ def login():
     """
     Endpoint de login con validación de contraseña.
     """
-    data = request.get_json() or {}
-    # Accept both Spanish and English keys for compatibility with tests/clients
-    usuario = data.get('usuario') or data.get('username') or ''
-    contrasena = data.get('contrasena') or data.get('password') or ''
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Usuario y contraseña requeridos'}), 400
 
-    if not usuario or not contrasena:
+    # Accept both Spanish and English keys for compatibility with tests/clients
+    usuario = data.get('usuario') or data.get('username')
+    contrasena = data.get('contrasena') or data.get('password')
+
+    if (
+        not isinstance(usuario, str)
+        or not isinstance(contrasena, str)
+        or not usuario
+        or not contrasena
+    ):
         return jsonify({'error': 'Usuario y contraseña requeridos'}), 400
 
     # Validar credenciales

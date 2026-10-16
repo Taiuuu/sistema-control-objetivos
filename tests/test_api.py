@@ -7,9 +7,10 @@ import datetime
 
 
 @pytest.fixture
-def api_client(db_initialized):
+def api_client(db_initialized, monkeypatch):
     """Cliente de test para la API Flask."""
     # Monkeypatch database path
+    monkeypatch.setenv('VESP_SSE_PUBLISH_TOKEN', 'test-sse-token')
     import api.app as app_module
     from database import db as db_module
     
@@ -41,8 +42,23 @@ def auth_token(api_client, db_initialized):
     return None
 
 
+@pytest.fixture
+def operador_auth_token(api_client, operador_user):
+    response = api_client.post('/api/auth/login', json={
+        'username': 'operador_test',
+        'password': 'Prueba123!'
+    })
+    assert response.status_code == 200
+    return response.get_json()['access_token']
+
+
 class TestAuthAPI:
     """Tests para endpoints de autenticación."""
+
+    def test_login_rechaza_json_que_no_sea_objeto(self, api_client):
+        response = api_client.post('/api/auth/login', json=['invalid'])
+
+        assert response.status_code == 400
     
     def test_login_exitoso(self, api_client, admin_user):
         """Debe autenticarse correctamente con credenciales válidas."""
@@ -77,6 +93,17 @@ class TestAuthAPI:
 
 class TestObjetivosAPI:
     """Tests para endpoints de objetivos."""
+
+    def test_crear_objetivo_rechaza_json_que_no_sea_objeto(
+        self, api_client, auth_token
+    ):
+        response = api_client.post(
+            '/api/objetivos',
+            headers={'Authorization': f'Bearer {auth_token}'},
+            json=['invalid']
+        )
+
+        assert response.status_code == 400
     
     def test_get_objetivos_sin_auth(self, api_client):
         """Debe rechazar acceso sin autenticación."""
@@ -206,6 +233,53 @@ class TestSSEAPI:
             '/api/sse/publish',
             json=['invalid'],
             headers={'Authorization': 'Bearer test-sse-token'}
+        )
+
+        assert response.status_code == 400
+
+
+class TestAutorizacionAPI:
+    """Las rutas respetan permisos definidos para cada rol."""
+
+    def test_operador_no_puede_crear_supervisor(
+        self, api_client, operador_auth_token
+    ):
+        response = api_client.post(
+            '/api/supervisores',
+            json={'nombre': 'Supervisor no autorizado'},
+            headers={'Authorization': f'Bearer {operador_auth_token}'}
+        )
+
+        assert response.status_code == 403
+
+    def test_operador_no_puede_consultar_reportes(
+        self, api_client, operador_auth_token
+    ):
+        response = api_client.get(
+            '/api/reportes/mensual/2026/10',
+            headers={'Authorization': f'Bearer {operador_auth_token}'}
+        )
+
+        assert response.status_code == 403
+
+    def test_pasadas_rechaza_cuerpo_que_no_es_objeto_json(
+        self, api_client, operador_auth_token
+    ):
+        response = api_client.post(
+            '/api/pasadas',
+            json=['dato inválido'],
+            headers={'Authorization': f'Bearer {operador_auth_token}'}
+        )
+
+        assert response.status_code == 400
+
+    def test_supervisores_rechaza_cuerpo_que_no_es_objeto_json(
+        self, api_client, auth_token
+    ):
+        response = api_client.post(
+            '/api/supervisores',
+            json=['dato inválido'],
+            headers={'Authorization': f'Bearer {auth_token}'}
         )
 
         assert response.status_code == 400

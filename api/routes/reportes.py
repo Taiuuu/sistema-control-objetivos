@@ -5,6 +5,7 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 from services.reportes import generar_reporte_mensual, generar_reporte_diario
+from services.permisos import tiene_permiso
 
 reportes_bp = Blueprint('reportes', __name__)
 
@@ -12,6 +13,9 @@ reportes_bp = Blueprint('reportes', __name__)
 @jwt_required()
 def get_reporte_mensual(anio, mes):
     """Obtener reporte mensual."""
+    if not tiene_permiso('reportes.ver'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
         reporte = generar_reporte_mensual(anio, mes)
         return jsonify(reporte), 200
@@ -22,6 +26,9 @@ def get_reporte_mensual(anio, mes):
 @jwt_required()
 def get_reporte_diario(fecha):
     """Obtener reporte diario."""
+    if not tiene_permiso('reportes.ver'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
         reporte = generar_reporte_diario(fecha)
         return jsonify(reporte), 200

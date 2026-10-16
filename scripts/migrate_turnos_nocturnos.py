@@ -5,8 +5,11 @@
 
 import sqlite3
 import datetime
+import logging
 from database.db import DB_PATH
 from services.logger import registrar_accion
+
+logger = logging.getLogger(__name__)
 
 
 def _parsear_hora(hora: str) -> datetime.time:
@@ -136,8 +139,10 @@ def migrar_turnos_nocturnos():
                 usuario_id=None,
                 accion=f"MIGRACIÓN_TURNOS_NOCTURNOS: {len(cambios)} registros actualizados"
             )
-        except:
-            pass  # Si falla auditoría, continuar igual
+        except Exception:
+            logger.exception(
+                "No se pudo registrar en auditoría la migración de turnos nocturnos."
+            )
         
         print(f"\n✅ Migración completada exitosamente!")
         print(f"   {len(cambios)} registros actualizados")

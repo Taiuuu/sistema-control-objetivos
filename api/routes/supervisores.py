@@ -8,6 +8,7 @@ from models.supervisores import (
     agregar_supervisor, listar_supervisores, obtener_supervisor,
     actualizar_supervisor, dar_de_baja_supervisor
 )
+from services.permisos import tiene_permiso
 
 supervisores_bp = Blueprint('supervisores', __name__)
 
@@ -15,6 +16,9 @@ supervisores_bp = Blueprint('supervisores', __name__)
 @jwt_required()
 def get_supervisores():
     """Obtener lista de supervisores."""
+    if not tiene_permiso('supervisores.ver'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
         supervisores = listar_supervisores()
         return jsonify([{
@@ -29,6 +33,9 @@ def get_supervisores():
 @jwt_required()
 def get_supervisor(id):
     """Obtener supervisor por ID."""
+    if not tiene_permiso('supervisores.ver'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
         sup = obtener_supervisor(id)
         if sup:
@@ -45,11 +52,17 @@ def get_supervisor(id):
 @jwt_required()
 def create_supervisor():
     """Crear nuevo supervisor."""
+    if not tiene_permiso('supervisores.crear'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'error': 'Se requiere un objeto JSON'}), 400
+
         nombre = data.get('nombre')
 
-        if not nombre:
+        if not isinstance(nombre, str) or not nombre.strip():
             return jsonify({'error': 'Nombre requerido'}), 400
 
         agregar_supervisor(nombre)
@@ -61,11 +74,17 @@ def create_supervisor():
 @jwt_required()
 def update_supervisor(id):
     """Actualizar supervisor."""
+    if not tiene_permiso('supervisores.editar'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'error': 'Se requiere un objeto JSON'}), 400
+
         nombre = data.get('nombre')
 
-        if not nombre:
+        if not isinstance(nombre, str) or not nombre.strip():
             return jsonify({'error': 'Nombre requerido'}), 400
 
         actualizar_supervisor(id, nombre)
@@ -77,6 +96,9 @@ def update_supervisor(id):
 @jwt_required()
 def delete_supervisor(id):
     """Dar de baja supervisor."""
+    if not tiene_permiso('supervisores.eliminar'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
         dar_de_baja_supervisor(id)
         return jsonify({'message': 'Supervisor dado de baja'}), 200

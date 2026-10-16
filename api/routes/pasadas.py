@@ -5,6 +5,7 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 from models.turnos import registrar_turno, listar_turnos_del_dia
+from services.permisos import tiene_permiso
 
 pasadas_bp = Blueprint('pasadas', __name__)
 
@@ -12,8 +13,14 @@ pasadas_bp = Blueprint('pasadas', __name__)
 @jwt_required()
 def create_pasada():
     """Crear nueva pasada."""
+    if not tiene_permiso('pasadas.crear'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'error': 'Se requiere un objeto JSON'}), 400
+
         fecha = data.get('fecha')
         hora = data.get('hora')
         turno = data.get('turno')
@@ -39,6 +46,9 @@ def create_pasada():
 @jwt_required()
 def get_pasadas_dia(fecha):
     """Obtener pasadas del día."""
+    if not tiene_permiso('pasadas.ver'):
+        return jsonify({'error': 'Permiso denegado'}), 403
+
     try:
         pasadas = listar_turnos_del_dia(fecha)
         return jsonify([{
