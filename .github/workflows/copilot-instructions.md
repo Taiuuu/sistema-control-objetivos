@@ -11,7 +11,7 @@
 ## Alcance de lectura
 - No releas ni escanees el proyecto entero salvo que se pida explícitamente. Trabajá solo sobre el/los archivo(s) y fragmento(s) que te paso en el prompt.
 - Si necesitás contexto de otro archivo para resolver algo, pedímelo puntualmente en vez de asumir o inventar la estructura.
-- Preferí `CONTEXT.md` (si está en el repo) como fuente de verdad sobre la arquitectura general, en vez de inferir leyendo todo.
+- Preferí `docs/contexts/` (si existe en el repo) como fuente de verdad sobre el contexto general del proyecto, en vez de inferir leyendo todo.
 
 ## Estilo de código
 - Python 3, tipado con type hints donde ya se usa en el archivo.

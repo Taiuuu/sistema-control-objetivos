@@ -100,12 +100,12 @@ Las dependencias de desarrollo adicionales se encuentran en `docs/requirements-d
 - `database/` - Inicialización, migraciones y acceso thread-safe a SQLite.
 - `api/` - API Flask modular y sus blueprints.
 - `tests/` - Pruebas automatizadas.
-- `docs/` - Manual de usuario, contexto técnico y documentación de desarrollo.
+- `docs/` - Manual de usuario, contextos del proyecto y documentación de desarrollo.
 
 ## Documentación adicional
 
 - [Manual de usuario](docs/MANUAL_USUARIO.md)
-- [Contexto técnico](docs/CONTEXT.md)
+- [Contexto de diseño de interfaz](docs/contexts/ui-theme.md)
 - [Guía del instalador](GUIA_INSTALADOR_INNO_SETUP.txt)
 
 ## Autoría
