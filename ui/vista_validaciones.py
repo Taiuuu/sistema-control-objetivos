@@ -251,8 +251,8 @@ class VistaValidaciones(QWidget):
         self.texto_errores.setText(texto_errores)
 
         # Resumen
+        conn = conectar()
         try:
-            conn = conectar()
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM pasadas")
             total_pasadas = cursor.fetchone()[0]
@@ -260,14 +260,12 @@ class VistaValidaciones(QWidget):
             total_objetivos = cursor.fetchone()[0]
             cursor.execute("SELECT COUNT(*) FROM supervisores")
             total_supervisores = cursor.fetchone()[0]
-            conn.close()
-
             self.label_resumen.setText(
                 f"Errores: {len(errores)} | Advertencias: {len(advertencias)} | "
                 f"Pasadas: {total_pasadas} | Objetivos: {total_objetivos} | Supervisores: {total_supervisores}"
             )
-        except:
-            pass
+        finally:
+            conn.close()
 
     def reparar_problemas(self):
         """Intenta reparar los problemas encontrados."""

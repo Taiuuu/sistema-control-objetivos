@@ -76,9 +76,8 @@ class GestorDB:
         if hasattr(self._local, 'conexion') and self._local.conexion:
             try:
                 self._local.conexion.close()
-            except Exception:
-                pass
-            self._local.conexion = None
+            finally:
+                self._local.conexion = None
     
     def ejecutar(self, query: str, params: tuple = (), 
                  cache: bool = False, ttl: int = 300) -> list:

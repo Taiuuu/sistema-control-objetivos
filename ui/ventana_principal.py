@@ -2,6 +2,7 @@
 # VESP Organizations - Sistema de Control de Objetivos
 # Ventana principal del sistema — UI/UX mejorada
 # =============================================================================
+import logging
 import sqlite3
 
 from typing import Optional, Callable
@@ -43,6 +44,8 @@ from ui.vista_sincronizacion import VistaSincronizacion
 from ui.configuracion import ConfiguracionDialog
 from ui.animaciones import animar_aparecer, tiene_animacion_activa
 from ui.theme.theme_manager import get_theme_manager
+
+logger = logging.getLogger(__name__)
 from ui.theme.stylesheet import generate_date_edit_dropdown_stylesheet
 from ui.theme.tokens import THEMES
 from ui.theme.colors import parse_color
@@ -1383,8 +1386,8 @@ class VentanaPrincipal(QWidget):
             if hasattr(self, "timer_inactividad"):
                 self.timer_inactividad.start()
             actualizar_actividad_sesion()
-        except Exception:
-            pass
+        except RuntimeError:
+            logger.exception("No se pudo actualizar la actividad de la sesión.")
 
     def eventFilter(self, objeto, evento):
         if evento.type() in (
@@ -1414,17 +1417,11 @@ class VentanaPrincipal(QWidget):
             return super().event(evento)
 
     def moveEvent(self, evento):
-        try:
-            self._registrar_actividad()
-        except Exception:
-            pass
+        self._registrar_actividad()
         super().moveEvent(evento)
 
     def resizeEvent(self, evento):
-        try:
-            self._registrar_actividad()
-        except Exception:
-            pass
+        self._registrar_actividad()
         super().resizeEvent(evento)
 
     def cerrar_por_inactividad(self):

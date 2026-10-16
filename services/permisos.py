@@ -3,9 +3,13 @@
 # Módulo de permisos y roles de usuario
 # =============================================================================
 
+import logging
+import sqlite3
 from typing import Dict, List, Set
 from functools import wraps
 from services.sesion import get_rol, get_usuario_id
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # DEFINICIÓN DE ROLES Y PERMISOS
@@ -102,8 +106,9 @@ def tiene_permiso(permiso: str) -> bool:
         from flask_jwt_extended import get_jwt
         claims = get_jwt()
         rol_actual = claims.get('rol') or claims.get('role')
-    except Exception:
-        pass
+    except RuntimeError:
+        # Flask raises RuntimeError when called outside an active request context.
+        logger.debug("No hay contexto JWT; se consultará la sesión local.")
 
     # Si no hay rol en JWT, caer back al gestor de sesión global
     if not rol_actual:
@@ -197,8 +202,8 @@ def requiere_permiso(permiso: str):
                             usuario_id, 
                             f"❌ Intento acceso denegado a {func.__name__} - Permiso requerido: {permiso}"
                         )
-                    except Exception as e:
-                        print(f"⚠️ Error registrando acceso denegado: {e}")
+                    except sqlite3.Error:
+                        logger.exception("No se pudo auditar el acceso denegado.")
                     
                     raise PermisoDenegadoError(
                         f"No tienes permiso para esta acción: {permiso}",
@@ -210,8 +215,8 @@ def requiere_permiso(permiso: str):
                 try:
                     from services.logger import registrar_accion
                     registrar_accion(usuario_id, f"✅ Acceso: {func.__name__}")
-                except Exception:
-                    pass  # No interrumpir si logging falla
+                except sqlite3.Error:
+                    logger.exception("No se pudo auditar el acceso permitido.")
                 
                 # Ejecutar función
                 return func(*args, **kwargs)
@@ -267,8 +272,8 @@ def requiere_rol(rol_requerido: str):
                             usuario_id,
                             f"❌ Intento acceso denegado: rol requerido '{rol_requerido}', tiene '{rol_actual}'"
                         )
-                    except Exception:
-                        pass
+                    except sqlite3.Error:
+                        logger.exception("No se pudo auditar el intento con rol incorrecto.")
                     
                     raise PermisoDenegadoError(
                         f"Se requiere rol '{rol_requerido}'",
@@ -279,8 +284,8 @@ def requiere_rol(rol_requerido: str):
                 try:
                     from services.logger import registrar_accion
                     registrar_accion(usuario_id, f"✅ Acceso: {func.__name__}")
-                except Exception:
-                    pass
+                except sqlite3.Error:
+                    logger.exception("No se pudo auditar el acceso permitido.")
                 
                 return func(*args, **kwargs)
                 
@@ -335,8 +340,8 @@ def requiere_alguno_de(roles_permitidos: List[str]):
                             usuario_id,
                             f"❌ Intento acceso denegado: roles permitidos {roles_permitidos}, tiene '{rol_actual}'"
                         )
-                    except Exception:
-                        pass
+                    except sqlite3.Error:
+                        logger.exception("No se pudo auditar el intento con rol incorrecto.")
                     
                     raise PermisoDenegadoError(
                         f"Se requiere uno de estos roles: {', '.join(roles_permitidos)}",
@@ -347,8 +352,8 @@ def requiere_alguno_de(roles_permitidos: List[str]):
                 try:
                     from services.logger import registrar_accion
                     registrar_accion(usuario_id, f"✅ Acceso: {func.__name__}")
-                except Exception:
-                    pass
+                except sqlite3.Error:
+                    logger.exception("No se pudo auditar el acceso permitido.")
                 
                 return func(*args, **kwargs)
                 

@@ -1771,7 +1771,7 @@ def confirmar_importacion_completa(
         try:
             conexion_bd.rollback()
         except Exception:
-            pass
+            logger.exception("Falló el rollback; se propagará el error original.")
 
         raise
 

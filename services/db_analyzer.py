@@ -2,9 +2,22 @@
 # VESP Organizations - Analizador de Indexación y Optimización de BD
 # =============================================================================
 
+import logging
+import re
 import sqlite3
+from contextlib import closing
 from typing import List, Dict, Optional
 from database.db import DB_PATH, conectar
+
+logger = logging.getLogger(__name__)
+_IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _quoted_identifier(value: str) -> str:
+    """Cita un identificador SQLite tras rechazar entradas no válidas."""
+    if not isinstance(value, str) or not _IDENTIFIER_PATTERN.fullmatch(value):
+        raise ValueError(f"Identificador SQL inválido: {value!r}")
+    return f'"{value}"'
 
 
 class AnalisisBD:
@@ -16,121 +29,109 @@ class AnalisisBD:
     def obtener_tablas(self) -> List[str]:
         """Retorna todas las tablas en la BD."""
         try:
-            conn = conectar()
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-            )
-            tablas = [row[0] for row in cursor.fetchall()]
-            conn.close()
-            return tablas
-        except Exception as e:
+            with closing(conectar()) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+                )
+                return [row[0] for row in cursor.fetchall()]
+        except sqlite3.Error as e:
             print(f"Error obteniendo tablas: {e}")
             return []
     
     def obtener_indices(self, tabla: str) -> List[Dict]:
         """Retorna los índices de una tabla."""
         try:
-            conn = conectar()
-            cursor = conn.cursor()
-            cursor.execute(f"PRAGMA index_list({tabla})")
-            indices_raw = cursor.fetchall()
-            
-            indices = []
-            for idx in indices_raw:
-                idx_name = idx[1]
-                is_unique = idx[2]
-                
-                # Obtener columnas del índice
-                cursor.execute(f"PRAGMA index_info({idx_name})")
-                columnas = [row[2] for row in cursor.fetchall()]
-                
-                # Contar tamaño estimado
-                cursor.execute(f"SELECT COUNT(*) FROM {tabla}")
+            tabla_sql = _quoted_identifier(tabla)
+            with closing(conectar()) as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"PRAGMA index_list({tabla_sql})")
+                indices_raw = cursor.fetchall()
+
+                indices = []
+                cursor.execute(f"SELECT COUNT(*) FROM {tabla_sql}")
                 tamaño_tabla = cursor.fetchone()[0]
-                
-                indices.append({
-                    "nombre": idx_name,
-                    "columnas": columnas,
-                    "unico": bool(is_unique),
-                    "tamaño_estimado_bytes": len(columnas) * tamaño_tabla * 8
-                })
-            
-            conn.close()
-            return indices
-        except Exception as e:
+                for idx in indices_raw:
+                    idx_name = idx[1]
+                    cursor.execute(
+                        f"PRAGMA index_info({_quoted_identifier(idx_name)})"
+                    )
+                    columnas = [row[2] for row in cursor.fetchall()]
+                    indices.append({
+                        "nombre": idx_name,
+                        "columnas": columnas,
+                        "unico": bool(idx[2]),
+                        "tamaño_estimado_bytes": len(columnas) * tamaño_tabla * 8
+                    })
+                return indices
+        except (sqlite3.Error, ValueError) as e:
             print(f"Error obteniendo índices de {tabla}: {e}")
             return []
     
     def obtener_esquema_tabla(self, tabla: str) -> List[Dict]:
         """Retorna el esquema de una tabla."""
         try:
-            conn = conectar()
-            cursor = conn.cursor()
-            cursor.execute(f"PRAGMA table_info({tabla})")
-            columnas_raw = cursor.fetchall()
-            
-            columnas = []
-            for col in columnas_raw:
-                columnas.append({
-                    "nombre": col[1],
-                    "tipo": col[2],
-                    "not_null": col[3],
-                    "default": col[4],
-                    "pk": col[5]
-                })
-            
-            conn.close()
-            return columnas
-        except Exception as e:
+            with closing(conectar()) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"PRAGMA table_info({_quoted_identifier(tabla)})"
+                )
+                return [
+                    {
+                        "nombre": col[1],
+                        "tipo": col[2],
+                        "not_null": col[3],
+                        "default": col[4],
+                        "pk": col[5]
+                    }
+                    for col in cursor.fetchall()
+                ]
+        except (sqlite3.Error, ValueError) as e:
             print(f"Error obteniendo esquema de {tabla}: {e}")
             return []
     
     def analizar_fragmentation(self, tabla: str) -> float:
         """Calcula el porcentaje de fragmentación de una tabla."""
         try:
-            conn = conectar()
-            cursor = conn.cursor()
-            
-            # Total de filas
-            cursor.execute(f"SELECT COUNT(*) FROM {tabla}")
-            total_filas = cursor.fetchone()[0]
-            
-            if total_filas == 0:
-                return 0.0
-            
-            # Obtener tamaño de página
-            cursor.execute("PRAGMA page_size")
-            page_size = cursor.fetchone()[0]
-            
-            # Contar páginas usadas
-            cursor.execute(f"SELECT SUM(pgsize) FROM dbstat WHERE name='{tabla}'")
-            resultado = cursor.fetchone()[0]
-            paginas_usadas = (resultado or 0) / page_size
-            
-            # Fragmentación teórica (simplificada)
-            fragmentacion = (1 - (total_filas / max(paginas_usadas, 1))) * 100
-            
-            conn.close()
-            return max(0, min(100, fragmentacion))
-        except:
+            tabla_sql = _quoted_identifier(tabla)
+            with closing(conectar()) as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT COUNT(*) FROM {tabla_sql}")
+                total_filas = cursor.fetchone()[0]
+                if total_filas == 0:
+                    return 0.0
+
+                cursor.execute("PRAGMA page_size")
+                page_size = cursor.fetchone()[0]
+                if not page_size:
+                    return 0.0
+
+                cursor.execute(
+                    "SELECT SUM(pgsize) FROM dbstat WHERE name = ?", (tabla,)
+                )
+                resultado = cursor.fetchone()[0]
+                paginas_usadas = (resultado or 0) / page_size
+                fragmentacion = (
+                    1 - (total_filas / max(paginas_usadas, 1))
+                ) * 100
+                return max(0, min(100, fragmentacion))
+        except (sqlite3.Error, ValueError, ZeroDivisionError) as e:
+            logger.warning("No se pudo analizar la fragmentación de %s: %s", tabla, e)
             return 0.0
     
     def obtener_estadisticas_tabla(self, tabla: str) -> Dict:
         """Retorna estadísticas de una tabla."""
         try:
-            conn = conectar()
-            cursor = conn.cursor()
-            
-            cursor.execute(f"SELECT COUNT(*) FROM {tabla}")
-            total_filas = cursor.fetchone()[0]
-            
-            # Tamaño estimado
-            cursor.execute(f"SELECT SUM(pgsize) FROM dbstat WHERE name='{tabla}'")
-            tamaño_bytes = cursor.fetchone()[0] or 0
-            
-            conn.close()
-            
+            tabla_sql = _quoted_identifier(tabla)
+            with closing(conectar()) as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT COUNT(*) FROM {tabla_sql}")
+                total_filas = cursor.fetchone()[0]
+                cursor.execute(
+                    "SELECT SUM(pgsize) FROM dbstat WHERE name = ?", (tabla,)
+                )
+                tamaño_bytes = cursor.fetchone()[0] or 0
+
             return {
                 "tabla": tabla,
                 "total_filas": total_filas,
@@ -138,7 +139,7 @@ class AnalisisBD:
                 "tamaño_mb": tamaño_bytes / (1024 * 1024),
                 "indices": len(self.obtener_indices(tabla))
             }
-        except Exception as e:
+        except (sqlite3.Error, ValueError) as e:
             return {"tabla": tabla, "error": str(e)}
     
     def sugerir_indices(self) -> List[Dict]:
@@ -185,54 +186,61 @@ class AnalisisBD:
                 continue
             
             # Verificar que la tabla y columnas existan
-            try:
-                esquema = {col["nombre"] for col in self.obtener_esquema_tabla(tabla)}
-                if all(col in esquema for col in columnas):
-                    nombre_indice = f"idx_{tabla}_{'_'.join(columnas)}"
-                    sugerencias.append({
-                        "tabla": tabla,
-                        "columnas": columnas,
-                        "nombre_indice": nombre_indice,
-                        "razon": razon,
-                        "impacto_porcentaje": impacto,
-                        "estado": "recomendado"
-                    })
-            except:
-                continue
+            esquema = {col["nombre"] for col in self.obtener_esquema_tabla(tabla)}
+            if all(col in esquema for col in columnas):
+                nombre_indice = f"idx_{tabla}_{'_'.join(columnas)}"
+                sugerencias.append({
+                    "tabla": tabla,
+                    "columnas": columnas,
+                    "nombre_indice": nombre_indice,
+                    "razon": razon,
+                    "impacto_porcentaje": impacto,
+                    "estado": "recomendado"
+                })
         
         # Ordenar por impacto descendente
         return sorted(sugerencias, key=lambda x: x["impacto_porcentaje"], reverse=True)
     
     def crear_indice(self, tabla: str, columnas: List[str], nombre_indice: Optional[str] = None) -> bool:
         """Crea un índice en la BD."""
-        if not nombre_indice:
-            nombre_indice = f"idx_{tabla}_{'_'.join(columnas)}"
-        
-        columnas_str = ", ".join(columnas)
-        sql = f"CREATE INDEX IF NOT EXISTS {nombre_indice} ON {tabla} ({columnas_str})"
-        
         try:
-            conn = conectar()
-            conn.execute("PRAGMA foreign_keys=OFF")
-            cursor = conn.cursor()
-            cursor.execute(sql)
-            conn.commit()
-            conn.close()
+            tabla_sql = _quoted_identifier(tabla)
+            columnas_sql = ", ".join(_quoted_identifier(col) for col in columnas)
+            if not columnas:
+                raise ValueError("El índice debe incluir al menos una columna.")
+            if not nombre_indice:
+                nombre_indice = f"idx_{tabla}_{'_'.join(columnas)}"
+            nombre_sql = _quoted_identifier(nombre_indice)
+
+            columnas_existentes = {
+                col["nombre"] for col in self.obtener_esquema_tabla(tabla)
+            }
+            if not columnas_existentes or any(
+                columna not in columnas_existentes for columna in columnas
+            ):
+                raise ValueError(f"Tabla o columnas inexistentes: {tabla}")
+
+            with closing(conectar()) as conn:
+                conn.execute("PRAGMA foreign_keys=OFF")
+                conn.execute(
+                    f"CREATE INDEX IF NOT EXISTS {nombre_sql} "
+                    f"ON {tabla_sql} ({columnas_sql})"
+                )
+                conn.commit()
             return True
-        except Exception as e:
+        except (sqlite3.Error, ValueError) as e:
             print(f"Error creando índice: {e}")
             return False
     
     def eliminar_indice(self, nombre_indice: str) -> bool:
         """Elimina un índice de la BD."""
         try:
-            conn = conectar()
-            cursor = conn.cursor()
-            cursor.execute(f"DROP INDEX IF EXISTS {nombre_indice}")
-            conn.commit()
-            conn.close()
+            nombre_sql = _quoted_identifier(nombre_indice)
+            with closing(conectar()) as conn:
+                conn.execute(f"DROP INDEX IF EXISTS {nombre_sql}")
+                conn.commit()
             return True
-        except Exception as e:
+        except (sqlite3.Error, ValueError) as e:
             print(f"Error eliminando índice: {e}")
             return False
     
@@ -242,26 +250,18 @@ class AnalisisBD:
         Retorna resumen de cambios.
         """
         try:
-            conn = conectar()
-            cursor = conn.cursor()
-            
-            # ANALYZE: actualiza estadísticas
-            cursor.execute("ANALYZE")
-            
-            # VACUUM: compacta BD
-            cursor.execute("VACUUM")
-            
-            # REINDEX: reconstruye índices
-            cursor.execute("REINDEX")
-            
-            conn.commit()
-            conn.close()
+            with closing(conectar()) as conn:
+                cursor = conn.cursor()
+                cursor.execute("ANALYZE")
+                cursor.execute("VACUUM")
+                cursor.execute("REINDEX")
+                conn.commit()
             
             return {
                 "exitoso": True,
                 "operaciones": ["ANALYZE", "VACUUM", "REINDEX"]
             }
-        except Exception as e:
+        except sqlite3.Error as e:
             return {
                 "exitoso": False,
                 "error": str(e)

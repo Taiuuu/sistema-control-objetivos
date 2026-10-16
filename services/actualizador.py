@@ -4,8 +4,11 @@
 # =============================================================================
 
 import webbrowser
+import logging
 import requests
 from PyQt6.QtWidgets import QMessageBox
+
+logger = logging.getLogger(__name__)
 
 
 # URL del archivo version.txt en el repositorio remoto
@@ -52,22 +55,22 @@ def verificar_actualizacion(parent=None) -> None:
             return
 
         version_remota = respuesta.text.strip()
+        hay_actualizacion = _version_es_mayor(version_remota, version_local)
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("No se pudo verificar la versión remota: %s", exc)
+        return
 
-        if not _version_es_mayor(version_remota, version_local):
-            return
+    if not hay_actualizacion:
+        return
 
-        resultado = QMessageBox.question(
-            parent,
-            "Actualización disponible",
-            f"Nueva versión disponible: {version_remota}\n"
-            f"Versión actual: {version_local}\n\n"
-            f"¿Querés ir a descargarla?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
+    resultado = QMessageBox.question(
+        parent,
+        "Actualización disponible",
+        f"Nueva versión disponible: {version_remota}\n"
+        f"Versión actual: {version_local}\n\n"
+        f"¿Querés ir a descargarla?",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+    )
 
-        if resultado == QMessageBox.StandardButton.Yes:
-            webbrowser.open(URL_RELEASES)
-
-    except Exception:
-        # Falla silenciosamente si no hay conexión
-        pass
+    if resultado == QMessageBox.StandardButton.Yes:
+        webbrowser.open(URL_RELEASES)

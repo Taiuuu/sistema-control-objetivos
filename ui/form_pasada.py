@@ -3,6 +3,7 @@
 # Formulario para registrar pasadas
 # =============================================================================
 
+import logging
 import sqlite3
 from PyQt6.QtWidgets import (
     QWidget,
@@ -27,6 +28,8 @@ from services.validador_horas_limite import validar_hora_turno_nocturno
 from ui.widgets.dialogos import confirmar_mensaje, mostrar_mensaje
 from ui.components import GlassCard, PillButton
 from ui.components.calendar import configure_calendar_theme
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # FUNCIONES AUXILIARES
@@ -327,8 +330,8 @@ class FormPasada(QWidget):
                 f"Hora: {hora}"
             )
 
-        except Exception:
-            pass
+        except sqlite3.Error:
+            logger.exception("No se pudo registrar la acción de la pasada en el log.")
 
         self.pasada_registrada.emit()
 

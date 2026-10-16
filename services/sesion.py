@@ -168,8 +168,8 @@ def verificar_token_sesion(token: str) -> bool:
             abs(float(timestamp_inicio) - (_sesion_iniciada or 0)) < 1):
             return validar_sesion_activa()
 
-    except Exception:
-        pass
+    except (TypeError, ValueError):
+        return False
 
     return False
 

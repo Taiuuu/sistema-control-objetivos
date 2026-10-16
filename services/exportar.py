@@ -4,9 +4,11 @@
 # =============================================================================
 
 import datetime
+import logging
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 from openpyxl.drawing.image import Image as XLImage
+
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
@@ -14,6 +16,8 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
 from services.reportes import generar_reporte_mensual, clasificar_cumplimiento
 
+
+logger = logging.getLogger(__name__)
 
 MESES = [
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -123,8 +127,8 @@ def exportar_excel(anio: int, mes: int, ruta: str, reporte: dict | None = None, 
         img.width = 80
         img.height = 80
         ws.add_image(img, "A1")
-    except Exception:
-        pass
+    except (ImportError, OSError, ValueError) as exc:
+        logger.warning("No se pudo agregar el logo al reporte Excel: %s", exc)
 
     ws.merge_cells("B1:F2")
     ws["B1"] = "Seguridad Privada"
@@ -210,7 +214,8 @@ def exportar_pdf(anio: int, mes: int, ruta: str, reporte: dict | None = None, fi
             ("ALIGN", (2, 0), (2, 0), "RIGHT"),
         ]))
         elementos.append(tabla_header)
-    except Exception:
+    except (OSError, ValueError) as exc:
+        logger.warning("No se pudo agregar el logo al reporte PDF: %s", exc)
         elementos.append(Paragraph("<b>VESP Organizations</b>", estilos["Title"]))
 
     elementos.append(Spacer(1, 0.5*cm))

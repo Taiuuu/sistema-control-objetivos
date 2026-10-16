@@ -2,7 +2,7 @@
 # VESP Organizations - Vista de Indexación y Optimización
 # =============================================================================
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QThreadPool
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QTabWidget, QTableWidget, QTableWidgetItem, QMessageBox,
@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QFont
 from services.db_analyzer import AnalisisBD
+from services.background_task import BackgroundTask
 from services.auditoria import registrar_auditoria, TipoOperacion
 from datetime import datetime
 from ui.components import StatusBadge
@@ -23,6 +24,7 @@ class VistaIndexacion(QWidget):
         super().__init__()
         self.usuario_actual = usuario_actual
         self.analizador = AnalisisBD()
+        self._tarea_optimizacion = None
         self.init_ui()
         self.actualizar_datos()
 
@@ -42,10 +44,10 @@ class VistaIndexacion(QWidget):
         btn_actualizar.clicked.connect(self.actualizar_datos)
         botones_layout.addWidget(btn_actualizar)
         
-        btn_optimizar = QPushButton("⚡ Optimizar BD Ahora")
-        btn_optimizar.setObjectName("PrimaryButton")
-        btn_optimizar.clicked.connect(self.optimizar_bd)
-        botones_layout.addWidget(btn_optimizar)
+        self.btn_optimizar = QPushButton("⚡ Optimizar BD Ahora")
+        self.btn_optimizar.setObjectName("PrimaryButton")
+        self.btn_optimizar.clicked.connect(self.optimizar_bd)
+        botones_layout.addWidget(self.btn_optimizar)
         
         btn_exportar = QPushButton("📄 Exportar Reporte")
         btn_exportar.clicked.connect(self.exportar_reporte)
@@ -408,25 +410,43 @@ class VistaIndexacion(QWidget):
         if respuesta != QMessageBox.StandardButton.Yes:
             return
         
+        if self._tarea_optimizacion is not None:
+            return
+
+        self.btn_optimizar.setEnabled(False)
+        tarea = BackgroundTask(self.analizador.optimizar_bd)
+        tarea.signals.finished.connect(self._finalizar_optimizacion)
+        tarea.signals.error.connect(self._error_optimizacion)
+        self._tarea_optimizacion = tarea
+        QThreadPool.globalInstance().start(tarea)
+
+    def _finalizar_optimizacion(self, resultado):
+        self._tarea_optimizacion = None
+        self.btn_optimizar.setEnabled(True)
+
+        if not resultado["exitoso"]:
+            QMessageBox.critical(self, "Error", f"Error: {resultado.get('error')}")
+            return
+
         try:
-            resultado = self.analizador.optimizar_bd()
-            
-            if resultado["exitoso"]:
-                if self.usuario_actual:
-                    registrar_auditoria(
-                        usuario_id=self.usuario_actual.get('id') if isinstance(self.usuario_actual, dict) else None,
-                        tipo_operacion=TipoOperacion.UPDATE,
-                        tabla="bd",
-                        detalles="Optimización ejecutada: ANALYZE, VACUUM, REINDEX",
-                        usuario_nombre=self.usuario_actual.get('username') if isinstance(self.usuario_actual, dict) else None
-                    )
-                
-                QMessageBox.information(self, "Éxito", "BD optimizada correctamente")
-                self.actualizar_datos()
-            else:
-                QMessageBox.critical(self, "Error", f"Error: {resultado.get('error')}")
+            if self.usuario_actual:
+                registrar_auditoria(
+                    usuario_id=self.usuario_actual.get('id') if isinstance(self.usuario_actual, dict) else None,
+                    tipo_operacion=TipoOperacion.UPDATE,
+                    tabla="bd",
+                    detalles="Optimización ejecutada: ANALYZE, VACUUM, REINDEX",
+                    usuario_nombre=self.usuario_actual.get('username') if isinstance(self.usuario_actual, dict) else None
+                )
+
+            QMessageBox.information(self, "Éxito", "BD optimizada correctamente")
+            self.actualizar_datos()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al optimizar: {e}")
+
+    def _error_optimizacion(self, error):
+        self._tarea_optimizacion = None
+        self.btn_optimizar.setEnabled(True)
+        QMessageBox.critical(self, "Error", f"Error al optimizar: {error}")
 
     def exportar_reporte(self):
         """Exporta el reporte a archivo."""
