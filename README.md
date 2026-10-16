@@ -64,6 +64,8 @@ python -m api.app
 Por defecto queda disponible en `http://127.0.0.1:5000`. El host, puerto y modo debug pueden
 configurarse con `VESP_API_HOST`, `VESP_API_PORT` y `VESP_API_DEBUG`. La especificación OpenAPI
 está disponible en `GET /api/docs`.
+El rate limiting usa almacenamiento en memoria por defecto; para que los límites se compartan
+entre procesos, configurá `VESP_RATE_LIMIT_STORAGE_URI` con una URL Redis.
 La publicación de notificaciones SSE requiere el encabezado
 `Authorization: Bearer <VESP_SSE_PUBLISH_TOKEN>`; el valor predeterminado es
 `Mosconi2795` para uso local. Cambialo mediante esa variable de entorno antes de
