@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QPushButton, QMessageBox, QDialog,
     QLabel, QLineEdit, QDateEdit, QCheckBox,
     QInputDialog, QComboBox, QListWidget, QTabWidget, QMenu, QHeaderView,
-    QHBoxLayout
+    QHBoxLayout, QScrollArea, QFrame
 )
 from PyQt6.QtCore import QDate, Qt
 from models.objetivos import (
@@ -59,13 +59,14 @@ class DialogoEditarObjetivo(QDialog):
         self.setFixedSize(440, 620)
         self._theme_manager = get_theme_manager()
 
-        card = GlassCard(parent=self)
+        card = GlassCard()
         layout = QVBoxLayout()
         layout.setSpacing(10)
         card.add_layout(layout)
 
         layout.addWidget(QLabel("Nombre:"))
         self.input_nombre = QLineEdit(objetivo.nombre)
+        self.input_nombre.setFixedHeight(38)
         layout.addWidget(self.input_nombre)
 
         layout.addWidget(QLabel("Fecha inicio:"))
@@ -73,6 +74,8 @@ class DialogoEditarObjetivo(QDialog):
         self.input_inicio.setCalendarPopup(True)
         configure_calendar_theme(self.input_inicio)
         self.input_inicio.setDate(QDate.fromString(objetivo.fecha_inicio, "yyyy-MM-dd"))
+        self.input_inicio.setDisplayFormat("dd/MM/yyyy")
+        self.input_inicio.setFixedHeight(38)
         layout.addWidget(self.input_inicio)
 
         layout.addWidget(QLabel("Tipo de objetivo:"))
@@ -80,9 +83,11 @@ class DialogoEditarObjetivo(QDialog):
         self.selector_tipo.addItem("Puntual", "puntual")
         self.selector_tipo.addItem("Intermitente", "intermitente")
         self.selector_tipo.setCurrentIndex(1 if objetivo.tipo_objetivo == "intermitente" else 0)
+        self.selector_tipo.setFixedHeight(38)
         layout.addWidget(self.selector_tipo)
 
         self.check_fin = QCheckBox("Tiene fecha de finalización:")
+        self.check_fin.setFixedHeight(28)
         self.check_fin.setChecked(objetivo.fecha_fin is not None)
         self.check_fin.toggled.connect(self._toggle_fecha_fin)
         layout.addWidget(self.check_fin)
@@ -95,6 +100,8 @@ class DialogoEditarObjetivo(QDialog):
         else:
             self.input_fin.setDate(QDate.currentDate())
         self.input_fin.setEnabled(objetivo.fecha_fin is not None)
+        self.input_fin.setDisplayFormat("dd/MM/yyyy")
+        self.input_fin.setFixedHeight(38)
         layout.addWidget(self.input_fin)
 
         layout.addWidget(QLabel("Días de cobertura:"))
@@ -102,20 +109,31 @@ class DialogoEditarObjetivo(QDialog):
         self.dias = {}
         for nombre_dia, numero in DIAS_NOMBRES.items():
             cb = QCheckBox(nombre_dia)
+            cb.setFixedHeight(28)
             cb.setChecked(numero in dias_actuales)
             layout.addWidget(cb)
             self.dias[nombre_dia] = cb
 
         self.historial = QListWidget()
+        self.historial.setMinimumHeight(90)
         layout.addWidget(QLabel("Historial de períodos:"))
         layout.addWidget(self.historial)
         self._cargar_historial()
 
         self.boton_periodo = QPushButton()
         self.boton_periodo.setObjectName("ObjectivePeriodAction")
+        self.boton_periodo.setFixedHeight(38)
         self.boton_periodo.clicked.connect(self._cambiar_periodo)
         layout.addWidget(self.boton_periodo)
         self._actualizar_boton_periodo()
+
+        area_desplazamiento = QScrollArea(self)
+        area_desplazamiento.setWidgetResizable(True)
+        area_desplazamiento.setFrameShape(QFrame.Shape.NoFrame)
+        area_desplazamiento.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        area_desplazamiento.setWidget(card)
 
         fila_botones = QHBoxLayout()
         fila_botones.addStretch()
@@ -126,11 +144,12 @@ class DialogoEditarObjetivo(QDialog):
         self.boton_guardar.clicked.connect(self._guardar)
         fila_botones.addWidget(self.boton_cancelar)
         fila_botones.addWidget(self.boton_guardar)
-        layout.addLayout(fila_botones)
 
         layout_principal = QVBoxLayout(self)
         layout_principal.setContentsMargins(16, 16, 16, 16)
-        layout_principal.addWidget(card)
+        layout_principal.setSpacing(10)
+        layout_principal.addWidget(area_desplazamiento, 1)
+        layout_principal.addLayout(fila_botones)
         self._theme_manager.theme_changed.connect(self._aplicar_tema)
         self._aplicar_tema(self._theme_manager.current())
 

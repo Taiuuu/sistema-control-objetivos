@@ -1,7 +1,7 @@
 import pytest
 from types import SimpleNamespace
 from PyQt6.QtGui import QColor
-from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtCore import QDate, QPoint, Qt
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
@@ -280,6 +280,57 @@ def test_objectives_screen_uses_glass_card_and_single_branded_primary(
 
     manager.set_theme(original_theme)
     window.close()
+
+
+def test_edit_objective_dialog_keeps_controls_separated_in_scroll_area(app, monkeypatch):
+    import ui.lista_objetivos as objectives_screen
+    from models.types import Objetivo
+
+    monkeypatch.setattr(objectives_screen, "listar_periodos", lambda _objective_id: [])
+    dialog = objectives_screen.DialogoEditarObjetivo(
+        Objetivo(
+            nombre="Objetivo de prueba",
+            fecha_inicio="2026-10-01",
+            dias_semana="1,2,3,4,5,6,7",
+            id=1,
+        )
+    )
+    dialog.show()
+    app.processEvents()
+
+    area = dialog.findChild(objectives_screen.QScrollArea)
+    assert area is not None
+    assert area.verticalScrollBar().maximum() > 0
+
+    labels = {
+        label.text(): label
+        for label in dialog.findChildren(QLabel)
+        if label.text() in {
+            "Nombre:",
+            "Fecha inicio:",
+            "Tipo de objetivo:",
+            "Días de cobertura:",
+        }
+    }
+
+    def top(widget):
+        return widget.mapTo(dialog, QPoint(0, 0)).y()
+
+    def bottom(widget):
+        return widget.mapTo(dialog, QPoint(0, widget.height())).y()
+
+    assert bottom(labels["Nombre:"]) <= top(dialog.input_nombre)
+    assert bottom(dialog.input_nombre) <= top(labels["Fecha inicio:"])
+    assert bottom(labels["Fecha inicio:"]) <= top(dialog.input_inicio)
+    assert bottom(dialog.input_inicio) <= top(labels["Tipo de objetivo:"])
+    assert bottom(labels["Tipo de objetivo:"]) <= top(dialog.selector_tipo)
+    assert bottom(dialog.selector_tipo) <= top(dialog.check_fin)
+    assert bottom(dialog.check_fin) <= top(dialog.input_fin)
+    assert bottom(dialog.input_fin) <= top(labels["Días de cobertura:"])
+    assert bottom(dialog.boton_cancelar) <= dialog.height()
+    assert bottom(dialog.boton_guardar) <= dialog.height()
+
+    dialog.close()
 
 
 def test_component_preview_switches_all_components_live(app, tmp_path, monkeypatch):
