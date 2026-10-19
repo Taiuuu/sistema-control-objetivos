@@ -96,7 +96,7 @@ def _eliminar_pasada(pasada_id: int) -> None:
 def _eliminar_pasadas_por_fecha(fecha: str) -> int:
     conexion = sqlite3.connect(DB_PATH)
     try:
-        from services.backup import crear_backup
+        from services.backups.backup import crear_backup
         crear_backup("manual", conexion_origen=conexion)
         conexion.execute("BEGIN")
         cursor = conexion.execute(

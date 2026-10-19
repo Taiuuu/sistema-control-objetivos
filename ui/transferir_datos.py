@@ -185,7 +185,7 @@ class TransferirDatos(QWidget):
                 return
 
             # Backup antes de importar
-            from services.backup import hacer_backup
+            from services.backups.backup import hacer_backup
             backup_creado = hacer_backup()
             if backup_creado:
                 self.log.append("✓ Backup realizado antes de importar.")

@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.logging_config import configurar_logging
 from core.configuracion import DB_PATH
 from core.instancia import adquirir_bloqueo_instancia
-from services.backup import listar_backups, restaurar_backup
+from services.backups.backup import listar_backups, restaurar_backup
 
 
 def main() -> int:

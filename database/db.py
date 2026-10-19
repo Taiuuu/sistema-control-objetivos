@@ -417,7 +417,7 @@ def _respaldar_duplicados_naturales_antes_de_migrar() -> None:
         conexion.close()
 
     if duplicados:
-        from services.backup import crear_backup
+        from services.backups.backup import crear_backup
 
         conexion_respaldo = _sqlite3_connect_original(DB_PATH)
         try:

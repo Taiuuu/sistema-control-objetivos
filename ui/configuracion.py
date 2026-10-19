@@ -297,7 +297,7 @@ class ConfiguracionDialog(QDialog):
         )
 
     def _actualizar_backups(self) -> None:
-        from services.backup import listar_backups
+        from services.backups.backup import listar_backups
 
         self.backup_list.clear()
         for copia in listar_backups():
@@ -311,7 +311,7 @@ class ConfiguracionDialog(QDialog):
             self.backup_list.addItem(fila)
 
     def _crear_backup(self) -> None:
-        from services.backup import crear_backup
+        from services.backups.backup import crear_backup
 
         try:
             ruta = crear_backup("manual")
@@ -360,7 +360,7 @@ class ConfiguracionDialog(QDialog):
         if not aceptada or confirmacion != "RESTAURAR":
             QMessageBox.information(self, "Restauración cancelada", "No se modificó la base.")
             return
-        from services.backup import restaurar_backup
+        from services.backups.backup import restaurar_backup
 
         try:
             restaurar_backup(ruta)

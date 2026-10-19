@@ -11,7 +11,7 @@ import pytest
 
 from core.instancia import adquirir_bloqueo_instancia
 from database import db as db_module
-from services import backup
+from services.backups import backup
 from services.operaciones_seguras import (
     eliminar_pasadas_mes,
     obtener_vista_previa_borrado_mes,
