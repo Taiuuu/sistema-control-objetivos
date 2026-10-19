@@ -289,7 +289,6 @@ class VentanaPrincipal(QWidget):
         self.panel_lateral = GlassCard(
             shadow=True,
             content_margins=0,
-            background_alpha=220,
         )
         self.panel_lateral.setFixedWidth(self.SIDEBAR_EXPANDIDO)
 

@@ -89,8 +89,8 @@ def generate_calendar_stylesheet(tokens: Mapping[str, str]) -> str:
             border: none;
             gridline-color: transparent;
             outline: none;
-            selection-background-color: {tokens["accent"]};
-            selection-color: {tokens["accent_text"]};
+            selection-background-color: {tokens["selection_bg"]};
+            selection-color: {tokens["selection_text"]};
             font-size: {tokens["font_size_md"]};
         }}
         QCalendarWidget QTableView#qt_calendar_calendarview::item,
@@ -105,8 +105,8 @@ def generate_calendar_stylesheet(tokens: Mapping[str, str]) -> str:
             background-color: {_rgba(tokens["accent"], 18)};
         }}
         QCalendarWidget QTableView#qt_calendar_calendarview::item:selected {{
-            color: {tokens["accent_text"]};
-            background-color: {tokens["accent"]};
+            color: {tokens["selection_text"]};
+            background-color: {tokens["selection_bg"]};
         }}
         QCalendarWidget QTableView#qt_calendar_calendarview QHeaderView::section {{
             min-height: 24px;
@@ -157,8 +157,8 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             font-weight: 600;
         }}
         QPushButton:hover {{
-            color: {tokens["text_primary"]};
-            background-color: {tokens["surface_alt"]};
+            color: {tokens["hover_text"]};
+            background-color: {tokens["hover_bg"]};
             border-color: {tokens["accent"]};
         }}
         QPushButton:pressed {{
@@ -166,7 +166,7 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
         }}
         QPushButton:disabled {{
             color: {tokens["text_disabled"]};
-            background-color: {tokens["surface_alt"]};
+            background-color: {tokens["disabled_bg"]};
             border-color: {tokens["border"]};
         }}
         QPushButton#SidebarActive {{
@@ -217,40 +217,45 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             background-color: {tokens["surface_alt"]};
             border: {tokens["border_width"]} solid {tokens["border"]};
             border-radius: {tokens["radius_sm"]};
-            selection-background-color: {tokens["accent"]};
-            selection-color: {tokens["accent_text"]};
+            selection-background-color: {tokens["selection_bg"]};
+            selection-color: {tokens["selection_text"]};
         }}
         QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus,
         QDateEdit:focus, QDateTimeEdit:focus, QTimeEdit:focus, QSpinBox:focus {{
-            border-color: {tokens["accent"]};
+            border-color: {tokens["focus"]};
         }}
         QLineEdit:disabled, QTextEdit:disabled, QPlainTextEdit:disabled,
         QComboBox:disabled, QDateEdit:disabled, QDateTimeEdit:disabled,
         QTimeEdit:disabled, QSpinBox:disabled {{
             color: {tokens["text_disabled"]};
+            background-color: {tokens["disabled_bg"]};
         }}
         QComboBox QAbstractItemView {{
             color: {tokens["text_primary"]};
             background-color: {tokens["surface"]};
             border: {tokens["border_width"]} solid {tokens["border"]};
-            selection-background-color: {tokens["accent"]};
-            selection-color: {tokens["accent_text"]};
+            selection-background-color: {tokens["selection_bg"]};
+            selection-color: {tokens["selection_text"]};
         }}
         QListWidget, QTextEdit, QPlainTextEdit {{
             color: {tokens["text_primary"]};
             background-color: {_rgba(tokens["surface"], 248)};
             border: {tokens["border_width"]} solid {tokens["border"]};
             border-radius: {tokens["radius_sm"]};
-            selection-background-color: {_rgba(tokens["accent"], 16)};
-            selection-color: {tokens["text_primary"]};
+            selection-background-color: {tokens["selection_bg"]};
+            selection-color: {tokens["selection_text"]};
         }}
         QListWidget::item {{
             padding: 6px {tokens["spacing_sm"]};
             border-bottom: {tokens["border_width"]} solid {_rgba(tokens["border"], 45)};
         }}
         QListWidget::item:hover, QListWidget::item:selected {{
-            background-color: {_rgba(tokens["accent"], 12)};
-            color: {tokens["text_primary"]};
+            background-color: {tokens["hover_bg"]};
+            color: {tokens["hover_text"]};
+        }}
+        QListWidget::item:selected {{
+            background-color: {tokens["selection_bg"]};
+            color: {tokens["selection_text"]};
         }}
         QGroupBox {{
             color: {tokens["text_secondary"]};
@@ -273,31 +278,39 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             border: none;
             border-radius: {tokens["radius_md"]};
             gridline-color: transparent;
-            selection-background-color: {_rgba(tokens["accent"], 16)};
-            selection-color: {tokens["text_primary"]};
+            selection-background-color: {tokens["selection_bg"]};
+            selection-color: {tokens["selection_text"]};
         }}
         QTableWidget::item {{
             border-bottom: {tokens["border_width"]} solid {_rgba(tokens["border"], 45)};
             padding: 7px 8px;
         }}
         QTableWidget::item:hover, QTableWidget::item:selected {{
-            color: {tokens["text_primary"]};
-            background-color: {_rgba(tokens["accent"], 12)};
+            color: {tokens["hover_text"]};
+            background-color: {tokens["hover_bg"]};
+        }}
+        QTableWidget::item:selected {{
+            color: {tokens["selection_text"]};
+            background-color: {tokens["selection_bg"]};
         }}
         QTableView {{
             color: {tokens["text_primary"]};
             background-color: {_rgba(tokens["surface"], 248)};
             border: none;
             gridline-color: transparent;
-            selection-background-color: {_rgba(tokens["accent"], 16)};
-            selection-color: {tokens["text_primary"]};
+            selection-background-color: {tokens["selection_bg"]};
+            selection-color: {tokens["selection_text"]};
         }}
         QTableView::item {{
             border-bottom: {tokens["border_width"]} solid {_rgba(tokens["border"], 45)};
             padding: 7px 8px;
         }}
         QTableView::item:hover, QTableView::item:selected {{
-            background-color: {_rgba(tokens["accent"], 12)};
+            background-color: {tokens["hover_bg"]};
+        }}
+        QTableView::item:selected {{
+            background-color: {tokens["selection_bg"]};
+            color: {tokens["selection_text"]};
         }}
         QHeaderView::section {{
             color: {tokens["text_secondary"]};
@@ -323,12 +336,13 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             margin: {tokens["spacing_xs"]};
         }}
         QTabBar::tab:selected {{
-            color: {tokens["text_primary"]};
-            background-color: {tokens["surface_alt"]};
+            color: {tokens["selection_text"]};
+            background-color: {tokens["selection_bg"]};
             border-color: {tokens["accent"]};
         }}
         QTabBar::tab:hover:!selected {{
-            color: {tokens["text_primary"]};
+            color: {tokens["hover_text"]};
+            background-color: {tokens["hover_bg"]};
             border-color: {tokens["border"]};
         }}
         QScrollBar:vertical {{
@@ -364,8 +378,8 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             border-radius: {tokens["radius_sm"]};
         }}
         QMenu::item:selected {{
-            color: {tokens["text_primary"]};
-            background-color: {_rgba(tokens["accent"], 16)};
+            color: {tokens["selection_text"]};
+            background-color: {tokens["selection_bg"]};
         }}
         QMenu::item[danger="true"] {{ color: {tokens["danger"]}; }}
         QMenu::item[danger="true"]:selected {{
@@ -395,6 +409,16 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             background-color: {tokens["surface"]};
             border: {tokens["border_width"]} solid {tokens["border"]};
             border-radius: {tokens["radius_card"]};
+        }}
+        QMessageBox, QFileDialog {{
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface"]};
+        }}
+        QFileDialog QTreeView, QFileDialog QListView {{
+            color: {tokens["text_primary"]};
+            background-color: {tokens["surface"]};
+            selection-background-color: {tokens["selection_bg"]};
+            selection-color: {tokens["selection_text"]};
         }}
         QToolTip {{
             color: {tokens["text_primary"]};

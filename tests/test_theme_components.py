@@ -392,16 +392,19 @@ def test_sidebar_menu_buttons_initialize_and_refresh_theme(app, tmp_path, monkey
         app.processEvents()
 
 
-def test_translucent_sidebar_card_keeps_theme_surface_and_shadow(app, tmp_path, monkeypatch):
+def test_sidebar_card_uses_opaque_theme_surface_and_shadow(app, tmp_path, monkeypatch):
     manager = get_theme_manager()
     original_theme = manager.current()
     monkeypatch.setattr(manager, "_config_file", tmp_path / "tema.json")
-    card = GlassCard(shadow=True, background_alpha=220, content_margins=0)
+    card = GlassCard(shadow=True, content_margins=0)
 
     try:
         for theme_name in manager.available_themes():
             manager.set_theme(theme_name)
-            assert "background-color: rgba(" in card.styleSheet()
+            assert (
+                f"background-color: {manager.tokens(theme_name)['surface']};"
+                in card.styleSheet()
+            )
             assert card.graphicsEffect() is not None
             assert card._shadow_effect is not None
             assert card._shadow_effect.blurRadius() == 22

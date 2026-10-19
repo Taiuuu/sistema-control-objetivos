@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from PyQt6.QtCore import qInstallMessageHandler
@@ -33,10 +34,16 @@ def test_all_themes_define_same_complete_token_surface():
         "text_primary",
         "text_secondary",
         "text_disabled",
+        "disabled_bg",
         "accent",
         "accent_hover",
         "accent_hover_text",
         "accent_text",
+        "focus",
+        "hover_bg",
+        "hover_text",
+        "selection_bg",
+        "selection_text",
         "success",
         "success_text",
         "warning",
@@ -73,6 +80,23 @@ def test_theme_logo_paths_exist_for_every_theme():
     assert all(Path(tokens["logo_path"]).is_file() for tokens in THEMES.values())
 
 
+def test_ui_colors_are_defined_only_in_the_theme_tokens():
+    color_pattern = re.compile(r"(?:#[0-9a-fA-F]{6}\b|rgb\()")
+    ui_root = Path(__file__).resolve().parents[1] / "ui"
+    exceptions = {Path("theme/tokens.py")}
+
+    hardcoded = [
+        path.relative_to(ui_root)
+        for path in ui_root.rglob("*")
+        if path.is_file()
+        and path.suffix in {".py", ".qss"}
+        and path.relative_to(ui_root) not in exceptions
+        and color_pattern.search(path.read_text(encoding="utf-8"))
+    ]
+
+    assert hardcoded == []
+
+
 def test_stylesheet_covers_global_controls_for_each_theme():
     for tokens in THEMES.values():
         stylesheet = generate_stylesheet(tokens)
@@ -97,6 +121,8 @@ def test_stylesheet_covers_global_controls_for_each_theme():
             assert selector in stylesheet
         assert tokens["bg_gradient_start"] in stylesheet
         assert tokens["accent"] in stylesheet
+        assert tokens["selection_bg"] in stylesheet
+        assert tokens["hover_bg"] in stylesheet
         assert "QTableWidget::item" in stylesheet
         assert "padding: 7px 8px;" in stylesheet
         assert "QTableView::item" in stylesheet
@@ -256,6 +282,9 @@ def test_theme_text_and_status_colors_meet_wcag_contrast():
         for foreground, background in (
             ("accent_text", "accent"),
             ("accent_hover_text", "accent_hover"),
+            ("hover_text", "hover_bg"),
+            ("selection_text", "selection_bg"),
+            ("text_disabled", "disabled_bg"),
             ("danger_button_text", "danger_button_bg"),
             ("text_primary", "surface_alt"),
         ):

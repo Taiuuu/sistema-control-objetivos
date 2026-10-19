@@ -211,8 +211,30 @@ class ThemeManager(QObject):
         palette.setColor(QPalette.ColorRole.WindowText, QColor(tokens["text_primary"]))
         palette.setColor(QPalette.ColorRole.Button, QColor(tokens["surface_alt"]))
         palette.setColor(QPalette.ColorRole.ButtonText, QColor(tokens["text_primary"]))
-        palette.setColor(QPalette.ColorRole.Highlight, QColor(tokens["accent"]))
-        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(tokens["accent_text"]))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(tokens["selection_bg"]))
+        palette.setColor(
+            QPalette.ColorRole.HighlightedText, QColor(tokens["selection_text"])
+        )
+        for role in (
+            QPalette.ColorRole.WindowText,
+            QPalette.ColorRole.Text,
+            QPalette.ColorRole.ButtonText,
+        ):
+            palette.setColor(
+                QPalette.ColorGroup.Disabled,
+                role,
+                QColor(tokens["text_disabled"]),
+            )
+        palette.setColor(
+            QPalette.ColorGroup.Disabled,
+            QPalette.ColorRole.Base,
+            QColor(tokens["disabled_bg"]),
+        )
+        palette.setColor(
+            QPalette.ColorGroup.Disabled,
+            QPalette.ColorRole.Button,
+            QColor(tokens["disabled_bg"]),
+        )
         app.setPalette(palette)
         app.setStyleSheet(generate_stylesheet(tokens))
 

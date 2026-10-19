@@ -14,7 +14,7 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
-from PyQt6.QtCore import QTimer, QObject, pyqtSignal
+from PyQt6.QtCore import QTimer, QObject, Qt, pyqtSignal
 
 from ui.login import LoginWindow
 from ui.ventana_principal import VentanaPrincipal
@@ -159,6 +159,9 @@ def iniciar_app() -> None:
     logger.info("🚀 Iniciando VESP Organizations")
 
     try:
+        QApplication.setAttribute(
+            Qt.ApplicationAttribute.AA_DontUseNativeDialogs, True
+        )
         app = QApplication(sys.argv)
     except Exception as error:
         logger.critical("No se pudo inicializar Qt", exc_info=True)
