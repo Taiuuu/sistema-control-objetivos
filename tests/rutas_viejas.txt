@@ -10,6 +10,7 @@ path: CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx
 path: scripts/instalador.iss
 path: seguridad.db
 path: sync_queue.json
+path: docs/version.txt
 module: services.actualizador
 module: services.calculo_pasadas
 module: services.backup

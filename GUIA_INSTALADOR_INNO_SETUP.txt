@@ -101,7 +101,7 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Ejecutar {#MyAppName}"; Flags: 
 ## 🔄 ACTUALIZACIÓN PARA NUEVAS VERSIONES
 
 ### Checklist Pre-Actualización:
-- [ ] **Cambiar versión en código**: Actualizar `docs/version.txt`
+- [ ] **Cambiar versión en código**: Actualizar `version.txt`
 - [ ] **Actualizar requirements.txt**: Si hay nuevas dependencias
 - [ ] **Probar la aplicación**: Asegurarse que funciona correctamente
 - [ ] **Crear nuevo ejecutable**: `pyinstaller --onefile --windowed --name "VESP Control" --add-data "assets;assets" scripts/main.py`

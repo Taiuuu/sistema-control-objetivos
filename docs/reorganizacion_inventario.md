@@ -48,5 +48,6 @@ Inventario inicial generado antes de mover rutas. Se debe repetir la búsqueda g
 - `services/import_history.py` se movió a `services/importador/import_history.py`; el historial continúa almacenándose bajo `~/VESP Control/`.
 - `seguridad.db` y `sync_queue.json` se archivaron en `_archivo/` porque las rutas runtime de base/cola apuntan al directorio del usuario, no a la raíz del repo.
 - Los `.pyc` versionados se retiraron del índice.
+- `docs/version.txt` era idéntico a `version.txt`; se retiró el duplicado y login/guía usan la fuente raíz.
 - El Excel local de octubre se comparó con la fixture versionada: sus SHA-256 difieren (`3140e2bed38338a8f22bfc44f64846c7575071063e6097a46e337f8ba5c354fa` frente a `b6adac3a25a2acb80dafcd47290e5e1426c31c9ba3a75f4b3ba2df0eab75a482`). Sigue sin versionar y se deja intacto, pendiente de decisión.
 - `version.txt` y `pytest.ini` permanecen en raíz por compatibilidad de URL y descubrimiento automático de configuración.
