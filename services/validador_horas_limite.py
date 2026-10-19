@@ -4,7 +4,7 @@
 
 import datetime
 from typing import Tuple, Optional
-from services.calculo_pasadas import hora_corresponde_a_turno
+from services.pasadas.calculo_pasadas import hora_corresponde_a_turno
 
 
 def _parsear_hora(hora: str) -> datetime.time:

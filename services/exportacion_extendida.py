@@ -8,7 +8,7 @@ import json
 import csv
 from datetime import date, datetime, timedelta
 from database.db import DB_PATH
-from services.calculo_pasadas import rango_datetime_de_mes
+from services.pasadas.calculo_pasadas import rango_datetime_de_mes
 
 
 def exportar_pasadas_csv(anio: int, mes: int, ruta: str) -> None:

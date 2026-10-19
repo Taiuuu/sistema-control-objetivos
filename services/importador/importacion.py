@@ -34,7 +34,7 @@ from typing import Any
 
 from core.configuracion import EXPORTS_DIR
 from services.backup import crear_backup
-from services.calculo_pasadas import mes_de_fecha_turno
+from services.pasadas.calculo_pasadas import mes_de_fecha_turno
 from .modelos import (
     PasadaNormalizada,
     Problema,

@@ -9,7 +9,7 @@ import calendar
 import datetime
 from database.db import DB_PATH
 from services.backup import crear_backup
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     fecha_hora_desde_fecha_turno,
     mes_de_pasada,
     rango_datetime_de_mes,

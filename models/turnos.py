@@ -25,7 +25,7 @@ from .validators import (
     validar_hora,
     validar_id
 )
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     fecha_de_turno,
     fecha_hora_desde_fecha_turno,
     hora_corresponde_a_turno,

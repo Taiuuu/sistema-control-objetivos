@@ -57,7 +57,7 @@ Las rutas mensuales que usan `fecha_operativa` dependen de que ese campo esté p
 
 ## Resolución aplicada en esta etapa
 
-- `services/calculo_pasadas.py` concentra la atribución de fecha de turno, mes, rangos mensuales y conteo natural de pasadas.
+- `services/pasadas/calculo_pasadas.py` concentra la atribución de fecha de turno, mes, rangos mensuales y conteo natural de pasadas.
 - El importador usa el modulo central para inferir fecha calendario a partir de la fecha de hoja; NOCHE antes de las 08:00 cae en el dia calendario siguiente, conservando la fecha operativa de la hoja.
 - Reportes mensual/por objetivo, estadísticas mensuales, exportaciones, API y pantallas consultan `fecha_operativa` (con fallback histórico cuando falta) y reutilizan las funciones centrales para indexar o contar. La tabla de cobertura también deduplica con la clave natural central.
 - La sincronización conserva la validación opcional del horario, pero calcula la fecha de turno centralmente incluso cuando se desactiva esa validación.

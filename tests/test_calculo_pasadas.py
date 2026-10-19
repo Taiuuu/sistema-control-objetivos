@@ -1,6 +1,6 @@
 from datetime import date, datetime, time, timedelta
 
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     contar_pasadas_por_objetivo,
     fecha_calendario_de_turno,
     fecha_de_turno,
@@ -132,7 +132,7 @@ def test_fechas_de_turno_de_excel_conservan_el_dia_de_la_hoja():
 
 
 def test_ciclos_dia_noche_admiten_solapamientos_sin_inferir_turno():
-    from services.calculo_pasadas import hora_corresponde_a_turno
+    from services.pasadas.calculo_pasadas import hora_corresponde_a_turno
     from services.gestor_turnos import GestorTurnos
 
     assert hora_corresponde_a_turno(time(7, 40), "D")

@@ -11,7 +11,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 import threading
 from services.data_provider import get_data_provider, Pasada
-from services.calculo_pasadas import fecha_de_turno
+from services.pasadas.calculo_pasadas import fecha_de_turno
 from services.gestor_turnos import GestorTurnos
 from services.config_app import sync_remoto_habilitado, ruta_sync_queue
 

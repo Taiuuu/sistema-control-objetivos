@@ -9,7 +9,7 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     fecha_calendario_de_turno,
     fecha_de_turno,
     normalizar_turno,
