@@ -28,6 +28,7 @@ from ui.components import GlassCard, PillButton, StatusBadge
 from ui.components.calendar import configure_calendar_theme
 from ui.components.base import rgba
 from ui.theme.theme_manager import get_theme_manager
+from ui.atajos import registrar_atajo
 
 
 DIAS_MAP = {
@@ -300,6 +301,7 @@ class ListaObjetivos(QWidget):
         if tiene_permiso("objetivos.crear"):
             self.boton_agregar = PillButton("＋  Agregar objetivo", "primary")
             self.boton_agregar.setObjectName("ObjectivesPrimaryAction")
+            self.boton_agregar.setToolTip("Agregar objetivo (Ctrl+N)")
             self.boton_agregar.clicked.connect(self._abrir_form_objetivo)
             header.addWidget(self.boton_agregar, 0, Qt.AlignmentFlag.AlignVCenter)
         card_layout.addLayout(header)
@@ -328,6 +330,9 @@ class ListaObjetivos(QWidget):
 
         layout.addWidget(card)
         self._cargar_tabla()
+        registrar_atajo(self, "F5", self._cargar_tabla)
+        if self.boton_agregar is not None:
+            registrar_atajo(self, "Ctrl+N", self._abrir_form_objetivo)
 
         # Conectar señales de sincronización
         self.sincronizador = obtener_sincronizador()

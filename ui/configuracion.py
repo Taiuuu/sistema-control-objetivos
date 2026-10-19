@@ -204,6 +204,14 @@ class ConfiguracionDialog(QDialog):
                 "La configuración de funciones requiere una sesión iniciada."
             )
         funciones.addWidget(self.customize_menu_button)
+        self.keyboard_help_button = QPushButton("Atajos de teclado")
+        self.keyboard_help_button.setToolTip("Abrir la ayuda de atajos (F1)")
+        self.keyboard_help_button.setAccessibleName("Atajos de teclado")
+        if parent and hasattr(parent, "abrir_ayuda"):
+            self.keyboard_help_button.clicked.connect(parent.abrir_ayuda)
+        else:
+            self.keyboard_help_button.setEnabled(False)
+        funciones.addWidget(self.keyboard_help_button)
         funciones.addStretch(1)
 
         datos_page, datos = crear_pagina()

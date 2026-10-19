@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     , QDialog, QDialogButtonBox, QCheckBox, QGridLayout, QMenu
 )
 from PyQt6.QtCore import QDate, QTimer, QEvent, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QIcon, QShortcut, QKeySequence
+from PyQt6.QtGui import QColor, QIcon
 from services.reportes import obtener_objetivos_del_dia
 from services.queries_tabla import (
     obtener_equipo, obtener_supervisores_de_pasadas, cargar_supervisores
@@ -42,6 +42,7 @@ from ui.vista_indexacion import VistaIndexacion
 from ui.vista_sincronizacion import VistaSincronizacion
 from ui.configuracion import ConfiguracionDialog
 from ui.animaciones import animar_aparecer, tiene_animacion_activa
+from ui.atajos import escapar_o_limpiar_busqueda, registrar_atajo
 from ui.theme.theme_manager import get_theme_manager
 
 logger = logging.getLogger(__name__)
@@ -398,7 +399,9 @@ class VentanaPrincipal(QWidget):
         def add_btn(icono, texto, accion, tooltip_extra="", clave=None, seccion=None):
             b = BotonMenu(icono, texto, oscuro)
             b.setProperty("menu_key", clave or "")
-            b.setToolTip(f"{texto}  {tooltip_extra}".strip())
+            tooltip = f"{texto}  {tooltip_extra}".strip()
+            b.setProperty("base_tooltip", tooltip)
+            b.setToolTip(tooltip)
             b.clicked.connect(lambda: self._activar_boton(b, accion))
             self._botones_menu.append(b)
             self.layout_scroll.addWidget(b)
@@ -422,7 +425,7 @@ class VentanaPrincipal(QWidget):
             "registrar_turno", operacion,
         )
         add_btn(
-            "📝", "Notas del día", self.abrir_notas, "(Ctrl+N)",
+            "📝", "Notas del día", self.abrir_notas,
             "notas", operacion,
         )
 
@@ -440,7 +443,7 @@ class VentanaPrincipal(QWidget):
             "reporte_mensual", consultas,
         )
         add_btn(
-            "📅", "Reporte objetivo", self.abrir_reporte_mensual_objetivo, "(Ctrl+Ñ)",
+            "📅", "Reporte objetivo", self.abrir_reporte_mensual_objetivo,
             "reporte_objetivo", consultas,
         )
         add_btn("❓", "Ayuda", self.abrir_ayuda, "(Ctrl+H)", "ayuda", consultas)
@@ -482,6 +485,9 @@ class VentanaPrincipal(QWidget):
         for boton in self._botones_menu:
             clave = boton.property("menu_key")
             boton.setVisible(not clave or self._es_menu_visible(clave))
+        visibles = [boton for boton in self._botones_menu if not boton.isHidden()]
+        for indice, boton in enumerate(visibles[:9], start=1):
+            boton.setToolTip(f"{boton.property('base_tooltip')} · Ctrl+{indice}")
         for seccion, botones in self._secciones_menu.items():
             seccion.setVisible(
                 self._sidebar_expandido
@@ -1434,7 +1440,7 @@ class VentanaPrincipal(QWidget):
             ("Ctrl+O",     self.abrir_form_objetivo),
             ("Ctrl+S",     self.abrir_form_supervisor),
             ("Ctrl+T",     self.abrir_form_turno),
-            ("Ctrl+N",     self.abrir_notas),
+            ("Ctrl+N",     self.abrir_form_pasada),
             ("Ctrl+R",     self.abrir_reporte_mensual),
             ("Ctrl+B",     self.cargar_tabla),
             ("Ctrl+F",     self._enfocar_buscador_activo),
@@ -1444,14 +1450,39 @@ class VentanaPrincipal(QWidget):
             ("Ctrl+Left",  self._fecha_anterior),
             ("Ctrl+Right", self._fecha_siguiente),
             ("Ctrl+\\",    self._toggle_sidebar),
+            ("F1",         self.abrir_ayuda),
+            ("F5",         self.cargar_tabla),
         ]
         for seq, fn in mapa:
-            QShortcut(QKeySequence(seq), self).activated.connect(fn)
+            registrar_atajo(self, seq, fn)
+        for indice in range(1, 10):
+            registrar_atajo(
+                self,
+                f"Ctrl+{indice}",
+                lambda index=indice: self._ir_a_opcion_menu(index),
+            )
+
+    def _ir_a_opcion_menu(self, indice: int) -> None:
+        opciones_visibles = [
+            boton for boton in self._botones_menu if not boton.isHidden()
+        ]
+        if 1 <= indice <= len(opciones_visibles):
+            opciones_visibles[indice - 1].click()
 
     def _enfocar_buscador_activo(self) -> None:
         ventana_activa = self.app.activeWindow() if self.app else self
-        buscador = ventana_activa.findChild(QLineEdit) if ventana_activa else None
-        (buscador or self.buscador).setFocus()
+        if ventana_activa is None:
+            return
+        buscador = next(
+            (
+                campo
+                for campo in ventana_activa.findChildren(QLineEdit)
+                if campo.property("search_field") is True
+            ),
+            None,
+        )
+        if buscador is not None:
+            buscador.setFocus()
 
     def _configurar_timers(self):
         self.timer_inactividad = QTimer()
@@ -1798,7 +1829,17 @@ class VentanaPrincipal(QWidget):
             ventana = cls(*args, **kwargs)
             setattr(self, attr, ventana)
 
-            QShortcut(QKeySequence("Esc"), ventana).activated.connect(ventana.close)
+            registrar_atajo(
+                ventana,
+                "Esc",
+                lambda ventana=ventana: escapar_o_limpiar_busqueda(ventana),
+                proteger_edicion=False,
+            )
+            registrar_atajo(ventana, "F1", self.abrir_ayuda)
+            registrar_atajo(ventana, "Ctrl+H", self.abrir_ayuda)
+            registrar_atajo(
+                ventana, "Ctrl+F", self._enfocar_buscador_activo
+            )
 
             if on_close:
                 ventana.destroyed.connect(on_close)

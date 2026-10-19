@@ -88,6 +88,7 @@ class SearchInput(QLineEdit):
 
     def __init__(self, placeholder: str = "Buscar...", parent=None):
         super().__init__(parent)
+        self.setProperty("search_field", True)
         self.setPlaceholderText(placeholder)
         self._search_action = self.addAction(
             QIcon(),

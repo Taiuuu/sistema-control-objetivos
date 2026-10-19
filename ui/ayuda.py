@@ -12,22 +12,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from ui.theme.theme_manager import get_theme_manager
 from ui.components import GlassCard, ThemeLogo
-
-
-SHORTCUTS = [
-    ("Ctrl + P", "Registrar pasada"),
-    ("Ctrl + O", "Agregar objetivo"),
-    ("Ctrl + S", "Agregar supervisor"),
-    ("Ctrl + T", "Registrar turno"),
-    ("Ctrl + N", "Notas del día"),
-    ("Ctrl + R", "Reporte mensual"),
-    ("Ctrl + B", "Actualizar tabla principal"),
-    ("Ctrl + H", "Abrir esta ayuda"),
-    ("Ctrl + =", "Aumentar zoom"),
-    ("Ctrl + -", "Reducir zoom"),
-    ("Ctrl + ←", "Día anterior"),
-    ("Ctrl + →", "Día siguiente"),
-]
+from ui.atajos import ATAJOS
 
 
 class Ayuda(QWidget):
@@ -115,9 +100,9 @@ class Ayuda(QWidget):
         tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         tabla.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         tabla.verticalHeader().setVisible(False)
-        tabla.setRowCount(len(SHORTCUTS))
+        tabla.setRowCount(len(ATAJOS))
 
-        for i, (atajo, accion) in enumerate(SHORTCUTS):
+        for i, (atajo, accion) in enumerate(ATAJOS):
             item_atajo = QTableWidgetItem(atajo)
             item_atajo.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             tabla.setItem(i, 0, item_atajo)
@@ -125,7 +110,10 @@ class Ayuda(QWidget):
 
         layout.addWidget(tabla)
 
-        nota = QLabel("Tip: los atajos funcionan desde la ventana principal.")
+        nota = QLabel(
+            "Los atajos contextuales funcionan en las pantallas que muestran esa acción. "
+            "F1 o Ctrl+H abre esta ayuda."
+        )
         nota.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._nota_atajos = nota
         layout.addWidget(nota)

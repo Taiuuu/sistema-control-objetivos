@@ -184,7 +184,7 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 
 ### Cambiar Tema
 
-- En Configuración, elegí uno de los temas disponibles
+- En Configuración → Temas, elegí Blanco, Verde, Negro o Grafito
 - El tema elegido se guarda automáticamente
 
 ### Validar Índices y Caché
@@ -213,18 +213,37 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 
 | Tecla         | Acción                            |
 | ------------- | --------------------------------  |
-| `Enter`       | Completar login / Guardar cambios.|
-| `Esc`         | Cerrar diálogo.                   |
-| `Ctrl+E`      | Exportar (en reportes).           |
-| `Ctrl+Q`      | Cerrar la aplicación.             |
+| `Ctrl+F` | Enfocar el buscador de la pantalla actual, cuando exista. |
+| `Ctrl+E` | Abrir las opciones de exportación en pantallas compatibles. |
+| `Ctrl+N` | Crear un registro en pantallas que admiten altas, como pasadas y objetivos. |
+| `F5` | Actualizar la pantalla actual; en reportes vuelve a generarlos. |
+| `Esc` | Limpiar la búsqueda activa o cerrar la ventana actual. |
+| `Ctrl+1` a `Ctrl+9` | Abrir la opción correspondiente entre las primeras nueve visibles del menú. |
+| `F1` o `Ctrl+H` | Abrir la ayuda y la tabla completa de atajos. |
+| `Ctrl+P` | Registrar una pasada desde la ventana principal. |
+| `Ctrl+O` | Agregar un objetivo desde la ventana principal. |
+| `Ctrl+S` | Agregar un supervisor desde la ventana principal. |
+| `Ctrl+T` | Registrar un turno desde la ventana principal. |
+| `Ctrl+R` | Abrir el reporte mensual desde la ventana principal. |
+| `Ctrl+B` | Volver al control diario y actualizarlo. |
+| `Ctrl+Enter` | Generar el reporte mensual o por objetivo. |
+| `Ctrl+=` / `Ctrl+-` | Aumentar o reducir el tamaño de letra. |
+| `Ctrl+←` / `Ctrl+→` | Ir al día anterior o siguiente en el control diario. |
+| `Ctrl+\` | Contraer o expandir el menú lateral. |
+
+Los atajos de acción se ignoran mientras el foco está en un campo de texto para no
+interrumpir la escritura. Los atajos contextuales se aplican solo a las pantallas que
+ofrecen la acción; la ayuda muestra el catálogo común.
 
 ---
 
-## 🔧 CONFIGURACIÓN RECOMENDADA
+## 🔧 CONFIGURACIÓN
 
-- **Temá**: Oscuro (menos cansado para sesiones largas)
-- **Frecuencia de backup**: Diaria
-- **Sincronización**: Automática (si está habilitada)
+- **Funciones visibles**: elegí qué accesos aparecen en el menú; ocultar una opción no
+  cambia permisos ni desactiva registros de auditoría.
+- **Backups y datos**: revisá copias verificadas, creá una copia o configurá una ruta externa.
+- **Cuenta**: cambiá la contraseña de tu usuario.
+- **Ayuda**: abrí Atajos de teclado desde Configuración o presioná `F1`.
 
 ---
 

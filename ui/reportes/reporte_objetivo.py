@@ -11,7 +11,6 @@ from PyQt6.QtWidgets import (
     QPushButton, QTableWidget, QTableWidgetItem,
     QComboBox, QMessageBox, QScrollArea
 )
-from PyQt6.QtGui import QShortcut, QKeySequence
 from PyQt6.QtWidgets import QHeaderView
 from PyQt6.QtCore import Qt
 from services.background_task import run_background_task
@@ -30,6 +29,7 @@ from services.reportes_unificados.objetivo import (
 from ui.components import StatusBadge
 from ui.components.base import wrap_content_in_glass_card
 from ui.reportes.acciones_exportacion import mostrar_dialogo_exportar
+from ui.atajos import registrar_atajo
 
 
 # =============================================================================
@@ -138,13 +138,16 @@ class ReporteObjetivo(QWidget):
 
         self.boton_generar = QPushButton("Generar reporte")
         self.boton_generar.setObjectName("PrimaryButton")
+        self.boton_generar.setToolTip("Generar reporte (Ctrl+Enter)")
         self.boton_generar.clicked.connect(self._generar)
 
         self.boton_excel = QPushButton("Exportar Excel")
+        self.boton_excel.setToolTip("Abrir opciones de exportación (Ctrl+E)")
         self.boton_excel.clicked.connect(self._exportar_excel)
         self.boton_excel.setEnabled(False)
 
         self.boton_pdf = QPushButton("Exportar PDF")
+        self.boton_pdf.setToolTip("Abrir opciones de exportación")
         self.boton_pdf.clicked.connect(self._exportar_pdf)
         self.boton_pdf.setEnabled(False)
 
@@ -200,8 +203,9 @@ class ReporteObjetivo(QWidget):
         self.setLayout(layout)
         wrap_content_in_glass_card(self)
         self._actualizar_objetivos()
-        QShortcut(QKeySequence("Ctrl+Enter"), self).activated.connect(self._generar)
-        QShortcut(QKeySequence("Ctrl+E"), self).activated.connect(self._exportar_excel)
+        registrar_atajo(self, "Ctrl+Enter", self._generar)
+        registrar_atajo(self, "Ctrl+E", self._exportar_excel)
+        registrar_atajo(self, "F5", self._generar)
 
     # ------------------------------------------------------------------
     def _get_mes_anio(self):

@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QSpinBox, QLineEdit, QMenu, QHeaderView
     , QInputDialog
 )
-from PyQt6.QtCore import QDate, QSignalBlocker, QTime
+from PyQt6.QtCore import QDate, QSignalBlocker, QTime, Qt
 
 from database.db import DB_PATH
 from services.operaciones_seguras import (
@@ -31,6 +31,8 @@ from services.queries_tabla import (
 from services.reportes_unificados.consultas import crear_datos_para_exportar
 from services.reportes_unificados.datos import COLUMNAS_DIARIAS
 from ui.reportes.acciones_exportacion import mostrar_dialogo_exportar
+from ui.atajos import registrar_atajo
+from ui.form_pasada import FormPasada
 from ui.components import GlassCard, PillButton, SearchInput, StatusBadge
 from ui.components.calendar import configure_calendar_theme
 from ui.components.base import wrap_content_in_glass_card
@@ -419,11 +421,15 @@ class ListaPasadas(QWidget):
         fila.addWidget(self.selector_fecha)
 
         self.buscador = SearchInput("Buscar objetivo o supervisor...")
+        self.buscador.setToolTip(
+            "Buscar objetivo o supervisor (Ctrl+F); Esc limpia la búsqueda"
+        )
         self.buscador.setClearButtonEnabled(True)
         self.buscador.textChanged.connect(self._cargar_tabla)
         fila.addWidget(self.buscador, 1)
 
         self.btn_filtrar = PillButton("Filtrar", "secondary")
+        self.btn_filtrar.setToolTip("Mostrar u ocultar filtros adicionales")
         self.btn_filtrar.setCheckable(True)
         self.btn_filtrar.toggled.connect(self._alternar_filtros)
         fila.addWidget(self.btn_filtrar)
@@ -431,14 +437,17 @@ class ListaPasadas(QWidget):
         self.contador_filtros.setAccessibleName("Cantidad de filtros activos")
         fila.addWidget(self.contador_filtros)
         self.btn_limpiar_filtros = PillButton("Limpiar filtros", "ghost")
+        self.btn_limpiar_filtros.setToolTip("Restablecer los filtros")
         self.btn_limpiar_filtros.clicked.connect(self._limpiar_filtros)
         fila.addWidget(self.btn_limpiar_filtros)
 
         self.btn_exportar_excel = PillButton("Exportar Excel", "primary")
+        self.btn_exportar_excel.setToolTip("Exportar (Ctrl+E)")
         self.btn_exportar_excel.clicked.connect(self._exportar_excel)
         fila.addWidget(self.btn_exportar_excel)
 
         self.btn_exportar_pdf = PillButton("Exportar PDF", "secondary")
+        self.btn_exportar_pdf.setToolTip("Abrir opciones de exportación")
         self.btn_exportar_pdf.clicked.connect(self._exportar_pdf)
         fila.addWidget(self.btn_exportar_pdf)
 
@@ -536,6 +545,14 @@ class ListaPasadas(QWidget):
         self.setLayout(layout)
 
         self._actualizar_permisos()
+        registrar_atajo(self, "Ctrl+F", self.buscador.setFocus)
+        registrar_atajo(self, "Ctrl+N", self._nueva_pasada)
+        registrar_atajo(self, "F5", self._cargar_tabla)
+        registrar_atajo(
+            self,
+            "Ctrl+E",
+            self._exportar_excel,
+        )
         self._cargar_tabla()
 
         self.sincronizador = obtener_sincronizador()
@@ -552,6 +569,14 @@ class ListaPasadas(QWidget):
     def _alternar_filtros(self, visibles: bool) -> None:
         self.panel_filtros.setVisible(visibles)
         self._actualizar_contador_filtros()
+
+    def _nueva_pasada(self) -> None:
+        self._form_pasada = FormPasada(
+            fecha_inicial=self.selector_fecha.date().toString("yyyy-MM-dd")
+        )
+        self._form_pasada.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self._form_pasada.pasada_registrada.connect(self._cargar_tabla)
+        self._form_pasada.show()
 
     def _limpiar_filtros(self) -> None:
         blockers = [
