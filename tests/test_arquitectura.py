@@ -62,7 +62,7 @@ UI_DATABASE_EXCEPTIONS = {
     # La pantalla de usuarios administra registros directamente en SQLite.
     "ui/gestionar_usuarios.py": "Persistencia directa de la administración de usuarios.",
     # El importador de pantalla coordina la conexión de la base.
-    "ui/importar_excel.py": "Entrega la conexión SQLite al servicio de importación.",
+    "ui/importador/importar_excel.py": "Entrega la conexión SQLite al servicio de importación.",
     # La lista de pasadas ejecuta consultas para la vista tabular.
     "ui/lista_pasadas.py": "Consultas SQL directas desde la lista de pasadas.",
     # El login valida credenciales y actualiza estado de acceso directamente.

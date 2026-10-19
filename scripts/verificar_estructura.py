@@ -67,7 +67,7 @@ def _exercise_screens() -> None:
     from ui.form_pasada import FormPasada
     from ui.form_supervisor import FormSupervisor
     from ui.gestionar_usuarios import GestionarUsuarios
-    from ui.importar_excel import ImportarExcel
+    from ui.importador.importar_excel import ImportarExcel
     from ui.lista_objetivos import ListaObjetivos
     from ui.lista_pasadas import ListaPasadas
     from ui.lista_supervisores import ListaSupervisores

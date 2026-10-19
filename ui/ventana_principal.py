@@ -35,7 +35,7 @@ from ui.vista_logs import VistaLogs
 from ui.gestionar_usuarios import GestionarUsuarios
 from ui.ayuda import Ayuda
 from ui.transferir_datos import TransferirDatos
-from ui.importar_excel import ImportarExcel
+from ui.importador.importar_excel import ImportarExcel
 from ui.feriados import VistaFeriados
 from ui.vista_auditoria import VistaAuditoria
 from ui.vista_indexacion import VistaIndexacion
