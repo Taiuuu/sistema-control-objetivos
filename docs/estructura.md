@@ -29,6 +29,7 @@
 │   ├── test_arquitectura.py          Reglas de dependencias inspeccionadas con AST
 │   └── test_sin_rutas_viejas.py      Detección de referencias a rutas migradas
 └── ui/                               Interfaz PyQt6
+    ├── tabla_lotes.py                Renderizado progresivo de tablas
     ├── components/                   Componentes visuales reutilizables
     ├── importador/                   Importación desde Excel
     ├── reportes/                     Reportes, diálogo y flujo de exportación compartido

@@ -7,9 +7,24 @@ from PyQt6.QtCore import (
     QParallelAnimationGroup, QPropertyAnimation,
     QEasingCurve, QPoint
 )
+from PyQt6.QtCore import QSettings
 from PyQt6.QtWidgets import QWidget, QGraphicsOpacityEffect
 
 _active_animations = []
+_SETTINGS_ORG = "VESP Organizations"
+_SETTINGS_APP = "Interfaz"
+
+
+def animaciones_reducidas() -> bool:
+    return QSettings(_SETTINGS_ORG, _SETTINGS_APP).value(
+        "animaciones/reducir", False, type=bool
+    )
+
+
+def establecer_animaciones_reducidas(reducidas: bool) -> None:
+    settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
+    settings.setValue("animaciones/reducir", bool(reducidas))
+    settings.sync()
 
 
 def _guardar_animacion(animacion):
@@ -28,6 +43,9 @@ def tiene_animacion_activa(widget: QWidget) -> bool:
 
 def animar_aparecer(widget: QWidget, duracion: int = 180) -> None:
     """Anima la aparición de un widget con efecto fade in."""
+    if animaciones_reducidas():
+        return
+
     if widget.isWindow():
         widget.setWindowOpacity(0.0)
         objetivo = widget
@@ -49,6 +67,10 @@ def animar_aparecer(widget: QWidget, duracion: int = 180) -> None:
 
 def animar_deslizar(widget: QWidget, desde: QPoint, hasta: QPoint, duracion: int = 350) -> None:
     """Anima el movimiento de un widget de una posición a otra."""
+    if animaciones_reducidas():
+        widget.move(hasta)
+        return
+
     animacion = QPropertyAnimation(widget, b"pos", widget)
     animacion.setDuration(duracion)
     animacion.setStartValue(desde)
@@ -60,6 +82,9 @@ def animar_deslizar(widget: QWidget, desde: QPoint, hasta: QPoint, duracion: int
 
 def animar_entrada(widget: QWidget, duracion: int = 180, offset_y: int = 12) -> None:
     """Aplica una animación suave de entrada con fade in y deslizado desde abajo."""
+    if animaciones_reducidas():
+        return
+
     original_pos = widget.pos()
     widget.move(original_pos + QPoint(0, offset_y))
 

@@ -59,13 +59,24 @@ No se confirmó un defecto que bloquee universalmente la navegación en la inspe
 
 ## Registro de los 10 problemas y estado
 
-Este archivo es la línea base de la Fase 1. En Fase 2 se resolvieron el hallazgo 1, la opacidad de cards del 10 y se cubrieron tokens de estado/selección/hover/deshabilitado en el stylesheet global. En Fase 3 se reordenó el menú y Configuración pasó a tener pestañas. En Fase 4 la regla de vigencia se centralizó en un servicio con pruebas para fin ayer, hoy, ausencia de fin y fecha futura; se añadió recuento y limpieza de filtros. No se encontró en `ui/` ninguna mención o acceso de “Deshacer importación”. Los demás hallazgos continúan pendientes de responsive y fluidez; las funciones ya existentes listadas como avances se deben preservar.
+Este archivo conserva la línea base de la Fase 1. En Fase 2 se resolvieron el hallazgo 1, la opacidad de cards del 10 y se cubrieron tokens de estado/selección/hover/deshabilitado en el stylesheet global. En Fase 3 se reordenó el menú y Configuración pasó a tener pestañas. En Fase 4 la regla de vigencia se centralizó en un servicio con pruebas para fin ayer, hoy, ausencia de fin y fecha futura; se añadió recuento y limpieza de filtros. No se encontró en `ui/` ninguna mención o acceso de “Deshacer importación”.
+
+En Fase 7, las consultas de la tabla principal, pasadas, objetivos, logs y auditoría se ejecutan en tareas de fondo; las conexiones SQLite de estas consultas se crean en el hilo de trabajo o se obtienen mediante servicios existentes con conexión local por hilo. Logs, auditoría, objetivos y pasadas pintan sus filas por lotes con feedback de carga. La tabla diaria conserva renderizado sincrónico porque presenta los objetivos de un solo día. Se agregó “Reducir animaciones” y transiciones breves para la entrada de pantallas y la selección del sidebar. La limitación de filtros de pasadas (día en vez de rango/mes y sin filtro de estado) continúa pendiente por falta de APIs existentes; no se añadió lógica de datos a la pantalla.
 
 ## Validación base
 
 - `python -m pytest`: **falló en colección**; 234 pruebas detectadas, 4 errores de importación en `test_configuracion_theme.py`, `test_pasadas_ui.py`, `test_theme_components.py` y `test_theme_system.py`, todos causados por `ImportError: libGL.so.1: cannot open shared object file`. No se ejecutaron las pruebas de esos módulos.
-- `python -m compileall .`: pendiente de la validación de cierre de esta fase.
+- Fase 7: `python -m compileall .` terminó sin errores; `python -m pytest tests/test_arquitectura.py tests/test_objetivos_estado.py` pasó (11 pruebas).
+- Suite completa al cierre de Fase 7: 239 pruebas detectadas, pero la recolección se interrumpió por cinco errores de importación de PyQt (`test_configuracion_theme.py`, `test_pasadas_ui.py`, `test_responsive_ui.py`, `test_theme_components.py` y `test_theme_system.py`), todos por la dependencia de sistema ausente `libGL.so.1`. El bloqueo es del entorno y debe resolverse para validar visualmente las pantallas.
 
 ## Mediciones de apertura
 
-No se tomaron tiempos de apertura en esta auditoría. La medición comparativa antes/después corresponde a la fase de fluidez; cualquier valor debe obtenerse ejecutando la aplicación con una base de prueba y un mismo perfil de datos.
+No se midieron tiempos antes de los cambios. Después, se agregó registro en el log para la construcción de `LoginWindow`, `VentanaPrincipal` y las ventanas secundarias abiertas desde la ventana principal, además de la construcción del login. El entorno de validación actual no permite iniciar PyQt porque falta `libGL.so.1`, por lo que no hay valores runtime comparables que reportar.
+
+| Pantalla/operación | Antes | Después |
+|---|---:|---:|
+| Login y ventana principal | No medido | Instrumentado en log; sin valor runtime disponible |
+| Ventanas secundarias abiertas desde el menú | No medido | Instrumentadas por nombre; sin valor runtime disponible |
+| Consultas y pintado de listas | No medido | Consultas en background y filas por lotes; sin valor runtime disponible |
+
+La medición comparativa queda pendiente de ejecutar en un entorno con Qt funcional y una misma base de prueba antes/después. No se inventan cifras.

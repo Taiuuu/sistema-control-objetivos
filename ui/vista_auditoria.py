@@ -4,13 +4,14 @@
 # =============================================================================
 
 import json
+import logging
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTableWidget, QTableWidgetItem, QDateEdit, QComboBox,
     QPushButton, QMessageBox, QTextEdit, QTabWidget,
-    QSplitter, QFileDialog, QHeaderView, QScrollArea, QFrame
+    QSplitter, QFileDialog, QHeaderView, QScrollArea, QFrame, QProgressBar
 )
-from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtCore import QDate, QSignalBlocker, Qt
 from services.auditoria import (
     obtener_auditoria_usuario, obtener_auditoria_tabla,
     obtener_cambios_por_fecha, validar_integridad_auditoria,
@@ -20,19 +21,20 @@ from services.sesion import get_usuario_id
 from ui.components import StatusBadge
 from ui.components.calendar import configure_calendar_theme
 from ui.components.base import wrap_content_in_glass_card
+from services.background_task import run_background_task
+from services.usuarios import listar_usuarios, obtener_usuario_por_id
+from ui.atajos import registrar_atajo
+from ui.tabla_lotes import cargar_tabla_en_lotes
+
+logger = logging.getLogger(__name__)
 
 
 def _obtener_nombre_usuario(usuario_id: int | None) -> str:
     """Obtiene el nombre de usuario por ID."""
     if not usuario_id:
         return "Sistema"
-    from database.db import conectar
-    conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute("SELECT username FROM usuarios WHERE id = ?", (usuario_id,))
-    resultado = cursor.fetchone()
-    conn.close()
-    return resultado[0] if resultado else f"Usuario {usuario_id}"
+    usuario = obtener_usuario_por_id(usuario_id)
+    return usuario["username"] if usuario else f"Usuario {usuario_id}"
 
 
 class VistaAuditoria(QWidget):
@@ -83,6 +85,7 @@ class VistaAuditoria(QWidget):
         controles.addSpacing(20)
         controles.addWidget(QLabel("Usuario:"))
         self.combo_usuario = QComboBox()
+        self._usuarios_cargados = False
         self._cargar_usuarios()
         self.combo_usuario.currentIndexChanged.connect(self._cargar_datos)
         controles.addWidget(self.combo_usuario)
@@ -153,73 +156,162 @@ class VistaAuditoria(QWidget):
         widget_integridad.setLayout(layout_integridad)
         self.tabs.addTab(widget_integridad, "Integridad")
 
+        self.estado_carga = QLabel()
+        layout_principal.addWidget(self.estado_carga)
+        self.barra_carga = QProgressBar()
+        self.barra_carga.setRange(0, 0)
+        self.barra_carga.setTextVisible(False)
+        self.barra_carga.setMaximumHeight(5)
+        self.barra_carga.hide()
+        layout_principal.addWidget(self.barra_carga)
         layout_principal.addWidget(self.tabs)
         wrap_content_in_glass_card(self)
 
+        self._carga_id = 0
+        self._tareas_carga = {}
+        registrar_atajo(self, "F5", self._cargar_datos)
         self._cargar_datos()
 
     def _cargar_usuarios(self) -> None:
         """Carga la lista de usuarios disponibles."""
-        try:
-            from database.db import conectar
-            conn = conectar()
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, username FROM usuarios ORDER BY username")
-            usuarios = cursor.fetchall()
-            conn.close()
+        self.combo_usuario.setEnabled(False)
+        self.combo_usuario.addItem("Cargando usuarios…", None)
+        tarea = run_background_task(listar_usuarios)
+        self._tarea_usuarios = tarea
+        tarea.signals.finished.connect(self._mostrar_usuarios)
+        tarea.signals.error.connect(self._error_cargar_usuarios)
 
-            self.combo_usuario.clear()
-            self.combo_usuario.addItem("Todos", None)
-            for uid, username in usuarios:
-                self.combo_usuario.addItem(username, uid)
-        except Exception as e:
-            print(f"Error cargando usuarios: {e}")
+    def _mostrar_usuarios(self, usuarios: list[dict]) -> None:
+        self._tarea_usuarios = None
+        bloqueador = QSignalBlocker(self.combo_usuario)
+        self.combo_usuario.clear()
+        self.combo_usuario.addItem("Todos", None)
+        for usuario in usuarios:
+            self.combo_usuario.addItem(usuario["username"], usuario["id"])
+        del bloqueador
+        self._usuarios_cargados = True
+        self.combo_usuario.setEnabled(
+            self.combo_vista.currentText() == "Por Usuario"
+        )
+
+    def _error_cargar_usuarios(self, mensaje: str) -> None:
+        self._tarea_usuarios = None
+        self._usuarios_cargados = False
+        self.combo_usuario.setEnabled(False)
+        logger.error("No se pudieron cargar los usuarios para auditoría: %s", mensaje)
+        QMessageBox.critical(
+            self,
+            "Error",
+            "No se pudieron cargar los usuarios para filtrar la auditoría.",
+        )
 
     def _cambiar_vista(self) -> None:
         """Cambia la vista según la selección del combo."""
         vista = self.combo_vista.currentText()
         
         self.selector_fecha.setEnabled(vista == "Por Fecha")
-        self.combo_usuario.setEnabled(vista == "Por Usuario")
+        self.combo_usuario.setEnabled(
+            vista == "Por Usuario" and self._usuarios_cargados
+        )
         self.combo_tabla.setEnabled(vista == "Por Tabla")
 
         self._cargar_datos()
 
     def _cargar_datos(self) -> None:
         """Carga los datos de auditoría según los filtros."""
+        self._cancelar_renderizado()
         vista = self.combo_vista.currentText()
-        registros = []
+        self._carga_id += 1
+        solicitud = self._carga_id
+        if vista == "Validar Integridad":
+            self.tabla_auditoria.setRowCount(0)
+            self.tabla_auditoria.setEnabled(True)
+            self.barra_carga.hide()
+            self.estado_carga.clear()
+            return
 
-        try:
-            if vista == "Por Fecha":
-                fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
-                registros = obtener_cambios_por_fecha(fecha)
-            elif vista == "Por Usuario":
-                usuario_id = self.combo_usuario.currentData()
-                if usuario_id:
-                    registros = obtener_auditoria_usuario(usuario_id)
-            elif vista == "Por Tabla":
-                tabla = self.combo_tabla.currentText()
-                if tabla:
-                    registros = obtener_auditoria_tabla(tabla)
-            elif vista == "Validar Integridad":
-                self.tabla_auditoria.setRowCount(0)
-                return
+        fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
+        usuario_id = self.combo_usuario.currentData()
+        tabla = self.combo_tabla.currentText()
+        self.estado_carga.setText("Cargando auditoría…")
+        self.barra_carga.show()
+        self.tabla_auditoria.setEnabled(False)
+        tarea = run_background_task(
+            self._consultar_datos_auditoria,
+            vista,
+            fecha,
+            usuario_id,
+            tabla,
+        )
+        self._tareas_carga[solicitud] = tarea
+        tarea.signals.finished.connect(
+            lambda resultado, id_solicitud=solicitud:
+                self._mostrar_resultado_auditoria(id_solicitud, resultado)
+        )
+        tarea.signals.error.connect(
+            lambda mensaje, id_solicitud=solicitud:
+                self._error_carga_auditoria(id_solicitud, mensaje)
+        )
 
-            self._mostrar_registros(registros)
+    @staticmethod
+    def _consultar_datos_auditoria(
+        vista: str, fecha: str, usuario_id: int | None, tabla: str
+    ) -> tuple[list, dict]:
+        if vista == "Por Fecha":
+            registros = obtener_cambios_por_fecha(fecha)
+        elif vista == "Por Usuario":
+            registros = (
+                obtener_auditoria_usuario(usuario_id) if usuario_id else []
+            )
+        elif vista == "Por Tabla":
+            registros = obtener_auditoria_tabla(tabla) if tabla else []
+        else:
+            registros = []
 
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error cargando datos: {e}")
+        nombres = {}
+        for registro in registros:
+            id_usuario = registro[2] if len(registro) > 2 else None
+            if id_usuario is not None and id_usuario not in nombres:
+                nombres[id_usuario] = _obtener_nombre_usuario(id_usuario)
+        return registros, nombres
 
-    def _mostrar_registros(self, registros: list) -> None:
+    def _mostrar_resultado_auditoria(
+        self, solicitud: int, resultado: tuple[list, dict]
+    ) -> None:
+        self._tareas_carga.pop(solicitud, None)
+        if solicitud != self._carga_id:
+            return
+        registros, nombres = resultado
+        self._mostrar_registros(registros, nombres, solicitud)
+
+    def _error_carga_auditoria(self, solicitud: int, mensaje: str) -> None:
+        self._tareas_carga.pop(solicitud, None)
+        if solicitud != self._carga_id:
+            return
+        self._cancelar_renderizado()
+        self.tabla_auditoria.setEnabled(True)
+        self.barra_carga.hide()
+        self.estado_carga.setText("No se pudo cargar la auditoría.")
+        QMessageBox.critical(
+            self, "Error", "No se pudieron cargar los datos de auditoría."
+        )
+        logger.error("No se pudo cargar la auditoría: %s", mensaje)
+
+    def _mostrar_registros(
+        self, registros: list, nombres: dict, solicitud: int
+    ) -> None:
         """Muestra los registros en la tabla."""
-        self.tabla_auditoria.setRowCount(len(registros))
 
-        for i, registro in enumerate(registros):
+        def poblar_fila(i: int) -> None:
+            registro = registros[i]
             # Los campos varían según el tipo de query, pero usamos índices seguros
             try:
                 fecha_hora = f"{registro[0]} {registro[1]}"
-                usuario = _obtener_nombre_usuario(registro[2] if len(registro) > 2 else None)
+                id_usuario = registro[2] if len(registro) > 2 else None
+                usuario = nombres.get(
+                    id_usuario,
+                    "Sistema" if id_usuario is None else f"Usuario {id_usuario}",
+                )
                 tipo_op = registro[3] if len(registro) > 3 else ""
                 tabla = registro[4] if len(registro) > 4 else ""
                 reg_id = str(registro[5]) if len(registro) > 5 else ""
@@ -246,7 +338,31 @@ class VistaAuditoria(QWidget):
             except Exception as e:
                 print(f"Error mostrando registro {i}: {e}")
 
-        self.tabla_auditoria.resizeRowsToContents()
+        self._timer_render = cargar_tabla_en_lotes(
+            self.tabla_auditoria,
+            len(registros),
+            poblar_fila,
+            lambda: self._finalizar_render_auditoria(solicitud, registros),
+        )
+
+    def _finalizar_render_auditoria(
+        self, solicitud: int, registros: list
+    ) -> None:
+        if solicitud != self._carga_id:
+            return
+        self._timer_render = None
+        self.tabla_auditoria.setEnabled(True)
+        self.barra_carga.hide()
+        self.estado_carga.setText(
+            "" if registros else "Todavía no hay registros para estos filtros."
+        )
+
+    def _cancelar_renderizado(self) -> None:
+        timer = getattr(self, "_timer_render", None)
+        if timer is not None:
+            timer.stop()
+            timer.deleteLater()
+            self._timer_render = None
 
     def _mostrar_cambios(self, registro: tuple) -> None:
         """Muestra los detalles de cambios de un registro."""

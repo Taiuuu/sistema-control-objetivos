@@ -25,7 +25,7 @@ Archivos clave:
 - `services/feriados.py` — persistencia y consulta de feriados; `ui/feriados.py` y reportes.
 - `services/queries_tabla.py` — datos para tablas; ventana principal y reportes.
 - `services/operaciones_seguras.py` — operaciones protegidas, incluido borrado mensual con backup; pantallas de pasadas.
-- `services/background_task.py` — trabajos/señales Qt; pantallas que ejecutan consultas/reportes en segundo plano.
+- `services/background_task.py` — trabajos/señales Qt; pantallas que ejecutan consultas/reportes en segundo plano. Cada tarea debe obtener su conexión SQLite desde su propio hilo (el gestor DB usa estado local por hilo).
 - `services/sincronizacion.py`, `services/sync_manager.py`, `services/config_app.py` — notificaciones, cola y preferencia de sync; UI, modelos y arranque.
 - `services/notificaciones.py` — notificaciones de escritorio; consumidor de UI/operaciones.
 - `services/menu_config.py` — configuración de módulos/menú; ventana principal y sidebar.

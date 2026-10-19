@@ -3,14 +3,14 @@
 # Pantalla de listado, edición y eliminación de pasadas registradas
 # =============================================================================
 
+import logging
 import sqlite3
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTableWidget, QTableWidgetItem, QPushButton,
     QDateEdit, QTimeEdit, QComboBox, QMessageBox, QDialog,
-    QSpinBox, QLineEdit, QMenu, QHeaderView
-    , QInputDialog
+    QSpinBox, QLineEdit, QMenu, QHeaderView, QProgressBar, QInputDialog
 )
 from PyQt6.QtCore import QDate, QSignalBlocker, QTime, Qt
 
@@ -36,6 +36,9 @@ from ui.form_pasada import FormPasada
 from ui.components import GlassCard, PillButton, SearchInput, StatusBadge
 from ui.components.calendar import configure_calendar_theme
 from ui.components.base import wrap_content_in_glass_card
+from ui.tabla_lotes import cargar_tabla_en_lotes
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -49,44 +52,42 @@ def _cargar_pasadas(
     busqueda: str = "",
 ) -> list:
     conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
+    try:
+        cursor = conexion.cursor()
+        query = """
+            SELECT
+                p.id,
+                p.hora,
+                p.turno,
+                o.nombre,
+                s.nombre,
+                p.objetivo_id,
+                p.supervisor_id
+            FROM pasadas p
+            JOIN objetivos o ON p.objetivo_id = o.id
+            JOIN supervisores s ON p.supervisor_id = s.id
+            WHERE COALESCE(p.fecha_operativa, p.fecha) = ?
+        """
+        params = [fecha]
 
-    query = """
-        SELECT
-            p.id,
-            p.hora,
-            p.turno,
-            o.nombre,
-            s.nombre,
-            p.objetivo_id,
-            p.supervisor_id
-        FROM pasadas p
-        JOIN objetivos o ON p.objetivo_id = o.id
-        JOIN supervisores s ON p.supervisor_id = s.id
-        WHERE COALESCE(p.fecha_operativa, p.fecha) = ?
-    """
-    params = [fecha]
+        if supervisor_id:
+            query += " AND p.supervisor_id = ?"
+            params.append(supervisor_id)
 
-    if supervisor_id:
-        query += " AND p.supervisor_id = ?"
-        params.append(supervisor_id)
+        if turno:
+            query += " AND p.turno = ?"
+            params.append(turno)
 
-    if turno:
-        query += " AND p.turno = ?"
-        params.append(turno)
+        if busqueda:
+            query += " AND (LOWER(o.nombre) LIKE ? OR LOWER(s.nombre) LIKE ?)"
+            termino = f"%{busqueda.lower()}%"
+            params.extend([termino, termino])
 
-    if busqueda:
-        query += " AND (LOWER(o.nombre) LIKE ? OR LOWER(s.nombre) LIKE ?)"
-        termino = f"%{busqueda.lower()}%"
-        params.extend([termino, termino])
-
-    query += " ORDER BY p.hora"
-
-    cursor.execute(query, tuple(params))
-
-    datos = cursor.fetchall()
-    conexion.close()
-    return datos
+        query += " ORDER BY p.hora"
+        cursor.execute(query, tuple(params))
+        return cursor.fetchall()
+    finally:
+        conexion.close()
 
 
 def _eliminar_pasada(pasada_id: int) -> None:
@@ -402,6 +403,9 @@ class ListaPasadas(QWidget):
         self.setWindowTitle("Listado de Pasadas")
         self.resize(900, 560)
         self.setMinimumSize(560, 360)
+        self._carga_id = 0
+        self._tareas_carga = {}
+        self._timer_render = None
 
         layout = QVBoxLayout()
         card = GlassCard()
@@ -540,6 +544,14 @@ class ListaPasadas(QWidget):
         self.tabla.setSortingEnabled(True)
 
         card_layout.addWidget(self.tabla)
+        self.estado_carga = QLabel()
+        card_layout.addWidget(self.estado_carga)
+        self.barra_carga = QProgressBar()
+        self.barra_carga.setRange(0, 0)
+        self.barra_carga.setTextVisible(False)
+        self.barra_carga.setMaximumHeight(5)
+        self.barra_carga.hide()
+        card_layout.addWidget(self.barra_carga)
 
         layout.addWidget(card)
         self.setLayout(layout)
@@ -612,26 +624,54 @@ class ListaPasadas(QWidget):
             else "Más filtros"
         )
 
-    def _cargar_tabla(self):
-
+    def _cargar_tabla(self, *_args):
+        self._cancelar_renderizado()
         self._actualizar_permisos()
+        self._carga_id += 1
+        solicitud = self._carga_id
         fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
         supervisor_id = self.selector_supervisor.currentData() or None
         turno = self.selector_turno.currentText()
         if turno == "Todos":
             turno = None
 
-        datos = _cargar_pasadas(fecha, supervisor_id, turno, self.buscador.text().strip())
+        self.estado_carga.setText("Cargando pasadas…")
+        self.barra_carga.show()
+        self.tabla.setEnabled(False)
+        tarea = run_background_task(
+            _cargar_pasadas,
+            fecha,
+            supervisor_id,
+            turno,
+            self.buscador.text().strip(),
+        )
+        self._tareas_carga[solicitud] = tarea
+        tarea.signals.finished.connect(
+            lambda datos, id_solicitud=solicitud:
+                self._mostrar_pasadas(id_solicitud, datos)
+        )
+        tarea.signals.error.connect(
+            lambda mensaje, id_solicitud=solicitud:
+                self._error_carga(id_solicitud, mensaje)
+        )
 
+    def _mostrar_pasadas(self, solicitud: int, datos: list) -> None:
+        self._tareas_carga.pop(solicitud, None)
+        if solicitud != self._carga_id:
+            return
+
+        self.tabla.setSortingEnabled(False)
         self.tabla.setRowCount(len(datos))
 
-        for fila, item in enumerate(datos):
-
+        def poblar_fila(fila: int) -> None:
+            item = datos[fila]
             pasada_id = item[0]
             turno_pasada = item[2]
 
             def _item(texto):
-                return QTableWidgetItem(texto)
+                celda = QTableWidgetItem(texto)
+                celda.setToolTip(texto)
+                return celda
 
             self.tabla.setItem(fila, 0, _item(item[1]))
             badge_turno = StatusBadge(
@@ -657,7 +697,41 @@ class ListaPasadas(QWidget):
             boton_acciones.setMenu(menu)
             self.tabla.setCellWidget(fila, 4, self._centrar_widget(boton_acciones))
 
-        self.tabla.resizeRowsToContents()
+        self._timer_render = cargar_tabla_en_lotes(
+            self.tabla,
+            len(datos),
+            poblar_fila,
+            lambda: self._finalizar_render(solicitud, datos),
+        )
+
+    def _finalizar_render(self, solicitud: int, datos: list) -> None:
+        if solicitud != self._carga_id:
+            return
+        self._timer_render = None
+        self.tabla.setSortingEnabled(True)
+        self.tabla.setEnabled(True)
+        self.barra_carga.hide()
+        self.estado_carga.setText(
+            "" if datos else "Todavía no hay pasadas para esta fecha."
+        )
+
+    def _cancelar_renderizado(self) -> None:
+        timer = self._timer_render
+        if timer is not None:
+            timer.stop()
+            timer.deleteLater()
+            self._timer_render = None
+        self.tabla.setSortingEnabled(True)
+
+    def _error_carga(self, solicitud: int, mensaje: str) -> None:
+        self._tareas_carga.pop(solicitud, None)
+        if solicitud != self._carga_id:
+            return
+        self.tabla.setSortingEnabled(True)
+        self.tabla.setEnabled(True)
+        self.barra_carga.hide()
+        self.estado_carga.setText("No se pudieron cargar las pasadas.")
+        logger.error("No se pudo cargar la lista de pasadas: %s", mensaje)
         self._actualizar_contador_filtros()
 
     @staticmethod

@@ -4,6 +4,7 @@
 # =============================================================================
 import logging
 import sqlite3
+from time import perf_counter
 
 from typing import Optional, Callable
 
@@ -12,12 +13,13 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QLabel,
     QPushButton, QDateEdit, QComboBox, QMessageBox,
     QFrame, QLineEdit, QHeaderView, QScrollArea,
-    QToolButton, QSizePolicy
-    , QDialog, QDialogButtonBox, QCheckBox, QGridLayout, QMenu
+    QToolButton, QSizePolicy, QDialog, QDialogButtonBox,
+    QCheckBox, QGridLayout, QMenu, QProgressBar
 )
 from PyQt6.QtCore import QDate, QTimer, QEvent, Qt, pyqtSignal, QSettings
 from PyQt6.QtGui import QColor, QIcon
 from services.reportes import obtener_objetivos_del_dia
+from services.background_task import run_background_task
 from services.queries_tabla import (
     obtener_equipo, obtener_supervisores_de_pasadas, cargar_supervisores
 )
@@ -204,6 +206,8 @@ class VentanaPrincipal(QWidget):
         self._sidebar_expandido = True
         self._metricas_colapsadas = False
         self._boton_activo      = None
+        self._carga_tabla_id = 0
+        self._tareas_carga_tabla = {}
         self._menu_visible = obtener_menu_usuario(usuario_id)
         self._claves_menu_permitidas = obtener_claves_menu_permitidas(
             rol, obtener_permisos_rol(str(rol or "").casefold())
@@ -508,6 +512,7 @@ class VentanaPrincipal(QWidget):
             self._boton_activo.set_activo(False)
         btn.set_activo(True)
         self._boton_activo = btn
+        animar_aparecer(btn, 180)
         accion()
 
     def _construir_zona_inferior(self) -> QWidget:
@@ -765,6 +770,7 @@ class VentanaPrincipal(QWidget):
         self._sep_header.show()
         self._tabla_card.show()
         self.tabla.show()
+        animar_aparecer(self._tabla_card, 180)
         self.cargar_tabla()
         self._panel_derecho.update()
         self.tabla.viewport().update()
@@ -778,6 +784,7 @@ class VentanaPrincipal(QWidget):
         self.tabla.hide()
         self._landing.show()
         self._landing.update()
+        animar_aparecer(self._landing, 180)
 
     def _construir_metricas(self) -> QWidget:
         contenedor = GlassCard(shadow=False, content_margins=8)
@@ -1096,6 +1103,15 @@ class VentanaPrincipal(QWidget):
 
         self.tabla.setStyleSheet(self._estilo_tabla(oscuro))
         self._tabla_card = GlassCard(content_margins=8)
+        self._estado_carga_tabla = QLabel()
+        self._estado_carga_tabla.setObjectName("TableLoadStatus")
+        self._tabla_card.add_widget(self._estado_carga_tabla)
+        self._barra_carga_tabla = QProgressBar()
+        self._barra_carga_tabla.setRange(0, 0)
+        self._barra_carga_tabla.setTextVisible(False)
+        self._barra_carga_tabla.setMaximumHeight(5)
+        self._barra_carga_tabla.hide()
+        self._tabla_card.add_widget(self._barra_carga_tabla)
         self._tabla_card.add_widget(self.tabla, 1)
         layout_derecho.addWidget(self._tabla_card, 1)
 
@@ -1602,19 +1618,21 @@ class VentanaPrincipal(QWidget):
 
     def _obtener_todas_pasadas_por_turno(self, fecha: str, supervisor_id: int = None) -> tuple:
         conexion = sqlite3.connect(DB_PATH)
-        cursor = conexion.cursor()
-        query = """
-            SELECT objetivo_id, turno, COUNT(*)
-            FROM pasadas WHERE COALESCE(fecha_operativa, fecha) = ?
-        """
-        params = [fecha]
-        if supervisor_id:
-            query += " AND supervisor_id = ?"
-            params.append(supervisor_id)
-        query += " GROUP BY objetivo_id, turno"
-        cursor.execute(query, params)
-        resultados = cursor.fetchall()
-        conexion.close()
+        try:
+            cursor = conexion.cursor()
+            query = """
+                SELECT objetivo_id, turno, COUNT(*)
+                FROM pasadas WHERE COALESCE(fecha_operativa, fecha) = ?
+            """
+            params = [fecha]
+            if supervisor_id:
+                query += " AND supervisor_id = ?"
+                params.append(supervisor_id)
+            query += " GROUP BY objetivo_id, turno"
+            cursor.execute(query, params)
+            resultados = cursor.fetchall()
+        finally:
+            conexion.close()
         pasadas_dia   = {}
         pasadas_noche = {}
         for obj_id, turno, count in resultados:
@@ -1650,31 +1668,87 @@ class VentanaPrincipal(QWidget):
         return contenedor
 
     def cargar_tabla(self) -> None:
-        fecha         = self.selector_fecha.date().toString("yyyy-MM-dd")
-        turno         = self.filtro_turno.currentText()
-        turno         = None if turno == "Todos los turnos" else turno
+        self._carga_tabla_id += 1
+        solicitud = self._carga_tabla_id
+        fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
+        turno = self.filtro_turno.currentText()
+        turno = None if turno == "Todos los turnos" else turno
         supervisor_id = self.filtro_supervisor.currentData()
-        filtro_estado = self.filtro_estado.currentText()
-        texto_busq    = self.buscador.text().strip().lower()
+        self._estado_carga_tabla.setText("Cargando datos…")
+        self._barra_carga_tabla.show()
+        self.tabla.setEnabled(False)
 
-        objetivos = sorted(obtener_objetivos_del_dia(fecha), key=lambda o: o[1].lower())
+        tarea = run_background_task(
+            self._consultar_datos_tabla, fecha, turno, supervisor_id
+        )
+        self._tareas_carga_tabla[solicitud] = tarea
+        tarea.signals.finished.connect(
+            lambda datos, id_solicitud=solicitud:
+                self._mostrar_datos_tabla(id_solicitud, datos)
+        )
+        tarea.signals.error.connect(
+            lambda mensaje, id_solicitud=solicitud:
+                self._error_carga_tabla(id_solicitud, mensaje)
+        )
+
+    def _consultar_datos_tabla(
+        self, fecha: str, turno: Optional[str], supervisor_id: Optional[int]
+    ) -> tuple:
+        """Consulta los datos de la pantalla desde conexiones propias del hilo."""
+        objetivos = sorted(
+            obtener_objetivos_del_dia(fecha), key=lambda objetivo: objetivo[1].lower()
+        )
         equipo_dia_importado = obtener_supervisores_de_pasadas(fecha, "diurno")
         equipo_noche_importado = obtener_supervisores_de_pasadas(fecha, "nocturno")
         equipo_dia_manual = obtener_equipo(fecha, "diurno")
         equipo_noche_manual = obtener_equipo(fecha, "nocturno")
-        equipo_dia = equipo_dia_manual if equipo_dia_manual != "—" else equipo_dia_importado
-        equipo_noche = equipo_noche_manual if equipo_noche_manual != "—" else equipo_noche_importado
-
-        pasadas_dia_tot, pasadas_noche_tot = self._obtener_todas_pasadas_por_turno(fecha)
-        self._actualizar_metricas(objetivos, pasadas_dia_tot, pasadas_noche_tot)
+        equipo_dia = (
+            equipo_dia_manual if equipo_dia_manual != "—" else equipo_dia_importado
+        )
+        equipo_noche = (
+            equipo_noche_manual
+            if equipo_noche_manual != "—"
+            else equipo_noche_importado
+        )
+        pasadas_dia_tot, pasadas_noche_tot = (
+            self._obtener_todas_pasadas_por_turno(fecha)
+        )
         pasadas_dia_fil, pasadas_noche_fil = self._aplicar_filtro_pasadas(
             fecha, turno, supervisor_id, pasadas_dia_tot, pasadas_noche_tot
         )
+        return (
+            objetivos,
+            equipo_dia,
+            equipo_noche,
+            pasadas_dia_tot,
+            pasadas_noche_tot,
+            pasadas_dia_fil,
+            pasadas_noche_fil,
+        )
 
+    def _mostrar_datos_tabla(self, solicitud: int, datos: tuple) -> None:
+        self._tareas_carga_tabla.pop(solicitud, None)
+        if solicitud != self._carga_tabla_id:
+            return
+
+        (
+            objetivos,
+            equipo_dia,
+            equipo_noche,
+            pasadas_dia_tot,
+            pasadas_noche_tot,
+            pasadas_dia_fil,
+            pasadas_noche_fil,
+        ) = datos
+        self._actualizar_metricas(objetivos, pasadas_dia_tot, pasadas_noche_tot)
         filas = self._filtrar_filas(
-            objetivos, texto_busq, filtro_estado,
-            pasadas_dia_fil, pasadas_noche_fil,
-            pasadas_dia_tot, pasadas_noche_tot
+            objetivos,
+            self.buscador.text().strip().lower(),
+            self.filtro_estado.currentText(),
+            pasadas_dia_fil,
+            pasadas_noche_fil,
+            pasadas_dia_tot,
+            pasadas_noche_tot,
         )
 
         sorting_enabled = self.tabla.isSortingEnabled()
@@ -1682,14 +1756,28 @@ class VentanaPrincipal(QWidget):
         self.tabla.setUpdatesEnabled(False)
         self._limpiar_tabla()
         self.tabla.setRowCount(len(filas))
-        
-        for i, fila in enumerate(filas):
-            self._poblar_fila(i, fila, equipo_dia, equipo_noche)
-
+        for indice, fila in enumerate(filas):
+            self._poblar_fila(indice, fila, equipo_dia, equipo_noche)
         self.tabla.resizeRowsToContents()
         self.tabla.setUpdatesEnabled(True)
         self.tabla.setSortingEnabled(sorting_enabled)
+        self.tabla.setEnabled(True)
+        self._barra_carga_tabla.hide()
+        self._estado_carga_tabla.setText(
+            "No hay objetivos que coincidan con los filtros."
+            if not filas
+            else ""
+        )
         self.tabla.update()
+
+    def _error_carga_tabla(self, solicitud: int, mensaje: str) -> None:
+        self._tareas_carga_tabla.pop(solicitud, None)
+        if solicitud != self._carga_tabla_id:
+            return
+        self.tabla.setEnabled(True)
+        self._barra_carga_tabla.hide()
+        self._estado_carga_tabla.setText("No se pudieron actualizar los datos.")
+        logger.error("No se pudo cargar la tabla principal: %s", mensaje)
         
     def _aplicar_filtro_pasadas(
         self,
@@ -1840,7 +1928,13 @@ class VentanaPrincipal(QWidget):
         ventana = getattr(self, attr, None)
 
         if ventana is None or not ventana.isVisible():
+            inicio = perf_counter()
             ventana = cls(*args, **kwargs)
+            logger.info(
+                "Apertura de pantalla %s: %.1f ms",
+                attr,
+                (perf_counter() - inicio) * 1000,
+            )
             setattr(self, attr, ventana)
 
             registrar_atajo(

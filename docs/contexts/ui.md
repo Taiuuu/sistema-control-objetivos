@@ -14,6 +14,7 @@ Archivos clave:
 - `ui/login.py`, `ui/cambiar_password.py`, `ui/gestionar_usuarios.py` — identidad, contraseña y cuentas.
 - `ui/configuracion.py`, `ui/vista_auditoria.py`, `ui/vista_logs.py`, `ui/vista_indexacion.py`, `ui/vista_sincronizacion.py` — preferencias/backups, auditoría, logs, BD y sincronización.
 - `ui/theme/` — temas globales; `ui/components/` y `ui/widgets/` — componentes visuales.
+- `ui/tabla_lotes.py` — renderizado progresivo de filas de `QTableWidget` para no monopolizar el bucle de eventos.
 - `ui/ayuda.py` — tabla de atajos y FAQ.
 
 Flujo: `scripts/main.py` → login → `VentanaPrincipal` → pantallas/diálogos → servicios y modelos; la interfaz recibe señales para refrescar tema y tareas asíncronas.
@@ -29,6 +30,8 @@ Atajos: `ui/atajos.py` es el catálogo único; la ayuda lo muestra y el manual l
 Responsive: la ventana principal usa un mínimo de 720×440, colapsa el sidebar por debajo de 980 px y lo vuelve a expandir sobre 1120 px; Ctrl+\\ y el botón permiten cambiarlo manualmente. Guarda/restaura su geometría con QSettings en `VESP Organizations/Interfaz`, clave `ventana_principal/geometria`. La prueba `tests/test_responsive_ui.py` recorre 23 pantallas en 1920×1080, 1366×768 y 1024×600 con los cuatro temas; `VESP_GENERAR_CAPTURAS_UI=1` guarda capturas en `docs/capturas_despues/`, excluido de Git.
 
 DPI: Qt 6 aplica escalado de alta densidad; `scripts/main.py` usa la política PassThrough antes de crear QApplication para conservar factores fraccionarios.
+
+Fluidez: las listas de pasadas, objetivos, logs y auditoría consultan mediante `services.background_task.run_background_task`; actualizaciones obsoletas se descartan con identificadores de solicitud y la interfaz muestra estado de carga. El renderizado de filas se distribuye en lotes con `ui/tabla_lotes.py`. La preferencia “Reducir animaciones” se guarda en QSettings y evita los efectos de entrada.
 
 Invariantes: pantallas nuevas deben consumir servicios cuando exista contrato adecuado; UI no debe importar `database` ni SQL directo según arquitectura objetivo; actualizar temas en diálogos/widgets relevantes.
 

@@ -8,6 +8,7 @@ import os
 import logging
 import traceback
 import threading
+from time import perf_counter
 from typing import Optional
 
 # Agregar el directorio raíz del proyecto al path
@@ -328,7 +329,12 @@ def iniciar_app() -> None:
             iniciar_sesion(usuario_id, rol)
 
             nonlocal ventana_principal
+            inicio_apertura = perf_counter()
             ventana_principal = VentanaPrincipal(usuario_id, rol, on_login_exitoso, app)
+            logger.info(
+                "Apertura de pantalla VentanaPrincipal: %.1f ms",
+                (perf_counter() - inicio_apertura) * 1000,
+            )
             ventana_principal.show()
             from ui.animaciones import animar_aparecer
             animar_aparecer(ventana_principal, 180)
@@ -358,7 +364,12 @@ def iniciar_app() -> None:
     # Mostrar ventana de login
     try:
         logger.info("Mostrando ventana de login...")
+        inicio_apertura = perf_counter()
         login = LoginWindow(on_login_exitoso)
+        logger.info(
+            "Apertura de pantalla LoginWindow: %.1f ms",
+            (perf_counter() - inicio_apertura) * 1000,
+        )
         login.show()
         logger.info("✅ Ventana de login mostrada")
 

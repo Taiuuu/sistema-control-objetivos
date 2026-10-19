@@ -8,8 +8,10 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QPushButton, QMessageBox, QDialog,
     QLabel, QLineEdit, QDateEdit, QCheckBox,
     QInputDialog, QComboBox, QListWidget, QTabWidget, QMenu, QHeaderView,
-    QHBoxLayout, QScrollArea, QFrame
+    QHBoxLayout, QScrollArea, QFrame, QProgressBar
 )
+import logging
+
 from PyQt6.QtCore import QDate, Qt
 from models.objetivos import (
     actualizar_objetivo,
@@ -29,6 +31,8 @@ from ui.components.calendar import configure_calendar_theme
 from ui.components.base import rgba
 from ui.theme.theme_manager import get_theme_manager
 from ui.atajos import registrar_atajo
+from services.background_task import run_background_task
+from ui.tabla_lotes import cargar_tabla_en_lotes
 
 
 DIAS_MAP = {
@@ -41,6 +45,8 @@ DIAS_NOMBRES = {
     "Jueves": "4", "Viernes": "5", "Sábado": "6", "Domingo": "7",
     "Feriados": "8"
 }
+
+logger = logging.getLogger(__name__)
 
 
 def _cargar_objetivos() -> list[Objetivo]:
@@ -279,6 +285,9 @@ class ListaObjetivos(QWidget):
         self.setWindowTitle("Listado de objetivos")
         self.resize(950, 560)
         self.setMinimumSize(560, 360)
+        self._carga_id = 0
+        self._tareas_carga = {}
+        self._render_timers = {}
         self._theme_manager = get_theme_manager()
 
         layout = QVBoxLayout(self)
@@ -326,6 +335,15 @@ class ListaObjetivos(QWidget):
         self._aplicar_tema(self._theme_manager.current())
         self._theme_manager.theme_changed.connect(self._aplicar_tema)
         self.tabs.currentChanged.connect(self._cargar_tabla)
+        self.estado_carga = QLabel("Cargando objetivos…")
+        self.estado_carga.setObjectName("ObjectivesLoadStatus")
+        card_layout.addWidget(self.estado_carga)
+        self.barra_carga = QProgressBar()
+        self.barra_carga.setRange(0, 0)
+        self.barra_carga.setTextVisible(False)
+        self.barra_carga.setMaximumHeight(5)
+        self.barra_carga.hide()
+        card_layout.addWidget(self.barra_carga)
         card_layout.addWidget(self.tabs, 1)
 
         layout.addWidget(card)
@@ -489,56 +507,128 @@ class ListaObjetivos(QWidget):
                 """
             )
     def _cargar_tabla(self, _indice: int = 0) -> None:
-        objetivos = _cargar_objetivos()
+        self._cancelar_lotes()
+        self._carga_id += 1
+        solicitud = self._carga_id
+        self.estado_carga.setText("Cargando objetivos…")
+        self.barra_carga.show()
+        for tabla in self.tablas.values():
+            tabla.setEnabled(False)
+        tarea = run_background_task(_cargar_objetivos)
+        self._tareas_carga[solicitud] = tarea
+        tarea.signals.finished.connect(
+            lambda objetivos, id_solicitud=solicitud:
+                self._mostrar_objetivos(id_solicitud, objetivos)
+        )
+        tarea.signals.error.connect(
+            lambda mensaje, id_solicitud=solicitud:
+                self._error_carga_objetivos(id_solicitud, mensaje)
+        )
+
+    def _mostrar_objetivos(
+        self, solicitud: int, objetivos: list[Objetivo]
+    ) -> None:
+        self._tareas_carga.pop(solicitud, None)
+        if solicitud != self._carga_id:
+            return
         filtros = {
             "actuales": objetivo_esta_activo,
             "finalizados": lambda obj: not objetivo_esta_activo(obj),
             "todos": lambda obj: True,
         }
         for clave, tabla in self.tablas.items():
-            tabla.setRowCount(0)
             seleccionados = [obj for obj in objetivos if filtros[clave](obj)]
-            tabla.setRowCount(len(seleccionados))
-            self._llenar_tabla(tabla, seleccionados)
-            tabla.resizeRowsToContents()
+            tabla_id = id(tabla)
 
-    def _llenar_tabla(self, tabla: QTableWidget, objetivos: list[Objetivo]) -> None:
-        for i, o in enumerate(objetivos):
-            dias_texto = ", ".join([DIAS_MAP.get(d, d) for d in (o.dias_semana or "").split(",")])
-            fin_texto = o.fecha_fin if o.fecha_fin else "Sin fecha fin"
+            def finalizar_tabla(
+                tabla=tabla, tabla_id=tabla_id, datos=seleccionados
+            ) -> None:
+                self._render_timers.pop(tabla_id, None)
+                tabla.resizeRowsToContents()
+                tabla.setEnabled(True)
+                if not self._render_timers and solicitud == self._carga_id:
+                    self.estado_carga.setText(
+                        ""
+                        if objetivos
+                        else "Todavía no hay objetivos para mostrar."
+                    )
+                    self.barra_carga.hide()
 
-            tabla.setItem(i, 0, QTableWidgetItem(o.nombre))
-            tabla.setItem(i, 1, QTableWidgetItem(o.fecha_inicio or "—"))
-            tabla.setItem(i, 2, QTableWidgetItem(fin_texto))
-            tabla.setItem(i, 3, QTableWidgetItem(dias_texto))
-            if o.es_placeholder:
-                estado, estado_tipo = "Incompleto", "warning"
-            else:
-                activo = objetivo_esta_activo(o)
-                estado = "Pendiente de revisión" if o.pendiente_revision else ("Vigente" if activo else "Finalizado")
-                estado_tipo = "warning" if o.pendiente_revision else ("ok" if activo else "info")
-            estado_badge = StatusBadge(estado, estado_tipo)
-            tabla.setCellWidget(i, 4, self._centrar_widget(estado_badge))
+            timer = cargar_tabla_en_lotes(
+                tabla,
+                len(seleccionados),
+                lambda fila, tabla=tabla, datos=seleccionados:
+                    self._llenar_fila(tabla, fila, datos[fila]),
+                finalizar_tabla,
+            )
+            self._render_timers[tabla_id] = timer
 
-            menu = QMenu(self)
-            accion_editar = menu.addAction("Editar")
-            accion_editar.triggered.connect(lambda checked=False, obj=o: self._editar(obj))
-            if o.pendiente_revision and not o.es_placeholder:
-                accion_revision = menu.addAction("Marcar revisado")
-                accion_revision.triggered.connect(
-                    lambda checked=False, obj_id=o.id: self._marcar_revisado(obj_id)
-                )
-            elif not o.fecha_fin or self.es_admin:
-                accion_baja = menu.addAction("Dar de baja")
-                accion_baja.setProperty("danger", True)
-                accion_baja.triggered.connect(
-                    lambda checked=False, obj_id=o.id, nombre=o.nombre: self._dar_de_baja(obj_id, nombre)
-                )
-            boton_acciones = QPushButton("⋯")
-            boton_acciones.setObjectName("ObjectiveActions")
-            boton_acciones.setToolTip("Acciones del objetivo")
-            boton_acciones.setMenu(menu)
-            tabla.setCellWidget(i, 5, self._centrar_widget(boton_acciones))
+    def _error_carga_objetivos(self, solicitud: int, mensaje: str) -> None:
+        self._tareas_carga.pop(solicitud, None)
+        if solicitud != self._carga_id:
+            return
+        for tabla in self.tablas.values():
+            tabla.setEnabled(True)
+        self.barra_carga.hide()
+        self.estado_carga.setText("No se pudieron cargar los objetivos.")
+        logger.error("No se pudo cargar la lista de objetivos: %s", mensaje)
+
+    def _cancelar_lotes(self) -> None:
+        for timer in self._render_timers.values():
+            timer.stop()
+            timer.deleteLater()
+        self._render_timers.clear()
+
+    def _llenar_fila(
+        self, tabla: QTableWidget, i: int, o: Objetivo
+    ) -> None:
+        dias_texto = ", ".join(
+            DIAS_MAP.get(d, d) for d in (o.dias_semana or "").split(",")
+        )
+        fin_texto = o.fecha_fin if o.fecha_fin else "Sin fecha fin"
+
+        for columna, texto in enumerate(
+            (o.nombre, o.fecha_inicio or "—", fin_texto, dias_texto)
+        ):
+            item = QTableWidgetItem(texto)
+            item.setToolTip(texto)
+            tabla.setItem(i, columna, item)
+
+        if o.es_placeholder:
+            estado, estado_tipo = "Incompleto", "warning"
+        else:
+            activo = objetivo_esta_activo(o)
+            estado = (
+                "Pendiente de revisión"
+                if o.pendiente_revision
+                else ("Vigente" if activo else "Finalizado")
+            )
+            estado_tipo = (
+                "warning" if o.pendiente_revision else ("ok" if activo else "info")
+            )
+        estado_badge = StatusBadge(estado, estado_tipo)
+        tabla.setCellWidget(i, 4, self._centrar_widget(estado_badge))
+
+        menu = QMenu(self)
+        accion_editar = menu.addAction("Editar")
+        accion_editar.triggered.connect(lambda checked=False, obj=o: self._editar(obj))
+        if o.pendiente_revision and not o.es_placeholder:
+            accion_revision = menu.addAction("Marcar revisado")
+            accion_revision.triggered.connect(
+                lambda checked=False, obj_id=o.id: self._marcar_revisado(obj_id)
+            )
+        elif not o.fecha_fin or self.es_admin:
+            accion_baja = menu.addAction("Dar de baja")
+            accion_baja.setProperty("danger", True)
+            accion_baja.triggered.connect(
+                lambda checked=False, obj_id=o.id, nombre=o.nombre:
+                    self._dar_de_baja(obj_id, nombre)
+            )
+        boton_acciones = QPushButton("⋯")
+        boton_acciones.setObjectName("ObjectiveActions")
+        boton_acciones.setToolTip("Acciones del objetivo")
+        boton_acciones.setMenu(menu)
+        tabla.setCellWidget(i, 5, self._centrar_widget(boton_acciones))
 
     def _abrir_form_objetivo(self) -> None:
         from ui.form_objetivo import FormObjetivo

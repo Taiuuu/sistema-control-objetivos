@@ -4,6 +4,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
     QDialog,
+    QCheckBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -20,6 +21,10 @@ from PyQt6.QtWidgets import (
 )
 
 from ui.theme.theme_manager import get_theme_manager
+from ui.animaciones import (
+    animaciones_reducidas,
+    establecer_animaciones_reducidas,
+)
 from core.configuracion import (
     establecer_ruta_backup_externo,
     obtener_ruta_backup_externo,
@@ -280,6 +285,15 @@ class ConfiguracionDialog(QDialog):
         font_row.addWidget(self.decrease_font_button)
         font_row.addWidget(self.increase_font_button)
         temas.addWidget(font_section)
+        self.reduce_animations_checkbox = QCheckBox("Reducir animaciones")
+        self.reduce_animations_checkbox.setChecked(animaciones_reducidas())
+        self.reduce_animations_checkbox.setToolTip(
+            "Desactivar transiciones y efectos de entrada"
+        )
+        self.reduce_animations_checkbox.toggled.connect(
+            establecer_animaciones_reducidas
+        )
+        temas.addWidget(self.reduce_animations_checkbox)
         temas.addStretch(1)
 
         cuenta_page, cuenta = crear_pagina()
