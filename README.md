@@ -173,6 +173,7 @@ no requiere mantener una lista fija de objetivos ni un JSON esperado aparte.
 ## Documentación adicional
 
 - [Manual de usuario](docs/MANUAL_USUARIO.md)
+- [Índice de contextos para desarrollo](docs/contexts/00-indice.md)
 - [Contexto de diseño de interfaz](docs/contexts/ui-theme.md)
 - [Guía del instalador](GUIA_INSTALADOR_INNO_SETUP.txt)
 
