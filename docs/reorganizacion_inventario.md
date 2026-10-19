@@ -36,7 +36,7 @@ Inventario inicial generado antes de mover rutas. Se debe repetir la búsqueda g
 ## Observaciones
 
 - `seguridad.db`, el Excel de septiembre, `sync_queue.json`, `version.txt` y bytecode `.pyc` aparecen en el índice Git.
-- La raíz contiene también `CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx`, que no aparece en el índice y no se debe mover hasta verificar si es un dato local.
+- La raíz contenía `CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx`; está versionado y difiere de la fixture homónima.
 - `.gitignore` ya incluye `__pycache__/`, `*.py[cod]`, `data/`, `.venv/`, `venv/`, `dist/`, `build/` y `.env`.
 
 ## Resoluciones posteriores al inventario
@@ -49,5 +49,5 @@ Inventario inicial generado antes de mover rutas. Se debe repetir la búsqueda g
 - `seguridad.db` y `sync_queue.json` se archivaron en `_archivo/` porque las rutas runtime de base/cola apuntan al directorio del usuario, no a la raíz del repo.
 - Los `.pyc` versionados se retiraron del índice.
 - `docs/version.txt` era idéntico a `version.txt`; se retiró el duplicado y login/guía usan la fuente raíz.
-- El Excel local de octubre se comparó con la fixture versionada: sus SHA-256 difieren (`3140e2bed38338a8f22bfc44f64846c7575071063e6097a46e337f8ba5c354fa` frente a `b6adac3a25a2acb80dafcd47290e5e1426c31c9ba3a75f4b3ba2df0eab75a482`). Sigue sin versionar y se deja intacto, pendiente de decisión.
+- El Excel de octubre versionado se comparó con la fixture simplificada homónima: sus SHA-256 difieren (`3140e2bed38338a8f22bfc44f64846c7575071063e6097a46e337f8ba5c354fa` frente a `b6adac3a25a2acb80dafcd47290e5e1426c31c9ba3a75f4b3ba2df0eab75a482`). El libro completo se movió intacto a `tests/fixtures/CONTROL RECORRIDOS - OCTUBRE - 2026 COMPLETO.xlsx` y el JSON dorado lo consume.
 - `version.txt` y `pytest.ini` permanecen en raíz por compatibilidad de URL y descubrimiento automático de configuración.

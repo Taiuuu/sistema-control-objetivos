@@ -15,14 +15,14 @@ Se inspeccionaron los `Import`, `ImportFrom` y niveles relativos con `ast` sobre
 
 | Origen | Destinos internos observados |
 |---|---|
-| `api` | `core`, `database`, `models`, `services` |
-| `core` | `database`, `services` |
-| `database` | Sin imports a `ui` ni `services` |
-| `models` | `database` (violación de la dirección deseada) |
-| `scripts` | `api`, `core`, `database`, `models`, `services`, `ui` |
+| `api` | `database`, `models`, `services` |
+| `core` | Ninguno de los paquetes analizados |
+| `database` | `core`, `services` (dependencia legacy de backup/caché) |
+| `models` | `database`, `services` (violaciones de la dirección deseada) |
+| `scripts` | `api`, `core`, `database`, `services`, `ui` |
 | `services` | `core`, `database`, `models` |
-| `tests` | `api`, `database`, `models`, `services`, `tests`, `ui` |
-| `ui` | `core`, `database`, `models`, `services`, `ui` |
+| `tests` | `api`, `database`, `models`, `services`, `ui` |
+| `ui` | `core`, `database`, `models`, `services` |
 
 La dependencia directa `ui -> database` existe en pantallas y widgets, y hay imports de PyQt6 en `services.actualizador`, `services.background_task`, `services.notificaciones` y `services.sincronizacion`. Se conservan como deuda conocida; esta reorganización no cambia lógica ni sustituye esos accesos.
 

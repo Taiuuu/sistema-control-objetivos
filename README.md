@@ -162,8 +162,8 @@ no requiere mantener una lista fija de objetivos ni un JSON esperado aparte.
 ## Estructura
 
 - `scripts/` - Entrada principal y utilidades de mantenimiento.
-- `ui/` - Ventanas y componentes de la interfaz PyQt6.
-- `services/` - Lógica de negocio, importación, reportes, sincronización y seguridad.
+- `ui/` - Ventanas y componentes PyQt6; las pantallas de importación y reportes están agrupadas por funcionalidad.
+- `services/` - Lógica de negocio y subpaquetes de importación, pasadas, backups y actualizaciones.
 - `models/` - Entidades y validaciones de dominio.
 - `database/` - Inicialización, migraciones y acceso thread-safe a SQLite.
 - `api/` - API Flask modular y sus blueprints.

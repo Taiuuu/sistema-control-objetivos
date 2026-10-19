@@ -5,9 +5,9 @@
 Libros completos analizados:
 
 - `tests/fixtures/CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx`: septiembre de 2026.
-- `tests/fixtures/CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx`: octubre de 2026.
+- `tests/fixtures/CONTROL RECORRIDOS - OCTUBRE - 2026 COMPLETO.xlsx`: libro completo de octubre de 2026 usado por el conteo dorado.
 
-El directorio `tests/fixtures/` contiene además `CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx` y fixtures de parser (`ambiguedad.xlsx`, `columnas_faltantes.xlsx`, `formatos_hora.xlsx`, `hora_corrupta.xlsx`, `objetivos_misma_hora.xlsx`, `orden_cronologico.xlsx`, `reimportacion.xlsx`, `supervisor_distinto.xlsx` y `vacio.xlsx`). Los otros fixtures sirven para probar entradas; no representan meses completos.
+El directorio `tests/fixtures/` contiene además `CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx`, una fixture pequeña distinta del libro completo, y fixtures de parser (`ambiguedad.xlsx`, `columnas_faltantes.xlsx`, `formatos_hora.xlsx`, `hora_corrupta.xlsx`, `objetivos_misma_hora.xlsx`, `orden_cronologico.xlsx`, `reimportacion.xlsx`, `supervisor_distinto.xlsx` y `vacio.xlsx`). Los otros fixtures sirven para probar entradas; no representan meses completos.
 
 ## Estructura real de los libros completos
 

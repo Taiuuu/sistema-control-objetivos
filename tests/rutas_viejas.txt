@@ -6,10 +6,12 @@ path: ui/importar_excel.py
 path: ui/reporte_mensual.py
 path: ui/reporte_objetivo.py
 path: services/import_history.py
-path: CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx
+path: ./CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx
+path: ./CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx
+path: ../CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx
 path: scripts/instalador.iss
-path: seguridad.db
-path: sync_queue.json
+path: ./seguridad.db
+path: ./sync_queue.json
 path: docs/version.txt
 module: services.actualizador
 module: services.calculo_pasadas
