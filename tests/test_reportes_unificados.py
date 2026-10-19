@@ -1,6 +1,7 @@
 """Pruebas del contrato común de datos para los informes exportables."""
 
 import datetime
+import re
 import sqlite3
 
 import pytest
@@ -13,6 +14,7 @@ from services.reportes_unificados.datos import (
     crear_datos_objetivo,
 )
 from services.reportes_unificados.excel import exportar_excel
+from services.reportes_unificados.pdf import exportar_pdf
 from services.reportes_unificados.modelos import (
     ColumnaReporte,
     MetadatosReporte,
@@ -305,3 +307,33 @@ def test_excel_usa_el_objeto_comun_respetando_orden_y_tipos(tmp_path):
     assert resumen.print_title_rows == "$5:$5"
     assert resumen.page_setup.fitToWidth == 1
     assert resumen.column_dimensions["A"].width >= 34
+
+
+def test_pdf_pagina_tablas_largas_y_texto_unicode(tmp_path):
+    reporte = {
+        "anio": 2026,
+        "mes": 10,
+        "cumplimiento_total": 60.0,
+        "objetivos": [
+            {
+                "id": identificador,
+                "nombre": f"Objetivo Ñ {identificador} — " + ("texto largo " * 18),
+                "dias_esperados": 10,
+                "dias_con_pasada": 6,
+                "dias_sin_pasada": 4,
+                "cumplimiento_porcentaje": 60.0,
+            }
+            for identificador in range(1, 81)
+        ],
+    }
+    datos = crear_datos_mensuales(reporte)
+    ruta = tmp_path / "reporte.pdf"
+
+    exportar_pdf(datos, ruta, contenido="resumen")
+
+    contenido_pdf = ruta.read_bytes()
+    paginas = len(re.findall(rb"/Type\s*/Page\b", contenido_pdf))
+    assert contenido_pdf.startswith(b"%PDF-")
+    assert paginas >= 2
+    assert len(datos.filas) == 80
+    assert datos.filas[0]["objetivo"].startswith("Objetivo Ñ")
