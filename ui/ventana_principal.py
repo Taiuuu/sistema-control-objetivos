@@ -426,7 +426,13 @@ class VentanaPrincipal(QWidget):
             "notas", operacion,
         )
 
-        consultas = add_section("CONSULTAS Y REPORTES")
+        gestion = add_section("OBJETIVOS Y SUPERVISORES")
+        self._btn_add_obj = add_btn(
+            "➕", "Agregar objetivo", self.abrir_form_objetivo, "(Ctrl+O)",
+            "agregar_objetivo", gestion,
+        )
+
+        consultas = add_section("REPORTES Y CONSULTAS")
         add_btn("🔍", "Ver pasadas", self.abrir_lista_pasadas, clave="ver_pasadas", seccion=consultas)
         add_btn("🏖️", "Feriados", self.abrir_feriados, clave="feriados", seccion=consultas)
         add_btn(
@@ -437,15 +443,11 @@ class VentanaPrincipal(QWidget):
             "📅", "Reporte objetivo", self.abrir_reporte_mensual_objetivo, "(Ctrl+Ñ)",
             "reporte_objetivo", consultas,
         )
-        add_btn("💾", "Transferir datos", self.abrir_transferir_datos, clave="transferir_datos", seccion=consultas)
-        add_btn("📥", "Importar Excel", self.abrir_importar_excel, clave="importar_excel", seccion=consultas)
         add_btn("❓", "Ayuda", self.abrir_ayuda, "(Ctrl+H)", "ayuda", consultas)
 
-        gestion = add_section("GESTIÓN")
-        self._btn_add_obj = add_btn(
-            "➕", "Agregar objetivo", self.abrir_form_objetivo, "(Ctrl+O)",
-            "agregar_objetivo", gestion,
-        )
+        importacion = add_section("IMPORTACIÓN Y DATOS")
+        add_btn("📥", "Importar Excel", self.abrir_importar_excel, clave="importar_excel", seccion=importacion)
+        add_btn("💾", "Transferir datos", self.abrir_transferir_datos, clave="transferir_datos", seccion=importacion)
         add_btn(
             "📍", "Ver objetivos", self.abrir_lista_objetivos,
             clave="ver_objetivos", seccion=gestion,
@@ -566,8 +568,13 @@ class VentanaPrincipal(QWidget):
 
     def _configurar_menu(self) -> None:
         dialogo = QDialog(self)
-        dialogo.setWindowTitle("Configurar menú")
+        dialogo.setWindowTitle("Funciones visibles")
         layout = QVBoxLayout(dialogo)
+        descripcion = QLabel(
+            "Elegí qué accesos querés ver. Ocultarlos no cambia los permisos ni los datos."
+        )
+        descripcion.setWordWrap(True)
+        layout.addWidget(descripcion)
         checks = {}
         etiquetas = {
             "control_diario": "Control diario",
@@ -670,9 +677,9 @@ class VentanaPrincipal(QWidget):
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(18)
 
-        titulo = QLabel("Módulos")
+        titulo = QLabel("Inicio")
         titulo.setObjectName("LandingTitle")
-        subtitulo = QLabel("Accesos rápidos a las herramientas de trabajo")
+        subtitulo = QLabel("Elegí a qué sección querés ir")
         subtitulo.setObjectName("LandingSubtitle")
         layout.addWidget(titulo)
         layout.addWidget(subtitulo)

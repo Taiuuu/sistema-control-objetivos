@@ -481,8 +481,9 @@ def test_main_sidebar_navigation_is_grouped_and_admin_links_keep_permission_gate
         VentanaPrincipal._construir_botones_menu(owner)
         assert [label.text() for label in owner._secciones_sidebar if not label.isHidden()] == [
             "OPERACIÓN DIARIA",
-            "CONSULTAS Y REPORTES",
-            "GESTIÓN",
+            "OBJETIVOS Y SUPERVISORES",
+            "REPORTES Y CONSULTAS",
+            "IMPORTACIÓN Y DATOS",
         ]
         button_names = [button._texto_completo.strip().split(maxsplit=1)[-1]
                         for button in owner._botones_menu if not button.isHidden()]

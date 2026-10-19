@@ -24,6 +24,9 @@ def test_theme_cards_apply_selected_theme_and_show_active_state(
         for card in dialog.findChildren(ThemeSelectionCard)
     }
 
+    assert [
+        dialog.tabs.tabText(index) for index in range(dialog.tabs.count())
+    ] == ["Temas", "Funciones visibles", "Backups y datos", "Cuenta", "Acerca de"]
     assert list(cards) == ["Claro", "Verde", "Negro", "Grafito"]
     assert cards[original_theme].preview.isChecked()
     assert not cards[original_theme].check.isHidden()

@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -163,7 +164,7 @@ class ThemeSelectionCard(QFrame):
 
 
 class ConfiguracionDialog(QDialog):
-    """Preferencias de apariencia y navegación."""
+    """Preferencias visuales, de funciones, datos y cuenta."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -173,48 +174,50 @@ class ConfiguracionDialog(QDialog):
         self.setMinimumSize(min(420, ancho_disponible), min(340, alto_disponible))
         self.resize(min(620, ancho_disponible), min(480, alto_disponible))
         self._manager = get_theme_manager()
+        self._password_window = None
+        self.tabs = QTabWidget(self)
 
-        contenido = QWidget()
-        root = QVBoxLayout(contenido)
-        root.setContentsMargins(24, 22, 24, 24)
-        root.setSpacing(16)
+        def crear_pagina():
+            contenido = QWidget()
+            layout = QVBoxLayout(contenido)
+            layout.setContentsMargins(20, 18, 20, 18)
+            layout.setSpacing(14)
+            scroll = QScrollArea(self.tabs)
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setWidget(contenido)
+            return scroll, layout
 
-        title = QLabel("Configuración")
-        title.setStyleSheet("font-size: 22px; font-weight: 700; background: transparent;")
-        root.addWidget(title)
-
-        navigation_title = QLabel("Navegación")
-        navigation_title.setStyleSheet(
-            "font-size: 16px; font-weight: 700; background: transparent;"
-        )
-        root.addWidget(navigation_title)
+        funciones_page, funciones = crear_pagina()
         navigation_description = QLabel(
-            "Elegí qué módulos querés mantener visibles en el menú."
+            "Elegí qué accesos querés ver. Ocultarlos no cambia los permisos ni los datos."
         )
         navigation_description.setWordWrap(True)
-        root.addWidget(navigation_description)
-        self.customize_menu_button = QPushButton("Personalizar módulos")
-        self.customize_menu_button.setAccessibleName("Personalizar módulos del menú")
+        funciones.addWidget(navigation_description)
+        self.customize_menu_button = QPushButton("Elegir funciones visibles")
+        self.customize_menu_button.setAccessibleName("Elegir funciones visibles")
         if parent and hasattr(parent, "_configurar_menu"):
             self.customize_menu_button.clicked.connect(parent._configurar_menu)
         else:
             self.customize_menu_button.setEnabled(False)
             self.customize_menu_button.setToolTip(
-                "La personalización del menú requiere una sesión iniciada."
+                "La configuración de funciones requiere una sesión iniciada."
             )
-        root.addWidget(self.customize_menu_button)
+        funciones.addWidget(self.customize_menu_button)
+        funciones.addStretch(1)
 
+        datos_page, datos = crear_pagina()
         backup_title = QLabel("Copias de seguridad")
         backup_title.setStyleSheet(
             "font-size: 16px; font-weight: 700; background: transparent;"
         )
-        root.addWidget(backup_title)
+        datos.addWidget(backup_title)
         backup_description = QLabel(
             "Las copias verificadas permiten recuperar la base de datos. "
             "La copia externa es opcional."
         )
         backup_description.setWordWrap(True)
-        root.addWidget(backup_description)
+        datos.addWidget(backup_description)
         backup_buttons = QHBoxLayout()
         self.create_backup_button = QPushButton("Crear copia ahora")
         self.create_backup_button.clicked.connect(self._crear_backup)
@@ -222,28 +225,29 @@ class ConfiguracionDialog(QDialog):
         self.external_backup_button.clicked.connect(self._elegir_ruta_externa)
         backup_buttons.addWidget(self.create_backup_button)
         backup_buttons.addWidget(self.external_backup_button)
-        root.addLayout(backup_buttons)
+        datos.addLayout(backup_buttons)
         self.external_backup_path = QLabel()
         self.external_backup_path.setWordWrap(True)
-        root.addWidget(self.external_backup_path)
+        datos.addWidget(self.external_backup_path)
         self.backup_list = QListWidget()
         self.backup_list.setMinimumHeight(110)
-        root.addWidget(self.backup_list)
+        datos.addWidget(self.backup_list)
         self.restore_backup_button = QPushButton("Restaurar copia seleccionada")
         self.restore_backup_button.clicked.connect(self._restaurar_backup)
-        root.addWidget(self.restore_backup_button)
+        datos.addWidget(self.restore_backup_button)
         self._actualizar_backups()
 
+        temas_page, temas = crear_pagina()
         appearance_title = QLabel("Apariencia")
         appearance_title.setStyleSheet("font-size: 16px; font-weight: 700; background: transparent;")
-        root.addWidget(appearance_title)
+        temas.addWidget(appearance_title)
 
         themes_grid = QGridLayout()
         themes_grid.setHorizontalSpacing(12)
         themes_grid.setVerticalSpacing(12)
         for index, theme_name in enumerate(self._manager.available_themes()):
             themes_grid.addWidget(ThemeSelectionCard(theme_name), index // 2, index % 2)
-        root.addLayout(themes_grid)
+        temas.addLayout(themes_grid)
 
         font_section = QFrame()
         font_section.setObjectName("FontSizeSection")
@@ -267,20 +271,37 @@ class ConfiguracionDialog(QDialog):
         self.increase_font_button.setToolTip("Aumentar tamaño de letra")
         font_row.addWidget(self.decrease_font_button)
         font_row.addWidget(self.increase_font_button)
-        root.addWidget(font_section)
+        temas.addWidget(font_section)
+        temas.addStretch(1)
 
-        close_button = QPushButton("Cerrar")
-        close_button.clicked.connect(self.accept)
-        root.addWidget(close_button, 0, Qt.AlignmentFlag.AlignRight)
+        cuenta_page, cuenta = crear_pagina()
+        cuenta.addWidget(QLabel("Administrá el acceso de tu cuenta."))
+        self.change_password_button = QPushButton("Cambiar contraseña")
+        self.change_password_button.clicked.connect(self._cambiar_contrasena)
+        tiene_sesion = isinstance(getattr(parent, "usuario_id", None), int)
+        self.change_password_button.setEnabled(tiene_sesion)
+        if not tiene_sesion:
+            self.change_password_button.setToolTip(
+                "Iniciá sesión para cambiar la contraseña."
+            )
+        cuenta.addWidget(self.change_password_button)
+        cuenta.addStretch(1)
 
-        scroll = QScrollArea(self)
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll.setWidget(contenido)
+        acerca_page, acerca = crear_pagina()
+        acerca.addWidget(QLabel("VESP Organizations"))
+        acerca.addWidget(
+            QLabel("Sistema de control de objetivos, supervisores y pasadas.")
+        )
+        acerca.addStretch(1)
+
+        self.tabs.addTab(temas_page, "Temas")
+        self.tabs.addTab(funciones_page, "Funciones visibles")
+        self.tabs.addTab(datos_page, "Backups y datos")
+        self.tabs.addTab(cuenta_page, "Cuenta")
+        self.tabs.addTab(acerca_page, "Acerca de")
         layout_principal = QVBoxLayout(self)
-        layout_principal.setContentsMargins(0, 0, 0, 0)
-        layout_principal.addWidget(scroll)
+        layout_principal.setContentsMargins(8, 8, 8, 8)
+        layout_principal.addWidget(self.tabs)
 
         self.decrease_font_button.clicked.connect(lambda: self._change_font_size(-1))
         self.increase_font_button.clicked.connect(lambda: self._change_font_size(1))
@@ -289,6 +310,20 @@ class ConfiguracionDialog(QDialog):
         self._apply_theme(self._manager.current())
         self._show_font_size(self._manager.font_size())
         self._actualizar_ruta_externa()
+
+    def _cambiar_contrasena(self) -> None:
+        usuario_id = getattr(self.parent(), "usuario_id", None)
+        if not isinstance(usuario_id, int):
+            self.change_password_button.setEnabled(False)
+            self.change_password_button.setToolTip(
+                "Iniciá sesión para cambiar la contraseña."
+            )
+            return
+
+        from ui.cambiar_password import CambiarPassword
+
+        self._password_window = CambiarPassword(usuario_id, lambda: None)
+        self._password_window.show()
 
     def _actualizar_ruta_externa(self) -> None:
         ruta = obtener_ruta_backup_externo()

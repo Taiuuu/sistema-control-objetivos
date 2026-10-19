@@ -21,12 +21,13 @@ Fuentes: clases de `ui/` y subdirectorios; listado de módulos en [docs/contexts
 El orden de `VentanaPrincipal._construir_botones_menu` ([ui/ventana_principal.py](../ui/ventana_principal.py), líneas 382-495) es:
 
 1. **Operación diaria**: Control diario, Registrar pasada, Registrar turno, Notas del día.
-2. **Consultas y reportes**: Ver pasadas, Feriados, Reporte mensual, Reporte objetivo, Transferir datos, Importar Excel, Ayuda.
-3. **Gestión**: Agregar objetivo, Ver objetivos, Agregar supervisor, Ver supervisores.
-4. **Administración**: Gestionar usuarios, Historial, Optimización de BD, Auditoría detallada, Sincronización.
+2. **Objetivos y supervisores**: Agregar objetivo, Ver objetivos, Agregar supervisor, Ver supervisores.
+3. **Reportes y consultas**: Ver pasadas, Feriados, Reporte mensual, Reporte objetivo, Ayuda.
+4. **Importación y datos**: Importar Excel, Transferir datos.
+5. **Administración**: Gestionar usuarios, Historial, Optimización de BD, Auditoría detallada, Sincronización.
 5. **Pie del sidebar**: Configuración y Cerrar sesión.
 
-Los accesos se filtran mediante permisos y la preferencia guardada del menú. La app inicia en una landing con tarjetas principales; no es necesario añadirla desde cero, pero debe armonizarse con los roles y orden nuevos.
+Los accesos se filtran mediante permisos y la preferencia guardada del menú. La app inicia en una landing con tarjetas principales; en Fase 3 se reorganizó el sidebar y se nombró la landing “Inicio”. Configuración ofrece pestañas Temas, Funciones visibles, Backups y datos, Cuenta y Acerca de; la visibilidad conserva la preferencia existente por usuario.
 
 ## Hallazgos ordenados por gravedad
 
@@ -58,7 +59,7 @@ No se confirmó un defecto que bloquee universalmente la navegación en la inspe
 
 ## Registro de los 10 problemas y estado
 
-Este archivo es la línea base de la Fase 1. En Fase 2 se resolvieron el hallazgo 1, la opacidad de cards del 10 y se cubrieron tokens de estado/selección/hover/deshabilitado en el stylesheet global. Los demás hallazgos continúan pendientes de las fases de navegación, responsive y fluidez; las funciones ya existentes listadas como avances se deben preservar.
+Este archivo es la línea base de la Fase 1. En Fase 2 se resolvieron el hallazgo 1, la opacidad de cards del 10 y se cubrieron tokens de estado/selección/hover/deshabilitado en el stylesheet global. En Fase 3 se reordenó el menú y Configuración pasó a tener pestañas. Los demás hallazgos continúan pendientes de responsive y fluidez; las funciones ya existentes listadas como avances se deben preservar.
 
 ## Validación base
 

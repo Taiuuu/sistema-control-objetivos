@@ -20,6 +20,8 @@ Flujo: `scripts/main.py` → login → `VentanaPrincipal` → pantallas/diálogo
 
 Tema: `ui/theme/tokens.py` define Claro, Verde, Negro y Grafito; `theme_manager.py` aplica paleta/stylesheet a QApplication y emite cambios; `stylesheet.py` y componentes enlazan tokens. Ver [ui-theme.md](./ui-theme.md), no duplicar tokens acá.
 
+Sidebar actual: Operación diaria → Objetivos y supervisores → Reportes y consultas → Importación y datos → Administración; Configuración y Cerrar sesión permanecen en el pie. La landing inicial se llama “Inicio” y filtra tarjetas por permisos/preferencias. Configuración contiene pestañas Temas, Funciones visibles, Backups y datos, Cuenta y Acerca de.
+
 Atajos globales registrados en ventana principal: Ctrl+P pasada, O objetivo, S supervisor, T turno, N notas, R reporte mensual, B recargar, F buscar, H ayuda, =/- zoom, flechas izquierda/derecha cambiar fecha, Ctrl+\\ sidebar. Esc cierra diálogos/ventanas que registran ese shortcut. Reportes: Ctrl+Enter genera y Ctrl+E exporta Excel. La ayuda omite algunos atajos registrados; modificarla junto a los shortcuts.
 
 Invariantes: pantallas nuevas deben consumir servicios cuando exista contrato adecuado; UI no debe importar `database` ni SQL directo según arquitectura objetivo; actualizar temas en diálogos/widgets relevantes.
