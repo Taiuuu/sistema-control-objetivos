@@ -277,21 +277,27 @@ def crear_datos_detalle(
             objetivos = filtro.get("objetivo_ids")
             if objetivos is not None and not isinstance(objetivos, (list, tuple, set)):
                 objetivos = (objetivos,)
-            if objetivos and fila[4] not in objetivos:
+            if objetivos is not None and fila[4] not in objetivos:
                 continue
             supervisores = filtro.get("supervisor_ids")
             if supervisores is not None and not isinstance(
                 supervisores, (list, tuple, set)
             ):
                 supervisores = (supervisores,)
-            if supervisores and fila[6] not in supervisores:
+            if supervisores is not None and fila[6] not in supervisores:
                 continue
             turnos = filtro.get("turnos")
             if isinstance(turnos, str):
                 turnos = (turnos,)
-            if turnos and turno not in {
-                normalizar_turno(str(turno_elegido)) for turno_elegido in turnos
-            }:
+            turnos_normalizados = (
+                {
+                    normalizar_turno(str(turno_elegido))
+                    for turno_elegido in turnos
+                }
+                if turnos is not None
+                else None
+            )
+            if turnos_normalizados is not None and turno not in turnos_normalizados:
                 continue
             if not _pertenece_a_equipo(
                 conexion, filtro.get("equipo_id"), fecha_turno, turno, fila[6]

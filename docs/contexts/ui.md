@@ -9,7 +9,7 @@ Archivos clave:
 - `ui/form_pasada.py`, `ui/form_de_turno.py`, `ui/lista_pasadas.py`, `ui/tabla_diaria.py` — operación diaria; usan modelos, validaciones, consultas y/o SQLite.
 - `ui/lista_objetivos.py`, `ui/form_objetivo.py`, `ui/lista_supervisores.py`, `ui/form_supervisor.py` — catálogos; modelos, permisos/sync y acceso legacy.
 - `ui/importador/importar_excel.py` — vista previa/resoluciones del servicio importador.
-- `ui/reportes/reporte_mensual.py`, `ui/reportes/reporte_objetivo.py`, `ui/widgets/tabla_cobertura.py` — reportes y cálculo compartido.
+- `ui/reportes/reporte_mensual.py`, `ui/reportes/reporte_objetivo.py`, `ui/reportes/dialogo_exportar.py`, `ui/widgets/tabla_cobertura.py` — reportes y selección de exportación.
 - `ui/feriados.py`, `ui/notas_diarias.py` — calendario/feriados y notas.
 - `ui/login.py`, `ui/cambiar_password.py`, `ui/gestionar_usuarios.py` — identidad, contraseña y cuentas.
 - `ui/configuracion.py`, `ui/vista_auditoria.py`, `ui/vista_logs.py`, `ui/vista_indexacion.py`, `ui/vista_sincronizacion.py` — preferencias/backups, auditoría, logs, BD y sincronización.

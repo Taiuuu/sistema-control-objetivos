@@ -163,3 +163,62 @@ def test_detalle_atribuye_madrugada_al_mes_de_turno(
             test_objetivo["id"]: {"diurno": 0, "nocturno": 1}
         },
     }
+
+
+def test_detalle_aplica_filtros_de_objetivo_supervisor_y_turno(
+    db_initialized, test_objetivo, test_supervisor
+):
+    conexion = sqlite3.connect(db_initialized)
+    cursor = conexion.cursor()
+    cursor.execute(
+        "INSERT INTO objetivos (nombre, dias_semana) VALUES (?, ?)",
+        ("Objetivo alternativo", "1,2,3,4,5"),
+    )
+    objetivo_alternativo = cursor.lastrowid
+    cursor.execute("INSERT INTO supervisores (nombre) VALUES (?)", ("Supervisor B",))
+    supervisor_alternativo = cursor.lastrowid
+    cursor.executemany(
+        """
+        INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id, fecha_operativa)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                "2026-10-30",
+                "10:00",
+                "diurno",
+                test_objetivo["id"],
+                test_supervisor["id"],
+                "2026-10-30",
+            ),
+            (
+                "2026-10-30",
+                "22:00",
+                "nocturno",
+                objetivo_alternativo,
+                supervisor_alternativo,
+                "2026-10-30",
+            ),
+        ],
+    )
+    conexion.commit()
+    conexion.close()
+
+    datos = crear_datos_detalle(
+        datetime.date(2026, 10, 30),
+        datetime.date(2026, 10, 30),
+        {
+            "objetivo_ids": [test_objetivo["id"]],
+            "supervisor_ids": [test_supervisor["id"]],
+            "turnos": ["diurno"],
+        },
+    )
+    sin_coincidencias = crear_datos_detalle(
+        datetime.date(2026, 10, 30),
+        datetime.date(2026, 10, 30),
+        {"supervisor_ids": [], "turnos": []},
+    )
+
+    assert len(datos.filas) == 1
+    assert datos.filas[0]["objetivo"] == test_objetivo["nombre"]
+    assert len(sin_coincidencias.filas) == 0

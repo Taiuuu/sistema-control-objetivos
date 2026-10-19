@@ -29,7 +29,7 @@
 └── ui/                               Interfaz PyQt6
     ├── components/                   Componentes visuales reutilizables
     ├── importador/                   Importación desde Excel
-    ├── reportes/                     Reportes mensual y por objetivo
+    ├── reportes/                     Reportes y diálogo reutilizable de exportación
     ├── theme/                        Tokens, colores y estilos
     └── widgets/                      Widgets reutilizables
 ```
