@@ -1,0 +1,9 @@
+# Rutas de origen ya migradas, reflejadas en docs/reorganizacion_plan.md.
+path: services/actualizador.py
+path: services/calculo_pasadas.py
+path: CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx
+path: scripts/instalador.iss
+path: seguridad.db
+path: sync_queue.json
+module: services.actualizador
+module: services.calculo_pasadas
