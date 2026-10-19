@@ -186,7 +186,7 @@ def obtener_top_supervisores(anio: int, mes: int, limite: int = 10) -> list:
         FROM supervisores s
         LEFT JOIN pasadas p ON s.id = p.supervisor_id 
             AND COALESCE(p.fecha_operativa, p.fecha) BETWEEN ? AND ?
-        WHERE s.fecha_baja IS NULL
+        WHERE s.fecha_baja IS NULL AND s.es_placeholder = 0
         GROUP BY s.id, s.nombre
         ORDER BY total_pasadas DESC
         LIMIT ?

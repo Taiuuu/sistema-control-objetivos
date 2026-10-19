@@ -151,7 +151,7 @@ class ListaSupervisores(QWidget):
 
         filtros.addWidget(QLabel("Estado"))
         self.filtro_estado = QComboBox()
-        self.filtro_estado.addItems(["Todos", "Activos", "Dado de baja"])
+        self.filtro_estado.addItems(["Todos", "Activos", "Dado de baja", "Incompletos"])
         self.filtro_estado.currentTextChanged.connect(self._cargar_tabla)
         filtros.addWidget(self.filtro_estado)
 
@@ -203,9 +203,17 @@ class ListaSupervisores(QWidget):
         if texto_buscar:
             supervisores = [s for s in supervisores if texto_buscar in (s.nombre or "").lower()]
         if estado == "Activos":
-            supervisores = [s for s in supervisores if s.fecha_baja is None]
+            supervisores = [
+                s for s in supervisores
+                if s.fecha_baja is None and not s.es_placeholder
+            ]
         elif estado == "Dado de baja":
-            supervisores = [s for s in supervisores if s.fecha_baja is not None]
+            supervisores = [
+                s for s in supervisores
+                if s.fecha_baja is not None and not s.es_placeholder
+            ]
+        elif estado == "Incompletos":
+            supervisores = [s for s in supervisores if s.es_placeholder]
 
         self.tabla.setUpdatesEnabled(False)
         self.tabla.clearContents()
@@ -216,7 +224,7 @@ class ListaSupervisores(QWidget):
             nombre = s.nombre
             fecha_alta = s.fecha_alta
             fecha_baja = s.fecha_baja
-            activo = s.fecha_baja is None
+            activo = s.fecha_baja is None and not s.es_placeholder
             def _item(texto):
                 return QTableWidgetItem(texto or "—")
 
@@ -227,7 +235,10 @@ class ListaSupervisores(QWidget):
             self.tabla.setItem(i, 2, _item(
                 self._formatear_fecha(fecha_baja) if fecha_baja else "—"
             ))
-            estado = StatusBadge("Activo" if activo else "Baja", "ok" if activo else "danger")
+            if s.es_placeholder:
+                estado = StatusBadge("Incompleto", "warning")
+            else:
+                estado = StatusBadge("Activo" if activo else "Baja", "ok" if activo else "danger")
             self.tabla.setCellWidget(i, 3, self._centrar_widget(estado))
 
             menu = QMenu(self)
@@ -236,26 +247,28 @@ class ListaSupervisores(QWidget):
                 lambda checked=False, sid=sup_id, n=nombre, fa=fecha_alta, fb=fecha_baja:
                 self._editar(sid, n, fa, fb),
             )
-            if activo:
-                accion_estado = menu.addAction(
-                    "Dar de baja",
+            if not s.es_placeholder:
+                if activo:
+                    accion_estado = menu.addAction(
+                        "Dar de baja",
+                        lambda checked=False, sid=sup_id, n=nombre:
+                        self._dar_de_baja(sid, n),
+                    )
+                else:
+                    accion_estado = menu.addAction(
+                        "Reactivar",
+                        lambda checked=False, sid=sup_id, n=nombre:
+                        self._reactivar(sid, n),
+                    )
+                if activo:
+                    accion_estado.setProperty("danger", True)
+            if not s.es_placeholder:
+                accion_eliminar = menu.addAction(
+                    "Eliminar permanentemente",
                     lambda checked=False, sid=sup_id, n=nombre:
-                    self._dar_de_baja(sid, n),
+                    self._eliminar(sid, n),
                 )
-            else:
-                accion_estado = menu.addAction(
-                    "Reactivar",
-                    lambda checked=False, sid=sup_id, n=nombre:
-                    self._reactivar(sid, n),
-                )
-            if activo:
-                accion_estado.setProperty("danger", True)
-            accion_eliminar = menu.addAction(
-                "Eliminar permanentemente",
-                lambda checked=False, sid=sup_id, n=nombre:
-                self._eliminar(sid, n),
-            )
-            accion_eliminar.setProperty("danger", True)
+                accion_eliminar.setProperty("danger", True)
             boton_acciones = QPushButton("⋯")
             boton_acciones.setObjectName("ObjectiveActions")
             boton_acciones.setToolTip("Acciones del supervisor")

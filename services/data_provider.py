@@ -54,7 +54,7 @@ class Objetivo:
     id: int
     nombre: str
     descripcion: str
-    fecha_inicio: str
+    fecha_inicio: Optional[str]
     fecha_fin: Optional[str]
     activo: bool
 
@@ -177,7 +177,9 @@ class SQLiteDataProvider(DataProvider):
         try:
             rows = gestor_db.ejecutar(
                 """SELECT id, nombre, descripcion, fecha_inicio, fecha_fin, activo
-                   FROM objetivos WHERE activo = 1 ORDER BY nombre"""
+                   FROM objetivos
+                   WHERE activo = 1 AND es_placeholder = 0
+                   ORDER BY nombre"""
             )
             return [
                 Objetivo(
@@ -207,7 +209,7 @@ class SQLiteDataProvider(DataProvider):
         try:
             rows = gestor_db.ejecutar(
                 """SELECT id, nombre, (fecha_baja IS NULL) AS activo FROM supervisores
-                   WHERE fecha_baja IS NULL ORDER BY nombre"""
+                   WHERE fecha_baja IS NULL AND es_placeholder = 0 ORDER BY nombre"""
             )
             return [
                 Supervisor(id=r['id'], nombre=r['nombre'], activo=bool(r['activo']))
@@ -609,7 +611,8 @@ class SQLiteDataProvider(DataProvider):
         try:
             query = """SELECT
                         (SELECT COUNT(*) FROM objetivos) as total_objetivos,
-                        (SELECT COUNT(*) FROM supervisores WHERE fecha_baja IS NULL) as supervisores,
+                        (SELECT COUNT(*) FROM supervisores
+                         WHERE fecha_baja IS NULL AND es_placeholder = 0) as supervisores,
                         (SELECT COUNT(*) FROM pasadas
                          WHERE COALESCE(fecha_operativa, fecha) = date('now')) as hoy,
                         (SELECT COUNT(*) FROM pasadas

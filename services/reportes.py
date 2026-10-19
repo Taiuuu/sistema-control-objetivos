@@ -136,14 +136,16 @@ def obtener_objetivos_del_dia(fecha: str) -> List[Tuple[int, str, str]]:
         query = """
             SELECT o.id, o.nombre, o.dias_semana, o.fecha_inicio, o.fecha_fin
             FROM objetivos o
-            WHERE EXISTS (
+            WHERE o.activo = 1
+              AND o.es_placeholder = 0
+              AND (EXISTS (
                 SELECT 1 FROM objetivo_periodos p
                 WHERE p.objetivo_id = o.id AND p.fecha_inicio <= ?
                   AND (p.fecha_fin IS NULL OR p.fecha_fin >= ?)
             )
             OR (NOT EXISTS (SELECT 1 FROM objetivo_periodos p0 WHERE p0.objetivo_id = o.id)
                 AND (o.fecha_inicio IS NULL OR o.fecha_inicio <= ?)
-                AND (o.fecha_fin IS NULL OR o.fecha_fin >= ?))
+                AND (o.fecha_fin IS NULL OR o.fecha_fin >= ?)))
         """
 
         objetivos_db = gestor_db.ejecutar(query, (fecha, fecha, fecha, fecha))

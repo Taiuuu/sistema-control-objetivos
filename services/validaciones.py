@@ -83,7 +83,10 @@ def validar_objetivo_existe(objetivo_id: int) -> None:
     try:
         conn = conectar()
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM objetivos WHERE id = ?", (objetivo_id,))
+        cursor.execute(
+            "SELECT id FROM objetivos WHERE id = ? AND es_placeholder = 0",
+            (objetivo_id,),
+        )
         if not cursor.fetchone():
             raise ErrorValidacion(f"Objetivo con ID {objetivo_id} no existe")
         conn.close()
@@ -125,7 +128,10 @@ def validar_supervisor_existe(supervisor_id: int) -> None:
     try:
         conn = conectar()
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM supervisores WHERE id = ?", (supervisor_id,))
+        cursor.execute(
+            "SELECT id FROM supervisores WHERE id = ? AND es_placeholder = 0",
+            (supervisor_id,),
+        )
         if not cursor.fetchone():
             raise ErrorValidacion(f"Supervisor con ID {supervisor_id} no existe")
         conn.close()

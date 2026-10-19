@@ -76,7 +76,12 @@ class DialogoEditarObjetivo(QDialog):
         self.input_inicio = QDateEdit()
         self.input_inicio.setCalendarPopup(True)
         configure_calendar_theme(self.input_inicio)
-        self.input_inicio.setDate(QDate.fromString(objetivo.fecha_inicio, "yyyy-MM-dd"))
+        if objetivo.fecha_inicio:
+            self.input_inicio.setDate(
+                QDate.fromString(objetivo.fecha_inicio, "yyyy-MM-dd")
+            )
+        else:
+            self.input_inicio.setDate(QDate.currentDate())
         self.input_inicio.setDisplayFormat("dd/MM/yyyy")
         self.input_inicio.setFixedHeight(38)
         layout.addWidget(self.input_inicio)
@@ -497,18 +502,21 @@ class ListaObjetivos(QWidget):
             fin_texto = o.fecha_fin if o.fecha_fin else "Sin fecha fin"
 
             tabla.setItem(i, 0, QTableWidgetItem(o.nombre))
-            tabla.setItem(i, 1, QTableWidgetItem(o.fecha_inicio))
+            tabla.setItem(i, 1, QTableWidgetItem(o.fecha_inicio or "—"))
             tabla.setItem(i, 2, QTableWidgetItem(fin_texto))
             tabla.setItem(i, 3, QTableWidgetItem(dias_texto))
-            estado = "Pendiente de revisión" if o.pendiente_revision else ("Vigente" if o.es_activo() else "Finalizado")
-            estado_tipo = "warning" if o.pendiente_revision else ("ok" if o.es_activo() else "info")
+            if o.es_placeholder:
+                estado, estado_tipo = "Incompleto", "warning"
+            else:
+                estado = "Pendiente de revisión" if o.pendiente_revision else ("Vigente" if o.es_activo() else "Finalizado")
+                estado_tipo = "warning" if o.pendiente_revision else ("ok" if o.es_activo() else "info")
             estado_badge = StatusBadge(estado, estado_tipo)
             tabla.setCellWidget(i, 4, self._centrar_widget(estado_badge))
 
             menu = QMenu(self)
             accion_editar = menu.addAction("Editar")
             accion_editar.triggered.connect(lambda checked=False, obj=o: self._editar(obj))
-            if o.pendiente_revision:
+            if o.pendiente_revision and not o.es_placeholder:
                 accion_revision = menu.addAction("Marcar revisado")
                 accion_revision.triggered.connect(
                     lambda checked=False, obj_id=o.id: self._marcar_revisado(obj_id)

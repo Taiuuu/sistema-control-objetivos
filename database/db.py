@@ -139,7 +139,8 @@ def crear_base_datos() -> None:
             fecha_inicio TEXT,
             fecha_fin    TEXT,
             dias_semana  TEXT,
-            activo       INTEGER DEFAULT 1
+            activo       INTEGER DEFAULT 1,
+            es_placeholder INTEGER NOT NULL DEFAULT 0
         )
     """)
 
@@ -176,7 +177,8 @@ def crear_base_datos() -> None:
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre       TEXT NOT NULL,
             fecha_alta   TEXT,
-            fecha_baja   TEXT
+            fecha_baja   TEXT,
+            es_placeholder INTEGER NOT NULL DEFAULT 0
         )
     """)
 
@@ -288,9 +290,60 @@ def crear_base_datos() -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_usuario_id ON logs(usuario_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_fecha ON logs(fecha DESC)")
 
+    migrar_supervisores_placeholder(cursor)
     migrar_objetivos_campos(cursor)
     migrar_pasadas_campos(cursor)
     migrar_clave_natural_pasadas(cursor)
+    cursor.execute("""
+        CREATE TRIGGER IF NOT EXISTS trg_pasadas_no_placeholder_insert
+        BEFORE INSERT ON pasadas
+        WHEN EXISTS (
+            SELECT 1 FROM objetivos
+            WHERE id = NEW.objetivo_id AND es_placeholder = 1
+        ) OR EXISTS (
+            SELECT 1 FROM supervisores
+            WHERE id = NEW.supervisor_id AND es_placeholder = 1
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'No se puede registrar una pasada con fichas históricas incompletas');
+        END
+    """)
+    cursor.execute("""
+        CREATE TRIGGER IF NOT EXISTS trg_pasadas_no_placeholder_update
+        BEFORE UPDATE OF objetivo_id, supervisor_id ON pasadas
+        WHEN EXISTS (
+            SELECT 1 FROM objetivos
+            WHERE id = NEW.objetivo_id AND es_placeholder = 1
+        ) OR EXISTS (
+            SELECT 1 FROM supervisores
+            WHERE id = NEW.supervisor_id AND es_placeholder = 1
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'No se puede asociar una pasada nueva a fichas históricas incompletas');
+        END
+    """)
+    cursor.execute("""
+        CREATE TRIGGER IF NOT EXISTS trg_supervisores_preservar_historial
+        BEFORE DELETE ON supervisores
+        WHEN EXISTS (SELECT 1 FROM pasadas WHERE supervisor_id = OLD.id)
+          OR EXISTS (
+              SELECT 1 FROM equipos
+              WHERE supervisor1_id = OLD.id
+                 OR supervisor2_id = OLD.id
+                 OR supervisor3_id = OLD.id
+          )
+        BEGIN
+            SELECT RAISE(ABORT, 'No se puede eliminar un supervisor con historial asociado');
+        END
+    """)
+    cursor.execute("""
+        CREATE TRIGGER IF NOT EXISTS trg_objetivos_preservar_historial
+        BEFORE DELETE ON objetivos
+        WHEN EXISTS (SELECT 1 FROM pasadas WHERE objetivo_id = OLD.id)
+        BEGIN
+            SELECT RAISE(ABORT, 'No se puede eliminar un objetivo con pasadas asociadas');
+        END
+    """)
     _crear_admin_si_no_existe(cursor)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS schema_version (
@@ -311,6 +364,18 @@ def crear_base_datos() -> None:
 # =============================================================================
 # MIGRACIONES
 # =============================================================================
+
+def migrar_supervisores_placeholder(cursor: sqlite3.Cursor) -> None:
+    """Marca supervisores creados para conservar relaciones históricas incompletas."""
+    columnas = {
+        fila[1] for fila in cursor.execute("PRAGMA table_info(supervisores)")
+    }
+    if "es_placeholder" not in columnas:
+        cursor.execute(
+            "ALTER TABLE supervisores "
+            "ADD COLUMN es_placeholder INTEGER NOT NULL DEFAULT 0"
+        )
+
 
 def _respaldar_duplicados_naturales_antes_de_migrar() -> None:
     """Respalda la BD antes de archivar duplicados que impiden el índice único."""
@@ -625,6 +690,7 @@ def migrar_objetivos_campos(cursor: sqlite3.Cursor | None = None) -> None:
         for columna_def in (
             "descripcion TEXT",
             "activo INTEGER DEFAULT 1",
+            "es_placeholder INTEGER NOT NULL DEFAULT 0",
             "tipo_objetivo TEXT DEFAULT 'puntual'",
             "pendiente_revision INTEGER DEFAULT 0",
         ):
@@ -639,6 +705,9 @@ def migrar_objetivos_campos(cursor: sqlite3.Cursor | None = None) -> None:
         )
         actualizar_cursor.execute(
             "UPDATE objetivos SET activo = 1 WHERE activo IS NULL"
+        )
+        actualizar_cursor.execute(
+            "UPDATE objetivos SET es_placeholder = 0 WHERE es_placeholder IS NULL"
         )
         actualizar_cursor.execute(
             "UPDATE objetivos SET tipo_objetivo = 'puntual' WHERE tipo_objetivo IS NULL OR tipo_objetivo = ''"

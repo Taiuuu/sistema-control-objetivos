@@ -166,15 +166,19 @@ def listar_objetivos(
         if solo_activos:
             query = f"""
                 SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana,
-                      datetime('now') as creado_en, tipo_objetivo, pendiente_revision
+                      datetime('now') as creado_en, tipo_objetivo,
+                      pendiente_revision, es_placeholder
                 FROM objetivos
-                  WHERE fecha_fin IS NULL OR fecha_fin >= date('now')
+                WHERE activo = 1
+                  AND es_placeholder = 0
+                  AND (fecha_fin IS NULL OR fecha_fin >= date('now'))
                 ORDER BY {orden}
             """
         else:
             query = f"""
                 SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana,
-                      datetime('now') as creado_en, tipo_objetivo, pendiente_revision
+                      datetime('now') as creado_en, tipo_objetivo,
+                      pendiente_revision, es_placeholder
                 FROM objetivos
                 ORDER BY CASE WHEN fecha_fin IS NULL THEN 0 ELSE 1 END,
                          {orden}
@@ -190,7 +194,8 @@ def listar_objetivos(
                 fecha_fin=r['fecha_fin'],
                 dias_semana=r['dias_semana'],
                 creado_en=r.get('creado_en'), tipo_objetivo=r.get('tipo_objetivo') or 'puntual',
-                pendiente_revision=bool(r.get('pendiente_revision', 0))
+                pendiente_revision=bool(r.get('pendiente_revision', 0)),
+                es_placeholder=bool(r.get('es_placeholder', 0)),
             )
             for r in resultados
         ]
@@ -221,7 +226,8 @@ def obtener_objetivo(objetivo_id: int) -> Objetivo:
         objetivo_id = validar_id(objetivo_id)
         
         resultado = gestor_db.ejecutar(
-            """SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana, tipo_objetivo, pendiente_revision
+            """SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana,
+                      tipo_objetivo, pendiente_revision, es_placeholder
                FROM objetivos WHERE id = ?""",
             (objetivo_id,)
         )
@@ -237,7 +243,8 @@ def obtener_objetivo(objetivo_id: int) -> Objetivo:
             fecha_inicio=r['fecha_inicio'],
             fecha_fin=r['fecha_fin'],
             dias_semana=r['dias_semana'], tipo_objetivo=r.get('tipo_objetivo') or 'puntual',
-            pendiente_revision=bool(r.get('pendiente_revision', 0))
+            pendiente_revision=bool(r.get('pendiente_revision', 0)),
+            es_placeholder=bool(r.get('es_placeholder', 0)),
         )
         
         logger.debug(f"Objetivo obtenido: {objetivo.nombre}")
@@ -264,7 +271,8 @@ def buscar_objetivos(texto: str) -> List[Objetivo]:
         texto = validar_nombre(texto, "búsqueda")
         
         resultados = gestor_db.ejecutar(
-            """SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana 
+            """SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana,
+                      es_placeholder
                FROM objetivos 
                WHERE nombre LIKE ? 
                ORDER BY nombre""",
@@ -277,7 +285,8 @@ def buscar_objetivos(texto: str) -> List[Objetivo]:
                 nombre=r['nombre'],
                 fecha_inicio=r['fecha_inicio'],
                 fecha_fin=r['fecha_fin'],
-                dias_semana=r['dias_semana']
+                dias_semana=r['dias_semana'],
+                es_placeholder=bool(r.get('es_placeholder', 0)),
             )
             for r in resultados
         ]
@@ -338,7 +347,12 @@ def actualizar_objetivo(
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE objetivos 
-                SET nombre = ?, fecha_inicio = ?, fecha_fin = ?, dias_semana = ?, tipo_objetivo = ?
+                SET nombre = ?, fecha_inicio = ?, fecha_fin = ?, dias_semana = ?,
+                    tipo_objetivo = ?, es_placeholder = 0,
+                    activo = CASE WHEN es_placeholder = 1 THEN 1 ELSE activo END,
+                    pendiente_revision = CASE
+                        WHEN es_placeholder = 1 THEN 0 ELSE pendiente_revision
+                    END
                 WHERE id = ?
             """, (nombre, fecha_inicio, fecha_fin, dias_semana, tipo_objetivo, objetivo_id))
         
@@ -536,14 +550,11 @@ def eliminar_objetivo(objetivo_id: int) -> bool:
             )
             pasadas_asociadas = cursor.fetchone()[0]
             if pasadas_asociadas:
-                logger.warning(
-                    "Eliminando %s pasada(s) asociada(s) al objetivo %s antes de borrar el objetivo",
-                    pasadas_asociadas,
-                    objetivo_id,
-                )
-                cursor.execute(
-                    "DELETE FROM pasadas WHERE objetivo_id = ?",
-                    (objetivo_id,)
+                raise DatabaseError(
+                    "DELETE",
+                    f"El objetivo {objetivo_id} tiene {pasadas_asociadas} "
+                    "pasada(s) asociada(s). Finalizalo en lugar de eliminarlo "
+                    "para conservar el historial.",
                 )
             cursor.execute(
                 "DELETE FROM objetivos WHERE id = ?",
@@ -565,6 +576,8 @@ def eliminar_objetivo(objetivo_id: int) -> bool:
         return True
 
     except (ValidationError, ObjetivoError):
+        raise
+    except DatabaseError:
         raise
     except sqlite3.IntegrityError as e:
         logger.error(f"Violación de integridad al eliminar objetivo {objetivo_id}: {e}")

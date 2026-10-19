@@ -56,6 +56,12 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 - **Crear supervisor**: Menú → "Nuevo Supervisor"
 - **Listar**: Menú → "Equipos" o "Supervisores"
 
+### Registros históricos incompletos
+
+- Los registros marcados **Incompleto** conservan el ID usado por pasadas históricas, pero su ficha original no pudo recuperarse.
+- No se ofrecen para nuevas pasadas. Editalos solo cuando puedas confirmar sus datos reales; al guardar una ficha corregida vuelve a estar disponible.
+- No se pueden eliminar objetivos o supervisores que tengan historial asociado. Para retirarlos del uso, dales de baja.
+
 ### Reportes
 
 - **Mensual**: Menú → "Reporte Mensual"

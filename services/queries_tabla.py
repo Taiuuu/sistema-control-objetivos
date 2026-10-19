@@ -95,7 +95,10 @@ def obtener_supervisores_de_pasadas(fecha: str, turno: str) -> str:
 
 @con_cache(ttl=60)
 def cargar_supervisores() -> list:
-    query = 'SELECT id, nombre FROM supervisores WHERE fecha_baja IS NULL ORDER BY nombre'
+    query = (
+        "SELECT id, nombre FROM supervisores "
+        "WHERE fecha_baja IS NULL AND es_placeholder = 0 ORDER BY nombre"
+    )
     resultados = gestor_db.ejecutar(query)
     return [(r['id'], r['nombre']) for r in resultados]
 

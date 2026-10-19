@@ -54,7 +54,7 @@ class EstadoSupervisor(str, Enum):
 @dataclass
 class Objetivo:
     nombre: str
-    fecha_inicio: str
+    fecha_inicio: Optional[str]
     dias_semana: str
     id: Optional[int] = None
     fecha_fin: Optional[str] = None
@@ -62,9 +62,13 @@ class Objetivo:
     actualizado_en: Optional[str] = None
     tipo_objetivo: str = "puntual"
     pendiente_revision: bool = False
+    es_placeholder: bool = False
 
     def es_activo(self) -> bool:
-        return self.fecha_fin is None or self.fecha_fin >= date.today().isoformat()
+        return (
+            not self.es_placeholder
+            and (self.fecha_fin is None or self.fecha_fin >= date.today().isoformat())
+        )
 
     def __hash__(self):
         return hash(self.id)
@@ -76,11 +80,12 @@ class Objetivo:
 @dataclass
 class Supervisor:
     nombre: str
-    fecha_alta: str
+    fecha_alta: Optional[str]
     id: Optional[int] = None
     fecha_baja: Optional[str] = None
     creado_en: Optional[str] = None
     actualizado_en: Optional[str] = None
+    es_placeholder: bool = False
 
     def es_activo(self) -> bool:
         return self.fecha_baja is None

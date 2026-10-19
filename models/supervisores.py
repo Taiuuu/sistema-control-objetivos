@@ -147,14 +147,14 @@ def listar_supervisores(
         
         if solo_activos:
             query = f"""
-                SELECT id, nombre, fecha_alta, fecha_baja
+                SELECT id, nombre, fecha_alta, fecha_baja, es_placeholder
                 FROM supervisores
-                WHERE fecha_baja IS NULL
+                WHERE fecha_baja IS NULL AND es_placeholder = 0
                 ORDER BY {orden}
             """
         else:
             query = f"""
-                SELECT id, nombre, fecha_alta, fecha_baja
+                SELECT id, nombre, fecha_alta, fecha_baja, es_placeholder
                 FROM supervisores
                 ORDER BY CASE WHEN fecha_baja IS NULL THEN 0 ELSE 1 END,
                          {orden}
@@ -167,7 +167,8 @@ def listar_supervisores(
                 id=r['id'],
                 nombre=r['nombre'],
                 fecha_alta=r['fecha_alta'],
-                fecha_baja=r['fecha_baja']
+                fecha_baja=r['fecha_baja'],
+                es_placeholder=bool(r['es_placeholder']),
             )
             for r in resultados
         ]
@@ -198,7 +199,7 @@ def obtener_supervisor(supervisor_id: int) -> Supervisor:
         supervisor_id = validar_id(supervisor_id)
         
         resultado = gestor_db.ejecutar(
-            """SELECT id, nombre, fecha_alta, fecha_baja 
+            """SELECT id, nombre, fecha_alta, fecha_baja, es_placeholder
                FROM supervisores WHERE id = ?""",
             (supervisor_id,)
         )
@@ -212,7 +213,8 @@ def obtener_supervisor(supervisor_id: int) -> Supervisor:
             id=r['id'],
             nombre=r['nombre'],
             fecha_alta=r['fecha_alta'],
-            fecha_baja=r['fecha_baja']
+            fecha_baja=r['fecha_baja'],
+            es_placeholder=bool(r['es_placeholder']),
         )
         
         logger.debug(f"Supervisor obtenido: {supervisor.nombre}")
@@ -239,7 +241,7 @@ def buscar_supervisores(texto: str) -> List[Supervisor]:
         texto = validar_nombre(texto, "búsqueda")
         
         resultados = gestor_db.ejecutar(
-            """SELECT id, nombre, fecha_alta, fecha_baja 
+            """SELECT id, nombre, fecha_alta, fecha_baja, es_placeholder
                FROM supervisores 
                WHERE nombre LIKE ? 
                ORDER BY nombre""",
@@ -251,7 +253,8 @@ def buscar_supervisores(texto: str) -> List[Supervisor]:
                 id=r['id'],
                 nombre=r['nombre'],
                 fecha_alta=r['fecha_alta'],
-                fecha_baja=r['fecha_baja']
+                fecha_baja=r['fecha_baja'],
+                es_placeholder=bool(r['es_placeholder']),
             )
             for r in resultados
         ]
@@ -311,7 +314,7 @@ def actualizar_supervisor(
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE supervisores
-                SET nombre = ?, fecha_alta = ?, fecha_baja = ?
+                SET nombre = ?, fecha_alta = ?, fecha_baja = ?, es_placeholder = 0
                 WHERE id = ?
             """, (nombre, fecha_alta, fecha_baja, supervisor_id))
         
@@ -321,6 +324,7 @@ def actualizar_supervisor(
             nombre=nombre,
             fecha_alta=fecha_alta,
             fecha_baja=fecha_baja,
+            es_placeholder=False,
             actualizado_en=datetime.now().isoformat()
         )
         
@@ -486,6 +490,30 @@ def eliminar_supervisor(supervisor_id: int) -> None:
         with gestor_db.transaction() as conn:
             cursor = conn.cursor()
             cursor.execute(
+                "SELECT COUNT(*) FROM pasadas WHERE supervisor_id = ?",
+                (supervisor_id,),
+            )
+            pasadas_asociadas = cursor.fetchone()[0]
+            cursor.execute(
+                """
+                SELECT COUNT(*)
+                FROM equipos
+                WHERE supervisor1_id = ?
+                   OR supervisor2_id = ?
+                   OR supervisor3_id = ?
+                """,
+                (supervisor_id, supervisor_id, supervisor_id),
+            )
+            equipos_asociados = cursor.fetchone()[0]
+            if pasadas_asociadas or equipos_asociados:
+                raise DatabaseError(
+                    "DELETE",
+                    f"El supervisor {supervisor_id} tiene "
+                    f"{pasadas_asociadas} pasada(s) y {equipos_asociados} "
+                    "equipo(s) asociados. Reasigná las pasadas o dalo de baja "
+                    "para conservar el historial.",
+                )
+            cursor.execute(
                 "DELETE FROM supervisores WHERE id = ?",
                 (supervisor_id,)
             )
@@ -497,6 +525,8 @@ def eliminar_supervisor(supervisor_id: int) -> None:
         
     except (ValidationError, SupervisorError) as e:
         logger.error(f"Error eliminando supervisor: {e}")
+        raise
+    except DatabaseError:
         raise
     except Exception as e:
         logger.error(f"Error inesperado al eliminar supervisor: {e}")
@@ -517,7 +547,11 @@ def _buscar_supervisor_por_nombre(nombre: str) -> Optional[Supervisor]:
     """
     try:
         resultado = gestor_db.ejecutar(
-            "SELECT id, nombre, fecha_alta, fecha_baja FROM supervisores WHERE nombre = ?",
+            """
+            SELECT id, nombre, fecha_alta, fecha_baja, es_placeholder
+            FROM supervisores
+            WHERE nombre = ?
+            """,
             (nombre,)
         )
         
@@ -529,7 +563,8 @@ def _buscar_supervisor_por_nombre(nombre: str) -> Optional[Supervisor]:
             id=r['id'],
             nombre=r['nombre'],
             fecha_alta=r['fecha_alta'],
-            fecha_baja=r['fecha_baja']
+            fecha_baja=r['fecha_baja'],
+            es_placeholder=bool(r['es_placeholder']),
         )
     except Exception:
         return None
