@@ -4,6 +4,7 @@ import datetime
 import sqlite3
 
 import pytest
+from openpyxl import load_workbook
 
 from services.reportes_unificados.datos import (
     crear_datos_diarios,
@@ -11,6 +12,7 @@ from services.reportes_unificados.datos import (
     crear_datos_mensuales,
     crear_datos_objetivo,
 )
+from services.reportes_unificados.excel import exportar_excel
 from services.reportes_unificados.modelos import (
     ColumnaReporte,
     MetadatosReporte,
@@ -222,3 +224,84 @@ def test_detalle_aplica_filtros_de_objetivo_supervisor_y_turno(
     assert len(datos.filas) == 1
     assert datos.filas[0]["objetivo"] == test_objetivo["nombre"]
     assert len(sin_coincidencias.filas) == 0
+
+
+def test_excel_usa_el_objeto_comun_respetando_orden_y_tipos(tmp_path):
+    datos = crear_datos_mensuales(
+        {
+            "anio": 2026,
+            "mes": 10,
+            "cumplimiento_total": 75.0,
+            "objetivos": [
+                {
+                    "id": 9,
+                    "nombre": "Objetivo Ñ",
+                    "dias_esperados": 4,
+                    "dias_con_pasada": 3,
+                    "dias_sin_pasada": 1,
+                    "cumplimiento_porcentaje": 75.0,
+                }
+            ],
+        },
+        {"turno": ["diurno", "nocturno"]},
+        filas_detalle=[
+            {
+                "fecha": datetime.date(2026, 10, 31),
+                "hora": datetime.time(23, 50),
+                "turno": "nocturno",
+                "objetivo": "Objetivo Ñ",
+                "supervisor": "Muñoz",
+                "notas": 'Observación "larga" con tilde',
+            }
+        ],
+        conteos_por_objetivo={9: {"diurno": 2, "nocturno": 3}},
+    )
+    ruta = tmp_path / "reporte.xlsx"
+
+    exportar_excel(
+        datos,
+        ruta,
+        columnas=[
+            "objetivo",
+            "pasadas_totales",
+            "cumplimiento",
+            "fecha",
+            "hora",
+            "notas",
+        ],
+        contenido="ambos",
+        incluir_notas=True,
+    )
+
+    libro = load_workbook(ruta, data_only=True)
+    resumen = libro["Resumen"]
+    detalle = libro["Detalle"]
+    assert [resumen.cell(5, col).value for col in range(1, 3)] == [
+        "Objetivo",
+        "Total de pasadas",
+    ]
+    assert resumen.cell(5, 3).value == "Cumplimiento"
+    assert resumen.cell(6, 1).value == "Objetivo Ñ"
+    assert resumen.cell(6, 2).value == 5
+    assert resumen.cell(6, 2).data_type == "n"
+    assert resumen.cell(6, 3).value == 0.75
+    assert resumen.cell(6, 3).number_format == "0.0%"
+    assert resumen.cell(7, 2).value == 5
+    assert [detalle.cell(5, col).value for col in range(1, 5)] == [
+        "Objetivo",
+        "Fecha",
+        "Hora",
+        "Observaciones",
+    ]
+    assert detalle.cell(6, 1).value == "Objetivo Ñ"
+    assert detalle.cell(6, 2).value.date() == datetime.date(2026, 10, 31)
+    assert detalle.cell(6, 3).value == datetime.time(23, 50)
+    assert detalle.cell(6, 4).value == 'Observación "larga" con tilde'
+    assert detalle.cell(6, 2).number_format == "dd/mm/yyyy"
+    assert detalle.cell(6, 3).number_format == "hh:mm"
+    assert libro.sheetnames == ["Resumen", "Detalle", "Parámetros"]
+    assert resumen.freeze_panes == "A6"
+    assert resumen.auto_filter.ref == "A5:C6"
+    assert resumen.print_title_rows == "$5:$5"
+    assert resumen.page_setup.fitToWidth == 1
+    assert resumen.column_dimensions["A"].width >= 34

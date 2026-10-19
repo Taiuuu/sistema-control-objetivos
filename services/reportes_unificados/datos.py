@@ -38,15 +38,16 @@ COLUMNAS_MENSUALES = (
 )
 
 COLUMNAS_DIARIAS = (
-    ColumnaReporte("fecha", "Fecha", "fecha", "dd/mm/aaaa", 14),
+    ColumnaReporte("fecha", "Fecha", "fecha", "dd/mm/yyyy", 14),
     ColumnaReporte("hora", "Hora", "hora", "hh:mm", 10, "centro"),
     ColumnaReporte("turno", "Turno", "texto", None, 13, "centro"),
     ColumnaReporte("objetivo", "Objetivo", "texto", None, 34),
     ColumnaReporte("supervisor", "Supervisor", "texto", None, 28),
+    ColumnaReporte("notas", "Observaciones", "texto_largo", None, 42),
 )
 
 COLUMNAS_OBJETIVO = (
-    ColumnaReporte("fecha", "Fecha", "fecha_texto", "dd/mm/aaaa", 14),
+    ColumnaReporte("fecha", "Fecha", "fecha_texto", "dd/mm/yyyy", 14),
     ColumnaReporte("dia_semana", "Día", "texto", None, 12, "centro"),
     ColumnaReporte("diurno", "Diurno", "texto", None, 32),
     ColumnaReporte("nocturno", "Nocturno", "texto", None, 32),
@@ -190,6 +191,7 @@ def crear_datos_diarios(
             "turno": str(pasada["turno"]),
             "objetivo": str(pasada["objetivo"]),
             "supervisor": str(pasada["supervisor"]),
+            "notas": str(pasada.get("notas", "")),
         }
         for pasada in reporte["pasadas"]
     )

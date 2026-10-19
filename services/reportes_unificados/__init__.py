@@ -11,6 +11,7 @@ from services.reportes_unificados.modelos import (
     MetadatosReporte,
     ReporteDatos,
 )
+from services.reportes_unificados.excel import exportar_excel
 
 __all__ = [
     "ColumnaReporte",
@@ -20,4 +21,5 @@ __all__ = [
     "crear_datos_detalle",
     "crear_datos_mensuales",
     "crear_datos_objetivo",
+    "exportar_excel",
 ]
