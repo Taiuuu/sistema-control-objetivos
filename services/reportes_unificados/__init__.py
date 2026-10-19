@@ -13,6 +13,12 @@ from services.reportes_unificados.modelos import (
 )
 from services.reportes_unificados.excel import exportar_excel
 from services.reportes_unificados.pdf import exportar_pdf
+from services.reportes_unificados.archivos import (
+    guardar_reporte,
+    mensaje_error_exportacion,
+    nombre_sugerido,
+    sanitizar_nombre_archivo,
+)
 
 __all__ = [
     "ColumnaReporte",
@@ -24,4 +30,8 @@ __all__ = [
     "crear_datos_objetivo",
     "exportar_excel",
     "exportar_pdf",
+    "guardar_reporte",
+    "mensaje_error_exportacion",
+    "nombre_sugerido",
+    "sanitizar_nombre_archivo",
 ]

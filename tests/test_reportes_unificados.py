@@ -15,6 +15,7 @@ from services.reportes_unificados.datos import (
 )
 from services.reportes_unificados.excel import exportar_excel
 from services.reportes_unificados.pdf import exportar_pdf
+from services.reportes_unificados import archivos as archivos_reportes
 from services.reportes_unificados.modelos import (
     ColumnaReporte,
     MetadatosReporte,
@@ -337,3 +338,59 @@ def test_pdf_pagina_tablas_largas_y_texto_unicode(tmp_path):
     assert paginas >= 2
     assert len(datos.filas) == 80
     assert datos.filas[0]["objetivo"].startswith("Objetivo Ñ")
+
+
+def test_nombre_sugerido_sanitiza_caracteres_y_respeta_limite():
+    ahora = datetime.datetime(2026, 10, 31, 14, 5)
+    nombre = archivos_reportes.nombre_sugerido(
+        "objetivo / Ñ", '2026-10: "especial"', "xlsx", ahora
+    )
+
+    assert nombre.endswith("_20261031-1405.xlsx")
+    assert len(nombre) <= 120
+    assert not any(caracter in nombre for caracter in '<>:"/\\|?*')
+
+
+def test_guardar_reporte_no_sobrescribe_y_audita(tmp_path, monkeypatch):
+    datos = crear_datos_mensuales(
+        {
+            "anio": 2026,
+            "mes": 10,
+            "cumplimiento_total": 100.0,
+            "objetivos": [
+                {
+                    "nombre": "Objetivo",
+                    "dias_esperados": 1,
+                    "dias_con_pasada": 1,
+                    "dias_sin_pasada": 0,
+                    "cumplimiento_porcentaje": 100.0,
+                }
+            ],
+        }
+    )
+    auditos = []
+    monkeypatch.setattr(archivos_reportes, "tiene_permiso", lambda _: True)
+    monkeypatch.setattr(
+        archivos_reportes, "_registrar_exportacion", lambda *args: auditos.append(args)
+    )
+    ruta = tmp_path / "reporte.xlsx"
+    archivos_reportes.guardar_reporte(
+        datos, ruta, "excel", contenido="resumen"
+    )
+
+    assert ruta.exists()
+    assert len(auditos) == 1
+    with pytest.raises(FileExistsError, match="Ya existe"):
+        archivos_reportes.guardar_reporte(
+            datos, ruta, "excel", contenido="resumen"
+        )
+    assert len(auditos) == 1
+
+
+def test_guardar_reporte_rechaza_usuario_sin_permiso(tmp_path, monkeypatch):
+    monkeypatch.setattr(archivos_reportes, "tiene_permiso", lambda _: False)
+
+    with pytest.raises(PermissionError, match="No tiene permiso"):
+        archivos_reportes.guardar_reporte(
+            None, tmp_path / "reporte.xlsx", "excel"
+        )
