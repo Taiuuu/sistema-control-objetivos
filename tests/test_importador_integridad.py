@@ -23,7 +23,7 @@ from services.importador.resolucion import EstadoResolucion
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
-ARCHIVO_DORADO = Path(__file__).parents[1] / (
+ARCHIVO_DORADO = Path(__file__).parent / "fixtures" / (
     "CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx"
 )
 

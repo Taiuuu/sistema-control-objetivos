@@ -2,10 +2,10 @@
 
 ## Archivos de ejemplo encontrados
 
-Libros completos en la raíz:
+Libros completos analizados:
 
-- `CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx`: septiembre de 2026.
-- `CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx`: octubre de 2026.
+- `tests/fixtures/CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx`: septiembre de 2026.
+- `tests/fixtures/CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx`: octubre de 2026.
 
 El directorio `tests/fixtures/` contiene además `CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx` y fixtures de parser (`ambiguedad.xlsx`, `columnas_faltantes.xlsx`, `formatos_hora.xlsx`, `hora_corrupta.xlsx`, `objetivos_misma_hora.xlsx`, `orden_cronologico.xlsx`, `reimportacion.xlsx`, `supervisor_distinto.xlsx` y `vacio.xlsx`). Los otros fixtures sirven para probar entradas; no representan meses completos.
 

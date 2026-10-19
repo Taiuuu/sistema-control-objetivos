@@ -155,8 +155,8 @@ python -m pytest
 ```
 
 Las dependencias de desarrollo adicionales se encuentran en `docs/requirements-dev.txt`.
-La prueba dorada del importador usa el Excel real de septiembre de 2026 que está en la
-raíz del proyecto y crea un catálogo temporal a partir de los nombres presentes en ese mes;
+La prueba dorada del importador usa `tests/fixtures/CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx`
+y crea un catálogo temporal a partir de los nombres presentes en ese mes;
 no requiere mantener una lista fija de objetivos ni un JSON esperado aparte.
 
 ## Estructura
