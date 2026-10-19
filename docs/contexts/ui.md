@@ -22,6 +22,8 @@ Tema: `ui/theme/tokens.py` define Claro, Verde, Negro y Grafito; `theme_manager.
 
 Sidebar actual: Operación diaria → Objetivos y supervisores → Reportes y consultas → Importación y datos → Administración; Configuración y Cerrar sesión permanecen en el pie. La landing inicial se llama “Inicio” y filtra tarjetas por permisos/preferencias. Configuración contiene pestañas Temas, Funciones visibles, Backups y datos, Cuenta y Acerca de.
 
+Vigencia de objetivos: las pestañas y la API usan `services/estado_objetivos.py`; no se debe volver a clasificar por fecha directamente en la pantalla. Ver el criterio de fin de hoy en [reglas_de_calculo.md](../reglas_de_calculo.md).
+
 Atajos globales registrados en ventana principal: Ctrl+P pasada, O objetivo, S supervisor, T turno, N notas, R reporte mensual, B recargar, F buscar, H ayuda, =/- zoom, flechas izquierda/derecha cambiar fecha, Ctrl+\\ sidebar. Esc cierra diálogos/ventanas que registran ese shortcut. Reportes: Ctrl+Enter genera y Ctrl+E exporta Excel. La ayuda omite algunos atajos registrados; modificarla junto a los shortcuts.
 
 Invariantes: pantallas nuevas deben consumir servicios cuando exista contrato adecuado; UI no debe importar `database` ni SQL directo según arquitectura objetivo; actualizar temas en diálogos/widgets relevantes.

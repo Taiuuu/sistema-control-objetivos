@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QSpinBox, QLineEdit, QMenu, QHeaderView
     , QInputDialog
 )
-from PyQt6.QtCore import QDate, QTime
+from PyQt6.QtCore import QDate, QSignalBlocker, QTime
 
 from database.db import DB_PATH
 from services.operaciones_seguras import (
@@ -427,6 +427,12 @@ class ListaPasadas(QWidget):
         self.btn_filtrar.setCheckable(True)
         self.btn_filtrar.toggled.connect(self._alternar_filtros)
         fila.addWidget(self.btn_filtrar)
+        self.contador_filtros = QLabel("0 filtros activos")
+        self.contador_filtros.setAccessibleName("Cantidad de filtros activos")
+        fila.addWidget(self.contador_filtros)
+        self.btn_limpiar_filtros = PillButton("Limpiar filtros", "ghost")
+        self.btn_limpiar_filtros.clicked.connect(self._limpiar_filtros)
+        fila.addWidget(self.btn_limpiar_filtros)
 
         self.btn_exportar_excel = PillButton("Exportar Excel", "primary")
         self.btn_exportar_excel.clicked.connect(self._exportar_excel)
@@ -545,7 +551,41 @@ class ListaPasadas(QWidget):
 
     def _alternar_filtros(self, visibles: bool) -> None:
         self.panel_filtros.setVisible(visibles)
-        self.btn_filtrar.setText("Ocultar filtros" if visibles else "Filtrar")
+        self._actualizar_contador_filtros()
+
+    def _limpiar_filtros(self) -> None:
+        blockers = [
+            QSignalBlocker(widget)
+            for widget in (
+                self.selector_fecha,
+                self.buscador,
+                self.selector_supervisor,
+                self.selector_turno,
+            )
+        ]
+        self.selector_fecha.setDate(QDate.currentDate())
+        self.buscador.clear()
+        self.selector_supervisor.setCurrentIndex(0)
+        self.selector_turno.setCurrentText("Todos")
+        del blockers
+        self._cargar_tabla()
+
+    def _actualizar_contador_filtros(self) -> None:
+        filtros_activos = sum(
+            (
+                self.selector_fecha.date() != QDate.currentDate(),
+                bool(self.buscador.text().strip()),
+                self.selector_supervisor.currentData() not in (None, 0),
+                self.selector_turno.currentText() != "Todos",
+            )
+        )
+        sufijo = "" if filtros_activos == 1 else "s"
+        self.contador_filtros.setText(f"{filtros_activos} filtro{sufijo} activo{sufijo}")
+        self.btn_filtrar.setText(
+            f"Más filtros ({filtros_activos})"
+            if filtros_activos
+            else "Más filtros"
+        )
 
     def _cargar_tabla(self):
 
@@ -593,6 +633,7 @@ class ListaPasadas(QWidget):
             self.tabla.setCellWidget(fila, 4, self._centrar_widget(boton_acciones))
 
         self.tabla.resizeRowsToContents()
+        self._actualizar_contador_filtros()
 
     @staticmethod
     def _centrar_widget(widget: QWidget) -> QWidget:

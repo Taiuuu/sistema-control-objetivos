@@ -146,7 +146,8 @@ def listar_objetivos(
     """Retorna todos los objetivos del sistema.
     
     Args:
-        solo_activos: Si True, solo retorna objetivos sin fecha de fin.
+        solo_activos: Si True, solo retorna registros habilitados en la base.
+            La vigencia efectiva por fecha de fin se determina en services.
         orden: Campo para ordenar ('nombre', 'fecha_inicio', 'fecha_fin').
     
     Returns:
@@ -171,7 +172,6 @@ def listar_objetivos(
                 FROM objetivos
                 WHERE activo = 1
                   AND es_placeholder = 0
-                  AND (fecha_fin IS NULL OR fecha_fin >= date('now'))
                 ORDER BY {orden}
             """
         else:
@@ -485,9 +485,6 @@ def dar_de_baja_objetivo(
         
         # Obtener objetivo actual
         objetivo = obtener_objetivo(objetivo_id)
-        
-        if not objetivo.es_activo():
-            logger.warning(f"Objetivo ya estaba inactivo: {objetivo.nombre}")
         
         # Actualizar
         with gestor_db.transaction() as conn:

@@ -10,6 +10,10 @@
 - **Fecha de turno:** día al que se atribuye la pasada, según fecha/hora calendario y turno. No es necesariamente `fecha` calendario.
 - **Mes de la pasada:** año y mes de la fecha de turno, no los de la hora calendario.
 
+## Vigencia de objetivos
+
+La vigencia efectiva se determina una sola vez en `services/estado_objetivos.py`. Un objetivo sin fecha de fin sigue vigente; uno con fecha de fin es vigente solo cuando esa fecha es posterior a hoy. Se adopta el criterio estricto: si la fecha de fin es hoy, ya se considera finalizado durante todo ese día. Los registros placeholder nunca se consideran vigentes. La fecha de referencia puede inyectarse en pruebas, pero en la aplicación se toma la fecha local del sistema.
+
 Las fechas/horas se tratan como hora local de Argentina (America/Argentina/Buenos_Aires): son valores de pared sin conversión a UTC. Una conversión UTC podría desplazar la fecha y no debe participar en la atribución.
 
 ## Corte y respaldo

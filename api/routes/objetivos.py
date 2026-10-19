@@ -11,6 +11,7 @@ from models.objetivos import (
 )
 from models.types import Objetivo
 from services.permisos import tiene_permiso
+from services.estado_objetivos import objetivo_esta_activo
 
 objetivos_bp = Blueprint('objetivos', __name__)
 
@@ -22,7 +23,7 @@ def _objetivo_a_dict(obj: Objetivo) -> dict:
         'fecha_inicio': obj.fecha_inicio,
         'fecha_fin': obj.fecha_fin,
         'dias_semana': obj.dias_semana,
-        'activo': obj.es_activo(),
+        'activo': objetivo_esta_activo(obj),
     }
 
 

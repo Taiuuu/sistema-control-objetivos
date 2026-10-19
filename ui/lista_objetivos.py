@@ -23,6 +23,7 @@ from models.types import Objetivo
 from services.sincronizacion import obtener_sincronizador
 from services.sesion import get_rol
 from services.permisos import tiene_permiso
+from services.estado_objetivos import objetivo_esta_activo
 from ui.components import GlassCard, PillButton, StatusBadge
 from ui.components.calendar import configure_calendar_theme
 from ui.components.base import rgba
@@ -485,8 +486,8 @@ class ListaObjetivos(QWidget):
     def _cargar_tabla(self, _indice: int = 0) -> None:
         objetivos = _cargar_objetivos()
         filtros = {
-            "actuales": lambda obj: obj.es_activo(),
-            "finalizados": lambda obj: not obj.es_activo(),
+            "actuales": objetivo_esta_activo,
+            "finalizados": lambda obj: not objetivo_esta_activo(obj),
             "todos": lambda obj: True,
         }
         for clave, tabla in self.tablas.items():
@@ -508,8 +509,9 @@ class ListaObjetivos(QWidget):
             if o.es_placeholder:
                 estado, estado_tipo = "Incompleto", "warning"
             else:
-                estado = "Pendiente de revisión" if o.pendiente_revision else ("Vigente" if o.es_activo() else "Finalizado")
-                estado_tipo = "warning" if o.pendiente_revision else ("ok" if o.es_activo() else "info")
+                activo = objetivo_esta_activo(o)
+                estado = "Pendiente de revisión" if o.pendiente_revision else ("Vigente" if activo else "Finalizado")
+                estado_tipo = "warning" if o.pendiente_revision else ("ok" if activo else "info")
             estado_badge = StatusBadge(estado, estado_tipo)
             tabla.setCellWidget(i, 4, self._centrar_widget(estado_badge))
 

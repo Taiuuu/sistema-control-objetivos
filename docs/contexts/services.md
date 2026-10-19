@@ -8,6 +8,7 @@ Archivos clave:
 - `services/data_provider.py` — proveedor abstracto y SQLite para usuarios/objetivos/supervisores/pasadas; usado por `sync_manager.py`.
 - `services/estadisticas.py` — métricas cacheadas; consume consultas y cálculo común, usada por vistas/reportes.
 - `services/pasadas/calculo_pasadas.py` — fecha operativa, mes, filtros y conteo; importador, reportes, API y UI.
+- `services/estado_objetivos.py` — vigencia efectiva por fecha de fin, compartida por UI y API.
 - `services/reportes_unificados/` — modelos dataclass y adaptadores del mismo objeto de datos para las salidas de reportes.
 - `services/reportes.py` — reportes diarios/mensuales y objetivos del día; UI y API.
 - `services/exportar.py`, `services/exportar_mes.py`, `services/exportacion_extendida.py` — exportación XLSX/PDF/mes y CSV extendido; pantallas de reportes.
