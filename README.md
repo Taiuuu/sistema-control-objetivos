@@ -146,6 +146,10 @@ encabezados repetidos al paginar y subtotales de agrupación. Ambos formatos se 
 desde la misma instantánea de datos. Cada archivo se registra en auditoría; el proceso no
 modifica pasadas ni datos de negocio.
 
+La API conserva los contratos JSON de reportes. El endpoint diario comparte filas y total
+de pasadas con la capa unificada; su porcentaje de cumplimiento mantiene el cálculo
+histórico de objetivos diarios.
+
 Para probar la exportación, abrí un reporte, elegí **Exportar**, actualizá la vista previa,
 seleccioná columnas/contenido/formato y continuá. Un archivo existente no se sobrescribe;
 si está abierto en Excel o un visor, cerralo o elegí otra ruta. Al terminar podés abrir el

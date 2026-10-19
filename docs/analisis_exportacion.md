@@ -66,12 +66,13 @@ La implementación unificada debe tener una sola capa de datos tipada y reproduc
 
 - Las tres pantallas con exportación se conectaron a `ui/reportes/acciones_exportacion.py` y `DialogoExportar`; conservan los filtros de fecha/supervisor/turno/búsqueda/estado aplicables. No se encontró una pantalla diaria separada. `Lista de pasadas` es el punto de entrada al detalle diario.
 - `services/reportes_unificados/` concentra metadatos, catálogo de columnas, filas, totales, notas y subtotales. Los servicios existentes de cumplimiento y el módulo puro `services/pasadas/calculo_pasadas.py` siguen determinando los cálculos; los escritores Excel/PDF reciben el mismo `ReporteDatos`.
-- `ReporteObjetivo` delega el cálculo a services y usa los mismos escritores y el diálogo. La API mensual ahora adapta el modelo común conservando el JSON histórico; la API diaria adapta el resultado del servicio diario para conservar su contrato.
+- `ReporteObjetivo` delega el cálculo a services y usa los mismos escritores y el diálogo. La API mensual usa el modelo común y conserva el JSON histórico. En la API diaria, filas y total usan el detalle canónico; se conserva el porcentaje de cumplimiento calculado por el servicio diario anterior para no redefinir ese indicador.
 - La exportación bloquea informes vacíos, sanitiza el nombre, rechaza sobrescrituras, traduce errores de archivo, registra errores técnicos, recuerda carpeta y ofrece abrir archivo/carpeta. Cada archivo generado añade una fila a auditoría; no se modifican datos operativos.
 - Las plantillas se guardan en `QSettings`, por lo que no hizo falta migración. No se añadió dependencia. Los exportadores de compatibilidad en `services/exportar.py` se mantienen porque pruebas y posibles consumidores externos aún los usan; las pantallas migradas ya no los llaman.
 - Agrupar ordena filas de detalle y el modelo calcula subtotales, que el PDF imprime. La barra de progreso es indeterminada; no hay indicador porcentual. La vista previa visualiza hasta 100 filas.
 - El resumen mensual exige el mes completo; el reporte por objetivo requiere un objetivo y el mes completo. No se amplió a informes mensuales parciales porque el servicio define expectativa por mes calendario. La lista de objetivos de la pantalla objetivo limita el origen de selección al objetivo mensual disponible.
 - El entorno no permite ejecutar las pantallas Qt: falta la biblioteca del sistema `libGL.so.1`. `compileall` y las pruebas de servicio/API/arquitectura sí se ejecutan.
+- El porcentaje de cumplimiento diario de la API sigue la regla histórica de objetivos del día, y no es una columna del detalle diario exportado. Se dejó sin reinterpretar porque esa expectativa diaria no está definida para reemplazarla por un conteo de pasadas por turno.
 
 ## Comparación de cifras anterior/nueva (prueba sintética)
 

@@ -31,7 +31,7 @@ Filtros: el mes mensual debe ser calendario completo; detalle admite día o rang
 
 Errores: nombres se sanitizan, archivos existentes no se reemplazan, `PermissionError` se traduce a mensaje accionable, y errores técnicos se registran en `data/logs/vesp.log`. El registro de auditoría es la única escritura intencional a la base durante una exportación.
 
-Limitaciones verificadas: no hay pantalla autónoma de reporte diario; `Lista de pasadas` ofrece detalle diario. La barra de progreso es indeterminada. Los escritores legacy en `services/exportar.py` permanecen por compatibilidad, pero las pantallas de reportes ya no los invocan.
+Limitaciones verificadas: no hay pantalla autónoma de reporte diario; `Lista de pasadas` ofrece detalle diario. La API diaria toma filas y total del modelo común, pero conserva el porcentaje del servicio legacy para no redefinir su indicador. La barra de progreso es indeterminada. Los escritores legacy en `services/exportar.py` permanecen por compatibilidad, pero las pantallas de reportes ya no los invocan.
 
 Pruebas: `python -m pytest -o addopts= tests/test_reportes_unificados.py tests/test_api.py tests/test_arquitectura.py`; la suite completa también se valida con `python -m pytest` cuando el sistema Qt dispone de `libGL.so.1`.
 
