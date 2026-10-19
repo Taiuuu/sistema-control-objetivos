@@ -70,9 +70,9 @@ UI_DATABASE_EXCEPTIONS = {
     # La pantalla de notas guarda y consulta sus registros directamente.
     "ui/notas_diarias.py": "Persistencia directa de notas diarias.",
     # Los reportes consultan SQLite desde las ventanas.
-    "ui/reporte_mensual.py": "Consulta directa de datos del reporte mensual.",
+    "ui/reportes/reporte_mensual.py": "Consulta directa de datos del reporte mensual.",
     # El reporte por objetivo arma sus datos con consultas SQLite directas.
-    "ui/reporte_objetivo.py": "Consultas directas del reporte por objetivo.",
+    "ui/reportes/reporte_objetivo.py": "Consultas directas del reporte por objetivo.",
     # La tabla diaria consulta y modifica registros desde la interfaz.
     "ui/tabla_diaria.py": "Consultas y escrituras directas de la tabla diaria.",
     # La transferencia importa/exporta datos con acceso SQLite desde la UI.

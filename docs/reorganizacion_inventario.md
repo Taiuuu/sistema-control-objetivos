@@ -44,6 +44,7 @@ Inventario inicial generado antes de mover rutas. Se debe repetir la búsqueda g
 - El Excel de septiembre se movió a `tests/fixtures/`; la prueba dorada pasó con su nueva ruta.
 - `services/backup.py` se movió a `services/backups/backup.py`; se actualizó también el string de `monkeypatch` en la prueba de importación.
 - `ui/importar_excel.py` se movió a `ui/importador/importar_excel.py`; se actualizaron la ventana principal y el verificador estructural.
+- `ui/reporte_mensual.py` y `ui/reporte_objetivo.py` se movieron a `ui/reportes/`; se actualizaron el verificador, la ventana principal y el import del test de reportes.
 - `seguridad.db` y `sync_queue.json` se archivaron en `_archivo/` porque las rutas runtime de base/cola apuntan al directorio del usuario, no a la raíz del repo.
 - Los `.pyc` versionados se retiraron del índice.
 - El Excel local de octubre se comparó con la fixture versionada: sus SHA-256 difieren (`3140e2bed38338a8f22bfc44f64846c7575071063e6097a46e337f8ba5c354fa` frente a `b6adac3a25a2acb80dafcd47290e5e1426c31c9ba3a75f4b3ba2df0eab75a482`). Sigue sin versionar y se deja intacto, pendiente de decisión.

@@ -27,8 +27,8 @@ from ui.form_pasada import FormPasada
 from ui.form_de_turno import FormTurno
 from ui.lista_objetivos import ListaObjetivos
 from ui.lista_supervisores import ListaSupervisores
-from ui.reporte_mensual import ReporteMensual
-from ui.reporte_objetivo import ReporteObjetivo
+from ui.reportes.reporte_mensual import ReporteMensual
+from ui.reportes.reporte_objetivo import ReporteObjetivo
 from ui.lista_pasadas import ListaPasadas
 from ui.notas_diarias import NotasDiarias
 from ui.vista_logs import VistaLogs

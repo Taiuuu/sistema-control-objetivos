@@ -73,8 +73,8 @@ def _exercise_screens() -> None:
     from ui.lista_supervisores import ListaSupervisores
     from ui.login import LoginWindow
     from ui.notas_diarias import NotasDiarias
-    from ui.reporte_mensual import ReporteMensual
-    from ui.reporte_objetivo import ReporteObjetivo
+    from ui.reportes.reporte_mensual import ReporteMensual
+    from ui.reportes.reporte_objetivo import ReporteObjetivo
     from ui.tabla_diaria import TablaDiaria
     from ui.transferir_datos import TransferirDatos
     from ui.ventana_principal import VentanaPrincipal

@@ -3,6 +3,8 @@ path: services/actualizador.py
 path: services/calculo_pasadas.py
 path: services/backup.py
 path: ui/importar_excel.py
+path: ui/reporte_mensual.py
+path: ui/reporte_objetivo.py
 path: CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx
 path: scripts/instalador.iss
 path: seguridad.db
@@ -11,3 +13,5 @@ module: services.actualizador
 module: services.calculo_pasadas
 module: services.backup
 module: ui.importar_excel
+module: ui.reporte_mensual
+module: ui.reporte_objetivo
