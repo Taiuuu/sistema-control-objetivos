@@ -61,3 +61,29 @@ La vista de auditoría importa `QFileDialog`, pero la búsqueda de usos no encon
 Hay dos flujos de exportación activos para el mismo dominio en `lista_pasadas.py` y `reporte_mensual.py`, más un tercer par independiente dentro de `reporte_objetivo.py`. No existe un exportador de reporte diario de UI ni una salida de reporte diario PDF/XLSX. La API expone reportes JSON con los servicios actuales, no archivos.
 
 La implementación unificada debe tener una sola capa de datos tipada y reproducible, mantener separada la función de intercambio mensual y los informes de importación/diagnóstico, y producir ambos formatos desde la misma instancia. Las dudas de expectativa por turno y vigencia histórica están descriptas en `docs/reglas_de_calculo.md`; no se infiere que cada objetivo requiera una pasada por DIA y otra por NOCHE.
+
+## Resultado de las fases de implementación
+
+- Las tres pantallas con exportación se conectaron a `ui/reportes/acciones_exportacion.py` y `DialogoExportar`; conservan los filtros de fecha/supervisor/turno/búsqueda/estado aplicables. No se encontró una pantalla diaria separada. `Lista de pasadas` es el punto de entrada al detalle diario.
+- `services/reportes_unificados/` concentra metadatos, catálogo de columnas, filas, totales, notas y subtotales. Los servicios existentes de cumplimiento y el módulo puro `services/pasadas/calculo_pasadas.py` siguen determinando los cálculos; los escritores Excel/PDF reciben el mismo `ReporteDatos`.
+- `ReporteObjetivo` delega el cálculo a services y usa los mismos escritores y el diálogo. La API mensual ahora adapta el modelo común conservando el JSON histórico; la API diaria adapta el resultado del servicio diario para conservar su contrato.
+- La exportación bloquea informes vacíos, sanitiza el nombre, rechaza sobrescrituras, traduce errores de archivo, registra errores técnicos, recuerda carpeta y ofrece abrir archivo/carpeta. Cada archivo generado añade una fila a auditoría; no se modifican datos operativos.
+- Las plantillas se guardan en `QSettings`, por lo que no hizo falta migración. No se añadió dependencia. Los exportadores de compatibilidad en `services/exportar.py` se mantienen porque pruebas y posibles consumidores externos aún los usan; las pantallas migradas ya no los llaman.
+- Agrupar ordena filas de detalle y el modelo calcula subtotales, que el PDF imprime. La barra de progreso es indeterminada; no hay indicador porcentual. La vista previa visualiza hasta 100 filas.
+- El resumen mensual exige el mes completo; el reporte por objetivo requiere un objetivo y el mes completo. No se amplió a informes mensuales parciales porque el servicio define expectativa por mes calendario. La lista de objetivos de la pantalla objetivo limita el origen de selección al objetivo mensual disponible.
+- El entorno no permite ejecutar las pantallas Qt: falta la biblioteca del sistema `libGL.so.1`. `compileall` y las pruebas de servicio/API/arquitectura sí se ejecutan.
+
+## Comparación de cifras anterior/nueva (prueba sintética)
+
+No había exportaciones de salida en fixtures/docs ni se usó la base real. La fixture dorada de octubre está marcada **SIN VERIFICAR**, por lo que no se presenta como verdad de negocio. Se comparó el exportador mensual anterior de `services/exportar.py` contra el nuevo Excel usando una base temporal de pytest, un objetivo laborable y una pasada DIA el miércoles 28/10/2026. El cálculo mensual del commit previo se conserva en el servicio; los campos comunes coinciden:
+
+| Objetivo | Turno/métrica | Valor anterior | Valor nuevo | Causa probable / clasificación |
+|---|---|---:|---:|---|
+| Objetivo Test | Días esperados | 22 | 22 | Sin diferencia; misma expectativa mensual. |
+| Objetivo Test | Días con pasada | 1 | 1 | Sin diferencia; misma fecha operativa. |
+| Objetivo Test | Días sin pasada | 21 | 21 | Sin diferencia; misma regla de cobertura diaria. |
+| Objetivo Test | Cumplimiento | 4,5 % | 4,5 % | Sin diferencia; porcentaje ponderado preservado. |
+| Objetivo Test | Pasadas DIA (conteo bruto) | No expuesto | 1 | Métrica añadida en la nueva exportación, no una regresión comparable. |
+| Objetivo Test | Pasadas NOCHE (conteo bruto) | No expuesto | 0 | Métrica añadida; no implica expectativa por turno. |
+
+La comparación automatizada está en `test_exportador_anterior_y_unificado_coinciden_en_resumen_mensual`. No demuestra que el conteo de producción sea correcto: compara una entrada de prueba conocida y clasifica como **sin evidencia de regresión** únicamente las métricas compartidas. No se comparó un archivo viejo real ni se decidió la validez de filas del Excel de octubre.
