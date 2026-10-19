@@ -28,7 +28,7 @@ Vigencia de objetivos: las pestañas y la API usan `services/estado_objetivos.py
 
 Atajos: `ui/atajos.py` es el catálogo único; la ayuda lo muestra y el manual lo documenta. La ventana principal registra Ctrl+P/O/S/T/R/B, Ctrl+N para alta, Ctrl+F, F1/Ctrl+H, F5, Ctrl+1…9, zoom, fecha y sidebar. Las pantallas que admiten altas, búsqueda, actualización o exportación registran Ctrl+N, Ctrl+F, F5 o Ctrl+E localmente. Los reportes también usan Ctrl+Enter. Esc limpia un buscador reconocido o cierra la ventana. Los atajos de acción se protegen cuando un campo de texto tiene el foco.
 
-Responsive: la ventana principal usa un mínimo de 720×440, colapsa el sidebar por debajo de 980 px y lo vuelve a expandir sobre 1120 px; Ctrl+\\ y el botón permiten cambiarlo manualmente. Guarda/restaura su geometría con QSettings en `VESP Organizations/Interfaz`, clave `ventana_principal/geometria`. La prueba `tests/test_responsive_ui.py` recorre 23 pantallas en 1920×1080, 1366×768 y 1024×600 con los cuatro temas; `VESP_GENERAR_CAPTURAS_UI=1` guarda capturas en `docs/capturas_despues/`, excluido de Git.
+Responsive: la ventana principal usa un mínimo de 720×440, colapsa el sidebar por debajo de 980 px y lo vuelve a expandir sobre 1120 px; Ctrl+\\ y el botón permiten cambiarlo manualmente. Guarda/restaura su geometría con QSettings en `VESP Organizations/Interfaz`, clave `ventana_principal/geometria`. La prueba `tests/test_responsive_ui.py` recorre 30 pantallas y diálogos en 1920×1080, 1366×768 y 1024×600 con los cuatro temas; `VESP_GENERAR_CAPTURAS_UI=1` guarda capturas en `docs/capturas_despues/`, excluido de Git.
 
 DPI: Qt 6 aplica escalado de alta densidad; `scripts/main.py` usa la política PassThrough antes de crear QApplication para conservar factores fraccionarios.
 
