@@ -125,6 +125,32 @@ cambiar su contraseña en el primer acceso. No se documentan aquí las credencia
 ![Pantalla principal de VESP Organizations](docs/img/pantalla-principal.png)
 ![Reporte de cumplimiento](docs/img/reporte-cumplimiento.png)
 
+### Reportes y exportación
+
+Las pantallas **Lista de pasadas**, **Reporte mensual** y **Reporte por objetivo** usan
+el diálogo **Exportar**. La selección inicial parte de los filtros de la pantalla y puede
+ajustarse: período (mes, rango o día), objetivos, supervisores, equipo, turnos, columnas y
+orden, contenido (resumen, detalle o ambos), agrupación y formato Excel/PDF. La vista previa
+muestra hasta 100 filas y el total; si no hay resultados, no se crea un archivo vacío.
+
+El resumen mensual y el reporte por objetivo requieren un mes calendario completo; el
+reporte por objetivo requiere un único objetivo. La lista de pasadas exporta detalle del
+día elegido. No existe una pantalla independiente de reporte diario. Las plantillas y la
+última carpeta se guardan en la configuración local de la aplicación.
+
+El Excel incluye **Resumen**, **Detalle** si se solicita y **Parámetros** con período,
+filtros, criterio de turnos, generación, usuario y versión. Sus encabezados, filtros,
+totales, tipos numéricos y ajustes de impresión están preparados para pantalla e impresión.
+El PDF se genera en A4 vertical u horizontal, con fuentes que admiten tildes y eñes,
+encabezados repetidos al paginar y subtotales de agrupación. Ambos formatos se generan
+desde la misma instantánea de datos. Cada archivo se registra en auditoría; el proceso no
+modifica pasadas ni datos de negocio.
+
+Para probar la exportación, abrí un reporte, elegí **Exportar**, actualizá la vista previa,
+seleccioná columnas/contenido/formato y continuá. Un archivo existente no se sobrescribe;
+si está abierto en Excel o un visor, cerralo o elegí otra ruta. Al terminar podés abrir el
+archivo o su carpeta. Para más pasos, consultá el [manual de usuario](docs/MANUAL_USUARIO.md).
+
 ### Copias de seguridad y recuperación
 
 La ruta de la base se configura con `VESP_DB_PATH`; si no se define, VESP conserva la

@@ -66,7 +66,44 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 
 - **Mensual**: Menú → "Reporte Mensual"
 - **Por objetivo**: Menú → "Reporte Objetivo"
-- **Exportar**: En el reporte → "Exportar a Excel/PDF"
+- **Detalle diario**: Menú → "Lista de pasadas", seleccioná el día
+- **Exportar**: en cualquiera de esas pantallas, usá "Exportar Excel" o "Exportar PDF";
+  ambas opciones abren el mismo diálogo y respetan los filtros ya aplicados
+
+#### Elegir y generar un informe
+
+1. Abrí **Reporte Mensual**, **Reporte Objetivo** o **Lista de pasadas** y establecé los
+   filtros de la pantalla. En Lista de pasadas elegí la fecha que querés incluir.
+2. Presioná **Exportar Excel** o **Exportar PDF**. En el diálogo **Exportar**, ajustá el
+   período: mes, rango de fechas o día. El resumen mensual exige el mes calendario completo;
+   el reporte por objetivo exige un mes completo y un solo objetivo.
+3. Elegí todos los objetivos o una selección (podés buscarlos), todos o algunos
+   supervisores, equipo y turnos Día/Noche. Los valores iniciales reflejan los filtros
+   vigentes en la pantalla.
+4. Marcá las columnas que querés incluir y usá **Subir**/**Bajar** para cambiar el orden.
+   Elegí resumen, detalle o ambos; indicá si querés totales y notas diarias; seleccioná una
+   agrupación si corresponde.
+5. Elegí Excel, PDF o ambos y presioná **Actualizar vista previa**. Se muestra una muestra
+   de hasta 100 filas y el total. Si cambiás opciones después, volvé a actualizarla antes
+   de continuar. Sin datos no se genera un archivo.
+6. Presioná **Continuar**, elegí la ubicación y esperá la generación. No se sobrescribe un
+   archivo existente. Si el archivo está abierto en Excel o un visor, cerralo o elegí otro
+   nombre. Al finalizar podés seleccionar **Abrir archivo** o **Abrir carpeta**.
+
+#### Plantillas y contenido de los archivos
+
+- Para reutilizar opciones, escribí un nombre en **Nombre de plantilla** y presioná
+  **Guardar plantilla**. Luego seleccionala y elegí **Usar plantilla**. Las plantillas se
+  guardan en la configuración local de la aplicación.
+- En Excel, **Resumen** contiene las filas principales y su total; **Detalle** aparece
+  cuando se pidió el detalle; **Parámetros** enumera filtros, criterio de conteo, fecha de
+  generación, usuario y versión de aplicación.
+- En PDF, el encabezado identifica empresa, informe, período y filtros; las tablas repiten
+  sus encabezados al paginar, incluyen totales/subtotales elegidos y el pie muestra número
+  de página y fecha/hora de generación. Se usa A4 vertical u horizontal según las columnas.
+- La lista de pasadas exporta detalle diario. No hay una pantalla separada de reporte diario.
+- La exportación registra usuario, filtros, informe y archivo en auditoría. No altera las
+  pasadas ni otros datos de negocio; el registro de auditoría sí se agrega intencionalmente.
 
 ### Configuración
 

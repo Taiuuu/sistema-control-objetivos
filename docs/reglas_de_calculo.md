@@ -75,4 +75,12 @@ Por lo tanto, no se debe interpretar todavía “todos” como una pasada por ca
 4. Determinar cuántas pasadas se esperan por objetivo y por turno; hoy el esquema solo aporta días de servicio, no turnos requeridos.
 5. Revisar los registros marcados en el análisis, en especial septiembre `5-9 (N)`, fila 15 (TURNO DIA a las 05:36), octubre `2-10 (D)`, fila 22 (DIA a las 06:33), septiembre `2-9 (N)`, fila 16 (NOCHE a las 07:00) y octubre `7-10 (N)`, fila 37 (NOCHE a las 07:15).
 
+## Límites de selección de informes
+
+- El resumen mensual y el reporte por objetivo requieren el mes calendario completo. En el reporte por objetivo se exige exactamente un objetivo porque el cálculo y la definición de cumplimiento son por objetivo; no se combina ni promedia más de un objetivo en esa pantalla.
+- El detalle de pasadas admite un día o un rango y agrupa por fecha de turno. Al elegir equipo, solo se incluyen supervisores asignados a ese equipo en la fecha y turno de cada pasada.
+- Una selección vacía de supervisores u objetivos significa cero resultados; “todos” es un estado distinto y no aplica restricción. Esto evita convertir accidentalmente un filtro vacío en “todos”.
+- La opción de agrupar ordena filas de detalle y calcula subtotales de cantidad de pasadas. No altera los totales de cobertura mensual ni crea una nueva regla de cumplimiento.
+- El punto 7 de la etapa de exportación exige no cambiar datos operativos; el registro de auditoría de la exportación sí escribe deliberadamente una fila de auditoría, según el punto 6. No se escriben pasadas, objetivos, equipos ni notas.
+
 Para los informes, mantener separados el número bruto de pasadas registradas por turno y los días cubiertos por objetivo. Un día con varias pasadas sigue siendo un solo día cubierto; los conteos DIA/NOCHE son descriptivos y no representan cumplimiento esperado por turno hasta validar la regla del punto 4.

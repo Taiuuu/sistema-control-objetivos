@@ -16,6 +16,7 @@ Archivos clave:
 | Ventanas, pantallas, atajos o temas | [ui.md](./ui.md) y [ui-theme.md](./ui-theme.md) |
 | API Flask, JWT, rate limit o SSE | [api.md](./api.md) |
 | Usuarios, roles, permisos, sesiones o auditoría | [seguridad_y_usuarios.md](./seguridad_y_usuarios.md) |
+| Reportes, selección de datos o exportación Excel/PDF | [reportes.md](./reportes.md), [calculo.md](./calculo.md) y [reglas_de_calculo.md](../reglas_de_calculo.md) |
 | Convenciones, dependencias entre capas o pruebas | [convenciones.md](./convenciones.md) y [estructura.md](../estructura.md) |
 
 Flujo: tarea → leer este índice → abrir el contexto específico → comprobar el código citado.

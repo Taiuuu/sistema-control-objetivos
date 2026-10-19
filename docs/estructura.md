@@ -20,7 +20,9 @@
 │   ├── backups/                      Copias de seguridad y restauración
 │   ├── importador/                   Pipeline y estado de importación Excel
 │   ├── pasadas/                      Reglas puras de atribución y conteo
-│   └── reportes_unificados/          Modelo común de datos de reportes
+│   └── reportes_unificados/          Modelo, consultas, escritores y archivos de reportes
+│       ├── modelos.py, datos.py, consultas.py, objetivo.py
+│       ├── excel.py, pdf.py, archivos.py
 ├── tests/                            Suite automatizada
 │   ├── fixtures/                     Libros dorados completos y archivos de entrada
 │   ├── golden/                       Resultados y cargadores de pruebas doradas
@@ -29,7 +31,7 @@
 └── ui/                               Interfaz PyQt6
     ├── components/                   Componentes visuales reutilizables
     ├── importador/                   Importación desde Excel
-    ├── reportes/                     Reportes y diálogo reutilizable de exportación
+    ├── reportes/                     Reportes, diálogo y flujo de exportación compartido
     ├── theme/                        Tokens, colores y estilos
     └── widgets/                      Widgets reutilizables
 ```
@@ -42,6 +44,7 @@
 - `models` debería contener dominio independiente de `database`, `services` y `ui`.
 - `api` conserva su punto de entrada Flask y registra sus blueprints en `api/routes/`.
 - `services/reportes_unificados/` prepara datos y metadatos sin depender de PyQt6; `services/reportes.py` se conserva como API histórica de cálculo.
+- `ui/reportes/acciones_exportacion.py` conecta el diálogo reutilizable con proveedores de datos y persistencia en segundo plano.
 - `scripts/main.py` conserva la entrada desktop.
 
 ## Deuda conocida
