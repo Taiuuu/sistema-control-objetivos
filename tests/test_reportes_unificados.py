@@ -443,6 +443,57 @@ def test_excel_y_pdf_conservan_los_mismos_datos_en_tablas_largas(
     libro.close()
 
 
+def test_exportador_anterior_y_unificado_coinciden_en_resumen_mensual(
+    db_initialized, test_objetivo, test_supervisor, tmp_path
+):
+    from services.exportar import _obtener_datos_reporte, exportar_excel as exportar_excel_anterior
+    from services.reportes import generar_reporte_mensual
+
+    with sqlite3.connect(db_initialized) as conexion:
+        conexion.execute(
+            """
+            INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                "2026-10-28",
+                "10:00",
+                "diurno",
+                test_objetivo["id"],
+                test_supervisor["id"],
+            ),
+        )
+
+    reporte_anterior = generar_reporte_mensual(2026, 10)
+    filas_anteriores = _obtener_datos_reporte(2026, 10, reporte_anterior)
+    datos_nuevos = crear_datos_mensuales(reporte_anterior)
+    ruta_anterior = tmp_path / "anterior.xlsx"
+    ruta_nueva = tmp_path / "nuevo.xlsx"
+
+    exportar_excel_anterior(2026, 10, str(ruta_anterior), reporte_anterior)
+    exportar_excel(datos_nuevos, ruta_nueva, contenido="resumen")
+
+    libro_anterior = load_workbook(ruta_anterior, data_only=True)
+    libro_nuevo = load_workbook(ruta_nueva, data_only=True)
+    anterior = libro_anterior["Reporte Octubre 2026"]
+    nuevo = libro_nuevo["Resumen"]
+    assert filas_anteriores == [("Objetivo Test", 1, 21, 4.5)]
+    assert (anterior["A8"].value, anterior["B8"].value, anterior["C8"].value) == (
+        "Objetivo Test",
+        1,
+        21,
+    )
+    assert (nuevo["A6"].value, nuevo["C6"].value, nuevo["D6"].value) == (
+        "Objetivo Test",
+        1,
+        21,
+    )
+    assert float(anterior["D8"].value.rstrip("%")) == nuevo["E6"].value * 100
+    assert (nuevo["B6"].value, nuevo["E6"].number_format) == (22, "0.0%")
+    libro_anterior.close()
+    libro_nuevo.close()
+
+
 def test_nombre_sugerido_sanitiza_caracteres_y_respeta_limite():
     ahora = datetime.datetime(2026, 10, 31, 14, 5)
     nombre = archivos_reportes.nombre_sugerido(
