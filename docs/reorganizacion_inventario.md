@@ -22,7 +22,7 @@ Inventario inicial generado antes de mover rutas. Se debe repetir la búsqueda g
 
 - Entrada desktop: `scripts/main.py`; la documentación la inicia con `python scripts/main.py`.
 - Entrada Flask: `python -m api.app`; blueprints en `api/routes/` y especificación en `api/docs.py`.
-- Inno Setup: `scripts/instalador.iss`; la guía y `.github/workflows/release.yml` lo invocan con rutas distintas (el workflow espera `instalador.iss` en la raíz).
+- Inno Setup: `instalador.iss` en la raíz; `GUIA_INSTALADOR_INNO_SETUP.txt` y `.github/workflows/release.yml` apuntan a esa ubicación.
 - No hay `.spec` versionados; `.gitignore` ignora `*.spec`. La guía contiene el comando PyInstaller y rutas de datos `assets`.
 - CI: `.github/workflows/tests.yml` y `.github/workflows/release.yml`; pytest usa `pytest.ini` y `tests/conftest.py`.
 - Tests dorados/fixtures: `tests/golden/`, `tests/fixtures/`, `tests/test_golden_pasadas.py` y `tests/test_importador_integridad.py`.
