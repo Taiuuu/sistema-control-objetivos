@@ -110,6 +110,8 @@ def crear_datos_mensuales(
     filtros: Mapping[str, Any] | None = None,
     filas_detalle: Sequence[Mapping[str, Any]] = (),
     conteos_por_objetivo: Mapping[int, Mapping[str, int]] | None = None,
+    notas: Sequence[Mapping[str, Any]] = (),
+    subtotales: Sequence[Mapping[str, Any]] = (),
 ) -> ReporteDatos:
     """Prepara resumen mensual y totales a partir del cálculo de reportes."""
     anio, mes = int(reporte["anio"]), int(reporte["mes"])
@@ -175,6 +177,8 @@ def crear_datos_mensuales(
         totales=totales,
         columnas_detalle=COLUMNAS_DIARIAS if filas_detalle else (),
         filas_detalle=tuple(dict(fila) for fila in filas_detalle),
+        notas=tuple(dict(nota) for nota in notas),
+        subtotales=tuple(dict(subtotal) for subtotal in subtotales),
     )
 
 
@@ -186,6 +190,7 @@ def crear_datos_diarios(
     fecha = datetime.date.fromisoformat(str(reporte["fecha"]))
     filas = tuple(
         {
+            "id": pasada.get("id"),
             "fecha": fecha,
             "hora": datetime.time.fromisoformat(str(pasada["hora"])),
             "turno": str(pasada["turno"]),
@@ -249,6 +254,7 @@ def crear_datos_detalle(
         raise ValueError("La fecha final no puede ser anterior a la fecha inicial")
 
     filtro = dict(filtros or {})
+    busqueda = str(filtro.get("busqueda") or "").casefold().strip()
     desde_ampliado = fecha_inicio - datetime.timedelta(days=1)
     hasta_ampliado = fecha_fin + datetime.timedelta(days=1)
     with closing(db.conectar()) as conexion:
@@ -275,6 +281,10 @@ def crear_datos_detalle(
             fecha_turno = fecha_de_turno(fecha_hora, str(fila[3]))
             turno = normalizar_turno(str(fila[3]))
             if not fecha_inicio <= fecha_turno <= fecha_fin:
+                continue
+            if busqueda and busqueda not in (
+                str(fila[5]).casefold() + " " + str(fila[7]).casefold()
+            ):
                 continue
             objetivos = filtro.get("objetivo_ids")
             if objetivos is not None and not isinstance(objetivos, (list, tuple, set)):

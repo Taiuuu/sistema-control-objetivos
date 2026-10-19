@@ -45,6 +45,7 @@ class ReporteDatos:
     filas_detalle: tuple[Mapping[str, Any], ...] = ()
     totales_incluidos: bool = True
     notas: tuple[Mapping[str, Any], ...] = ()
+    subtotales: tuple[Mapping[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         ids = [columna.id for columna in self.columnas]

@@ -3,24 +3,31 @@
 # Pantalla de reporte mensual de cumplimiento por objetivo
 # =============================================================================
 
-import sqlite3
 import datetime
 import calendar
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QTableWidget, QTableWidgetItem, QComboBox, QFileDialog, QMessageBox, QScrollArea
+    QPushButton, QTableWidget, QTableWidgetItem, QComboBox, QMessageBox, QScrollArea
 )
 from PyQt6.QtGui import QShortcut, QKeySequence
 from PyQt6.QtWidgets import QHeaderView
 from PyQt6.QtCore import Qt
 from services.background_task import run_background_task
-from services.exportar import exportar_excel, exportar_pdf
 from services.reportes import generar_reporte_mensual, clasificar_cumplimiento
-from services.queries_tabla import cargar_supervisores
+from services.queries_tabla import (
+    cargar_equipos_reportables,
+    cargar_objetivos_reportables,
+    cargar_supervisores,
+)
+from services.reportes_unificados.consultas import crear_datos_para_exportar
+from services.reportes_unificados.datos import (
+    COLUMNAS_DIARIAS,
+    COLUMNAS_MENSUALES,
+)
 from ui.animaciones import animar_aparecer
 from ui.components import StatusBadge
 from ui.components.base import wrap_content_in_glass_card
-from database.db import DB_PATH
+from ui.reportes.acciones_exportacion import mostrar_dialogo_exportar
 
 
 # =============================================================================
@@ -183,45 +190,42 @@ class ReporteMensual(QWidget):
         self.estado_label.setText("Error al generar reporte")
         self._set_controls_enabled(True)
 
-    def _filtros_dict(self) -> dict:
-        return {
-            "supervisor": self.selector_supervisor.currentText(),
-            "turno": self.selector_turno.currentText(),
-            "estado": self.selector_estado.currentText(),
-        }
-
     def _exportar_excel(self) -> None:
-        mes = self.selector_mes.currentIndex() + 1
-        anio = int(self.selector_anio.currentText())
-        ruta, _ = QFileDialog.getSaveFileName(
-            self, "Guardar Excel",
-            f"reporte_{anio}_{mes:02d}.xlsx",
-            "Excel (*.xlsx)"
-        )
-        if ruta:
-            self._set_controls_enabled(False)
-            self.estado_label.setText("Exportando a Excel...")
-            task = run_background_task(exportar_excel, anio, mes, ruta, self._reporte_actual, self._filtros_dict())
-            task.signals.finished.connect(lambda _: self._on_export_exitoso(ruta))
-            task.signals.error.connect(self._on_error)
+        self._abrir_dialogo_exportar("excel")
 
     def _exportar_pdf(self) -> None:
+        self._abrir_dialogo_exportar("pdf")
+
+    def _abrir_dialogo_exportar(self, formato: str) -> None:
         mes = self.selector_mes.currentIndex() + 1
         anio = int(self.selector_anio.currentText())
-        ruta, _ = QFileDialog.getSaveFileName(
-            self, "Guardar PDF",
-            f"reporte_{anio}_{mes:02d}.pdf",
-            "PDF (*.pdf)"
+        inicio = datetime.date(anio, mes, 1)
+        fin = datetime.date(
+            anio, mes, calendar.monthrange(anio, mes)[1]
         )
-        if ruta:
-            self._set_controls_enabled(False)
-            self.estado_label.setText("Exportando a PDF...")
-            task = run_background_task(exportar_pdf, anio, mes, ruta, self._reporte_actual, self._filtros_dict())
-            task.signals.finished.connect(lambda _: self._on_export_exitoso(ruta))
-            task.signals.error.connect(self._on_error)
-
-    def _on_export_exitoso(self, ruta: str) -> None:
-        QMessageBox.information(self, "Exportación completa", f"Archivo guardado en: {ruta}")
-        self.estado_label.setText("Exportación completada")
-        self._set_controls_enabled(True)
-        animar_aparecer(self.tabla, 180)
+        filtros = {
+            "supervisor_id": self.selector_supervisor.currentData(),
+            "turno": (
+                None
+                if self.selector_turno.currentText() == "Todos"
+                else self.selector_turno.currentText()
+            ),
+            "estado": self.selector_estado.currentText(),
+        }
+        catalogo = {
+            columna.id: columna
+            for columna in (*COLUMNAS_MENSUALES, *COLUMNAS_DIARIAS)
+        }
+        mostrar_dialogo_exportar(
+            self,
+            "mensual",
+            inicio,
+            fin,
+            crear_datos_para_exportar,
+            tuple(catalogo.values()),
+            filtros_iniciales=filtros,
+            objetivos=cargar_objetivos_reportables(),
+            supervisores=cargar_supervisores(),
+            equipos=cargar_equipos_reportables(),
+            formato_inicial=formato,
+        )

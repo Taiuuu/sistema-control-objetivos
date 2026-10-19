@@ -9,12 +9,15 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+import reportlab
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape, portrait
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     LongTable,
     Paragraph,
@@ -44,6 +47,7 @@ def exportar_pdf(
     incluir_notas: bool = False,
 ) -> None:
     """Genera un PDF con tablas paginadas desde las filas ya calculadas."""
+    _registrar_fuentes()
     if contenido not in {"resumen", "detalle", "ambos"}:
         raise ValueError(f"Contenido de informe no reconocido: {contenido}")
     if columnas is not None:
@@ -133,6 +137,18 @@ def exportar_pdf(
                 "No hay pasadas para los filtros seleccionados.",
             )
         )
+        if incluir_totales and datos.subtotales:
+            elementos.extend(_seccion_subtotales(datos, estilos, documento.width))
+    if incluir_notas and datos.notas:
+        elementos.extend(
+            _seccion_notas(
+                datos.notas,
+                estilos,
+                documento.width,
+            )
+        )
+    if incluir_totales and datos.metadatos.tipo_informe == "objetivo":
+        elementos.extend(_seccion_resumen_objetivo(datos, estilos))
     if not elementos:
         elementos.append(Paragraph("No hay contenido para imprimir.", estilos["Normal"]))
 
@@ -204,7 +220,11 @@ def _seccion_tabla(
         )
 
     indice_total = None
-    if incluir_totales and datos.totales_incluidos:
+    if (
+        incluir_totales
+        and datos.totales_incluidos
+        and datos.metadatos.tipo_informe != "objetivo"
+    ):
         indice_total = len(tabla_datos)
         tabla_datos.append(
             [
@@ -226,7 +246,7 @@ def _seccion_tabla(
     comandos = [
         ("BACKGROUND", (0, 0), (-1, 0), VERDE_INSTITUCIONAL),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (-1, 0), "VESP-Vera-Bold"),
         ("GRID", (0, 0), (-1, -1), 0.35, GRIS_BORDE),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING", (0, 0), (-1, -1), 4),
@@ -266,7 +286,7 @@ def _estilos() -> dict[str, ParagraphStyle]:
         "Seccion": ParagraphStyle(
             "SeccionReporte",
             parent=base["Heading2"],
-            fontName="Helvetica-Bold",
+            fontName="VESP-Vera-Bold",
             fontSize=11,
             leading=14,
             textColor=GRAFITO_INSTITUCIONAL,
@@ -275,7 +295,7 @@ def _estilos() -> dict[str, ParagraphStyle]:
         "Encabezado": ParagraphStyle(
             "EncabezadoReporte",
             parent=base["Normal"],
-            fontName="Helvetica-Bold",
+            fontName="VESP-Vera-Bold",
             fontSize=8,
             leading=10,
             textColor=colors.white,
@@ -284,7 +304,7 @@ def _estilos() -> dict[str, ParagraphStyle]:
         "Celda": ParagraphStyle(
             "CeldaReporte",
             parent=base["Normal"],
-            fontName="Helvetica",
+            fontName="VESP-Vera",
             fontSize=7.5,
             leading=9.5,
             textColor=GRAFITO_INSTITUCIONAL,
@@ -293,7 +313,7 @@ def _estilos() -> dict[str, ParagraphStyle]:
         "CeldaCentro": ParagraphStyle(
             "CeldaCentroReporte",
             parent=base["Normal"],
-            fontName="Helvetica",
+            fontName="VESP-Vera",
             fontSize=7.5,
             leading=9.5,
             textColor=GRAFITO_INSTITUCIONAL,
@@ -303,7 +323,7 @@ def _estilos() -> dict[str, ParagraphStyle]:
         "Total": ParagraphStyle(
             "TotalReporte",
             parent=base["Normal"],
-            fontName="Helvetica-Bold",
+            fontName="VESP-Vera-Bold",
             fontSize=7.5,
             leading=9.5,
             textColor=GRAFITO_INSTITUCIONAL,
@@ -311,7 +331,7 @@ def _estilos() -> dict[str, ParagraphStyle]:
         "ResumenTotales": ParagraphStyle(
             "ResumenTotalesReporte",
             parent=base["Normal"],
-            fontName="Helvetica-Bold",
+            fontName="VESP-Vera-Bold",
             fontSize=8,
             leading=11,
             textColor=GRAFITO_INSTITUCIONAL,
@@ -341,7 +361,7 @@ def _ancho_base(columna: ColumnaReporte) -> float:
         return 2.5 * cm
     if columna.tipo_dato == "texto_largo":
         return 5.2 * cm
-    return min(max(stringWidth(columna.etiqueta, "Helvetica", 8) + 18, 2.7 * cm), 5.5 * cm)
+    return min(max(stringWidth(columna.etiqueta, "VESP-Vera", 8) + 18, 2.7 * cm), 5.5 * cm)
 
 
 def _texto_celda(valor: Any, columna: ColumnaReporte) -> str:
@@ -393,7 +413,187 @@ def _texto_totales_pasadas(totales: Mapping[str, Any]) -> str:
 def _texto_filtros(filtros: Mapping[str, Any]) -> str:
     if not filtros:
         return "Sin filtros adicionales"
-    return " | ".join(f"{clave}: {valor}" for clave, valor in filtros.items())
+    partes = []
+    for clave, valor in filtros.items():
+        if isinstance(valor, (list, tuple, set)):
+            etiqueta = (
+                ", ".join(str(elemento) for elemento in valor)
+                if len(valor) <= 4
+                else f"{len(valor)} seleccionados"
+            )
+        else:
+            etiqueta = str(valor)
+        partes.append(f"{clave}: {etiqueta}")
+    return " | ".join(partes)
+
+
+def _registrar_fuentes() -> None:
+    """Usa Vera, incluida con ReportLab, para representar bien el texto español."""
+    directorio = Path(reportlab.__file__).resolve().parent / "fonts"
+    fuentes = {
+        "VESP-Vera": directorio / "Vera.ttf",
+        "VESP-Vera-Bold": directorio / "VeraBd.ttf",
+        "VESP-Vera-Italic": directorio / "VeraIt.ttf",
+        "VESP-Vera-BoldItalic": directorio / "VeraBI.ttf",
+    }
+    registradas = set(pdfmetrics.getRegisteredFontNames())
+    for nombre, ruta in fuentes.items():
+        if nombre not in registradas:
+            pdfmetrics.registerFont(TTFont(nombre, str(ruta)))
+    pdfmetrics.registerFontFamily(
+        "VESP-Vera",
+        normal="VESP-Vera",
+        bold="VESP-Vera-Bold",
+        italic="VESP-Vera-Italic",
+        boldItalic="VESP-Vera-BoldItalic",
+    )
+
+
+def _seccion_notas(
+    notas: Sequence[Mapping[str, Any]],
+    estilos: Mapping[str, ParagraphStyle],
+    ancho_disponible: float,
+) -> list:
+    filas = [
+        [
+            Paragraph("Fecha", estilos["Encabezado"]),
+            Paragraph("Nota diaria", estilos["Encabezado"]),
+        ]
+    ]
+    for nota in notas:
+        fecha = nota.get("fecha")
+        fecha_texto = (
+            fecha.strftime("%d/%m/%Y")
+            if isinstance(fecha, (date, datetime))
+            else str(fecha or "")
+        )
+        filas.append(
+            [
+                Paragraph(html.escape(fecha_texto), estilos["CeldaCentro"]),
+                Paragraph(
+                    html.escape(str(nota.get("nota", ""))).replace("\n", "<br/>"),
+                    estilos["Celda"],
+                ),
+            ]
+        )
+    tabla = LongTable(
+        filas,
+        colWidths=[2.7 * cm, ancho_disponible - 2.7 * cm],
+        repeatRows=1,
+        splitByRow=1,
+    )
+    tabla.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), GRAFITO_INSTITUCIONAL),
+                ("GRID", (0, 0), (-1, -1), 0.35, GRIS_BORDE),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRIS_FILA]),
+            ]
+        )
+    )
+    return [
+        Paragraph("Notas diarias", estilos["Seccion"]),
+        Spacer(1, 0.15 * cm),
+        tabla,
+    ]
+
+
+def _seccion_subtotales(
+    datos: ReporteDatos,
+    estilos: Mapping[str, ParagraphStyle],
+    ancho_disponible: float,
+) -> list:
+    etiquetas = {
+        "objetivo": "Objetivo",
+        "supervisor": "Supervisor",
+        "dia": "Día",
+    }
+    agrupacion = str(datos.subtotales[0]["agrupacion"])
+    filas = [
+        [
+            Paragraph(etiquetas[agrupacion], estilos["Encabezado"]),
+            Paragraph("Pasadas", estilos["Encabezado"]),
+        ]
+    ]
+    filas.extend(
+        [
+            Paragraph(html.escape(str(subtotal["etiqueta"])), estilos["Celda"]),
+            Paragraph(str(subtotal["pasadas"]), estilos["CeldaCentro"]),
+        ]
+        for subtotal in datos.subtotales
+    )
+    tabla = Table(
+        filas,
+        colWidths=[ancho_disponible * 0.8, ancho_disponible * 0.2],
+        repeatRows=1,
+        splitByRow=1,
+    )
+    tabla.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), GRAFITO_INSTITUCIONAL),
+                ("GRID", (0, 0), (-1, -1), 0.35, GRIS_BORDE),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRIS_FILA]),
+                ("LINEABOVE", (0, -1), (-1, -1), 1.2, GRAFITO_INSTITUCIONAL),
+            ]
+        )
+    )
+    return [
+        Paragraph("Subtotales por grupo", estilos["Seccion"]),
+        Spacer(1, 0.15 * cm),
+        tabla,
+        Spacer(1, 0.25 * cm),
+    ]
+
+
+def _seccion_resumen_objetivo(
+    datos: ReporteDatos,
+    estilos: Mapping[str, ParagraphStyle],
+) -> list:
+    etiquetas = {
+        "dias_esperados": "Días esperados",
+        "dias_con_dia": "Días con pasada DIA",
+        "dias_con_noche": "Días con pasada NOCHE",
+        "dias_sin_control": "Días sin control",
+        "cumplimiento": "Cumplimiento",
+    }
+    filas = [
+        [
+            Paragraph("Indicador", estilos["Encabezado"]),
+            Paragraph("Total", estilos["Encabezado"]),
+        ]
+    ]
+    for clave, etiqueta in etiquetas.items():
+        valor = datos.totales.get(clave)
+        texto = (
+            f"{float(valor) * 100:.1f}%"
+            if clave == "cumplimiento" and valor is not None
+            else str(valor if valor is not None else "")
+        )
+        filas.append(
+            [
+                Paragraph(html.escape(etiqueta), estilos["Celda"]),
+                Paragraph(html.escape(texto), estilos["CeldaCentro"]),
+            ]
+        )
+    tabla = Table(filas, colWidths=[7.2 * cm, 3 * cm], hAlign="LEFT")
+    tabla.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), GRAFITO_INSTITUCIONAL),
+                ("BACKGROUND", (0, 1), (-1, -1), GRIS_TOTAL),
+                ("GRID", (0, 0), (-1, -1), 0.35, GRIS_BORDE),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ]
+        )
+    )
+    return [
+        Paragraph("Totales del objetivo", estilos["Seccion"]),
+        Spacer(1, 0.15 * cm),
+        tabla,
+    ]
 
 
 class _LienzoNumerado(canvas.Canvas):
@@ -435,47 +635,62 @@ class _LienzoNumerado(canvas.Canvas):
         ancho, alto = self._tamano_pagina
         self.saveState()
         self.setFillColor(GRAFITO_INSTITUCIONAL)
-        self.setFont("Helvetica-Bold", 11)
+        self.setFont("VESP-Vera-Bold", 11)
         self._dibujar_logo(self._margen_lateral, alto - 1.1 * cm)
         self.drawString(
             self._margen_lateral + 0.95 * cm,
             alto - 0.65 * cm,
             "VESP Organizations",
         )
-        self.setFont("Helvetica-Bold", 9)
-        self.drawString(
-            self._margen_lateral,
-            alto - 1.25 * cm,
-            f"{self._titulo} — {self._periodo}",
+        ancho_texto = ancho - 2 * self._margen_lateral
+        estilo_titulo = ParagraphStyle(
+            "TituloReportePDF",
+            fontName="VESP-Vera-Bold",
+            fontSize=9,
+            leading=11,
+            textColor=GRAFITO_INSTITUCIONAL,
         )
+        titulo = Paragraph(
+            html.escape(f"{self._titulo} — {self._periodo}"),
+            estilo_titulo,
+        )
+        _, alto_titulo = titulo.wrap(ancho_texto, 1.2 * cm)
+        y_actual = alto - 1.35 * cm
+        titulo.drawOn(
+            self,
+            self._margen_lateral,
+            y_actual - alto_titulo,
+        )
+        y_actual -= alto_titulo + 0.1 * cm
         estilos = getSampleStyleSheet()
         estilo_filtros = ParagraphStyle(
             "FiltrosPDF",
             parent=estilos["Normal"],
-            fontName="Helvetica",
+            fontName="VESP-Vera",
             fontSize=7,
-            leading=8.5,
+            leading=8,
             textColor=GRAFITO_INSTITUCIONAL,
         )
         filtros = Paragraph(
             html.escape(f"Filtros: {self._filtros}"),
             estilo_filtros,
         )
-        filtros.wrapOn(self, ancho - 2 * self._margen_lateral, 0.9 * cm)
+        _, alto_filtros = filtros.wrap(ancho_texto, 1.05 * cm)
         filtros.drawOn(
             self,
             self._margen_lateral,
-            alto - 2.25 * cm,
+            y_actual - alto_filtros,
         )
+        y_actual -= alto_filtros + 0.1 * cm
         self.setStrokeColor(GRIS_BORDE)
         self.setLineWidth(0.4)
         self.line(
             self._margen_lateral,
-            alto - 2.35 * cm,
+            y_actual,
             ancho - self._margen_lateral,
-            alto - 2.35 * cm,
+            y_actual,
         )
-        self.setFont("Helvetica", 7)
+        self.setFont("VESP-Vera", 7)
         self.drawString(
             self._margen_lateral,
             0.9 * cm,

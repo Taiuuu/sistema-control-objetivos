@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QTableWidget, QTableWidgetItem, QPushButton,
     QDateEdit, QTimeEdit, QComboBox, QMessageBox, QDialog,
-    QSpinBox, QLineEdit, QFileDialog, QMenu, QHeaderView
+    QSpinBox, QLineEdit, QMenu, QHeaderView
     , QInputDialog
 )
 from PyQt6.QtCore import QDate, QTime
@@ -23,7 +23,14 @@ from services.sincronizacion import obtener_sincronizador
 from services.sesion import get_rol
 from services.validador_horas_limite import validar_hora_turno_nocturno
 from services.background_task import run_background_task
-from services.exportar import exportar_pasadas_excel, exportar_pasadas_pdf
+from services.queries_tabla import (
+    cargar_equipos_reportables,
+    cargar_objetivos_reportables,
+    cargar_supervisores,
+)
+from services.reportes_unificados.consultas import crear_datos_para_exportar
+from services.reportes_unificados.datos import COLUMNAS_DIARIAS
+from ui.reportes.acciones_exportacion import mostrar_dialogo_exportar
 from ui.components import GlassCard, PillButton, SearchInput, StatusBadge
 from ui.components.calendar import configure_calendar_theme
 from ui.components.base import wrap_content_in_glass_card
@@ -597,43 +604,37 @@ class ListaPasadas(QWidget):
         layout.addStretch()
         return contenedor
 
-    def _filtros_actuales(self) -> tuple[list, dict]:
-        fecha = self.selector_fecha.date().toString("yyyy-MM-dd")
-        supervisor_id = self.selector_supervisor.currentData() or None
-        supervisor = self.selector_supervisor.currentText()
-        turno = self.selector_turno.currentText()
-        if turno == "Todos":
-            turno = None
-        busqueda = self.buscador.text().strip()
-        datos = _cargar_pasadas(fecha, supervisor_id, turno, busqueda)
-        return datos, {
-            "fecha": fecha,
-            "supervisor": supervisor,
-            "turno": turno,
-            "busqueda": busqueda,
-        }
-
     def _exportar_excel(self) -> None:
-        datos, filtros = self._filtros_actuales()
-        ruta, _ = QFileDialog.getSaveFileName(
-            self, "Guardar Excel", f"pasadas_{filtros['fecha']}.xlsx", "Excel (*.xlsx)"
-        )
-        if not ruta:
-            return
-        tarea = run_background_task(exportar_pasadas_excel, datos, ruta, filtros)
-        tarea.signals.finished.connect(lambda _: QMessageBox.information(self, "Listo", f"Archivo guardado en:\n{ruta}"))
-        tarea.signals.error.connect(lambda mensaje: QMessageBox.critical(self, "Error", mensaje))
+        self._abrir_dialogo_exportar("excel")
 
     def _exportar_pdf(self) -> None:
-        datos, filtros = self._filtros_actuales()
-        ruta, _ = QFileDialog.getSaveFileName(
-            self, "Guardar PDF", f"pasadas_{filtros['fecha']}.pdf", "PDF (*.pdf)"
+        self._abrir_dialogo_exportar("pdf")
+
+    def _abrir_dialogo_exportar(self, formato: str) -> None:
+        fecha = self.selector_fecha.date().toPyDate()
+        filtros = {
+            "supervisor_id": self.selector_supervisor.currentData() or None,
+            "turno": (
+                None
+                if self.selector_turno.currentText() == "Todos"
+                else self.selector_turno.currentText()
+            ),
+            "busqueda": self.buscador.text().strip(),
+        }
+        mostrar_dialogo_exportar(
+            self,
+            "detalle",
+            fecha,
+            fecha,
+            crear_datos_para_exportar,
+            COLUMNAS_DIARIAS,
+            filtros_iniciales=filtros,
+            objetivos=cargar_objetivos_reportables(),
+            supervisores=cargar_supervisores(),
+            equipos=cargar_equipos_reportables(),
+            periodo_inicial="dia",
+            formato_inicial=formato,
         )
-        if not ruta:
-            return
-        tarea = run_background_task(exportar_pasadas_pdf, datos, ruta, filtros)
-        tarea.signals.finished.connect(lambda _: QMessageBox.information(self, "Listo", f"Archivo guardado en:\n{ruta}"))
-        tarea.signals.error.connect(lambda mensaje: QMessageBox.critical(self, "Error", mensaje))
 
     def _editar(self, pasada_id: int):
 

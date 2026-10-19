@@ -80,6 +80,15 @@ def exportar_excel(
             "No hay filas de detalle para los filtros seleccionados.",
         )
 
+    if incluir_notas and datos.notas:
+        hoja_notas = libro["Detalle"] if "Detalle" in libro.sheetnames else resumen
+        _escribir_notas(hoja_notas, datos)
+    if (
+        incluir_totales
+        and datos.metadatos.tipo_informe == "objetivo"
+    ):
+        _escribir_resumen_objetivo(resumen, datos)
+
     parametros = libro.create_sheet("Parámetros")
     _escribir_parametros(parametros, datos, contenido, incluir_totales, incluir_notas)
     libro.active = 0
@@ -144,6 +153,8 @@ def _escribir_hoja(
                 columna_idx,
                 _normalizar_valor(fila[columna.id], columna),
             )
+            if columna.tipo_dato in {"texto", "texto_largo"}:
+                celda.data_type = "s"
             celda.alignment = Alignment(
                 horizontal=_alineacion_excel(columna.alineacion),
                 vertical="top",
@@ -155,7 +166,11 @@ def _escribir_hoja(
             for celda in hoja[fila_idx][:cantidad_columnas]:
                 celda.fill = PatternFill("solid", fgColor=COLOR_FILA_ALTERNADA)
 
-    if incluir_totales and datos.totales_incluidos:
+    if (
+        incluir_totales
+        and datos.totales_incluidos
+        and datos.metadatos.tipo_informe != "objetivo"
+    ):
         fila_total = FILA_CABECERA + len(filas) + 1
         for columna_idx, columna in enumerate(columnas, start=1):
             valor = _valor_total(columna, totales)
@@ -376,3 +391,68 @@ def _escribir_parametros(
     hoja.sheet_properties.pageSetUpPr.fitToPage = True
     hoja.oddFooter.left.text = f"Generado: {datos.metadatos.generado_en:%d/%m/%Y %H:%M}"
     hoja.oddFooter.right.text = "Página &[Page] de &[Pages]"
+
+
+def _escribir_notas(hoja: Worksheet, datos: ReporteDatos) -> None:
+    """Agrega notas diarias aparte para no confundirlas con observaciones de pasadas."""
+    fila_inicio = hoja.max_row + 2
+    hoja.merge_cells(start_row=fila_inicio, start_column=1, end_row=fila_inicio, end_column=2)
+    titulo = hoja.cell(fila_inicio, 1, "Notas diarias")
+    titulo.font = Font(bold=True, color="FFFFFF")
+    titulo.fill = PatternFill("solid", fgColor=GRAFITO_INSTITUCIONAL)
+    for indice, etiqueta in enumerate(("Fecha", "Nota"), start=1):
+        celda = hoja.cell(fila_inicio + 1, indice, etiqueta)
+        celda.font = Font(bold=True, color="FFFFFF")
+        celda.fill = PatternFill("solid", fgColor=VERDE_INSTITUCIONAL)
+        celda.alignment = Alignment(wrap_text=True)
+    for fila_idx, nota in enumerate(datos.notas, start=fila_inicio + 2):
+        fecha = nota.get("fecha", "")
+        hoja.cell(
+            fila_idx,
+            1,
+            fecha if isinstance(fecha, (date, datetime)) else str(fecha),
+        )
+        celda_nota = hoja.cell(fila_idx, 2, str(nota.get("nota", "")))
+        celda_nota.data_type = "s"
+        hoja.cell(fila_idx, 1).alignment = Alignment(vertical="top")
+        hoja.cell(fila_idx, 2).alignment = Alignment(vertical="top", wrap_text=True)
+        hoja.row_dimensions[fila_idx].height = min(
+            15 * max(1, len(str(nota.get("nota", ""))) // 80 + 1),
+            400,
+        )
+        if isinstance(fecha, (date, datetime)):
+            hoja.cell(fila_idx, 1).number_format = "dd/mm/yyyy"
+    hoja.column_dimensions["A"].width = max(hoja.column_dimensions["A"].width or 0, 14)
+    hoja.column_dimensions["B"].width = max(hoja.column_dimensions["B"].width or 0, 60)
+
+
+def _escribir_resumen_objetivo(hoja: Worksheet, datos: ReporteDatos) -> None:
+    fila_inicio = hoja.max_row + 2
+    hoja.merge_cells(
+        start_row=fila_inicio,
+        start_column=1,
+        end_row=fila_inicio,
+        end_column=2,
+    )
+    titulo = hoja.cell(fila_inicio, 1, "Totales del objetivo")
+    titulo.font = Font(bold=True, color="FFFFFF")
+    titulo.fill = PatternFill("solid", fgColor=GRAFITO_INSTITUCIONAL)
+    etiquetas = {
+        "dias_esperados": "Días esperados",
+        "dias_con_dia": "Días con pasada DIA",
+        "dias_con_noche": "Días con pasada NOCHE",
+        "dias_sin_control": "Días sin control",
+        "cumplimiento": "Cumplimiento",
+    }
+    for indice, (clave, etiqueta) in enumerate(etiquetas.items(), start=1):
+        celda_etiqueta = hoja.cell(fila_inicio + indice, 1, etiqueta)
+        celda_valor = hoja.cell(
+            fila_inicio + indice,
+            2,
+            datos.totales.get(clave),
+        )
+        celda_etiqueta.font = Font(bold=True)
+        celda_etiqueta.fill = PatternFill("solid", fgColor=COLOR_TOTAL)
+        celda_valor.fill = PatternFill("solid", fgColor=COLOR_TOTAL)
+        if clave == "cumplimiento":
+            celda_valor.number_format = "0.0%"

@@ -24,8 +24,10 @@ from typing import List, Dict, Optional, Tuple, Any
 
 from database.gestor_db import gestor_db
 from services.pasadas.calculo_pasadas import (
+    fecha_de_turno,
     fecha_hora_desde_fecha_turno,
     indexar_pasadas_por_objetivo,
+    normalizar_turno,
     rango_datetime_de_mes,
 )
 from services.feriados import es_feriado
@@ -308,6 +310,11 @@ def generar_reporte_mensual(
     supervisor_id: int | None = None,
     turno: str | None = None,
     estado: str = "Todos",
+    *,
+    supervisor_ids: List[int] | None = None,
+    turnos: List[str] | None = None,
+    objetivo_ids: List[int] | None = None,
+    equipo_id: int | None = None,
 ) -> Dict[str, Any]:
     """Genera reporte mensual detallado de cumplimiento.
     
@@ -356,6 +363,13 @@ def generar_reporte_mensual(
             """SELECT id, nombre, fecha_inicio, fecha_fin, dias_semana 
                FROM objetivos ORDER BY nombre"""
         )
+        if objetivo_ids is not None:
+            seleccion_objetivos = set(objetivo_ids)
+            objetivos = [
+                objetivo
+                for objetivo in objetivos
+                if objetivo["id"] in seleccion_objetivos
+            ]
         periodos_raw = gestor_db.ejecutar(
             "SELECT objetivo_id, fecha_inicio, fecha_fin FROM objetivo_periodos"
         )
@@ -404,8 +418,65 @@ def generar_reporte_mensual(
             }
             for p in pasadas_raw
         ]
+        seleccion_supervisores = (
+            set(supervisor_ids) if supervisor_ids is not None else None
+        )
+        seleccion_turnos = (
+            {normalizar_turno(valor) for valor in turnos}
+            if turnos is not None
+            else None
+        )
+        equipos_por_fecha_turno: dict[tuple[str, str], set[int]] = {}
+        if equipo_id is not None:
+            equipos = gestor_db.ejecutar(
+                """
+                SELECT fecha, turno, supervisor1_id, supervisor2_id, supervisor3_id
+                FROM equipos WHERE id = ?
+                """,
+                (equipo_id,),
+            )
+            for equipo in equipos:
+                clave = (
+                    str(equipo["fecha"]),
+                    normalizar_turno(str(equipo["turno"])),
+                )
+                equipos_por_fecha_turno[clave] = {
+                    supervisor
+                    for supervisor in (
+                        equipo["supervisor1_id"],
+                        equipo["supervisor2_id"],
+                        equipo["supervisor3_id"],
+                    )
+                    if supervisor is not None
+                }
+        registros_filtrados = []
+        for pasada in registros_pasadas:
+            supervisor_pasada = pasada["supervisor_id"]
+            turno_pasada = normalizar_turno(pasada["turno"])
+            fecha_pasada = fecha_de_turno(
+                pasada["fecha_hora"], pasada["turno"]
+            ).isoformat()
+            if (
+                seleccion_supervisores is not None
+                and supervisor_pasada not in seleccion_supervisores
+            ):
+                continue
+            if (
+                seleccion_turnos is not None
+                and turno_pasada not in seleccion_turnos
+            ):
+                continue
+            if equipo_id is not None and supervisor_pasada not in (
+                equipos_por_fecha_turno.get((fecha_pasada, turno_pasada), set())
+            ):
+                continue
+            registros_filtrados.append(pasada)
         indexado_por_turno = indexar_pasadas_por_objetivo(
-            registros_pasadas, anio, mes, supervisor_id, turno
+            registros_filtrados,
+            anio,
+            mes,
+            supervisor_id,
+            turno,
         )
         pasadas_por_objetivo = {
             objetivo_id: fechas["diurno"] | fechas["nocturno"]

@@ -103,6 +103,33 @@ def cargar_supervisores() -> list:
     return [(r['id'], r['nombre']) for r in resultados]
 
 
+@con_cache(ttl=60)
+def cargar_objetivos_reportables() -> list:
+    """Obtiene objetivos seleccionables en los filtros de exportación."""
+    resultados = gestor_db.ejecutar(
+        """
+        SELECT id, nombre FROM objetivos
+        WHERE activo = 1 AND es_placeholder = 0
+        ORDER BY nombre
+        """
+    )
+    return [(fila["id"], fila["nombre"]) for fila in resultados]
+
+
+def cargar_equipos_reportables() -> list:
+    """Obtiene equipos para que el diálogo filtre por fecha y turno."""
+    resultados = gestor_db.ejecutar(
+        """
+        SELECT id, fecha, turno FROM equipos
+        ORDER BY fecha DESC, turno, id
+        """
+    )
+    return [
+        (fila["id"], f"{fila['fecha']} — {fila['turno']}")
+        for fila in resultados
+    ]
+
+
 # =============================================================================
 # PASADAS POR TURNO
 # =============================================================================

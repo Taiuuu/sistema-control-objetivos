@@ -9,25 +9,27 @@ import calendar
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QTableWidget, QTableWidgetItem,
-    QComboBox, QFileDialog, QMessageBox, QScrollArea
+    QComboBox, QMessageBox, QScrollArea
 )
 from PyQt6.QtGui import QShortcut, QKeySequence
 from PyQt6.QtWidgets import QHeaderView
 from PyQt6.QtCore import Qt
 from services.background_task import run_background_task
-from services.exportar import exportar_excel, exportar_pdf
-from services.reportes import objetivo_corresponde, clasificar_cumplimiento
-from services.pasadas.calculo_pasadas import (
-    fecha_de_turno,
-    fecha_hora_desde_fecha_turno,
-    indexar_pasadas_por_objetivo,
-    normalizar_turno,
-    rango_datetime_de_mes,
-)
+from services.reportes import clasificar_cumplimiento
 from database.db import DB_PATH
-from services.queries_tabla import cargar_supervisores
+from services.queries_tabla import (
+    cargar_equipos_reportables,
+    cargar_supervisores,
+)
+from services.reportes_unificados.consultas import crear_datos_para_exportar
+from services.reportes_unificados.datos import COLUMNAS_OBJETIVO
+from services.reportes_unificados.datos import crear_datos_objetivo
+from services.reportes_unificados.objetivo import (
+    calcular_reporte_objetivo as _calcular_reporte_objetivo_compartido,
+)
 from ui.components import StatusBadge
 from ui.components.base import wrap_content_in_glass_card
+from ui.reportes.acciones_exportacion import mostrar_dialogo_exportar
 
 
 # =============================================================================
@@ -41,185 +43,23 @@ def calcular_reporte_objetivo(
     supervisor_id: int | None = None,
     turno: str | None = None,
     estado_filtro: str = "Todos",
+    supervisor_ids: list[int] | None = None,
+    turnos: list[str] | None = None,
+    equipo_id: int | None = None,
 ) -> dict:
-    """
-    Retorna un dict con:
-      - nombre: str
-      - dias: list de dicts {fecha, dia_semana, diurno, nocturno, estado}
-      - resumen: dict {dias_esperados, dias_con_dia, dias_con_noche, dias_sin_control, porcentaje}
-    """
-    conexion = sqlite3.connect(DB_PATH)
-    cursor = conexion.cursor()
-
-    cursor.execute(
-        "SELECT nombre, fecha_inicio, fecha_fin, dias_semana FROM objetivos WHERE id = ?",
-        (objetivo_id,)
+    """Conserva la API de la pantalla y delega el cálculo al servicio común."""
+    return _calcular_reporte_objetivo_compartido(
+        anio,
+        mes,
+        objetivo_id,
+        supervisor_id=supervisor_id,
+        turno=turno,
+        estado_filtro=estado_filtro,
+        supervisor_ids=supervisor_ids,
+        turnos=turnos,
+        equipo_id=equipo_id,
+        ruta_db=DB_PATH,
     )
-    row = cursor.fetchone()
-    if not row:
-        conexion.close()
-        raise ValueError(f"No se encontró el objetivo con id {objetivo_id}")
-
-    nombre, inicio, fin, dias_str = row
-    total_dias = calendar.monthrange(anio, mes)[1]
-
-    cursor.execute(
-        "SELECT fecha_inicio, fecha_fin FROM objetivo_periodos WHERE objetivo_id = ? "
-        "ORDER BY fecha_inicio",
-        (objetivo_id,),
-    )
-    periodos = cursor.fetchall()
-
-    rango_inicio, rango_fin = rango_datetime_de_mes(
-        anio, mes, turno_noche_cruza=True
-    )
-    fecha_inicio_turno = rango_inicio.date().isoformat()
-    fecha_fin_turno = (
-        rango_fin.date() - datetime.timedelta(days=1)
-    ).isoformat()
-    cursor.execute(
-        """
-        SELECT COALESCE(p.fecha_operativa, p.fecha) AS fecha_turno,
-               p.hora, p.turno, p.objetivo_id,
-               p.supervisor_id, s.nombre
-        FROM pasadas p
-        JOIN supervisores s ON p.supervisor_id = s.id
-        WHERE COALESCE(p.fecha_operativa, p.fecha) BETWEEN ? AND ?
-          AND p.objetivo_id = ?
-          AND (? IS NULL OR p.supervisor_id = ?)
-        ORDER BY p.fecha, p.hora, p.turno, s.nombre
-        """,
-        (
-            fecha_inicio_turno,
-            fecha_fin_turno,
-            objetivo_id,
-            supervisor_id,
-            supervisor_id,
-        ),
-    )
-    filas_pasadas = cursor.fetchall()
-    registros_pasadas = [
-        {
-            "fecha_hora": fecha_hora_desde_fecha_turno(
-                fila[0], fila[1], fila[2]
-            ),
-            "turno": fila[2],
-            "objetivo_id": fila[3],
-            "supervisor_id": fila[4],
-        }
-        for fila in filas_pasadas
-    ]
-    fechas_pasadas = indexar_pasadas_por_objetivo(
-        registros_pasadas, anio, mes, supervisor_id
-    ).get(objetivo_id, {"diurno": set(), "nocturno": set()})
-    nombres_por_fecha_turno = {}
-    for fila in filas_pasadas:
-        fecha_hora = fecha_hora_desde_fecha_turno(
-            fila[0], fila[1], fila[2]
-        )
-        turno_pasada = normalizar_turno(fila[2])
-        fecha_pasada = fecha_de_turno(fecha_hora, turno_pasada)
-        if (fecha_pasada.year, fecha_pasada.month) != (anio, mes):
-            continue
-        nombres_por_fecha_turno.setdefault(
-            (fecha_pasada, turno_pasada), []
-        ).append(fila[5])
-
-    NOMBRES_DIA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
-
-    dias = []
-    dias_esperados = 0
-    dias_con_dia = 0
-    dias_con_noche = 0
-    dias_sin_control = 0
-
-    for dia in range(1, total_dias + 1):
-        fecha = f"{anio}-{mes:02d}-{dia:02d}"
-        fecha_dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
-
-        activo = any(
-            periodo_inicio <= fecha and
-            (periodo_fin is None or periodo_fin >= fecha)
-            for periodo_inicio, periodo_fin in periodos
-        ) if periodos else (
-            (not inicio or fecha >= inicio) and (not fin or fecha <= fin)
-        )
-        if not activo:
-            continue
-        if not objetivo_corresponde(fecha, dias_str):
-            continue
-
-        dias_esperados += 1
-        nombre_dia = NOMBRES_DIA[fecha_dt.weekday()]
-
-        fecha_objetivo = fecha_dt.date()
-        supervisores_dia_nombres = nombres_por_fecha_turno.get(
-            (fecha_objetivo, "diurno"), []
-        )
-        diurno_texto = "✔" if supervisores_dia_nombres else "✘"
-        if supervisores_dia_nombres:
-            diurno_texto = ", ".join(supervisores_dia_nombres)
-
-        supervisores_noche_nombres = nombres_por_fecha_turno.get(
-            (fecha_objetivo, "nocturno"), []
-        )
-        nocturno_texto = "✔" if supervisores_noche_nombres else "✘"
-        if supervisores_noche_nombres:
-            nocturno_texto = ", ".join(supervisores_noche_nombres)
-
-        tuvo_dia = fecha_objetivo in fechas_pasadas["diurno"]
-        tuvo_noche = fecha_objetivo in fechas_pasadas["nocturno"]
-
-        if tuvo_dia:
-            dias_con_dia += 1
-        if tuvo_noche:
-            dias_con_noche += 1
-        if not tuvo_dia and not tuvo_noche:
-            dias_sin_control += 1
-
-        if tuvo_dia and tuvo_noche:
-            estado = "Completo"
-        elif tuvo_dia:
-            estado = "Solo diurno"
-        elif tuvo_noche:
-            estado = "Solo nocturno"
-        else:
-            estado = "Sin control"
-
-        if turno == "diurno" and not tuvo_dia:
-            continue
-        if turno == "nocturno" and not tuvo_noche:
-            continue
-        if estado_filtro != "Todos" and estado != estado_filtro:
-            continue
-
-        dias.append({
-            "fecha": f"{dia:02d}/{mes:02d}/{anio}",
-            "dia_semana": nombre_dia,
-            "diurno": diurno_texto,
-            "nocturno": nocturno_texto,
-            "estado": estado,
-        })
-
-    porcentaje = 0.0
-    if dias_esperados > 0:
-        dias_controlados = dias_esperados - dias_sin_control
-        porcentaje = (dias_controlados / dias_esperados) * 100
-
-    conexion.close()
-
-    return {
-        "nombre": nombre,
-        "dias": dias,
-        "resumen": {
-            "dias_esperados": dias_esperados,
-            "dias_con_dia": dias_con_dia,
-            "dias_con_noche": dias_con_noche,
-            "dias_sin_control": dias_sin_control,
-            "porcentaje": porcentaje,
-            "estado_cumplimiento": clasificar_cumplimiento(porcentaje)[0],
-        }
-    }
 
 
 def cargar_objetivos_del_mes(anio: int, mes: int) -> list:
@@ -249,166 +89,6 @@ def cargar_objetivos_del_mes(anio: int, mes: int) -> list:
     objetivos = cursor.fetchall()
     conexion.close()
     return objetivos
-
-
-# =============================================================================
-# EXPORTACIÓN
-# =============================================================================
-
-def _exportar_excel_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str, datos: dict | None = None, filtros: dict | None = None) -> None:
-    import openpyxl
-    from openpyxl.styles import PatternFill, Font, Alignment
-
-    datos = datos or calcular_reporte_objetivo(anio, mes, objetivo_id)
-    filtros = filtros or {}
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Reporte"
-
-    # Título
-    ws.merge_cells("A1:E1")
-    ws["A1"] = f"Reporte: {datos['nombre']} — {mes:02d}/{anio}"
-    ws["A1"].font = Font(bold=True, size=13)
-    ws["A1"].alignment = Alignment(horizontal="center")
-    ws.merge_cells("A2:E2")
-    ws["A2"] = "Filtros: " + " | ".join(f"{clave}: {valor or 'Todos'}" for clave, valor in filtros.items())
-
-    # Encabezados
-    encabezados = ["Fecha", "Día", "Diurno", "Nocturno", "Estado"]
-    COLORES_HEADER = "2B4F8C"
-    for col, enc in enumerate(encabezados, start=1):
-        cell = ws.cell(row=4, column=col, value=enc)
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill("solid", fgColor=COLORES_HEADER)
-        cell.alignment = Alignment(horizontal="center")
-
-    # Colores por estado
-    COLOR_COMPLETO   = "90EE90"
-    COLOR_PARCIAL    = "FFD700"
-    COLOR_SIN        = "FF6B6B"
-
-    def color_fila(estado):
-        if estado == "Completo":
-            return COLOR_COMPLETO
-        elif estado in ("Solo diurno", "Solo nocturno"):
-            return COLOR_PARCIAL
-        return COLOR_SIN
-
-    # Filas
-    for fila_idx, d in enumerate(datos["dias"], start=5):
-        valores = [d["fecha"], d["dia_semana"], d["diurno"], d["nocturno"], d["estado"]]
-        fill = PatternFill("solid", fgColor=color_fila(d["estado"]))
-        for col, val in enumerate(valores, start=1):
-            cell = ws.cell(row=fila_idx, column=col, value=val)
-            cell.fill = fill
-            cell.alignment = Alignment(horizontal="center")
-
-    # Resumen
-    r = datos["resumen"]
-    _, categoria_cumplimiento = clasificar_cumplimiento(r["porcentaje"])
-    fila_res = len(datos["dias"]) + 5
-    ws.cell(row=fila_res,     column=1, value="Días esperados:").font    = Font(bold=True)
-    ws.cell(row=fila_res,     column=2, value=r["dias_esperados"])
-    ws.cell(row=fila_res + 1, column=1, value="Días c/ diurno:").font   = Font(bold=True)
-    ws.cell(row=fila_res + 1, column=2, value=r["dias_con_dia"])
-    ws.cell(row=fila_res + 2, column=1, value="Días c/ nocturno:").font = Font(bold=True)
-    ws.cell(row=fila_res + 2, column=2, value=r["dias_con_noche"])
-    ws.cell(row=fila_res + 3, column=1, value="Días sin control:").font = Font(bold=True)
-    ws.cell(row=fila_res + 3, column=2, value=r["dias_sin_control"])
-    ws.cell(row=fila_res + 4, column=1, value="Cumplimiento:").font     = Font(bold=True)
-    celda_cumplimiento = ws.cell(row=fila_res + 4, column=2, value=f"{r['porcentaje']:.1f}%")
-    celda_cumplimiento.fill = PatternFill(
-        "solid",
-        fgColor={"verde": "C8E6C9", "amarillo": "FFF3CD", "rojo": "FFCDD2"}[categoria_cumplimiento],
-    )
-
-    # Ancho columnas - ajustar para nombres de supervisores
-    ws.column_dimensions["A"].width = 14
-    ws.column_dimensions["B"].width = 8
-    ws.column_dimensions["C"].width = 25  # Más ancho para nombres
-    ws.column_dimensions["D"].width = 25  # Más ancho para nombres
-    ws.column_dimensions["E"].width = 16
-
-    wb.save(ruta)
-
-
-def _exportar_pdf_objetivo(anio: int, mes: int, objetivo_id: int, ruta: str, datos: dict | None = None, filtros: dict | None = None) -> None:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
-
-    datos = datos or calcular_reporte_objetivo(anio, mes, objetivo_id)
-    filtros = filtros or {}
-    doc = SimpleDocTemplate(ruta, pagesize=A4)
-    styles = getSampleStyleSheet()
-    elementos = []
-
-    # Título
-    elementos.append(Paragraph(
-        f"<b>Reporte: {datos['nombre']}</b>",
-        styles["Title"]
-    ))
-    elementos.append(Paragraph(
-        f"Período: {mes:02d}/{anio}",
-        styles["Normal"]
-    ))
-    elementos.append(Paragraph(
-        "Filtros: " + " | ".join(f"{clave}: {valor or 'Todos'}" for clave, valor in filtros.items()),
-        styles["Normal"]
-    ))
-    elementos.append(Spacer(1, 12))
-
-    # Tabla de días
-    encabezados = ["Fecha", "Día", "Diurno", "Nocturno", "Estado"]
-    filas = [encabezados]
-    for d in datos["dias"]:
-        filas.append([d["fecha"], d["dia_semana"], d["diurno"], d["nocturno"], d["estado"]])
-
-    tabla = Table(filas, colWidths=[80, 40, 80, 80, 90])  # Ajustar anchos para nombres
-
-    COLOR_HEADER   = colors.HexColor("#2B4F8C")
-    COLOR_COMPLETO = colors.HexColor("#90EE90")
-    COLOR_PARCIAL  = colors.HexColor("#FFD700")
-    COLOR_SIN      = colors.HexColor("#FF6B6B")
-
-    estilo_base = [
-        ("BACKGROUND", (0, 0), (-1, 0), COLOR_HEADER),
-        ("TEXTCOLOR",  (0, 0), (-1, 0), colors.white),
-        ("FONTNAME",   (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("ALIGN",      (0, 0), (-1, -1), "CENTER"),
-        ("GRID",       (0, 0), (-1, -1), 0.5, colors.grey),
-    ]
-
-    def color_estado(estado):
-        if estado == "Completo":
-            return COLOR_COMPLETO
-        elif estado in ("Solo diurno", "Solo nocturno"):
-            return COLOR_PARCIAL
-        return COLOR_SIN
-
-    for i, d in enumerate(datos["dias"], start=1):
-        estilo_base.append(
-            ("BACKGROUND", (0, i), (-1, i), color_estado(d["estado"]))
-        )
-
-    tabla.setStyle(TableStyle(estilo_base))
-    elementos.append(tabla)
-    elementos.append(Spacer(1, 16))
-
-    # Resumen
-    r = datos["resumen"]
-    resumen_texto = (
-        f"<b>Días esperados:</b> {r['dias_esperados']}  |  "
-        f"<b>Con diurno:</b> {r['dias_con_dia']}  |  "
-        f"<b>Con nocturno:</b> {r['dias_con_noche']}  |  "
-        f"<b>Sin control:</b> {r['dias_sin_control']}  |  "
-        f"<b>Cumplimiento:</b> {r['porcentaje']:.1f}%"
-    )
-    elementos.append(Paragraph(resumen_texto, styles["Normal"]))
-
-    doc.build(elementos)
-
 
 # =============================================================================
 # PANTALLA
@@ -634,47 +314,91 @@ class ReporteObjetivo(QWidget):
         self.estado_label.setText("Error al generar reporte")
         self._set_controls_enabled(True)
 
-    def _filtros_dict(self) -> dict:
-        return {
-            "supervisor": self.selector_supervisor.currentText(),
-            "turno": self.selector_turno.currentText(),
-            "estado": self.selector_estado.currentText(),
-        }
-
     # ------------------------------------------------------------------
     def _exportar_excel(self) -> None:
-        mes, anio = self._get_mes_anio()
-        objetivo_id = self._get_objetivo_id()
-        nombre_obj = self.selector_objetivo.currentText().replace(" ", "_")
-        ruta, _ = QFileDialog.getSaveFileName(
-            self, "Guardar Excel",
-            f"reporte_{nombre_obj}_{anio}_{mes:02d}.xlsx",
-            "Excel (*.xlsx)"
-        )
-        if ruta:
-            self._set_controls_enabled(False)
-            self.estado_label.setText("Exportando a Excel...")
-            task = run_background_task(_exportar_excel_objetivo, anio, mes, objetivo_id, ruta, self._datos, self._filtros_dict())
-            task.signals.finished.connect(lambda _: self._on_export_exitoso(ruta))
-            task.signals.error.connect(self._on_error)
+        self._abrir_dialogo_exportar("excel")
 
     def _exportar_pdf(self) -> None:
+        self._abrir_dialogo_exportar("pdf")
+
+    def _abrir_dialogo_exportar(self, formato: str) -> None:
         mes, anio = self._get_mes_anio()
         objetivo_id = self._get_objetivo_id()
-        nombre_obj = self.selector_objetivo.currentText().replace(" ", "_")
-        ruta, _ = QFileDialog.getSaveFileName(
-            self, "Guardar PDF",
-            f"reporte_{nombre_obj}_{anio}_{mes:02d}.pdf",
-            "PDF (*.pdf)"
-        )
-        if ruta:
-            self._set_controls_enabled(False)
-            self.estado_label.setText("Exportando a PDF...")
-            task = run_background_task(_exportar_pdf_objetivo, anio, mes, objetivo_id, ruta, self._datos, self._filtros_dict())
-            task.signals.finished.connect(lambda _: self._on_export_exitoso(ruta))
-            task.signals.error.connect(self._on_error)
+        if objetivo_id is None:
+            QMessageBox.warning(
+                self, "Sin objetivos", "No hay un objetivo seleccionado para exportar."
+            )
+            return
+        filtros_iniciales = {
+            "objetivo_id": objetivo_id,
+            "supervisor_id": self.selector_supervisor.currentData(),
+            "turno": (
+                None
+                if self.selector_turno.currentText() == "Todos"
+                else self.selector_turno.currentText()
+            ),
+            "estado": self.selector_estado.currentText(),
+        }
+        estado = self.selector_estado.currentText()
 
-    def _on_export_exitoso(self, ruta: str) -> None:
-        QMessageBox.information(self, "Exportación completa", f"Archivo guardado en:\n{ruta}")
-        self.estado_label.setText("Exportación completada")
-        self._set_controls_enabled(True)
+        def proveedor(seleccion: dict):
+            inicio = seleccion["fecha_inicio"]
+            fin = seleccion["fecha_fin"]
+            if (
+                inicio != inicio.replace(day=1)
+                or fin.day != calendar.monthrange(fin.year, fin.month)[1]
+                or (inicio.year, inicio.month) != (fin.year, fin.month)
+            ):
+                raise ValueError(
+                    "El reporte por objetivo requiere el mes calendario completo."
+                )
+            objetivos_seleccionados = seleccion["objetivo_ids"]
+            ids_objetivo = (
+                [objetivo_id]
+                if objetivos_seleccionados is None
+                else objetivos_seleccionados
+            )
+            if len(ids_objetivo) != 1:
+                raise ValueError(
+                    "El reporte por objetivo debe incluir exactamente un objetivo."
+                )
+            supervisores = seleccion["supervisor_ids"]
+            turnos = seleccion["turnos"]
+            turno_unico = turnos[0] if len(turnos) == 1 else None
+            reporte = calcular_reporte_objetivo(
+                inicio.year,
+                inicio.month,
+                int(ids_objetivo[0]),
+                supervisor_ids=[int(valor) for valor in supervisores],
+                turnos=turnos,
+                equipo_id=seleccion["equipo_id"],
+                turno=turno_unico,
+                estado_filtro=estado,
+            )
+            return crear_datos_objetivo(
+                inicio.year,
+                inicio.month,
+                reporte,
+                {
+                    **filtros_iniciales,
+                    "objetivo_id": int(ids_objetivo[0]),
+                    "supervisor_ids": supervisores,
+                    "turnos": turnos,
+                    "equipo_id": seleccion["equipo_id"],
+                    "agrupacion": seleccion["agrupacion"],
+                },
+            )
+
+        mostrar_dialogo_exportar(
+            self,
+            "objetivo",
+            datetime.date(anio, mes, 1),
+            datetime.date(anio, mes, calendar.monthrange(anio, mes)[1]),
+            proveedor,
+            COLUMNAS_OBJETIVO,
+            filtros_iniciales=filtros_iniciales,
+            objetivos=self._objetivos,
+            supervisores=cargar_supervisores(),
+            equipos=cargar_equipos_reportables(),
+            formato_inicial=formato,
+        )

@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
 )
 
 from services.permisos import tiene_permiso
+from services.background_task import run_background_task
 from services.reportes_unificados.modelos import ColumnaReporte, ReporteDatos
 from ui.theme.theme_manager import ThemeManager
 
@@ -63,6 +64,8 @@ class DialogoExportar(QDialog):
         self._filtros_iniciales = dict(filtros_iniciales or {})
         self._datos_previa: ReporteDatos | None = None
         self._seleccion_previa: dict | None = None
+        self._tarea_previa = None
+        self._previsualizando = False
         self._columnas = tuple(columnas)
         self._theme_manager = ThemeManager.instance()
         self.setWindowTitle("Exportar")
@@ -137,6 +140,9 @@ class DialogoExportar(QDialog):
 
         self.lista_supervisores = self._crear_lista(supervisores)
         self.lista_supervisores.setMaximumHeight(110)
+        self.todos_supervisores = QCheckBox("Todos los supervisores")
+        self.todos_supervisores.setChecked(True)
+        self.todos_supervisores.toggled.connect(self._alternar_supervisores)
         self.lista_equipos = QComboBox()
         self.lista_equipos.addItem("Todos los equipos", None)
         for equipo_id, nombre in equipos:
@@ -153,6 +159,7 @@ class DialogoExportar(QDialog):
         grilla.addWidget(self.lista_objetivos, 2, 0, 1, 2)
         grilla.addWidget(QLabel("Supervisores:"), 0, 2)
         grilla.addWidget(self.lista_supervisores, 1, 2, 2, 1)
+        grilla.addWidget(self.todos_supervisores, 4, 2, 1, 1)
         grilla.addWidget(QLabel("Equipo:"), 3, 0)
         grilla.addWidget(self.lista_equipos, 3, 1)
         turnos = QHBoxLayout()
@@ -176,6 +183,7 @@ class DialogoExportar(QDialog):
     def _aplicar_filtro_inicial(self, filtros: Mapping[str, object]) -> None:
         supervisor_id = filtros.get("supervisor_id")
         if supervisor_id is not None:
+            self.todos_supervisores.setChecked(False)
             self._seleccionar_ids(self.lista_supervisores, {supervisor_id})
         objetivo_id = filtros.get("objetivo_id")
         if objetivo_id is not None:
@@ -202,6 +210,9 @@ class DialogoExportar(QDialog):
     def _alternar_objetivos(self, todos: bool) -> None:
         self.lista_objetivos.setEnabled(not todos)
         self.busqueda_objetivos.setEnabled(not todos)
+
+    def _alternar_supervisores(self, todos: bool) -> None:
+        self.lista_supervisores.setEnabled(not todos)
 
     def _filtrar_objetivos(self, texto: str) -> None:
         texto = texto.casefold().strip()
@@ -325,7 +336,11 @@ class DialogoExportar(QDialog):
             "fecha_inicio": desde,
             "fecha_fin": hasta,
             "objetivo_ids": objetivo_ids,
-            "supervisor_ids": self._ids_seleccionados(self.lista_supervisores),
+            "supervisor_ids": (
+                None
+                if self.todos_supervisores.isChecked()
+                else self._ids_seleccionados(self.lista_supervisores)
+            ),
             "equipo_id": self.lista_equipos.currentData(),
             "turnos": [
                 turno
@@ -368,7 +383,27 @@ class DialogoExportar(QDialog):
             return
         try:
             seleccion = self._selection()
-            datos = self._proveedor_vista_previa(seleccion)
+            if self._previsualizando:
+                return
+            self._previsualizando = True
+            self._datos_previa = None
+            self._seleccion_previa = None
+            self.cantidad_filas.setText("Preparando vista previa…")
+            self.boton_previsualizar.setEnabled(False)
+            self._tarea_previa = run_background_task(
+                self._proveedor_vista_previa, seleccion
+            )
+            self._tarea_previa.signals.finished.connect(
+                lambda datos: self._mostrar_vista_previa(datos, seleccion)
+            )
+            self._tarea_previa.signals.error.connect(self._error_vista_previa)
+        except Exception as error:
+            self._finalizar_previsualizacion()
+            logger.exception("No se pudo preparar la vista previa del informe")
+            QMessageBox.critical(self, "Error de vista previa", str(error))
+
+    def _mostrar_vista_previa(self, datos: ReporteDatos, seleccion: dict) -> None:
+        try:
             if seleccion["contenido"] == "detalle":
                 catalogo = datos.columnas_detalle or datos.columnas
                 filas = datos.filas_detalle or datos.filas
@@ -404,10 +439,21 @@ class DialogoExportar(QDialog):
             self._datos_previa = datos
             self._seleccion_previa = seleccion
         except Exception as error:
-            self._datos_previa = None
-            self._seleccion_previa = None
-            logger.exception("No se pudo preparar la vista previa del informe")
-            QMessageBox.critical(self, "Error de vista previa", str(error))
+            logger.exception("No se pudo mostrar la vista previa del informe")
+            self._error_vista_previa(str(error))
+            return
+        self._finalizar_previsualizacion()
+
+    def _error_vista_previa(self, mensaje: str) -> None:
+        logger.error("Falló la vista previa de exportación: %s", mensaje)
+        self._finalizar_previsualizacion()
+        self._datos_previa = None
+        self._seleccion_previa = None
+        QMessageBox.critical(self, "Error de vista previa", mensaje)
+
+    def _finalizar_previsualizacion(self) -> None:
+        self._previsualizando = False
+        self.boton_previsualizar.setEnabled(True)
 
     def _leer_plantillas(self) -> dict[str, dict]:
         from PyQt6.QtCore import QSettings
@@ -473,7 +519,10 @@ class DialogoExportar(QDialog):
             self.todos_objetivos.setChecked(datos["objetivo_ids"] is None)
             if datos["objetivo_ids"] is not None:
                 self._seleccionar_ids(self.lista_objetivos, set(datos["objetivo_ids"]))
-            self._seleccionar_ids(self.lista_supervisores, set(datos["supervisor_ids"]))
+            supervisores = datos.get("supervisor_ids")
+            self.todos_supervisores.setChecked(supervisores is None)
+            if supervisores is not None:
+                self._seleccionar_ids(self.lista_supervisores, set(supervisores))
             self.lista_equipos.setCurrentIndex(
                 self.lista_equipos.findData(datos["equipo_id"])
             )
@@ -536,7 +585,16 @@ class DialogoExportar(QDialog):
         """Devuelve una copia validada de la configuración elegida."""
         return self._selection()
 
+    def datos_previsualizados(self) -> ReporteDatos | None:
+        """Retorna la misma instantánea que se mostró en la vista previa."""
+        return self._datos_previa
+
     def accept(self) -> None:
+        if self._previsualizando:
+            QMessageBox.information(
+                self, "Vista previa", "Esperá a que termine la vista previa."
+            )
+            return
         try:
             seleccion = self._selection()
         except ValueError as error:
@@ -574,4 +632,24 @@ class DialogoExportar(QDialog):
                 "No hay datos para el período y los filtros seleccionados.",
             )
             return
+        if contenido == "ambos":
+            seleccionadas = set(seleccion["columnas"])
+            if self._datos_previa.filas and not seleccionadas.intersection(
+                columna.id for columna in self._datos_previa.columnas
+            ):
+                QMessageBox.warning(
+                    self,
+                    "Columnas",
+                    "Elegí al menos una columna disponible en el resumen.",
+                )
+                return
+            if self._datos_previa.filas_detalle and not seleccionadas.intersection(
+                columna.id for columna in self._datos_previa.columnas_detalle
+            ):
+                QMessageBox.warning(
+                    self,
+                    "Columnas",
+                    "Elegí al menos una columna disponible en el detalle.",
+                )
+                return
         super().accept()

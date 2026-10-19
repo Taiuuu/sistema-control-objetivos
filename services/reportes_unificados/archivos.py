@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+from contextlib import closing
 from pathlib import Path
 from typing import Sequence
 
@@ -130,6 +131,8 @@ def guardar_reporte(
             raise FileExistsError(mensaje_error_exportacion(error)) from error
         if isinstance(error, PermissionError):
             raise PermissionError(mensaje_error_exportacion(error)) from error
+        if isinstance(error, OSError) and error.errno == 22:
+            raise OSError(22, mensaje_error_exportacion(error)) from error
         raise
 
 
@@ -159,7 +162,7 @@ def _registrar_exportacion(
         ensure_ascii=False,
         default=str,
     )
-    with db.conectar() as conexion:
+    with closing(db.conectar()) as conexion:
         conexion.execute(
             """
             INSERT INTO auditoria (
@@ -173,3 +176,4 @@ def _registrar_exportacion(
                 detalles,
             ),
         )
+        conexion.commit()

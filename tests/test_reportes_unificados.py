@@ -1,12 +1,14 @@
 """Pruebas del contrato común de datos para los informes exportables."""
 
 import datetime
+import json
 import re
 import sqlite3
 
 import pytest
 from openpyxl import load_workbook
 
+from services.reportes_unificados import pdf as pdf_reportes
 from services.reportes_unificados.datos import (
     crear_datos_diarios,
     crear_datos_detalle,
@@ -229,6 +231,87 @@ def test_detalle_aplica_filtros_de_objetivo_supervisor_y_turno(
     assert len(sin_coincidencias.filas) == 0
 
 
+def test_resumen_mensual_usa_la_misma_seleccion_de_filtros(
+    db_initialized, test_objetivo, test_supervisor
+):
+    from services.reportes_unificados.consultas import crear_datos_para_exportar
+
+    with sqlite3.connect(db_initialized) as conexion:
+        cursor = conexion.execute(
+            "INSERT INTO objetivos (nombre, dias_semana) VALUES (?, ?)",
+            ("Objetivo sin seleccionar", "1,2,3,4,5"),
+        )
+        otro_objetivo = cursor.lastrowid
+        conexion.execute(
+            "INSERT INTO supervisores (nombre) VALUES (?)",
+            ("Supervisor excluido",),
+        )
+        otro_supervisor = conexion.execute(
+            "SELECT id FROM supervisores WHERE nombre = ?",
+            ("Supervisor excluido",),
+        ).fetchone()[0]
+        conexion.executemany(
+            """
+            INSERT INTO pasadas
+                (fecha, fecha_operativa, hora, turno, objetivo_id, supervisor_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    "2026-10-28",
+                    "2026-10-28",
+                    "10:00",
+                    "diurno",
+                    test_objetivo["id"],
+                    test_supervisor["id"],
+                ),
+                (
+                    "2026-10-28",
+                    "2026-10-28",
+                    "22:00",
+                    "nocturno",
+                    test_objetivo["id"],
+                    otro_supervisor,
+                ),
+                (
+                    "2026-10-28",
+                    "2026-10-28",
+                    "11:00",
+                    "diurno",
+                    otro_objetivo,
+                    test_supervisor["id"],
+                ),
+            ],
+        )
+
+    datos = crear_datos_para_exportar(
+        {
+            "tipo_informe": "mensual",
+            "fecha_inicio": datetime.date(2026, 10, 1),
+            "fecha_fin": datetime.date(2026, 10, 31),
+            "objetivo_ids": [test_objetivo["id"]],
+            "supervisor_ids": [test_supervisor["id"]],
+            "turnos": ["diurno"],
+            "equipo_id": None,
+            "agrupacion": "supervisor",
+        }
+    )
+
+    assert [fila["objetivo"] for fila in datos.filas] == [test_objetivo["nombre"]]
+    assert datos.filas[0]["dias_con_pasada"] == 1
+    assert datos.filas[0]["pasadas_diurnas"] == 1
+    assert datos.filas[0]["pasadas_nocturnas"] == 0
+    assert len(datos.filas_detalle) == 1
+    assert datos.subtotales == (
+        {
+            "agrupacion": "supervisor",
+            "valor": test_supervisor["nombre"],
+            "etiqueta": test_supervisor["nombre"],
+            "pasadas": 1,
+        },
+    )
+
+
 def test_excel_usa_el_objeto_comun_respetando_orden_y_tipos(tmp_path):
     datos = crear_datos_mensuales(
         {
@@ -310,7 +393,9 @@ def test_excel_usa_el_objeto_comun_respetando_orden_y_tipos(tmp_path):
     assert resumen.column_dimensions["A"].width >= 34
 
 
-def test_pdf_pagina_tablas_largas_y_texto_unicode(tmp_path):
+def test_excel_y_pdf_conservan_los_mismos_datos_en_tablas_largas(
+    tmp_path, monkeypatch
+):
     reporte = {
         "anio": 2026,
         "mes": 10,
@@ -328,16 +413,34 @@ def test_pdf_pagina_tablas_largas_y_texto_unicode(tmp_path):
         ],
     }
     datos = crear_datos_mensuales(reporte)
-    ruta = tmp_path / "reporte.pdf"
+    ruta_pdf = tmp_path / "reporte.pdf"
+    ruta_excel = tmp_path / "reporte.xlsx"
+    valores_pdf = []
+    texto_celda_original = pdf_reportes._texto_celda
 
-    exportar_pdf(datos, ruta, contenido="resumen")
+    def registrar_texto(valor, columna):
+        texto = texto_celda_original(valor, columna)
+        valores_pdf.append(texto)
+        return texto
 
-    contenido_pdf = ruta.read_bytes()
+    monkeypatch.setattr(pdf_reportes, "_texto_celda", registrar_texto)
+
+    exportar_excel(datos, ruta_excel, contenido="resumen")
+    exportar_pdf(datos, ruta_pdf, contenido="resumen")
+
+    contenido_pdf = ruta_pdf.read_bytes()
     paginas = len(re.findall(rb"/Type\s*/Page\b", contenido_pdf))
     assert contenido_pdf.startswith(b"%PDF-")
     assert paginas >= 2
     assert len(datos.filas) == 80
     assert datos.filas[0]["objetivo"].startswith("Objetivo Ñ")
+    assert any("Objetivo Ñ 1" in valor for valor in valores_pdf)
+    assert "60.0%" in valores_pdf
+    libro = load_workbook(ruta_excel, data_only=True)
+    hoja = libro["Resumen"]
+    assert hoja["C6"].value == 6
+    assert hoja["C86"].value == 480
+    libro.close()
 
 
 def test_nombre_sugerido_sanitiza_caracteres_y_respeta_limite():
@@ -394,3 +497,126 @@ def test_guardar_reporte_rechaza_usuario_sin_permiso(tmp_path, monkeypatch):
         archivos_reportes.guardar_reporte(
             None, tmp_path / "reporte.xlsx", "excel"
         )
+
+
+def test_error_de_permiso_al_escribir_se_traduce_y_no_deja_archivo(
+    tmp_path, monkeypatch
+):
+    datos = crear_datos_mensuales(
+        {
+            "anio": 2026,
+            "mes": 10,
+            "cumplimiento_total": 100.0,
+            "objetivos": [
+                {
+                    "nombre": "Objetivo",
+                    "dias_esperados": 1,
+                    "dias_con_pasada": 1,
+                    "dias_sin_pasada": 0,
+                    "cumplimiento_porcentaje": 100.0,
+                }
+            ],
+        }
+    )
+    monkeypatch.setattr(archivos_reportes, "tiene_permiso", lambda _: True)
+    monkeypatch.setattr(
+        archivos_reportes,
+        "_registrar_exportacion",
+        lambda *args: None,
+    )
+    monkeypatch.setattr(
+        archivos_reportes.os,
+        "open",
+        lambda *args, **kwargs: (_ for _ in ()).throw(PermissionError("ocupado")),
+    )
+    ruta = tmp_path / "ocupado.xlsx"
+
+    with pytest.raises(PermissionError, match="abierto en Excel"):
+        archivos_reportes.guardar_reporte(
+            datos, ruta, "excel", contenido="resumen"
+        )
+    assert not ruta.exists()
+
+
+def test_registrar_exportacion_guarda_usuario_filtros_y_archivo(
+    tmp_path, monkeypatch
+):
+    from database import db
+    import services.sesion as sesion
+
+    ruta_db = tmp_path / "auditoria.sqlite"
+    with sqlite3.connect(ruta_db) as conexion:
+        conexion.execute("CREATE TABLE usuarios (id INTEGER, username TEXT)")
+        conexion.execute("INSERT INTO usuarios VALUES (27, 'usuario_prueba')")
+        conexion.execute(
+            """
+            CREATE TABLE auditoria (
+                id INTEGER PRIMARY KEY,
+                fecha TEXT, hora TEXT, usuario_id INTEGER, tipo_operacion TEXT,
+                tabla TEXT, detalles TEXT, estado TEXT
+            )
+            """
+        )
+    monkeypatch.setattr(db, "DB_PATH", str(ruta_db))
+    monkeypatch.setattr(sesion, "get_usuario_id", lambda: 27)
+    datos = crear_datos_mensuales(
+        {
+            "anio": 2026,
+            "mes": 10,
+            "cumplimiento_total": 100.0,
+            "objetivos": [],
+        },
+        filtros={"supervisor_ids": [27]},
+    )
+    ruta = tmp_path / "reporte.xlsx"
+
+    archivos_reportes._registrar_exportacion(
+        datos, ruta, "excel", ["objetivo"], "resumen"
+    )
+
+    with sqlite3.connect(ruta_db) as conexion:
+        fila = conexion.execute(
+            "SELECT usuario_id, tipo_operacion, tabla, detalles, estado "
+            "FROM auditoria"
+        ).fetchone()
+    detalles = json.loads(fila[3])
+    assert fila[:3] == (27, "EXPORTACION", "reportes")
+    assert detalles["filtros"] == {"supervisor_ids": [27]}
+    assert detalles["archivo"] == str(ruta)
+    assert fila[4] == "EXITOSO"
+
+
+def test_calculo_por_objetivo_usa_el_servicio_compartido(
+    db_initialized, test_objetivo, admin_user, test_supervisor
+):
+    from services.reportes_unificados.objetivo import calcular_reporte_objetivo
+
+    with sqlite3.connect(db_initialized) as conexion:
+        conexion.execute(
+            """
+            INSERT INTO pasadas
+                (fecha, fecha_operativa, hora, turno, objetivo_id, supervisor_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "2026-10-28",
+                "2026-10-28",
+                "10:00",
+                "diurno",
+                test_objetivo["id"],
+                test_supervisor["id"],
+            ),
+        )
+
+    reporte = calcular_reporte_objetivo(
+        2026,
+        10,
+        test_objetivo["id"],
+        ruta_db=db_initialized,
+    )
+
+    fila = next(
+        dia for dia in reporte["dias"] if dia["fecha"] == "28/10/2026"
+    )
+    assert fila["estado"] == "Solo diurno"
+    assert "Supervisor Test" in fila["diurno"]

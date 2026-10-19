@@ -19,6 +19,8 @@ from services.reportes_unificados.archivos import (
     nombre_sugerido,
     sanitizar_nombre_archivo,
 )
+from services.reportes_unificados.consultas import crear_datos_para_exportar
+from services.reportes_unificados.objetivo import calcular_reporte_objetivo
 
 __all__ = [
     "ColumnaReporte",
@@ -28,6 +30,8 @@ __all__ = [
     "crear_datos_detalle",
     "crear_datos_mensuales",
     "crear_datos_objetivo",
+    "crear_datos_para_exportar",
+    "calcular_reporte_objetivo",
     "exportar_excel",
     "exportar_pdf",
     "guardar_reporte",
