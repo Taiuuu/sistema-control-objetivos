@@ -13,7 +13,7 @@ Archivos clave:
 | Copias, verificación, retención o restauración | [backups.md](./backups.md) |
 | Servicios, caché o proveedor de datos | [services.md](./services.md) |
 | Esquema SQLite, conexión o migración | [database.md](./database.md) |
-| Ventanas, pantallas, atajos o temas | [ui.md](./ui.md) y [ui-theme.md](./ui-theme.md) |
+| Interfaz, navegación, configuración, atajos o temas | [ui.md](./ui.md) y [ui-theme.md](./ui-theme.md) |
 | API Flask, JWT, rate limit o SSE | [api.md](./api.md) |
 | Usuarios, roles, permisos, sesiones o auditoría | [seguridad_y_usuarios.md](./seguridad_y_usuarios.md) |
 | Reportes, selección de datos o exportación Excel/PDF | [reportes.md](./reportes.md), [calculo.md](./calculo.md) y [reglas_de_calculo.md](../reglas_de_calculo.md) |

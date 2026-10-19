@@ -15,7 +15,8 @@ reportes de cumplimiento e importar recorridos desde Excel.
 - Reportes mensuales, diarios y por objetivo con exportación a Excel y PDF.
 - Usuarios con roles y permisos (`admin`, `supervisor`, `auditor`, `gerente` y `operador`), auditoría y control de sesiones.
 - Feriados, notas diarias, copias de seguridad verificadas y restauración.
-- Interfaz PyQt6 con temas claro y oscuro.
+- Interfaz PyQt6 con cuatro temas institucionales (Claro, Verde, Negro y Grafito), pantalla
+  de inicio, navegación organizada por secciones y configuración unificada.
 
 ## Integridad de la importación VESP
 
@@ -119,11 +120,24 @@ python scripts/main.py
 ```
 
 En el primer inicio se crea o actualiza la base SQLite local, se ejecutan las migraciones y se
-abre la pantalla de login. La instalación crea una cuenta administradora inicial y exige
-cambiar su contraseña en el primer acceso. No se documentan aquí las credenciales iniciales.
+abre la pantalla de login. Ingresá con las credenciales asignadas por la administración; si
+el sistema solicita cambiar la contraseña, completá ese paso para continuar. Después del
+login se abre **Inicio**, con accesos a las secciones permitidas para tu rol.
 
 ![Pantalla principal de VESP Organizations](docs/img/pantalla-principal.png)
 ![Reporte de cumplimiento](docs/img/reporte-cumplimiento.png)
+
+### Interfaz y personalización
+
+La pantalla **Inicio** permite entrar a las secciones disponibles para el rol. El menú lateral
+agrupa el trabajo diario, objetivos y supervisores, reportes, importación y administración;
+**Configuración** queda en una única entrada.
+
+En **Configuración** podés elegir uno de los cuatro temas, ajustar el tamaño de letra y reducir
+las animaciones. El tema se aplica a la aplicación sin reiniciarla. Las pestañas **Funciones
+visibles**, **Backups y datos**, **Cuenta** y **Acerca de** reúnen las demás preferencias.
+Ocultar una función solo quita su acceso del menú: no cambia permisos, datos ni el registro
+de auditoría. La ayuda **Atajos de teclado** está en Configuración y también se abre con `F1`.
 
 ### Reportes y exportación
 

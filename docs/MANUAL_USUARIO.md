@@ -19,42 +19,46 @@ python scripts/main.py
 
 ### 2. Pantalla de Login
 
-- **Usuario**: `admin` (usuario por defecto)
-- **Contraseña**: `0000` (contraseña por defecto)
-- **Botón**: Haz clic en "Entrar" o presiona Enter
+- Ingresá con las credenciales que te asignó la administración.
+- La ventana es fija y se centra en la pantalla. Presioná **Entrar** o la tecla `Enter`.
+- Si la aplicación solicita cambiar la contraseña, completá el formulario para continuar.
 
-**Advertencia:** Debes cambiar la contraseña del admin en la primera sesión
-
-### 3. Cambiar Contraseña (Primera Vez)
-
-Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
-
-1. Ingresa nueva contraseña (mínimo 4 caracteres)
-2. Confirma la contraseña
-3. Haz clic en "Cambiar"
+Después de iniciar sesión se abre **Inicio**, con accesos a las secciones disponibles para
+tu rol.
 
 ---
 
 ## 📋 FUNCIONES PRINCIPALES
 
+### Inicio y menú lateral
+
+**Inicio** es la pantalla de entrada después del login. Sus tarjetas muestran accesos según
+tu rol y las funciones visibles que tengas seleccionadas. El menú lateral agrupa las
+secciones de operación diaria, objetivos y supervisores, reportes, importación y datos, y
+administración. **Configuración** es una única opción al pie del menú.
+
 ### Control diario
 
-- **Ubicación**: Menú principal → "Control diario"
+- **Ubicación**: **Inicio** o menú lateral → "Control diario"
 - **Qué ves**: Resumen de objetivos, equipos, supervisores
 - **Para qué**: Vista general del estado del sistema
-- **Filtros**: Fecha, búsqueda y turno están visibles; supervisor y estado se encuentran en "Más filtros"
+- **Filtros**: fecha y búsqueda están visibles. Supervisor, turno y estado están en
+  **Más filtros**, que indica cuántos filtros adicionales están activos; usá el botón
+  **Limpiar filtros** para restablecerlos.
 
 ### Objetivos
 
-- **Crear**: Menú → "Nuevo Objetivo"
-- **Editar**: Tabla → Selecciona objetivo → "Editar"
-- **Listar**: Menú → "Objetivos"
+- **Crear**: "Agregar objetivo" en la pantalla **Ver objetivos** o el acceso correspondiente en **Inicio**
+- **Listar**: menú lateral → "Ver objetivos"
+- **Consultar**: las pestañas **Objetivos actuales**, **Objetivos finalizados** y **Todos** filtran la tabla; **Objetivos actuales** se abre por defecto
+- **Editar**: seleccioná el objetivo en la tabla y elegí la acción de edición
+- **Dar de baja**: abrí el menú contextual del objetivo y elegí **Dar de baja**; confirmá la acción en el diálogo que muestra el nombre del objetivo
 
 ### Equipos y Supervisores
 
-- **Crear equipo**: Menú → "Nuevo Equipo"
-- **Crear supervisor**: Menú → "Nuevo Supervisor"
-- **Listar**: Menú → "Equipos" o "Supervisores"
+- **Crear supervisor**: menú lateral → "Agregar supervisor"
+- **Listar**: menú lateral → "Ver supervisores"
+- Las opciones disponibles dependen del rol. Los equipos se administran desde las pantallas y permisos que tenga habilitados tu cuenta.
 
 ### Registros históricos incompletos
 
@@ -67,14 +71,14 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 - **Mensual**: Menú → "Reporte Mensual"
 - **Por objetivo**: Menú → "Reporte Objetivo"
 - **Detalle diario**: Menú → "Lista de pasadas", seleccioná el día
-- **Exportar**: en cualquiera de esas pantallas, usá "Exportar Excel" o "Exportar PDF";
-  ambas opciones abren el mismo diálogo y respetan los filtros ya aplicados
+- **Exportar**: en cualquiera de esas pantallas, usá **Exportar**; abre el mismo diálogo y
+  toma los filtros ya aplicados
 
 #### Elegir y generar un informe
 
 1. Abrí **Reporte Mensual**, **Reporte Objetivo** o **Lista de pasadas** y establecé los
    filtros de la pantalla. En Lista de pasadas elegí la fecha que querés incluir.
-2. Presioná **Exportar Excel** o **Exportar PDF**. En el diálogo **Exportar**, ajustá el
+2. Presioná **Exportar**. En el diálogo **Exportar**, ajustá el
    período: mes, rango de fechas o día. El resumen mensual exige el mes calendario completo;
    el reporte por objetivo exige un mes completo y un solo objetivo.
 3. Elegí todos los objetivos o una selección (podés buscarlos), todos o algunos
@@ -107,9 +111,18 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 
 ### Configuración
 
-- **Tema y tamaño de letra**: Abrí "Configuración" desde la parte inferior del menú
-- **Módulos visibles**: En "Configuración" → "Personalizar módulos", ocultá o recuperá accesos disponibles para tu rol
-- **Administración**: Las opciones de usuarios, historial, auditoría y sincronización aparecen según los permisos del rol
+- Abrí la única opción **Configuración** en la parte inferior del menú lateral.
+- **Temas**: elegí Claro, Verde, Negro o Grafito. El cambio se aplica sin reiniciar y cada
+  tema muestra el logo correspondiente. En esta pestaña también podés ajustar el tamaño de
+  letra y activar **Reducir animaciones**.
+- **Funciones visibles**: elegí qué accesos mostrar en el menú. Solo se oculta el acceso;
+  no cambian los permisos, los datos ni el registro de auditoría. Las opciones disponibles
+  respetan tu rol.
+- **Backups y datos**: creá o restaurá copias verificadas y configurá, si corresponde, una
+  ubicación externa.
+- **Cuenta**: cambiá la contraseña de tu usuario.
+- **Acerca de**: muestra el nombre y propósito de la aplicación.
+- **Atajos de teclado**: abrí el botón de ayuda en **Funciones visibles** o presioná `F1`.
 
 ---
 
@@ -184,8 +197,9 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 
 ### Cambiar Tema
 
-- En Configuración → Temas, elegí Blanco, Verde, Negro o Grafito
-- El tema elegido se guarda automáticamente
+- En **Configuración** → **Temas**, elegí Claro, Verde, Negro o Grafito.
+- El tema elegido se guarda y se aplica inmediatamente en la aplicación.
+- No hay un interruptor separado de modo oscuro/claro.
 
 ### Validar Índices y Caché
 
@@ -211,14 +225,17 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 
 ## ⌨️ ATAJOS DE TECLADO
 
+La lista completa está en **Configuración** → **Funciones visibles** → **Atajos de teclado**;
+podés abrirla desde cualquier pantalla con `F1` o `Ctrl+H`.
+
 | Tecla         | Acción                            |
 | ------------- | --------------------------------  |
 | `Ctrl+F` | Enfocar el buscador de la pantalla actual, cuando exista. |
 | `Ctrl+E` | Abrir las opciones de exportación en pantallas compatibles. |
 | `Ctrl+N` | Crear un registro en pantallas que admiten altas, como pasadas y objetivos. |
 | `F5` | Actualizar la pantalla actual; en reportes vuelve a generarlos. |
-| `Esc` | Limpiar la búsqueda activa o cerrar la ventana actual. |
-| `Ctrl+1` a `Ctrl+9` | Abrir la opción correspondiente entre las primeras nueve visibles del menú. |
+| `Esc` | Limpiar la búsqueda si contiene texto; si no, cerrar la ventana actual. |
+| `Ctrl+1` a `Ctrl+9` | Abrir una de las primeras nueve opciones visibles del menú. |
 | `F1` o `Ctrl+H` | Abrir la ayuda y la tabla completa de atajos. |
 | `Ctrl+P` | Registrar una pasada desde la ventana principal. |
 | `Ctrl+O` | Agregar un objetivo desde la ventana principal. |
@@ -233,17 +250,18 @@ Después del login, se abrirá la pantalla de cambio de contraseña obligatorio:
 
 Los atajos de acción se ignoran mientras el foco está en un campo de texto para no
 interrumpir la escritura. Los atajos contextuales se aplican solo a las pantallas que
-ofrecen la acción; la ayuda muestra el catálogo común.
+ofrecen la acción; los tooltips indican los atajos disponibles.
 
 ---
 
 ## 🔧 CONFIGURACIÓN
 
+- **Inicio**: muestra accesos grandes a las secciones permitidas para tu rol.
 - **Funciones visibles**: elegí qué accesos aparecen en el menú; ocultar una opción no
   cambia permisos ni desactiva registros de auditoría.
-- **Backups y datos**: revisá copias verificadas, creá una copia o configurá una ruta externa.
-- **Cuenta**: cambiá la contraseña de tu usuario.
-- **Ayuda**: abrí Atajos de teclado desde Configuración o presioná `F1`.
+- **Objetivos**: usá las pestañas actuales/finalizados/todos para elegir qué objetivos ver.
+- **Configuración**: concentra Temas, Funciones visibles, Backups y datos, Cuenta y Acerca de.
+- **Atajos**: consultá la tabla en Configuración o presioná `F1`.
 
 ---
 
