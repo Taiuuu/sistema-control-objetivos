@@ -15,6 +15,7 @@ from services.auditoria import registrar_auditoria, TipoOperacion
 from datetime import datetime
 from ui.components import StatusBadge
 from ui.components.base import wrap_content_in_glass_card
+from ui.feedback import mostrar_error_usuario
 
 
 class VistaIndexacion(QWidget):
@@ -42,15 +43,18 @@ class VistaIndexacion(QWidget):
         botones_layout = QHBoxLayout()
         
         btn_actualizar = QPushButton("🔄 Actualizar Análisis")
+        btn_actualizar.setToolTip("Actualizar estadísticas e índices de la base")
         btn_actualizar.clicked.connect(self.actualizar_datos)
         botones_layout.addWidget(btn_actualizar)
         
         self.btn_optimizar = QPushButton("⚡ Optimizar BD Ahora")
+        self.btn_optimizar.setToolTip("Optimizar la base de datos")
         self.btn_optimizar.setObjectName("PrimaryButton")
         self.btn_optimizar.clicked.connect(self.optimizar_bd)
         botones_layout.addWidget(self.btn_optimizar)
         
         btn_exportar = QPushButton("📄 Exportar Reporte")
+        btn_exportar.setToolTip("Guardar el reporte de optimización")
         btn_exportar.clicked.connect(self.exportar_reporte)
         botones_layout.addWidget(btn_exportar)
         
@@ -152,6 +156,7 @@ class VistaIndexacion(QWidget):
         botones_layout = QHBoxLayout()
         
         btn_borrar = QPushButton("🗑️ Eliminar Índice Seleccionado")
+        btn_borrar.setToolTip("Eliminar el índice seleccionado")
         btn_borrar.clicked.connect(self.eliminar_indice_seleccionado)
         botones_layout.addWidget(btn_borrar)
         
@@ -230,7 +235,12 @@ class VistaIndexacion(QWidget):
             self.texto_reporte.setText(reporte)
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error actualizando datos: {e}")
+            mostrar_error_usuario(
+                self,
+                "No se actualizaron los datos",
+                "No se pudo actualizar el análisis de la base de datos.",
+                e,
+            )
 
     def _actualizar_stats(self):
         """Actualiza la tabla de estadísticas."""
@@ -429,7 +439,12 @@ class VistaIndexacion(QWidget):
         self.btn_optimizar.setEnabled(True)
 
         if not resultado["exitoso"]:
-            QMessageBox.critical(self, "Error", f"Error: {resultado.get('error')}")
+            mostrar_error_usuario(
+                self,
+                "No se completó la optimización",
+                "No se pudo optimizar la base de datos.",
+                str(resultado.get("error") or "Error desconocido"),
+            )
             return
 
         try:
@@ -445,12 +460,22 @@ class VistaIndexacion(QWidget):
             QMessageBox.information(self, "Éxito", "BD optimizada correctamente")
             self.actualizar_datos()
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error al optimizar: {e}")
+            mostrar_error_usuario(
+                self,
+                "No se registró la optimización",
+                "La base se optimizó, pero no se pudo registrar la operación.",
+                e,
+            )
 
     def _error_optimizacion(self, error):
         self._tarea_optimizacion = None
         self.btn_optimizar.setEnabled(True)
-        QMessageBox.critical(self, "Error", f"Error al optimizar: {error}")
+        mostrar_error_usuario(
+            self,
+            "No se completó la optimización",
+            "No se pudo optimizar la base de datos.",
+            error,
+        )
 
     def exportar_reporte(self):
         """Exporta el reporte a archivo."""
@@ -473,4 +498,9 @@ class VistaIndexacion(QWidget):
             
             QMessageBox.information(self, "Éxito", f"Reporte exportado a:\n{ruta}")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error al exportar: {e}")
+            mostrar_error_usuario(
+                self,
+                "No se exportó el reporte",
+                "No se pudo exportar el reporte de optimización.",
+                e,
+            )

@@ -25,6 +25,7 @@ from services.background_task import run_background_task
 from services.usuarios import listar_usuarios, obtener_usuario_por_id
 from ui.atajos import registrar_atajo
 from ui.tabla_lotes import cargar_tabla_en_lotes
+from ui.feedback import mostrar_error_usuario
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +102,7 @@ class VistaAuditoria(QWidget):
         # Botón exportar
         controles.addStretch()
         btn_exportar = QPushButton("📊 Exportar CSV")
+        btn_exportar.setToolTip("Exportar el historial de auditoría a CSV")
         btn_exportar.setObjectName("PrimaryButton")
         btn_exportar.clicked.connect(self._exportar_auditoria)
         controles.addWidget(btn_exportar)
@@ -149,6 +151,7 @@ class VistaAuditoria(QWidget):
         self.texto_integridad = QTextEdit()
         self.texto_integridad.setReadOnly(True)
         btn_validar = QPushButton("🔍 Validar Integridad")
+        btn_validar.setToolTip("Comprobar la integridad de los registros de auditoría")
         btn_validar.clicked.connect(self._validar_integridad)
         layout_integridad.addWidget(btn_validar)
         layout_integridad.addWidget(self.texto_integridad)
@@ -292,10 +295,12 @@ class VistaAuditoria(QWidget):
         self.tabla_auditoria.setEnabled(True)
         self.barra_carga.hide()
         self.estado_carga.setText("No se pudo cargar la auditoría.")
-        QMessageBox.critical(
-            self, "Error", "No se pudieron cargar los datos de auditoría."
+        mostrar_error_usuario(
+            self,
+            "No se cargó la auditoría",
+            "No se pudieron cargar los datos de auditoría.",
+            mensaje,
         )
-        logger.error("No se pudo cargar la auditoría: %s", mensaje)
 
     def _mostrar_registros(
         self, registros: list, nombres: dict, solicitud: int
@@ -336,7 +341,9 @@ class VistaAuditoria(QWidget):
                 self.tabla_auditoria.setCellWidget(i, 7, btn)
 
             except Exception as e:
-                print(f"Error mostrando registro {i}: {e}")
+                logger.error(
+                    "No se pudo mostrar el registro de auditoría %s: %s", i, e
+                )
 
         self._timer_render = cargar_tabla_en_lotes(
             self.tabla_auditoria,
@@ -391,7 +398,10 @@ class VistaAuditoria(QWidget):
             self.tabs.setCurrentIndex(1)
 
         except Exception as e:
-            self.texto_cambios.setText(f"Error procesando cambios: {e}")
+            logger.error("No se pudieron procesar los cambios de auditoría: %s", e)
+            self.texto_cambios.setText(
+                "No se pudieron procesar los detalles de este cambio."
+            )
 
     def _validar_integridad(self) -> None:
         """Valida la integridad de la auditoría."""

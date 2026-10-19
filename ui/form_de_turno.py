@@ -13,6 +13,7 @@ from PyQt6.QtCore import QDate, Qt, pyqtSignal
 from ui.animaciones import animar_entrada
 from models.equipos import guardar_equipo_turno
 from ui.components import GlassCard, PillButton
+from ui.feedback import mostrar_error_usuario
 from ui.components.calendar import configure_calendar_theme
 
 
@@ -193,7 +194,12 @@ class FormTurno(QWidget):
         try:
             guardar_equipo_turno(fecha, turno, sup1, sup2, sup3)
         except Exception as error:
-            QMessageBox.critical(self, "Error", f"No se pudo guardar el turno: {error}")
+            mostrar_error_usuario(
+                self,
+                "No se guardó el turno",
+                "No se pudo guardar el equipo del turno. Revisá los datos e intentá nuevamente.",
+                error,
+            )
             return
         self.turno_registrado.emit()
         QMessageBox.information(self, "Listo", "Turno registrado correctamente.")

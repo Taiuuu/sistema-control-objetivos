@@ -13,6 +13,7 @@ from ui.animaciones import animar_entrada
 from models.objetivos import agregar_objetivo
 from services.validaciones import validar_objetivo, ErrorValidacion
 from ui.components import GlassCard, PillButton
+from ui.feedback import mostrar_error_usuario
 from ui.components.calendar import configure_calendar_theme
 from ui.theme.theme_manager import get_theme_manager
 
@@ -183,7 +184,12 @@ class FormObjetivo(QWidget):
         try:
             agregar_objetivo(nombre, inicio, dias_str, fecha_fin, self.selector_tipo.currentData())
         except Exception as error:
-            QMessageBox.critical(self, "Error", f"No se pudo guardar el objetivo: {error}")
+            mostrar_error_usuario(
+                self,
+                "No se guardó el objetivo",
+                "No se pudo guardar el objetivo. Revisá los datos e intentá nuevamente.",
+                error,
+            )
             return
 
         from services.logger import registrar_accion

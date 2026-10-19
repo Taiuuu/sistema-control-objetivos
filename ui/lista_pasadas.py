@@ -37,6 +37,7 @@ from ui.components import GlassCard, PillButton, SearchInput, StatusBadge
 from ui.components.calendar import configure_calendar_theme
 from ui.components.base import wrap_content_in_glass_card
 from ui.tabla_lotes import cargar_tabla_en_lotes
+from ui.feedback import mostrar_error_usuario
 
 logger = logging.getLogger(__name__)
 
@@ -694,6 +695,7 @@ class ListaPasadas(QWidget):
             boton_acciones = QPushButton("⋯")
             boton_acciones.setObjectName("ObjectiveActions")
             boton_acciones.setToolTip("Acciones de la pasada")
+            boton_acciones.setAccessibleName(f"Acciones para la pasada {pasada_id}")
             boton_acciones.setMenu(menu)
             self.tabla.setCellWidget(fila, 4, self._centrar_widget(boton_acciones))
 
@@ -803,10 +805,12 @@ class ListaPasadas(QWidget):
         try:
             eliminadas = _eliminar_pasadas_por_fecha(fecha)
         except Exception as error:
-            QMessageBox.critical(
+            mostrar_error_usuario(
                 self,
                 "No se borraron las pasadas",
-                f"No se pudo crear la copia previa o completar el borrado:\n{error}",
+                "No se pudo crear la copia previa o completar el borrado. "
+                "No se modificaron las pasadas.",
+                error,
             )
             return
         from services.logger import registrar_accion
@@ -844,7 +848,12 @@ class ListaPasadas(QWidget):
         try:
             vista = _vista_previa_pasadas_mes(año, mes)
         except Exception as error:
-            QMessageBox.critical(self, "Error", f"No se pudo preparar la vista previa:\n{error}")
+            mostrar_error_usuario(
+                self,
+                "No se pudo preparar el borrado",
+                "No se pudo preparar la vista previa. No se modificaron las pasadas.",
+                error,
+            )
             return
 
         respuesta = QMessageBox.question(
@@ -871,10 +880,12 @@ class ListaPasadas(QWidget):
         try:
             eliminadas = _eliminar_pasadas_por_mes(año, mes, confirmacion)
         except Exception as error:
-            QMessageBox.critical(
+            mostrar_error_usuario(
                 self,
                 "No se borraron las pasadas",
-                f"No se pudo crear/verificar la copia previa o completar el borrado:\n{error}",
+                "No se pudo crear o verificar la copia previa, o completar el borrado. "
+                "No se modificaron las pasadas.",
+                error,
             )
             return
         from services.logger import registrar_accion

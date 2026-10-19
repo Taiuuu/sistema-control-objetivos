@@ -5,6 +5,7 @@
 
 import sqlite3
 import bcrypt
+import logging
 import re
 import time
 import hashlib
@@ -22,6 +23,9 @@ from ui.animaciones import animar_entrada
 from ui.theme.theme_manager import get_theme_manager
 from ui.theme.tokens import THEMES
 from ui.components import GlassCard, PillButton, ThemeLogo
+from ui.feedback import mostrar_error_usuario
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -173,18 +177,16 @@ def verificar_login(username: str, password: str, ip_address: str = "localhost")
             # Error en validación de hash bcrypt - posible corrupción de datos
             from services.logger import registrar_accion
             registrar_accion(resultado[0], f"⚠️ Error bcrypt en login desde {ip_address}: {e}")
-            print(f"❌ Error bcrypt para usuario {username}: {e}")
+            logger.exception("Falló la validación de la contraseña durante el acceso.")
             return None
 
     except sqlite3.Error as e:
-        print(f"❌ Error BD en verificar_login: {e}")
+        logger.exception("Falló la consulta de autenticación.")
         from services.logger import registrar_accion
         registrar_accion(None, f"Error BD en login desde {ip_address}: {e}")
         return None
-    except Exception as e:
-        print(f"❌ Error inesperado en verificar_login: {e}")
-        import traceback
-        traceback.print_exc()
+    except Exception:
+        logger.exception("Ocurrió un error inesperado durante la autenticación.")
         return None
 
 
@@ -440,15 +442,26 @@ class LoginWindow(QWidget):
                     "Error", 
                     "El usuario fue eliminado. Por favor, contacte al administrador."
                 )
-                print(f"⚠️ Usuario {usuario_id} no encontrado post-cambio password")
+                logger.warning(
+                    "No se encontró el usuario %s después del cambio de contraseña.",
+                    usuario_id,
+                )
                 return
             
             rol = resultado[0]
             self.on_login_exitoso(usuario_id, rol)
             self.close()
         except sqlite3.Error as e:
-            QMessageBox.critical(self, "Error", f"Error al recuperar datos del usuario: {e}")
-            print(f"❌ Error BD en _login_post_cambio: {e}")
+            mostrar_error_usuario(
+                self,
+                "No se pudo iniciar sesión",
+                "No se pudieron recuperar los datos de la cuenta. Intentá nuevamente.",
+                e,
+            )
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error inesperado: {e}")
-            print(f"❌ Error inesperado en _login_post_cambio: {e}")
+            mostrar_error_usuario(
+                self,
+                "No se pudo iniciar sesión",
+                "Ocurrió un problema al iniciar sesión. Intentá nuevamente.",
+                e,
+            )

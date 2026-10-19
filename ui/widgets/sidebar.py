@@ -227,6 +227,7 @@ class SidebarWidget(QWidget):
         self._btn_colapsar.setText("‹")
         self._btn_colapsar.setFixedSize(24, 24)
         self._btn_colapsar.setToolTip("Colapsar menú (Ctrl+\\)")
+        self._btn_colapsar.setAccessibleName("Contraer o expandir el menú")
         self._btn_colapsar.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_colapsar.setObjectName("SidebarCollapse")
         self._btn_colapsar.setStyleSheet(f"""

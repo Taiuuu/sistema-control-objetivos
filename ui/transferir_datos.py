@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QMessageBox, QTextEdit
 )
+from ui.feedback import mostrar_error_usuario
 from PyQt6.QtCore import Qt
 from database.db import DB_PATH
 from ui.components import GlassCard, PillButton
@@ -145,8 +146,13 @@ class TransferirDatos(QWidget):
             self.log.append(f"✓ Datos exportados correctamente a: {ruta}")
             QMessageBox.information(self, "Listo", "Base de datos exportada correctamente.")
         except Exception as e:
-            self.log.append(f"✗ Error al exportar: {e}")
-            QMessageBox.critical(self, "Error", f"No se pudo exportar: {e}")
+            self.log.append("✗ No se pudo exportar la base de datos.")
+            mostrar_error_usuario(
+                self,
+                "No se exportaron los datos",
+                "No se pudo exportar la base de datos. Revisá el destino e intentá nuevamente.",
+                e,
+            )
 
     def _importar(self) -> None:
         """Importa una base de datos reemplazando la actual, con backup previo."""
@@ -203,5 +209,11 @@ class TransferirDatos(QWidget):
             )
 
         except Exception as e:
-            self.log.append(f"✗ Error al importar: {e}")
-            QMessageBox.critical(self, "Error", f"No se pudo importar: {e}")
+            self.log.append("✗ No se pudo importar la base de datos.")
+            mostrar_error_usuario(
+                self,
+                "No se importaron los datos",
+                "No se pudo completar la importación. Revisá el estado de la base "
+                "o contactá al administrador antes de continuar.",
+                e,
+            )

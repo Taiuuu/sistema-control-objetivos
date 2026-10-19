@@ -366,6 +366,7 @@ class VentanaPrincipal(QWidget):
         self.btn_colapsar.setText("‹")
         self.btn_colapsar.setFixedSize(28, 28)
         self.btn_colapsar.setToolTip("Colapsar menú (Ctrl+\\)")
+        self.btn_colapsar.setAccessibleName("Contraer o expandir el menú")
         self.btn_colapsar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_colapsar.setStyleSheet(f"""
             QToolButton {{
@@ -424,7 +425,7 @@ class VentanaPrincipal(QWidget):
 
         operacion = add_section("OPERACIÓN DIARIA")
         self._btn_control = add_btn(
-            "📋", "Control diario", self._mostrar_dashboard, "(Ctrl+B)",
+            "📋", "Control diario", self._mostrar_control_diario, "(Ctrl+B)",
             "control_diario", operacion,
         )
         self._btn_pasada = add_btn(
@@ -705,7 +706,7 @@ class VentanaPrincipal(QWidget):
         acciones = [
             (
                 "control_diario", "📋", "Control diario",
-                "Revisá la cobertura del día", self._mostrar_dashboard,
+                "Revisá la cobertura del día", self._mostrar_control_diario,
             ),
             (
                 "registrar_pasada", "✅", "Registrar pasada",
@@ -762,7 +763,7 @@ class VentanaPrincipal(QWidget):
                 )
                 indice += 1
 
-    def _mostrar_dashboard(self) -> None:
+    def _mostrar_control_diario(self) -> None:
         self._landing.hide()
         self._metricas.setVisible(not self._metricas_colapsadas)
         self._btn_toggle_metricas.show()
@@ -1198,9 +1199,8 @@ class VentanaPrincipal(QWidget):
             self._refrescar_tema_sidebar(oscuro)
             self._refrescar_tema_panel_derecho(oscuro)
             self._actualizar_colores_tabla()
-        except Exception as e:
-            print(f"⚠️ Error refrescando tema: {e}")
-            # No lanzar para que la app siga funcionando
+        except Exception:
+            logger.exception("No se pudo refrescar el tema de la ventana.")
 
     def _refrescar_tema_sidebar(self, oscuro: bool) -> None:
         """Reaplica estilos del sidebar y sus subcomponentes.
@@ -1553,8 +1553,8 @@ class VentanaPrincipal(QWidget):
             ):
                 self._registrar_actividad()
             return super().event(evento)
-        except Exception as e:
-            print(f"Error en event: {e}")
+        except Exception:
+            logger.exception("Error al procesar un evento de la ventana.")
             return super().event(evento)
 
     def moveEvent(self, evento):

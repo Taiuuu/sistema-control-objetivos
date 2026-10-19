@@ -454,7 +454,7 @@ def test_main_sidebar_navigation_is_grouped_and_admin_links_keep_permission_gate
         lambda: VentanaPrincipal._actualizar_visibilidad_menu(owner)
     )
     action_names = (
-        "_mostrar_dashboard",
+        "_mostrar_control_diario",
         "abrir_form_pasada",
         "abrir_form_turno",
         "abrir_form_objetivo",
@@ -587,7 +587,7 @@ def test_collapsed_sidebar_keeps_icon_tooltips_and_expands_back(app):
     app.processEvents()
 
 
-def test_dashboard_metrics_are_compact_and_can_be_collapsed(app):
+def test_control_diario_metrics_are_compact_and_can_be_collapsed(app):
     from ui.ventana_principal import VentanaPrincipal
 
     owner = SimpleNamespace(_metricas_valores={})
@@ -595,26 +595,26 @@ def test_dashboard_metrics_are_compact_and_can_be_collapsed(app):
     assert all(card.height() == 72 for card in owner._metricas_valores.values())
 
     toggle = QToolButton()
-    dashboard = SimpleNamespace(
+    control_diario = SimpleNamespace(
         _metricas=metrics,
         _btn_toggle_metricas=toggle,
         _metricas_colapsadas=False,
     )
-    VentanaPrincipal._alternar_metricas(dashboard)
+    VentanaPrincipal._alternar_metricas(control_diario)
     assert metrics.isHidden()
-    assert dashboard._metricas_colapsadas
+    assert control_diario._metricas_colapsadas
     assert toggle.text() == "⌄"
 
-    VentanaPrincipal._alternar_metricas(dashboard)
+    VentanaPrincipal._alternar_metricas(control_diario)
     assert not metrics.isHidden()
-    assert not dashboard._metricas_colapsadas
+    assert not control_diario._metricas_colapsadas
     assert toggle.text() == "⌃"
     metrics.deleteLater()
     toggle.deleteLater()
     app.processEvents()
 
 
-def test_dashboard_metrics_and_table_card_only_show_on_control_view(app):
+def test_control_diario_metrics_and_table_card_hide_on_landing(app):
     from ui.ventana_principal import VentanaPrincipal
 
     metrics = QWidget()
@@ -625,7 +625,7 @@ def test_dashboard_metrics_and_table_card_only_show_on_control_view(app):
     table = QWidget()
     landing = QWidget()
     panel = QWidget()
-    dashboard = SimpleNamespace(
+    control_diario = SimpleNamespace(
         _landing=landing,
         _metricas=metrics,
         _metricas_colapsadas=False,
@@ -642,12 +642,12 @@ def test_dashboard_metrics_and_table_card_only_show_on_control_view(app):
         _panel_derecho=panel,
     )
 
-    VentanaPrincipal._mostrar_landing_inicial(dashboard)
+    VentanaPrincipal._mostrar_landing_inicial(control_diario)
     assert metrics.isHidden()
     assert table_card.isHidden()
     assert landing.isVisible()
 
-    VentanaPrincipal._mostrar_dashboard(dashboard)
+    VentanaPrincipal._mostrar_control_diario(control_diario)
     assert not metrics.isHidden()
     assert not table_card.isHidden()
     assert not table.isHidden()
@@ -658,7 +658,7 @@ def test_dashboard_metrics_and_table_card_only_show_on_control_view(app):
     app.processEvents()
 
 
-def test_dashboard_table_recolors_existing_rows_without_reloading(app):
+def test_control_diario_table_recolors_existing_rows_without_reloading(app):
     from ui.ventana_principal import VentanaPrincipal
 
     manager = get_theme_manager()

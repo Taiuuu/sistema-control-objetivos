@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QPushButton, QTableWidget,
     QTableWidgetItem, QComboBox, QMessageBox, QMenu, QHeaderView
 )
+from PyQt6.QtCore import Qt
 from ui.components import GlassCard, PillButton, StatusBadge
 from ui.components.base import wrap_content_in_glass_card
 
@@ -135,6 +136,10 @@ class GestionarUsuarios(QWidget):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
 
+        self.estado_vacio = QLabel("Todavía no hay usuarios registrados.")
+        self.estado_vacio.setObjectName("EmptyState")
+        self.estado_vacio.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.estado_vacio)
         layout.addWidget(self.tabla)
 
         self.setLayout(layout)
@@ -148,6 +153,7 @@ class GestionarUsuarios(QWidget):
 
     def _cargar_tabla(self) -> None:
         usuarios = cargar_usuarios()
+        self.estado_vacio.setVisible(not usuarios)
 
         self.tabla.setRowCount(len(usuarios))
 
@@ -203,6 +209,9 @@ class GestionarUsuarios(QWidget):
                 boton_acciones = QPushButton("⋯")
                 boton_acciones.setObjectName("ObjectiveActions")
                 boton_acciones.setToolTip("Acciones del usuario")
+                boton_acciones.setAccessibleName(
+                    f"Acciones para el usuario {username}"
+                )
                 boton_acciones.setMenu(menu)
                 self.tabla.setCellWidget(fila, 3, boton_acciones)
 

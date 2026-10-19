@@ -97,6 +97,25 @@ def test_ui_colors_are_defined_only_in_the_theme_tokens():
     assert hardcoded == []
 
 
+def test_ui_has_no_legacy_brand_or_dashboard_label():
+    ui_root = Path(__file__).resolve().parents[1] / "ui"
+    legacy_terms = (
+        "V.E.S.P",
+        "Dashboard",
+        "En vivo",
+        "modo oscuro",
+        "modo claro",
+        "modo rendimiento",
+        "Deshacer importación",
+    )
+    for path in ui_root.rglob("*"):
+        if path.is_file() and path.suffix in {".py", ".qss"}:
+            contenido = path.read_text(encoding="utf-8")
+            assert not any(termino.casefold() in contenido.casefold() for termino in legacy_terms), (
+                f"{path.relative_to(ui_root)} contiene un texto legacy"
+            )
+
+
 def test_stylesheet_covers_global_controls_for_each_theme():
     for tokens in THEMES.values():
         stylesheet = generate_stylesheet(tokens)
@@ -117,6 +136,8 @@ def test_stylesheet_covers_global_controls_for_each_theme():
             "QDialog",
             "QToolTip",
             "QCheckBox",
+            "QPushButton:focus",
+            "QToolButton:focus",
         ):
             assert selector in stylesheet
         assert tokens["bg_gradient_start"] in stylesheet
@@ -292,6 +313,21 @@ def test_theme_text_and_status_colors_meet_wcag_contrast():
             assert ratio >= 4.5, (
                 f"{theme_name}: {foreground} over {background} "
                 f"has contrast {ratio:.2f}:1"
+            )
+
+        for background_name in (
+            "gradient_start",
+            "gradient_end",
+            "surface_alt",
+            "surface_start",
+            "surface_end",
+            "contrast_start",
+            "contrast_end",
+        ):
+            ratio = _contrast_ratio(tokens["focus"], backgrounds[background_name])
+            assert ratio >= 3, (
+            f"{theme_name}: focus over {background_name} "
+            f"has contrast {ratio:.2f}:1"
             )
 
         for background in backgrounds.values():

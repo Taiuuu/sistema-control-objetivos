@@ -44,14 +44,17 @@ class VistaSincronizacion(QWidget):
         botones_layout = QHBoxLayout()
         
         btn_actualizar = QPushButton("🔄 Actualizar Estado")
+        btn_actualizar.setToolTip("Actualizar el estado de sincronización")
         btn_actualizar.clicked.connect(self.actualizar_datos)
         botones_layout.addWidget(btn_actualizar)
         
         btn_limpiar_historial = QPushButton("🗑️ Limpiar Historial")
+        btn_limpiar_historial.setToolTip("Borrar el historial de sincronización")
         btn_limpiar_historial.clicked.connect(self.limpiar_historial)
         botones_layout.addWidget(btn_limpiar_historial)
         
         btn_test_sincronizacion = QPushButton("🧪 Test Sincronización")
+        btn_test_sincronizacion.setToolTip("Probar la sincronización configurada")
         btn_test_sincronizacion.clicked.connect(self.test_sincronizacion)
         botones_layout.addWidget(btn_test_sincronizacion)
         

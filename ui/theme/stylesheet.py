@@ -147,6 +147,10 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
         QLabel#SuccessText {{ color: {tokens["success_text"]}; }}
         QLabel#WarningText {{ color: {tokens["warning_text"]}; }}
         QLabel#DangerText {{ color: {tokens["danger_text"]}; }}
+        QLabel#EmptyState {{
+            color: {tokens["text_secondary"]};
+            padding: {tokens["spacing_md"]};
+        }}
         QPushButton {{
             min-height: {tokens["control_height"]};
             padding: 0 {tokens["spacing_lg"]};
@@ -168,6 +172,10 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
             color: {tokens["text_disabled"]};
             background-color: {tokens["disabled_bg"]};
             border-color: {tokens["border"]};
+        }}
+        QPushButton:focus, QToolButton:focus, QCheckBox:focus,
+        QRadioButton:focus, QTabBar::tab:focus {{
+            border: 2px solid {tokens["focus"]};
         }}
         QPushButton#SidebarActive {{
             color: {tokens["accent_text"]};
@@ -208,6 +216,9 @@ def generate_stylesheet(tokens: Mapping[str, str]) -> str:
         QPushButton#ObjectiveActions:hover {{
             background-color: {_rgba(tokens["accent"], 12)};
             border-color: {tokens["accent"]};
+        }}
+        QPushButton#ObjectiveActions:focus {{
+            border: 2px solid {tokens["focus"]};
         }}
         QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QDateEdit, QDateTimeEdit,
         QTimeEdit, QSpinBox {{

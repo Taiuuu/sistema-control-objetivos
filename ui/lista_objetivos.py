@@ -627,6 +627,7 @@ class ListaObjetivos(QWidget):
         boton_acciones = QPushButton("⋯")
         boton_acciones.setObjectName("ObjectiveActions")
         boton_acciones.setToolTip("Acciones del objetivo")
+        boton_acciones.setAccessibleName(f"Acciones para el objetivo {o.nombre}")
         boton_acciones.setMenu(menu)
         tabla.setCellWidget(i, 5, self._centrar_widget(boton_acciones))
 

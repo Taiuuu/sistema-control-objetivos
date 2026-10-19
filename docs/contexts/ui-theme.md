@@ -30,6 +30,8 @@ Invariantes: un nombre de tema no reconocido produce `ValueError`; tamaño de fu
 
 Atajos: se registran desde navegación y pantallas; mantener sus nombres y tooltips sincronizados con [ui.md](./ui.md) y la ayuda de la app.
 
+Accesibilidad: usar el token `focus` para el borde visible de los controles; conservar contraste de texto, tooltips y nombres accesibles para botones solo con icono.
+
 Animaciones: breves y no bloqueantes; leer la preferencia de reducir animaciones cuando esté disponible.
 
 Dependencias: assets vía `services/assets.py`; contexto de pantallas y navegación en [ui.md](./ui.md).

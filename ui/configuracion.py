@@ -25,6 +25,7 @@ from ui.animaciones import (
     animaciones_reducidas,
     establecer_animaciones_reducidas,
 )
+from ui.feedback import mostrar_error_usuario
 from core.configuracion import (
     establecer_ruta_backup_externo,
     obtener_ruta_backup_externo,
@@ -387,8 +388,11 @@ class ConfiguracionDialog(QDialog):
         try:
             establecer_ruta_backup_externo(ruta)
         except OSError as error:
-            QMessageBox.critical(
-                self, "No se guardó la ruta externa", str(error)
+            mostrar_error_usuario(
+                self,
+                "No se guardó la ruta externa",
+                "No se pudo guardar la carpeta elegida. Revisá los permisos e intentá nuevamente.",
+                error,
             )
             return
         self._actualizar_ruta_externa()
@@ -422,7 +426,12 @@ class ConfiguracionDialog(QDialog):
         try:
             restaurar_backup(ruta)
         except Exception as error:
-            QMessageBox.critical(self, "No se restauró la copia", str(error))
+            mostrar_error_usuario(
+                self,
+                "No se restauró la copia",
+                "No se pudo restaurar la copia. La base actual se conservó.",
+                error,
+            )
             return
         QMessageBox.information(
             self,

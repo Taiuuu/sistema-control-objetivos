@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt
 from models.supervisores import agregar_supervisor
 from services.validaciones import validar_supervisor, ErrorValidacion
 from ui.components import GlassCard, PillButton
+from ui.feedback import mostrar_error_usuario
 
 
 # =============================================================================
@@ -69,7 +70,12 @@ class FormSupervisor(QWidget):
         try:
             agregar_supervisor(nombre)
         except Exception as error:
-            QMessageBox.critical(self, "Error", f"No se pudo guardar el supervisor: {error}")
+            mostrar_error_usuario(
+                self,
+                "No se guardó el supervisor",
+                "No se pudo guardar el supervisor. Intentá nuevamente.",
+                error,
+            )
             return
         from services.logger import registrar_accion
         from services.sesion import get_usuario_id

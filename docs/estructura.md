@@ -30,6 +30,7 @@
 │   └── test_sin_rutas_viejas.py      Detección de referencias a rutas migradas
 └── ui/                               Interfaz PyQt6
     ├── tabla_lotes.py                Renderizado progresivo de tablas
+    ├── feedback.py                   Errores claros con detalle en el log
     ├── components/                   Componentes visuales reutilizables
     ├── importador/                   Importación desde Excel
     ├── reportes/                     Reportes, diálogo y flujo de exportación compartido

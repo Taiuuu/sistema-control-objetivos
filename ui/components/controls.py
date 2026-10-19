@@ -69,6 +69,9 @@ class PillButton(QPushButton):
                 background-color: {pressed_bg};
                 border-color: {pressed_bg};
             }}
+            QPushButton:focus {{
+                border: 2px solid {tokens["focus"]};
+            }}
             QPushButton:disabled {{
                 color: {tokens["text_disabled"]};
                 background-color: {tokens["surface_alt"]};

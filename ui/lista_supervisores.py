@@ -19,6 +19,7 @@ from services.sincronizacion import obtener_sincronizador
 from ui.components import GlassCard, PillButton, SearchInput, StatusBadge
 from ui.components.calendar import configure_calendar_theme
 from ui.theme.theme_manager import get_theme_manager
+from ui.feedback import mostrar_error_usuario
 
 
 # =============================================================================
@@ -184,6 +185,10 @@ class ListaSupervisores(QWidget):
                 columna, QHeaderView.ResizeMode.ResizeToContents
             )
         self.tabla.setSortingEnabled(True)
+        self.estado_vacio = QLabel()
+        self.estado_vacio.setObjectName("EmptyState")
+        self.estado_vacio.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_layout.addWidget(self.estado_vacio)
         card_layout.addWidget(self.tabla)
 
         layout.addWidget(card)
@@ -215,6 +220,12 @@ class ListaSupervisores(QWidget):
         elif estado == "Incompletos":
             supervisores = [s for s in supervisores if s.es_placeholder]
 
+        self.estado_vacio.setText(
+            "No hay supervisores que coincidan con los filtros."
+            if texto_buscar or estado != "Todos"
+            else "Todavía no hay supervisores para mostrar."
+        )
+        self.estado_vacio.setVisible(not supervisores)
         self.tabla.setUpdatesEnabled(False)
         self.tabla.clearContents()
         self.tabla.setRowCount(len(supervisores))
@@ -272,6 +283,7 @@ class ListaSupervisores(QWidget):
             boton_acciones = QPushButton("⋯")
             boton_acciones.setObjectName("ObjectiveActions")
             boton_acciones.setToolTip("Acciones del supervisor")
+            boton_acciones.setAccessibleName(f"Acciones para el supervisor {nombre}")
             boton_acciones.setMenu(menu)
             self.tabla.setCellWidget(i, 4, self._centrar_widget(boton_acciones))
             self.tabla.setRowHeight(i, 44)
@@ -431,9 +443,11 @@ class ListaSupervisores(QWidget):
             )
             self._cargar_tabla()
         except Exception as e:
-            QMessageBox.critical(
-                self, "Error",
-                f"No se pudo completar la operación:<br>{e}",
+            mostrar_error_usuario(
+                self,
+                "No se completó la operación",
+                "No se pudo completar la operación sobre el supervisor. Intentá nuevamente.",
+                e,
             )
             
     def _on_datos_cambiados(self, tabla, operacion, datos):

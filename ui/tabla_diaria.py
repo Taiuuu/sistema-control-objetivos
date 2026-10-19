@@ -14,6 +14,7 @@ from ui.lista_objetivos import DialogoEditarObjetivo
 from ui.components import GlassCard, PillButton, StatusBadge
 import sqlite3
 from functools import partial
+from ui.feedback import mostrar_error_usuario
 
 def contar_pasadas(fecha, objetivo_id):
     conexion = sqlite3.connect(DB_PATH)
@@ -131,14 +132,24 @@ class TablaDiaria(QWidget):
             self.tabla.setSortingEnabled(sorting_enabled)
             self.tabla.update()
             self.tabla.setEnabled(True)
-            self.estado.setText(f"{len(objetivos)} objetivos cargados")
+            self.estado.setText(
+                f"{len(objetivos)} objetivos cargados"
+                if objetivos
+                else "Todavía no hay objetivos para esta fecha."
+            )
 
         except Exception as e:
             self._mostrar_error(str(e))
 
     def _mostrar_error(self, mensaje):
         self.tabla.setEnabled(True)
-        self.estado.setText(f"Error al cargar: {mensaje}")
+        self.estado.setText("No se pudieron cargar los objetivos para esta fecha.")
+        mostrar_error_usuario(
+            self,
+            "No se cargaron los datos",
+            "No se pudieron cargar los objetivos para esta fecha.",
+            mensaje,
+        )
 
     def _limpiar_tabla(self):
         """Elimina widgets y contenido previo de la tabla sin romper el renderizado."""
