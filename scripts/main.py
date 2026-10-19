@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtCore import QTimer, QObject, Qt, pyqtSignal
+from PyQt6.QtGui import QGuiApplication
 
 from ui.login import LoginWindow
 from ui.ventana_principal import VentanaPrincipal
@@ -159,6 +160,9 @@ def iniciar_app() -> None:
     logger.info("🚀 Iniciando VESP Organizations")
 
     try:
+        QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
+            Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+        )
         QApplication.setAttribute(
             Qt.ApplicationAttribute.AA_DontUseNativeDialogs, True
         )

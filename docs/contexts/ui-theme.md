@@ -22,6 +22,10 @@ Para agregar un tema: definir una paleta completa con `_palette`, asignarla a `T
 
 Responsive: usar layouts y políticas de tamaño; no fijar anchuras de contenido. Los calendarios se inicializan con `configure_calendar_theme`; el stylesheet global cubre calendario, tablas, encabezados, combos, tooltips, menús, cuadros de mensaje y diálogos de archivo. La app fuerza diálogos de archivo Qt no nativos para que el tema sea aplicable.
 
+Verificación visual: `tests/test_responsive_ui.py` comprueba widgets visibles en 23 pantallas, tres tamaños y los cuatro temas. Para guardar imágenes con `QWidget.grab()`, ejecutá `VESP_GENERAR_CAPTURAS_UI=1 python -m pytest tests/test_responsive_ui.py`; los archivos van a `docs/capturas_despues/` y no se versionan.
+
+DPI y ventana principal: el arranque configura `PassThrough` antes de crear QApplication; Qt 6 realiza el escalado de alta densidad. La ventana principal guarda y restaura su geometría, limitada por su mínimo de 720×440. Las ventanas secundarias deben usar layouts y mínimos que permitan 1024×600.
+
 Invariantes: un nombre de tema no reconocido produce `ValueError`; tamaño de fuente entre 9 y 20; el tema por defecto es Grafito; los logos por tema se resuelven en `tokens.py`. Los fondos de cards son opacos: no usar transparencias ni efectos de vidrio.
 
 Atajos: se registran desde navegación y pantallas; mantener sus nombres y tooltips sincronizados con [ui.md](./ui.md) y la ayuda de la app.

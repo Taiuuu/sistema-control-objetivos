@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QToolButton, QSizePolicy
     , QDialog, QDialogButtonBox, QCheckBox, QGridLayout, QMenu
 )
-from PyQt6.QtCore import QDate, QTimer, QEvent, Qt, pyqtSignal
+from PyQt6.QtCore import QDate, QTimer, QEvent, Qt, pyqtSignal, QSettings
 from PyQt6.QtGui import QColor, QIcon
 from services.reportes import obtener_objetivos_del_dia
 from services.queries_tabla import (
@@ -225,6 +225,13 @@ class VentanaPrincipal(QWidget):
             self.move(geometria.topLeft())
         else:
             self.resize(1100, 700)
+        configuracion_ventana = QSettings(
+            "VESP Organizations", "Interfaz"
+        )
+        geometria_guardada = configuracion_ventana.value(
+            "ventana_principal/geometria", b""
+        )
+        self.restoreGeometry(geometria_guardada)
         self._theme_manager = get_theme_manager()
         self.zoom_nivel = self._theme_manager.font_size()
         self.setWindowIcon(QIcon(THEMES[self._theme_manager.current()]["logo_path"]))
@@ -1568,6 +1575,13 @@ class VentanaPrincipal(QWidget):
         )
         if confirmar == QMessageBox.StandardButton.Yes:
             registrar_accion(self.usuario_id, "Cerró el sistema")
+            configuracion_ventana = QSettings(
+                "VESP Organizations", "Interfaz"
+            )
+            configuracion_ventana.setValue(
+                "ventana_principal/geometria", self.saveGeometry()
+            )
+            configuracion_ventana.sync()
             evento.accept()
         else:
             evento.ignore()
