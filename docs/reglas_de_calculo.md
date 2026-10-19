@@ -74,3 +74,5 @@ Por lo tanto, no se debe interpretar todavía “todos” como una pasada por ca
 3. Determinar validez y conteo de anulaciones, datos incompletos, registros fuera de horario y objetivos fuera de vigencia o sin servicio ese día.
 4. Determinar cuántas pasadas se esperan por objetivo y por turno; hoy el esquema solo aporta días de servicio, no turnos requeridos.
 5. Revisar los registros marcados en el análisis, en especial septiembre `5-9 (N)`, fila 15 (TURNO DIA a las 05:36), octubre `2-10 (D)`, fila 22 (DIA a las 06:33), septiembre `2-9 (N)`, fila 16 (NOCHE a las 07:00) y octubre `7-10 (N)`, fila 37 (NOCHE a las 07:15).
+
+Para los informes, mantener separados el número bruto de pasadas registradas por turno y los días cubiertos por objetivo. Un día con varias pasadas sigue siendo un solo día cubierto; los conteos DIA/NOCHE son descriptivos y no representan cumplimiento esperado por turno hasta validar la regla del punto 4.

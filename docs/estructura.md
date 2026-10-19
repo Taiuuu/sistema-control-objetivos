@@ -19,7 +19,8 @@
 │   ├── actualizaciones/              Actualización de la aplicación
 │   ├── backups/                      Copias de seguridad y restauración
 │   ├── importador/                   Pipeline y estado de importación Excel
-│   └── pasadas/                      Reglas puras de atribución y conteo
+│   ├── pasadas/                      Reglas puras de atribución y conteo
+│   └── reportes_unificados/          Modelo común de datos de reportes
 ├── tests/                            Suite automatizada
 │   ├── fixtures/                     Libros dorados completos y archivos de entrada
 │   ├── golden/                       Resultados y cargadores de pruebas doradas
@@ -40,6 +41,7 @@
 - `database` no debería depender de `services` ni de `ui`.
 - `models` debería contener dominio independiente de `database`, `services` y `ui`.
 - `api` conserva su punto de entrada Flask y registra sus blueprints en `api/routes/`.
+- `services/reportes_unificados/` prepara datos y metadatos sin depender de PyQt6; `services/reportes.py` se conserva como API histórica de cálculo.
 - `scripts/main.py` conserva la entrada desktop.
 
 ## Deuda conocida
