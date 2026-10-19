@@ -1,6 +1,6 @@
 {
   "estado_verificacion": "SIN VERIFICAR: revisar a mano antes de confiar",
-  "fuente": "../CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx",
+  "fuente": "fixtures/CONTROL RECORRIDOS - OCTUBRE - 2026 COMPLETO.xlsx",
   "periodo": {
     "anio": 2026,
     "mes": 10

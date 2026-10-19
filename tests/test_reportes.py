@@ -82,7 +82,7 @@ class TestGenerarReporteMensual:
         conexion.commit()
         conexion.close()
 
-        import ui.reporte_objetivo as reporte_objetivo
+        import ui.reportes.reporte_objetivo as reporte_objetivo
         from services.exportar import _obtener_datos_reporte
 
         monkeypatch.setattr(reporte_objetivo, "DB_PATH", db_initialized)

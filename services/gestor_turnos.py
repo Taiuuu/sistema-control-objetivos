@@ -6,7 +6,7 @@
 import datetime
 from services.logger import registrar_accion
 from services.sesion import get_usuario_id
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     HORA_CORTE_TURNO,
     HORA_FIN_DIURNO_MAXIMO,
     HORA_INICIO_DIURNO as HORA_INICIO_DIURNO_CENTRAL,

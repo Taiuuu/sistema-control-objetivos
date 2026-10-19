@@ -155,15 +155,15 @@ python -m pytest
 ```
 
 Las dependencias de desarrollo adicionales se encuentran en `docs/requirements-dev.txt`.
-La prueba dorada del importador usa el Excel real de septiembre de 2026 que está en la
-raíz del proyecto y crea un catálogo temporal a partir de los nombres presentes en ese mes;
+La prueba dorada del importador usa `tests/fixtures/CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx`
+y crea un catálogo temporal a partir de los nombres presentes en ese mes;
 no requiere mantener una lista fija de objetivos ni un JSON esperado aparte.
 
 ## Estructura
 
 - `scripts/` - Entrada principal y utilidades de mantenimiento.
-- `ui/` - Ventanas y componentes de la interfaz PyQt6.
-- `services/` - Lógica de negocio, importación, reportes, sincronización y seguridad.
+- `ui/` - Ventanas y componentes PyQt6; las pantallas de importación y reportes están agrupadas por funcionalidad.
+- `services/` - Lógica de negocio y subpaquetes de importación, pasadas, backups y actualizaciones.
 - `models/` - Entidades y validaciones de dominio.
 - `database/` - Inicialización, migraciones y acceso thread-safe a SQLite.
 - `api/` - API Flask modular y sus blueprints.
@@ -173,6 +173,7 @@ no requiere mantener una lista fija de objetivos ni un JSON esperado aparte.
 ## Documentación adicional
 
 - [Manual de usuario](docs/MANUAL_USUARIO.md)
+- [Índice de contextos para desarrollo](docs/contexts/00-indice.md)
 - [Contexto de diseño de interfaz](docs/contexts/ui-theme.md)
 - [Guía del instalador](GUIA_INSTALADOR_INNO_SETUP.txt)
 

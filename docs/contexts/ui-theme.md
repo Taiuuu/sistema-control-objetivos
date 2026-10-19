@@ -1,36 +1,25 @@
-Estoy trabajando en VESP Organizations, una app de escritorio en Python 3.11+ con PyQt6 y SQLite (carpetas: ui/, services/, database/, models/, api/). Quiero rediseñar la apariencia visual por ETAPAS, sin romper nada de la lógica ni de las funciones existentes.
+Última actualización: 2026-10-19
 
-ESTILO VISUAL:
-- Superficies opacas con bordes redondeados (16-20px), borde fino y sombra suave.
-- Fondo con degradado suave según el tema.
-- Sidebar a la izquierda sobre una card translúcida; ítem activo como "pill" resaltada; inactivos con ícono + texto en gris suave.
-- Título grande de pantalla arriba a la izquierda, usuario/menú arriba a la derecha.
-- Fila de KPIs en una card: ícono en círculo + etiqueta chica + número grande.
-- Tablas limpias, sin grillas pesadas, filas con aire, barras de progreso finas.
-- Una card de contraste para info destacada (ej. alertas pendientes).
-- Tipografía sans-serif limpia, jerarquía clara por tamaño y peso.
+Propósito: documentar el sistema real de temas y componentes visuales de VESP.
+Describe el código actual; no implica que todas las pantallas cumplan contraste o usen tokens.
 
-IDENTIDAD DE MARCA (VESP Organizations, Seguridad Privada). Colores institucionales exactos:
-- Verde institucional #0E7F09
-- Verde claro #60BA5A
-- Negro #000000
-- Grafito #231F20
-- Blanco #FFFFFF
-NO usar naranja ni otros acentos fuera de esta paleta (salvo colores semánticos de estado: advertencia/peligro, que deben convivir bien con la paleta).
+Archivos clave:
+- `ui/theme/tokens.py` — paletas Claro, Verde, Negro, Grafito y tokens semánticos.
+- `ui/theme/theme_manager.py` — singleton, preferencia local, señales y aplicación a QApplication.
+- `ui/theme/stylesheet.py` — stylesheet global construido desde tokens.
+- `ui/theme/colors.py` — colores auxiliares.
+- `ui/components/base.py`, `ui/components/indicators.py` — GlassCard, KPI, badge y logo.
+- `ui/configuracion.py` — selector de tema y tamaño de fuente.
+- `ui/widgets/estilos.py` — paletas legacy independientes.
 
-CUATRO TEMAS seleccionables (cada uno corresponde a una variante del logo):
-1. "Claro": fondo blanco / gris muy suave, acento #0E7F09, texto #231F20.
-2. "Verde": fondo #0E7F09 con degradé a un verde más oscuro, acento blanco y #60BA5A, texto blanco.
-3. "Negro": fondo #000000, acento blanco con detalles #60BA5A, texto blanco.
-4. "Grafito": fondo #231F20, acento #60BA5A, texto blanco.
-Regla de contraste: en temas oscuros, texto y acentos usan #60BA5A (NO #0E7F09, que no alcanza contraste sobre negro/grafito); #0E7F09 solo para superficies, bordes o botones con texto blanco.
+Flujo: selector → `ThemeManager.set_theme` → preferencia `~/VESP Control/tema.json` → paleta/stylesheet global → `theme_changed` → componentes conectados reaplican tokens.
 
-REGLAS NO NEGOCIABLES:
-1. Los 4 temas deben tener el mismo estilo de superficies opacas y cambiarse en caliente, aplicándose a TODA la app, incluidos diálogos y ventanas secundarias.
-2. Cero textos ilegibles: contraste mínimo WCAG AA en los 4 temas.
-3. Prohibido hardcodear colores en widgets. Todo color sale del archivo de tokens de tema.
-4. No cambiar lógica de negocio, base de datos, servicios ni API. Solo capa visual.
-5. Performance: la app no puede sentirse lenta. Prohibido QGraphicsDropShadowEffect en muchos widgets chicos o celdas de tablas; usarlo solo en cards grandes (máx. ~6 por pantalla).
-6. Cambios chicos y revisables: tocar solo los archivos de la etapa actual, y al terminar decirme qué archivos modificaste y cómo probar que no se rompió nada.
-7. La ventana conserva un fondo de degradado opaco; no usar translucidez de ventana ni efectos Acrylic/Mica/DWM.
-8. El token logo_path selecciona el logo por tema: Claro usa assets/vespLogoDarkGreen.svg, Verde usa assets/vespLogoLight.svg, Negro usa assets/logo_vesp_transparente.png y Grafito usa assets/logo_vesp_fondo_oscuro_transparente.png.
+Tokens: la paleta define fondos, superficies, texto, acento, estados, logo, radios, espacios y tamaños. Los nombres canónicos son Claro, Verde, Negro y Grafito; `available_themes()` y `tokens()` son contratos públicos del gestor.
+
+Invariantes: solicitar tema no reconocido produce `ValueError`; cambio de fuente acepta enteros entre 9 y 20; el tema por defecto al no hallar preferencia es Grafito; logo por tema se resuelve en `tokens.py`.
+
+Trampas conocidas: hay colores específicos con valores distintos a la paleta institucional solicitada (incluido acento de Claro) y estilos inline/locales en pantallas; no asegurar WCAG AA ni ausencia total de colores hardcodeados sin auditoría visual. `services/tema.py` es un sistema legacy aparte.
+
+Dependencias: la UI y los componentes consumen el manager/tokens; assets se resuelven con `services/assets.py`; [ui.md](./ui.md) cubre pantallas y atajos.
+
+Cómo actualizar este archivo: cotejar tokens, persistencia, señal y consumidores después de cambiar tema o estilos compartidos.

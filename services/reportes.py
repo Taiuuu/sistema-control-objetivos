@@ -23,7 +23,7 @@ from collections import defaultdict
 from typing import List, Dict, Optional, Tuple, Any
 
 from database.gestor_db import gestor_db
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     fecha_hora_desde_fecha_turno,
     indexar_pasadas_por_objetivo,
     rango_datetime_de_mes,

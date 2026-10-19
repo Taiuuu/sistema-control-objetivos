@@ -18,7 +18,7 @@ from ui.widgets.badges import BadgeEstado, BadgeNumero
 from ui.theme.colors import parse_color
 from ui.theme.stylesheet import generate_date_edit_dropdown_stylesheet
 from ui.theme.theme_manager import get_theme_manager
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     contar_pasadas_por_objetivo_en_fecha,
     fecha_hora_desde_fecha_turno,
 )

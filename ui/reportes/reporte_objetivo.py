@@ -17,7 +17,7 @@ from PyQt6.QtCore import Qt
 from services.background_task import run_background_task
 from services.exportar import exportar_excel, exportar_pdf
 from services.reportes import objetivo_corresponde, clasificar_cumplimiento
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     fecha_de_turno,
     fecha_hora_desde_fecha_turno,
     indexar_pasadas_por_objetivo,

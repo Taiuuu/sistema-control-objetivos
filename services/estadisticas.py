@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from collections import defaultdict
 from database.gestor_db import gestor_db
 from services.cache import cache_global
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     mes_de_fecha_turno,
     normalizar_turno,
     rango_datetime_de_mes,

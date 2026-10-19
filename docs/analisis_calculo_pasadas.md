@@ -2,12 +2,12 @@
 
 ## Archivos de ejemplo encontrados
 
-Libros completos en la raíz:
+Libros completos analizados:
 
-- `CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx`: septiembre de 2026.
-- `CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx`: octubre de 2026.
+- `tests/fixtures/CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx`: septiembre de 2026.
+- `tests/fixtures/CONTROL RECORRIDOS - OCTUBRE - 2026 COMPLETO.xlsx`: libro completo de octubre de 2026 usado por el conteo dorado.
 
-El directorio `tests/fixtures/` contiene además `CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx` y fixtures de parser (`ambiguedad.xlsx`, `columnas_faltantes.xlsx`, `formatos_hora.xlsx`, `hora_corrupta.xlsx`, `objetivos_misma_hora.xlsx`, `orden_cronologico.xlsx`, `reimportacion.xlsx`, `supervisor_distinto.xlsx` y `vacio.xlsx`). Los otros fixtures sirven para probar entradas; no representan meses completos.
+El directorio `tests/fixtures/` contiene además `CONTROL RECORRIDOS - OCTUBRE - 2026.xlsx`, una fixture pequeña distinta del libro completo, y fixtures de parser (`ambiguedad.xlsx`, `columnas_faltantes.xlsx`, `formatos_hora.xlsx`, `hora_corrupta.xlsx`, `objetivos_misma_hora.xlsx`, `orden_cronologico.xlsx`, `reimportacion.xlsx`, `supervisor_distinto.xlsx` y `vacio.xlsx`). Los otros fixtures sirven para probar entradas; no representan meses completos.
 
 ## Estructura real de los libros completos
 
@@ -46,7 +46,7 @@ Hay horas solapadas/atípicas incompatibles con inferir una frontera exacta solo
 - `services/sync_manager.py` calcula `fecha_operativa` con `GestorTurnos`; ante errores conserva la fecha original, lo que puede crear registros con una regla distinta.
 - `database/db.py::migrar_pasadas_campos` rellena `fecha_operativa` faltante con `fecha` cruda; no recalcula filas históricas desde hora y turno. No se encontró una migración histórica de turnos versionada: sí se crea `schema_version`, sin que eso garantice una fecha operativa correcta en las filas antiguas.
 - `services/reportes.py::generar_reporte_mensual` filtra `COALESCE(fecha_operativa, fecha)` entre el primer y último día del mes; agrupa por objetivo y fecha y convierte cualquier cantidad de pasadas de ese día en un solo día con pasada. No separa el número de pasadas por turno.
-- `ui/reporte_objetivo.py::calcular_reporte_objetivo` también filtra por fecha operativa y mes calendario, separa las pasadas en los turnos almacenados y cuenta presencia (no el número de pasadas). Usa otra consulta/cálculo independiente.
+- `ui/reportes/reporte_objetivo.py::calcular_reporte_objetivo` también filtra por fecha operativa y mes calendario, separa las pasadas en los turnos almacenados y cuenta presencia (no el número de pasadas). Usa otra consulta/cálculo independiente.
 - `services/estadisticas.py` mezcla `fecha_operativa` con `fecha` cruda: el promedio anual agrupa con `strftime` sobre `fecha`, distribución mensual y top de supervisores filtran `fecha`, mientras otras estadísticas usan `COALESCE(fecha_operativa, fecha)`.
 - `services/exportar_mes.py::exportar_mes_json` filtra las pasadas por `p.fecha` cruda, no por fecha operativa; puede excluir/incluir una pasada en el mes incorrecto cuando la fecha calendario difiere de la fecha de turno. Sus equipos/notas son registros por fecha y no pasadas.
 - `services/importador/importacion.py::_exportar_pasadas_seguridad` exporta por `COALESCE(fecha_operativa, fecha)`; se deduce el mes de esa fecha, que sí es de turno cuando está correctamente persistida.
@@ -57,7 +57,7 @@ Las rutas mensuales que usan `fecha_operativa` dependen de que ese campo esté p
 
 ## Resolución aplicada en esta etapa
 
-- `services/calculo_pasadas.py` concentra la atribución de fecha de turno, mes, rangos mensuales y conteo natural de pasadas.
+- `services/pasadas/calculo_pasadas.py` concentra la atribución de fecha de turno, mes, rangos mensuales y conteo natural de pasadas.
 - El importador usa el modulo central para inferir fecha calendario a partir de la fecha de hoja; NOCHE antes de las 08:00 cae en el dia calendario siguiente, conservando la fecha operativa de la hoja.
 - Reportes mensual/por objetivo, estadísticas mensuales, exportaciones, API y pantallas consultan `fecha_operativa` (con fallback histórico cuando falta) y reutilizan las funciones centrales para indexar o contar. La tabla de cobertura también deduplica con la clave natural central.
 - La sincronización conserva la validación opcional del horario, pero calcula la fecha de turno centralmente incluso cuando se desactiva esa validación.

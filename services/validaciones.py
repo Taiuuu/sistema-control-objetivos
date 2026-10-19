@@ -7,7 +7,7 @@ import sqlite3
 import re
 from typing import Optional, Tuple
 from database.db import DB_PATH, conectar
-from services.calculo_pasadas import fecha_de_turno, fecha_hora_de_registro
+from services.pasadas.calculo_pasadas import fecha_de_turno, fecha_hora_de_registro
 
 
 class ErrorValidacion(Exception):

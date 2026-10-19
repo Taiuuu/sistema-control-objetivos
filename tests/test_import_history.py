@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from services import import_history
+from services.importador import import_history
 
 
 def test_guardar_importacion_persiste_historial(tmp_path, monkeypatch):

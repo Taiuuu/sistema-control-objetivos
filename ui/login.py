@@ -289,7 +289,7 @@ class LoginWindow(QWidget):
         try:
             ruta_version = Path(ruta_asset("version.txt"))
             if not ruta_version.is_file():
-                ruta_version = Path(__file__).resolve().parents[1] / "docs" / "version.txt"
+                ruta_version = Path(__file__).resolve().parents[1] / "version.txt"
             version = ruta_version.read_text(encoding="utf-8").strip()
         except Exception:
             version = ""

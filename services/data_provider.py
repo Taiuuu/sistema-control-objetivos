@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 from database.gestor_db import gestor_db
 from services.cache import cache_global
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     fecha_de_turno,
     fecha_hora_de_registro,
     hora_corresponde_a_turno,

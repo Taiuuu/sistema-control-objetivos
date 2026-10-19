@@ -7,7 +7,7 @@
 ## 📋 INTRODUCCIÓN
 
 Esta guía explica cómo crear y mantener el instalador para VESP Organizations usando Inno Setup.
-El proyecto ya incluye un script base `scripts/instalador.iss` que puedes usar como punto de partida.
+El proyecto ya incluye un script base `instalador.iss` que puedes usar como punto de partida.
 
 ## 🔧 REQUISITOS PREVIOS
 
@@ -42,7 +42,7 @@ pyinstaller --onefile --windowed --name "VESP Control" --add-data "assets;assets
 
 ### Paso 2: Configurar el Script Inno Setup
 ```iss
-; scripts/instalador.iss
+; instalador.iss
 #define MyAppName "VESP Control"
 #define MyAppVersion "1.1.0"          ; ← CAMBIAR AQUÍ LA VERSIÓN
 #define MyAppPublisher "VESP Organizations"
@@ -85,7 +85,7 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Ejecutar {#MyAppName}"; Flags: 
 ### Paso 3: Compilar el Instalador
 ```bash
 # 1. Abrir Inno Setup Compiler
-# 2. File → Open → seleccionar scripts/instalador.iss
+# 2. File → Open → seleccionar instalador.iss
 # 3. Build → Compile
 # 4. El instalador se creará en instalador/VESP_Control_Instalador_v1.1.0.exe
 ```
@@ -101,7 +101,7 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Ejecutar {#MyAppName}"; Flags: 
 ## 🔄 ACTUALIZACIÓN PARA NUEVAS VERSIONES
 
 ### Checklist Pre-Actualización:
-- [ ] **Cambiar versión en código**: Actualizar `docs/version.txt`
+- [ ] **Cambiar versión en código**: Actualizar `version.txt`
 - [ ] **Actualizar requirements.txt**: Si hay nuevas dependencias
 - [ ] **Probar la aplicación**: Asegurarse que funciona correctamente
 - [ ] **Crear nuevo ejecutable**: `pyinstaller --onefile --windowed --name "VESP Control" --add-data "assets;assets" scripts/main.py`
@@ -127,7 +127,7 @@ Source: "docs\*"; DestDir: "{app}\docs"; Flags: ignoreversion recursesubdirs cre
 #### 3. Compilar y Probar
 ```bash
 # 1. Abrir Inno Setup Compiler
-# 2. Cargar scripts/instalador.iss
+# 2. Cargar instalador.iss
 # 3. Build → Compile
 # 4. Probar instalación
 # 5. Verificar que la nueva versión funciona

@@ -27,7 +27,7 @@ from database.db import (
     migrar_feriados,
     verificar_integridad,
 )
-from services.backup import (
+from services.backups.backup import (
     hacer_backup,
     listar_backups,
     restaurar_backup,
@@ -36,7 +36,7 @@ from services.backup import (
 from core.configuracion import asegurar_directorios
 from core.logging_config import configurar_logging as configurar_logging_archivo
 from core.instancia import adquirir_bloqueo_instancia
-from services.actualizador import verificar_actualizacion
+from services.actualizaciones.actualizador import verificar_actualizacion
 from services.api_rest import iniciar_api_rest
 from ui.theme.theme_manager import get_theme_manager
 

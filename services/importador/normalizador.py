@@ -16,7 +16,7 @@ from decimal import Decimal, InvalidOperation
 from datetime import date, time
 from typing import Any, NamedTuple, Optional
 
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     fecha_calendario_de_turno,
     fecha_de_turno,
 )

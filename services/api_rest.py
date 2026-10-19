@@ -10,7 +10,7 @@ from wsgiref.simple_server import make_server, WSGIRequestHandler, WSGIServer
 from socketserver import ThreadingMixIn
 from database.db import DB_PATH
 from services.reportes import obtener_objetivos_del_dia
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     contar_pasadas_por_objetivo_en_fecha,
     fecha_de_turno,
     fecha_hora_desde_fecha_turno,

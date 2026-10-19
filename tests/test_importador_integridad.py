@@ -23,7 +23,7 @@ from services.importador.resolucion import EstadoResolucion
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
-ARCHIVO_DORADO = Path(__file__).parents[1] / (
+ARCHIVO_DORADO = Path(__file__).parent / "fixtures" / (
     "CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx"
 )
 
@@ -327,7 +327,7 @@ def test_migracion_archiva_duplicados_y_crea_indice_unico(tmp_path, monkeypatch)
     monkeypatch.setattr(db_module, "DB_PATH", str(ruta))
     respaldos = []
     monkeypatch.setattr(
-        "services.backup.crear_backup",
+        "services.backups.backup.crear_backup",
         lambda motivo, conexion_origen=None: respaldos.append(motivo),
     )
     conexion = sqlite3.connect(ruta)

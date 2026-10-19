@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, time
-from services.calculo_pasadas import (
+from services.pasadas.calculo_pasadas import (
     HORA_CORTE_TURNO,
     HORA_FIN_DIURNO_MAXIMO,
     HORA_INICIO_DIURNO,
