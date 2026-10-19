@@ -159,6 +159,60 @@ class TestReportesAPI:
         assert 'mes' in data
         assert 'objetivos' in data
 
+    def test_reporte_diario_usa_las_filas_del_modelo_compartido(
+        self, api_client, auth_token, db_initialized, test_objetivo, test_supervisor
+    ):
+        import sqlite3
+
+        from services.reportes_unificados.consultas import crear_datos_para_exportar
+
+        fecha = datetime.date(2026, 10, 28)
+        with sqlite3.connect(db_initialized) as conexion:
+            cursor = conexion.execute(
+                """
+                INSERT INTO pasadas (fecha, hora, turno, objetivo_id, supervisor_id)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    fecha.isoformat(),
+                    "10:00",
+                    "diurno",
+                    test_objetivo["id"],
+                    test_supervisor["id"],
+                ),
+            )
+            pasada_id = cursor.lastrowid
+
+        datos = crear_datos_para_exportar(
+            {
+                "tipo_informe": "diario",
+                "fecha_inicio": fecha,
+                "fecha_fin": fecha,
+                "objetivo_ids": None,
+                "supervisor_ids": None,
+                "turnos": None,
+                "equipo_id": None,
+                "agrupacion": "ninguna",
+            }
+        )
+        respuesta = api_client.get(
+            f"/api/reportes/diario/{fecha.isoformat()}",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+
+        assert respuesta.status_code == 200
+        reporte = respuesta.get_json()
+        assert reporte["pasadas"] == [
+            {
+                "id": pasada_id,
+                "hora": datos.filas[0]["hora"].strftime("%H:%M"),
+                "turno": datos.filas[0]["turno"],
+                "objetivo": datos.filas[0]["objetivo"],
+                "supervisor": datos.filas[0]["supervisor"],
+            }
+        ]
+        assert reporte["total"] == datos.totales["pasadas"] == 1
+
 
 class TestRateLimiting:
     """Tests para rate limiting en API."""

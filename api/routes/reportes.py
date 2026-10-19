@@ -69,6 +69,19 @@ def get_reporte_diario(fecha):
     try:
         reporte_original = generar_reporte_diario(fecha)
         datos = crear_datos_diarios(reporte_original)
+        fecha_reporte = date.fromisoformat(fecha)
+        datos_compartidos = crear_datos_para_exportar(
+            {
+                "tipo_informe": "diario",
+                "fecha_inicio": fecha_reporte,
+                "fecha_fin": fecha_reporte,
+                "objetivo_ids": None,
+                "supervisor_ids": None,
+                "turnos": None,
+                "equipo_id": None,
+                "agrupacion": "ninguna",
+            }
+        )
         reporte = {
             "fecha": reporte_original["fecha"],
             "pasadas": [
@@ -79,9 +92,9 @@ def get_reporte_diario(fecha):
                     "objetivo": fila["objetivo"],
                     "supervisor": fila["supervisor"],
                 }
-                for fila in datos.filas
+                for fila in datos_compartidos.filas
             ],
-            "total": datos.totales["pasadas"],
+            "total": datos_compartidos.totales["pasadas"],
             "cumplimiento_porcentaje": datos.totales["cumplimiento"] * 100,
         }
         return jsonify(reporte), 200

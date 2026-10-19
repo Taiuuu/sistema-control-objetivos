@@ -324,6 +324,7 @@ def crear_datos_detalle(
             registros_por_objetivo.setdefault(int(fila[4]), []).append(registro)
             filas.append(
                 {
+                    "id": fila[0],
                     "fecha": fecha_turno,
                     "hora": datetime.time.fromisoformat(str(fila[2])),
                     "turno": turno,
