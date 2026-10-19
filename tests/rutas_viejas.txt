@@ -5,6 +5,7 @@ path: services/backup.py
 path: ui/importar_excel.py
 path: ui/reporte_mensual.py
 path: ui/reporte_objetivo.py
+path: services/import_history.py
 path: CONTROL RECORRIDOS - SEPTIEMBRE - 2026.xlsx
 path: scripts/instalador.iss
 path: seguridad.db
@@ -15,3 +16,4 @@ module: services.backup
 module: ui.importar_excel
 module: ui.reporte_mensual
 module: ui.reporte_objetivo
+module: services.import_history
